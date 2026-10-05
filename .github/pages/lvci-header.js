@@ -91,7 +91,7 @@
   // fallback rides onto every consumer dashboard still pointing at the root, the
   // same way faq.html / integrate.html anchor their links. loadVersion() refines
   // it from the same-origin catalog (and any relocation pointer it follows).
-  var SOURCE_FALLBACK_REPO = 'elijah286/LabVIEW-CI-with-Containers';
+  var SOURCE_FALLBACK_REPO = 'ni/LabVIEW-CI-CD-Toolkit';
   var srcRepo = SOURCE_FALLBACK_REPO;
   var srcRef = 'main';
 

@@ -221,7 +221,7 @@
           <label class="fl" for="repo" id="repoLabel">Target repo (owner/name)</label>
           <input type="text" id="repo" placeholder="your-org/your-lv-repo" autocomplete="off" spellcheck="false" list="repoList">
           <datalist id="repoList"></datalist>
-          <p class="hint" id="repoPrivHint" style="margin-top:6px">Installing to a private GitHub repo? Review the <a href="https://github.com/elijah286/LabVIEW-CI-with-Containers/blob/main/.github/labview-ci/README.md#installing-to-a-private-github-repository" target="_blank" rel="noopener">private repo setup notes</a> before creating the token.</p>
+          <p class="hint" id="repoPrivHint" style="margin-top:6px">Installing to a private GitHub repo? Review the <a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit/blob/main/.github/labview-ci/README.md#installing-to-a-private-github-repository" target="_blank" rel="noopener">private repo setup notes</a> before creating the token.</p>
           <p class="hint repopick" id="repoPickHint" style="display:none"></p>
           <div class="repopick-row" id="repoTokRow" style="display:none">
             <input id="repoTokInput" type="password" autocomplete="off" placeholder="github_pat_&hellip;">
@@ -414,7 +414,7 @@
   <script>
   (() => {
     "use strict";
-    const SOURCE_FALLBACK = { repo: "elijah286/LabVIEW-CI-with-Containers", ref: "main" };
+    const SOURCE_FALLBACK = { repo: "ni/LabVIEW-CI-CD-Toolkit", ref: "main" };
     const TEXT_EXTS = new Set([".yml",".yaml",".ps1",".sh",".py",".html",".htm",".md",".json",".xml",".viancfg",".txt",".cfg",".css",".js",".svg"]);
     const NO_SUB_PREFIX = ".github/labview-ci/";
     const GITLAB_PROVIDER_SOURCE = ".github/labview-ci/providers/gitlab";
@@ -780,8 +780,8 @@
       if (repoLabel) repoLabel.textContent = gitlab ? "Target project (full path)" : "Target repo (owner/name)";
       const privHint = $("repoPrivHint");
       if (privHint) privHint.innerHTML = gitlab
-        ? `Nested subgroup paths (<code class="inl">group/subgroup/project</code>) work too. The <a href="https://github.com/elijah286/LabVIEW-CI-with-Containers/blob/main/.github/labview-ci/README.md#installing-from-gitlab" target="_blank" rel="noopener">Installing from GitLab notes</a> cover the mirror and the command-line route.`
-        : `Installing to a private GitHub repo? Review the <a href="https://github.com/elijah286/LabVIEW-CI-with-Containers/blob/main/.github/labview-ci/README.md#installing-to-a-private-github-repository" target="_blank" rel="noopener">private repo setup notes</a> before creating the token.`;
+        ? `Nested subgroup paths (<code class="inl">group/subgroup/project</code>) work too. The <a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit/blob/main/.github/labview-ci/README.md#installing-from-gitlab" target="_blank" rel="noopener">Installing from GitLab notes</a> cover the mirror and the command-line route.`
+        : `Installing to a private GitHub repo? Review the <a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit/blob/main/.github/labview-ci/README.md#installing-to-a-private-github-repository" target="_blank" rel="noopener">private repo setup notes</a> before creating the token.`;
       const hint = $("providerTopHint");
       if (hint) hint.textContent = gitlab
         ? "GitLab installs use the same catalog plus native GitLab CI jobs in a source-owned provider package."

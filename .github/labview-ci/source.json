@@ -1,10 +1,10 @@
 {
   "comment": "Canonical home of the LabVIEW CI tooling -- the SINGLE source of implementation and the place to redirect existing clients and new installs when the canonical source moves. The legacy repo/ref fields retain the GitHub relocation contract for installed GitHub clients. The distributions object names supported download endpoints: GitHub is canonical and GitLab is an automated, one-way release mirror that carries the same source tree and released tags. New bootstrappers select a distribution explicitly and record it in the target manifest, so a GitLab-installed target updates from GitLab without creating a second codebase. To relocate the canonical source, update the legacy fields and the github distribution together, then update the gitlab distribution after its mirror changes. Keep the old canonical repo reachable so older clients can follow the pointer on their next update.",
-  "repo": "elijah286/LabVIEW-CI-with-Containers",
+  "repo": "ni/LabVIEW-CI-CD-Toolkit",
   "ref": "main",
   "distributions": {
     "github": {
-      "repo": "elijah286/LabVIEW-CI-with-Containers",
+      "repo": "ni/LabVIEW-CI-CD-Toolkit",
       "ref": "main",
       "url": "https://github.com"
     },

@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Build dashboard
-        uses: elijah286/LabVIEW-CI-with-Containers/actions/dashboard@v1
+        uses: ni/LabVIEW-CI-CD-Toolkit/actions/dashboard@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

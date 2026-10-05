@@ -8,7 +8,7 @@
 #
 # Usage (from the root of the repo you want to add CI to):
 #
-#   curl -fsSL https://raw.githubusercontent.com/elijah286/LabVIEW-CI-with-Containers/main/.github/labview-ci/install.sh \
+#   curl -fsSL https://raw.githubusercontent.com/ni/LabVIEW-CI-CD-Toolkit/main/.github/labview-ci/install.sh \
 #     | bash -s -- --activities masscompile,vi-analyzer,vidiff,dashboard \
 #                  --os windows,linux --labview-version 2026
 #
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 SOURCE_HOST="github"
-SOURCE_REPO="elijah286/LabVIEW-CI-with-Containers"
+SOURCE_REPO="ni/LabVIEW-CI-CD-Toolkit"
 SOURCE_REF="main"
 SOURCE_GITLAB_URL="https://gitlab.com"
 SRC_DIR=""
@@ -141,7 +141,7 @@ case "$SOURCE_HOST" in
   *) echo "ERROR: --source-host must be github or gitlab." >&2; exit 1 ;;
 esac
 
-if [ "$SOURCE_HOST" = gitlab ] && [ "$EXPLICIT_REPO" = 0 ] && [ "$SOURCE_REPO" = "elijah286/LabVIEW-CI-with-Containers" ]; then
+if [ "$SOURCE_HOST" = gitlab ] && [ "$EXPLICIT_REPO" = 0 ] && [ "$SOURCE_REPO" = "ni/LabVIEW-CI-CD-Toolkit" ]; then
   SOURCE_REPO="elijah286/ci-for-labview"
 fi
 

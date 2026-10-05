@@ -4,7 +4,7 @@ installedVersion: 4.15.5
 installedAt: 2026-08-19T19:08:17Z
 provider: github
 source:
-  repo: elijah286/LabVIEW-CI-with-Containers
+  repo: ni/LabVIEW-CI-CD-Toolkit
   ref: v4.15.5
 config:
   labviewVersion: "2026"

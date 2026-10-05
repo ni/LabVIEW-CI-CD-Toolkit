@@ -166,9 +166,9 @@
     <main class="content">
       <div class="repo-home">
         This documentation describes the
-        <a class="lvci-repo-link" data-show-name href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">LabVIEW-CI-with-Containers</a>
+        <a class="lvci-repo-link" data-show-name href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">LabVIEW-CI-CD-Toolkit</a>
         tooling, maintained by
-        <a class="lvci-owner-link" href="https://github.com/elijah286" target="_blank" rel="noopener">elijah286</a>.
+        <a class="lvci-owner-link" href="https://github.com/ni" target="_blank" rel="noopener">NI</a>.
         Looking for short answers instead? See the <a href="faq.html">FAQ</a>.
       </div>
 
@@ -504,7 +504,7 @@ flowchart TD
       <pre><code>schemaVersion: 1
     installedVersion: 4.17.4
 source:
-  repo: elijah286/LabVIEW-CI-with-Containers
+  repo: ni/LabVIEW-CI-CD-Toolkit
       ref:  v4.17.4            # pinned to an IMMUTABLE tag, never "main"
   distribution:            # archive origin chosen by the bootstrapper
     host: gitlab
@@ -655,7 +655,7 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
 
       <h3>Migrating or rehoming the project</h3>
       <p>A small relocation pointer (<code>.github/labview-ci/source.json</code>) lets the tooling's source move —
-        for example to an official NI repository — without breaking existing installs. If it names a different
+        now hosted at <code>ni/LabVIEW-CI-CD-Toolkit</code> — without breaking existing installs. If it names a different
         repo than the current one, the bootstrappers and the update workflow follow it automatically and re-pin a
         consumer's manifest to the new home on the next update. See <a href="#versioning">§18</a>.</p>
 
@@ -2044,10 +2044,21 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         <code>promote-release.py --tier</code> (set the pointer, flag the entry, bump the version), and commits to the
         default branch; the same buttons un-mark to roll a channel back to the previous build in that tier.</p>
       <h3>Relocation pointer</h3>
-      <p><code>.github/labview-ci/source.json</code> lets the project migrate (for example to an official NI repo)
+      <p><code>.github/labview-ci/source.json</code> names the canonical NI repository, <code>ni/LabVIEW-CI-CD-Toolkit</code>,
         without breaking installs: if it names a different repo than the current one, the bootstrappers and the
         update workflow follow it automatically, and a redirected update re-pins the consumer's manifest to the new
         home.</p>
+      <p>The source dashboard, documentation, FAQ, and installer are published at
+        <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/">ni.github.io/LabVIEW-CI-CD-Toolkit</a>.
+        GitHub repository redirects do not redirect the old GitHub Pages site, so published links must use this
+        new address. The pointer's GitHub distribution, the catalog's <code>source.repo</code>, and this repository's
+        install manifest all name the same NI source. That matching manifest makes the source dashboard publish
+        its current commit's page bundle rather than an older installed release; consumer dashboards still use
+        their opted-in tooling ref.</p>
+      <p>Immutable releases made before the transfer retain their original source metadata. Publish a release
+        containing the updated metadata and promote it to the desired install channel so new default installs
+        use the NI source. Keep legacy GitHub repository redirects reachable for existing clients following
+        the relocation pointer; do not rewrite historical tags or assume container packages moved with the repo.</p>
 
       <!-- 19 ──────────────────────────────────────────────────────────────── -->
       <h2 id="discovery">19. Client discovery <a class="anchor" href="#discovery">#</a></h2>
@@ -2305,7 +2316,7 @@ flowchart TD
         warm Docker layer cache, so the multi-gigabyte worker image is not re-pulled every job (see §22).</div>
 
       <p style="margin-top:40px"><a href="faq.html">← Back to the FAQ</a> &nbsp;·&nbsp;
-        <a class="lvci-repo-link" data-show-slug href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">View the source on GitHub →</a></p>
+        <a class="lvci-repo-link" data-show-slug href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">View the source on GitHub →</a></p>
     </main>
   </div>
 
@@ -2315,7 +2326,7 @@ flowchart TD
     // Resolve every repo link the same way faq.html does: read the repo this
     // dashboard was installed from (same-origin catalog.json), then follow the
     // relocation pointer (.github/labview-ci/source.json) to the canonical home.
-    var FALLBACK = { repo: "elijah286/LabVIEW-CI-with-Containers", ref: "main" };
+    var FALLBACK = { repo: "ni/LabVIEW-CI-CD-Toolkit", ref: "main" };
     function paint(repo) {
       var parts = String(repo).split("/"), owner = parts[0] || "", name = parts[1] || "";
       var url = "https://github.com/" + repo, slug = "github.com/" + repo;
