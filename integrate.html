@@ -218,10 +218,10 @@
           <p class="hint" id="providerTopHint" style="margin-top:6px">GitHub supports the browser pull-request install flow.</p>
         </div>
         <div class="field">
-          <label class="fl" for="repo">Target repo (owner/name)</label>
+          <label class="fl" for="repo" id="repoLabel">Target repo (owner/name)</label>
           <input type="text" id="repo" placeholder="your-org/your-lv-repo" autocomplete="off" spellcheck="false" list="repoList">
           <datalist id="repoList"></datalist>
-          <p class="hint" style="margin-top:6px">Installing to a private GitHub repo? Review the <a href="https://github.com/elijah286/LabVIEW-CI-with-Containers/blob/main/.github/labview-ci/README.md#installing-to-a-private-github-repository" target="_blank" rel="noopener">private repo setup notes</a> before creating the token.</p>
+          <p class="hint" id="repoPrivHint" style="margin-top:6px">Installing to a private GitHub repo? Review the <a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit/blob/main/.github/labview-ci/README.md#installing-to-a-private-github-repository" target="_blank" rel="noopener">private repo setup notes</a> before creating the token.</p>
           <p class="hint repopick" id="repoPickHint" style="display:none"></p>
           <div class="repopick-row" id="repoTokRow" style="display:none">
             <input id="repoTokInput" type="password" autocomplete="off" placeholder="github_pat_&hellip;">
@@ -231,8 +231,8 @@
         </div>
         <div class="field">
           <label class="fl" for="version">LabVIEW version</label>
-          <select id="version" disabled aria-disabled="true" title="The CI tooling, container images, and baked dependencies are built for LabVIEW 2026."></select>
-          <p class="hint" style="margin-top:6px">Fixed to LabVIEW 2026 &mdash; the container images and tooling are built for it.</p>
+          <select id="version" title="NI LabVIEW container release the CI workers run."></select>
+          <p class="hint" style="margin-top:6px">Defaults to the newest <em>qualified</em> NI container release; pick an older release (back to LabVIEW 2026 Q1, the first with container CI support) to pin this repository to it.</p>
         </div>
         <div class="field">
           <label class="fl">Operating systems</label>
@@ -414,9 +414,12 @@
   <script>
   (() => {
     "use strict";
-    const SOURCE_FALLBACK = { repo: "elijah286/LabVIEW-CI-with-Containers", ref: "main" };
+    const SOURCE_FALLBACK = { repo: "ni/LabVIEW-CI-CD-Toolkit", ref: "main" };
     const TEXT_EXTS = new Set([".yml",".yaml",".ps1",".sh",".py",".html",".htm",".md",".json",".xml",".viancfg",".txt",".cfg",".css",".js",".svg"]);
     const NO_SUB_PREFIX = ".github/labview-ci/";
+    const GITLAB_PROVIDER_SOURCE = ".github/labview-ci/providers/gitlab";
+    const GITLAB_PROVIDER_TARGET = ".gitlab/labview-ci";
+    const GITLAB_LEGACY_DASHBOARD_BUILDER = `${GITLAB_PROVIDER_TARGET}/build-dashboard.py`;
 
     let catalog = null;
     let liveCatalog = null;   // the source's live (dev-tip) catalog; 'catalog' may target an older channel
@@ -536,26 +539,52 @@
       return `https://raw.githubusercontent.com/${s.repo}/${s.ref}/${path}`;
     }
 
-    // ---- rendering -------------------------------------------------------
-    // The version field is LOCKED. The CI container images, baked VIPC, and the
-    // LabVIEW.exe path in every workflow target a single LabVIEW year
-    // (catalog.defaults.labviewVersion = 2026). Offering another year asked the
-    // jobs to pull a container image / use a LabVIEW path that doesn't exist,
-    // which failed every container run -- the bug a colleague hit by picking 2024.
-    // So render only that year, selected and disabled (grayed out).
-    // Code COMPATIBILITY with an older LabVIEW run-time is NOT handled here: it is
-    // owned by the project's own .lvproj "save for previous version" setting, which
-    // the 2026 container honors when it opens the project. So this field stays
-    // permanently locked -- no version/compatibility picker is needed.
+    // Legacy catalogs without a containers block fall back to the locked year.
+    function containerReleases() {
+      return (catalog.containers && Array.isArray(catalog.containers.supported))
+        ? catalog.containers.supported : [];
+    }
+    function selectedRelease() {
+      const rels = containerReleases();
+      if (!rels.length) return null;
+      return rels.find(r => r.id === $("version").value) || rels.find(r => r.id === catalog.containers.default) || rels[0];
+    }
+    // The LabVIEW YEAR the tooling passes to installers/workflows (--labview-version,
+    // manifest labviewVersion). Distinct from the release id ("2026q1").
+    function labviewYear() {
+      const rel = selectedRelease();
+      if (rel && rel.labviewYear) return rel.labviewYear;
+      return $("version").value || (catalog.defaults && catalog.defaults.labviewVersion) || "2026";
+    }
     function renderVersions() {
       const sel = $("version");
-      const locked = (catalog.defaults && catalog.defaults.labviewVersion) || "2026";
       sel.innerHTML = "";
-      const o = document.createElement("option");
-      o.value = locked; o.textContent = locked; o.selected = true;
-      sel.appendChild(o);
-      sel.disabled = true;
-      sel.setAttribute("aria-disabled", "true");
+      const rels = containerReleases();
+      if (!rels.length) {
+        const locked = (catalog.defaults && catalog.defaults.labviewVersion) || "2026";
+        const o = document.createElement("option");
+        o.value = locked; o.textContent = locked; o.selected = true;
+        sel.appendChild(o);
+        sel.disabled = true;
+        sel.setAttribute("aria-disabled", "true");
+        return;
+      }
+      const def = catalog.containers.default;
+      rels.forEach(rel => {
+        const o = document.createElement("option");
+        const qualified = rel.status === "qualified";
+        o.value = rel.id;
+        o.textContent = rel.label
+          + (rel.id === def ? " — default" : "")
+          + (qualified ? "" : " — " + (rel.status === "qualifying" ? "not yet qualified" : rel.status));
+        o.disabled = !qualified;
+        o.selected = rel.id === def;
+        if (rel.notes) o.title = rel.notes;
+        sel.appendChild(o);
+      });
+      sel.disabled = false;
+      sel.removeAttribute("aria-disabled");
+      sel.title = "NI LabVIEW container release the CI workers run. The newest qualified release is the default; picking an older release pins this repository to it.";
     }
 
     function isPlanned(cap) { return cap && cap.status === "planned"; }
@@ -648,7 +677,7 @@
     }
 
     // ---- file resolution (mirrors install.py) ----------------------------
-    function resolveFiles(activities, osList) {
+    function resolveActivities(activities) {
       const map = {}; catalog.capabilities.forEach(c => map[c.id] = c);
       const chosen = []; const stack = [...activities];
       while (stack.length) {
@@ -658,6 +687,12 @@
         chosen.push(id);
         (cap.requires || []).forEach(r => { if (!chosen.includes(r)) stack.push(r); });
       }
+      return chosen;
+    }
+
+    function resolveFiles(activities, osList) {
+      const map = {}; catalog.capabilities.forEach(c => map[c.id] = c);
+      const chosen = resolveActivities(activities);
       const files = [...((catalog.base && catalog.base.files) || [])];
       chosen.forEach(id => {
         const cap = map[id]; const sup = new Set(cap.supportsOs || []);
@@ -690,7 +725,7 @@
     function commandText() {
       const acts = csv(selected) || "dashboard";
       const oss = csv(osSel) || "windows,linux";
-      const ver = $("version").value;
+      const ver = labviewYear();
       const repo = $("repo").value.trim();
       const s = source();
       const extra = repo.includes("/") ? ` --repo ${repo}` : "";
@@ -704,11 +739,21 @@
     }
 
     function varsHint() {
-      const ver = $("version").value;
+      const ver = labviewYear();
       const repo = $("repo").value.trim() || "<owner>/<repo>";
+      const rel = selectedRelease();
+      const pinned = rel && catalog.containers && rel.id !== catalog.containers.default;
       if (isGitLab()) {
         $("varsStep").innerHTML =
           `Optional GitLab CI/CD variables can override installer defaults later; the initial scaffold records LabVIEW ${ver} in <code class="inl">.github/labview-ci.yml</code>.`;
+      } else if (pinned) {
+        const s = source();
+        const srcGhcr = "ghcr.io/" + s.repo.toLowerCase();
+        $("varsStep").innerHTML =
+          `Pinning this repo to <strong>${esc(rel.label)}</strong>: the browser install sets ` +
+          `<code class="inl">LCWC_BASE_IMAGE=${esc(srcGhcr)}-labview-base:${esc(rel.id)}</code> and ` +
+          `<code class="inl">LCWC_LINUX_BASE_IMAGE=${esc(srcGhcr)}-labview:linux-${esc(rel.id)}</code> as Actions variables ` +
+          `(command-line installs: set them with <code class="inl">gh variable set</code>).`;
       } else {
         $("varsStep").innerHTML =
           `Optionally pin settings as Actions variables: ` +
@@ -731,9 +776,15 @@
       const gitlab = isGitLab();
       const repo = $("repo");
       if (repo) repo.placeholder = gitlab ? "your-group/your-lv-repo" : "your-org/your-lv-repo";
+      const repoLabel = $("repoLabel");
+      if (repoLabel) repoLabel.textContent = gitlab ? "Target project (full path)" : "Target repo (owner/name)";
+      const privHint = $("repoPrivHint");
+      if (privHint) privHint.innerHTML = gitlab
+        ? `Nested subgroup paths (<code class="inl">group/subgroup/project</code>) work too. The <a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit/blob/main/.github/labview-ci/README.md#installing-from-gitlab" target="_blank" rel="noopener">Installing from GitLab notes</a> cover the mirror and the command-line route.`
+        : `Installing to a private GitHub repo? Review the <a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit/blob/main/.github/labview-ci/README.md#installing-to-a-private-github-repository" target="_blank" rel="noopener">private repo setup notes</a> before creating the token.`;
       const hint = $("providerTopHint");
       if (hint) hint.textContent = gitlab
-        ? "GitLab installs use the same catalog plus a generated .gitlab-ci.yml scaffold."
+        ? "GitLab installs use the same catalog plus native GitLab CI jobs in a source-owned provider package."
         : "GitHub supports the browser pull-request install flow.";
       const installHint = $("installHint");
       if (installHint) installHint.innerHTML = gitlab
@@ -757,7 +808,7 @@
         `<li>If you use the command-line fallback, first clone the GitLab repository locally, <code class="inl">cd</code> into that folder, then run the generated command there.</li>` +
         `<li>After merge or push, let the GitLab pipeline publish the <strong>Pages</strong> artifact from the <code class="inl">pages</code> job.</li>` +
         `<li id="varsStep">Optional GitLab CI/CD variables can override installer defaults later.</li>` +
-        `<li>Full Windows LabVIEW worker parity requires a registered Windows Docker GitLab Runner; the first scaffold publishes the dashboard payload.</li>`
+        `<li>Windows LabVIEW jobs need a Windows Docker GitLab Runner; Linux jobs need a privileged Docker-in-Docker runner. Build the custom worker before workflows that require its baked dependencies.</li>`
         : `<li>Merge the install pull request — the <strong>dashboard publishes itself</strong> from that merge (no CI run required), and the README link lands in the same merge.</li>` +
           `<li>Enable <strong>GitHub Pages</strong> from the <code class="inl">gh-pages</code> branch (Settings &rsaquo; Pages).</li>` +
           `<li>Set <strong>Workflow permissions</strong> to <em>Read and write</em> (Settings &rsaquo; Actions &rsaquo; General).</li>` +
@@ -800,8 +851,18 @@
 
     function manifestYaml(activities, osList, ver) {
       const s = source();
+      const distribution = (catalog && catalog.source) || SOURCE_FALLBACK;
       const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
       const acts = activities.filter(id => { const c = byId(id); return c && c.status !== "planned"; });
+      // `ver` is the raw version-select value: a container release id ("2026q1")
+      // on containers-aware catalogs, or a bare LabVIEW year on legacy ones.
+      // labviewVersion always records the YEAR (what workflows/installers use);
+      // containerRelease records the NI container release the repo selected.
+      const rel = containerReleases().find(r => r.id === ver) || null;
+      const year = rel ? rel.labviewYear : ver;
+      const cfg = ["config:", `  labviewVersion: "${year}"`];
+      if (rel) cfg.push(`  containerRelease: "${rel.id}"`);
+      cfg.push(`  os: [${osList.join(", ")}]`);
       return [
         "# LabVIEW CI install manifest - generated by the configurator",
         `schemaVersion: ${catalog.schemaVersion || 1}`,
@@ -809,7 +870,8 @@
         `installedAt: ${now}`,
         `provider: ${provider()}`,
         "source:", `  repo: ${s.repo}`, `  ref: ${s.ref}`,
-        "config:", `  labviewVersion: "${ver}"`, `  os: [${osList.join(", ")}]`,
+        "  distribution:", "    host: github", `    repo: ${distribution.repo}`, `    ref: ${distribution.ref || canonical.ref || "main"}`, "    url: https://github.com",
+        ...cfg,
         "activities:", ...acts.map(a => `  - ${a}`), ""
       ].join("\n");
     }
@@ -820,126 +882,145 @@
         "  - local: '.gitlab/labview-ci/pipeline.yml'\n";
       }
 
-      function gitlabPipelineYaml() {
-        return "# LabVIEW CI - GitLab pipeline scaffold.\n" +
-        "# Publishes the dashboard payload to GitLab Pages. Windows LabVIEW workers require a registered Windows Docker runner.\n" +
-        "stages:\n" +
-        "  - dashboard\n" +
-        "  - pages\n\n" +
-        "variables:\n" +
-        "  LVCI_PROVIDER: gitlab\n" +
-        "  LVCI_TARGET_SHA: $CI_COMMIT_SHA\n\n" +
-        "lvci:dashboard:\n" +
-        "  stage: dashboard\n" +
-        "  image: python:3.12-alpine\n" +
-        "  rules:\n" +
-        "    - if: '$CI_COMMIT_BRANCH == \"main\"'\n" +
-        "    - if: '$CI_PIPELINE_SOURCE == \"web\"'\n" +
-        "    - if: '$CI_PIPELINE_SOURCE == \"schedule\"'\n" +
-        "  script:\n" +
-        "    - python .gitlab/labview-ci/build-dashboard.py\n" +
-        "  artifacts:\n" +
-        "    paths:\n" +
-        "      - public\n" +
-        "    expire_in: 1 week\n\n" +
-        "pages:\n" +
-        "  stage: pages\n" +
-        "  needs:\n" +
-        "    - job: lvci:dashboard\n" +
-        "      artifacts: true\n" +
-        "  rules:\n" +
-        "    - if: '$CI_COMMIT_BRANCH == \"main\"'\n" +
-        "    - if: '$CI_PIPELINE_SOURCE == \"web\"'\n" +
-        "  script:\n" +
-        "    - test -d public\n" +
-        "  artifacts:\n" +
-        "    paths:\n" +
-        "      - public\n";
+      function gitlabPipelineYaml(activities, osList, version, providerManifest) {
+        const templatePaths = ["templates/common.yml", "templates/pages.yml"];
+        const mappings = providerManifest.capabilityTemplates || {};
+        activities.forEach(activity => {
+          osList.forEach(osName => {
+            const template = mappings[activity] && mappings[activity][osName];
+            if (template && !templatePaths.includes(template)) templatePaths.push(template);
+          });
+        });
+        const release = containerReleases().find(r => r.id === version);
+        const year = release ? release.labviewYear : version;
+        const customImage = activities.includes("custom-image") ? "true" : "false";
+        return [
+          "# LabVIEW CI - GitLab pipeline. Generated by the LabVIEW CI configurator.",
+          "# Capability jobs are native GitLab jobs installed under .gitlab/labview-ci/templates/.",
+          "workflow:",
+          "  rules:",
+          "    - if: '$CI_PIPELINE_SOURCE == \"merge_request_event\"'",
+          "    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'",
+          "    - if: '$CI_PIPELINE_SOURCE == \"web\"'",
+          "    - if: '$CI_PIPELINE_SOURCE == \"schedule\"'",
+          "",
+          "stages:",
+          "  - prepare",
+          "  - verify",
+          "  - pages",
+          "",
+          "variables:",
+          "  LVCI_PROVIDER: gitlab",
+          "  LVCI_TARGET_SHA: $CI_COMMIT_SHA",
+          `  LVCI_LABVIEW_VERSION: \"${year}\"`,
+          `  LVCI_USE_CUSTOM_IMAGE: \"${customImage}\"`,
+          "  LVCI_WINDOWS_RUNNER_TAG: windows-docker",
+          "  LVCI_LINUX_RUNNER_TAG: linux-docker",
+          "  LVCI_SNAPSHOT_MODE: head",
+          "  LVCI_SNAPSHOT_MAX_COMMITS: \"0\"",
+          "  LVCI_SNAPSHOT_MAX_VIS: \"0\"",
+          "  LVCI_SNAPSHOT_TIME_BUDGET_MINUTES: \"300\"",
+          "  LVCI_SNAPSHOT_FORCE: \"false\"",
+          "",
+          "include:",
+          ...templatePaths.map(template => `  - local: '${GITLAB_PROVIDER_TARGET}/${template}'`),
+          "",
+          "pages:",
+          "  extends: .lvci:pages",
+          "  rules:",
+          "    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'",
+          "      when: always",
+          ""
+        ].join("\n");
       }
 
-      function gitlabDashboardBuilderPy() {
-        const fallbackRepo = $("repo").value.trim() || "namespace/project";
-        return `#!/usr/bin/env python3
-    from __future__ import annotations
+    function gitlabProviderEntries(providerManifest) {
+      return providerManifest.files.map(relative => ({
+        sourcePath: `${GITLAB_PROVIDER_SOURCE}/${relative}`,
+        targetPath: `${GITLAB_PROVIDER_TARGET}/${relative}`
+      }));
+    }
 
-    import html
-    import json
-    import os
-    import shutil
-    from pathlib import Path
-
-    ROOT = Path.cwd()
-    PUBLIC = ROOT / "public"
-    PAGES_SRC = ROOT / ".github" / "pages"
-    CATALOG = ROOT / ".github" / "labview-ci" / "catalog.json"
-    MANIFEST = ROOT / ".github" / "labview-ci.yml"
-
-    def copy_pages() -> None:
-      PUBLIC.mkdir(parents=True, exist_ok=True)
-      if PAGES_SRC.is_dir():
-        for child in PAGES_SRC.iterdir():
-          dst = PUBLIC / child.name
-          if child.is_dir():
-            if dst.exists():
-              shutil.rmtree(dst)
-            shutil.copytree(child, dst)
-          else:
-            shutil.copy2(child, dst)
-      if CATALOG.is_file():
-        shutil.copy2(CATALOG, PUBLIC / "catalog.json")
-
-    def read_catalog() -> dict:
-      if CATALOG.is_file():
-        return json.loads(CATALOG.read_text(encoding="utf-8"))
-      return {"version": "${esc(catalog.version || "")}"}
-
-    def selected_activities() -> list[str]:
-      if not MANIFEST.is_file():
-        return []
-      activities = []
-      in_activities = False
-      for raw in MANIFEST.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if line == "activities:":
-          in_activities = True
-          continue
-        if in_activities and line.startswith("- "):
-          activities.append(line[2:].strip())
-        elif in_activities and line and not raw.startswith(" "):
-          break
-      return activities
-
-    def main() -> None:
-      copy_pages()
-      cat = read_catalog()
-      repo = html.escape(os.environ.get("CI_PROJECT_PATH", "${esc(fallbackRepo)}"))
-      version = html.escape(str(cat.get("version", "${esc(catalog.version || "")}")))
-      sha = html.escape(os.environ.get("CI_COMMIT_SHA", "")[:12])
-      pages = html.escape(os.environ.get("CI_PAGES_URL", "${esc(gitlabPagesUrl())}"))
-      activities = selected_activities() or ["dashboard"]
-      activity_html = "".join("<li>" + html.escape(a) + "</li>" for a in activities)
-      (PUBLIC / "index.html").write_text("""<!doctype html>
-    <html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-    <title>LabVIEW CI - GitLab</title>
-    <style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:#f6f8fa;color:#24292f}main{max-width:920px;margin:0 auto;padding:42px 20px}.panel{background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:24px}code{background:#afb8c133;border-radius:6px;padding:.16em .38em}</style></head>
-    <body><main><div class=\"panel\"><h1>LabVIEW CI for GitLab</h1>
-    <p>This repository has the first GitLab provider scaffold for LabVIEW CI installed. Shared dashboard assets and catalog metadata stay versioned with the GitHub provider while GitLab-specific CI templates publish this Pages site.</p>
-    <p><strong>Project:</strong> <code>""" + repo + """</code><br><strong>Tooling version:</strong> <code>""" + version + """</code><br><strong>Pages URL:</strong> <code>""" + pages + """</code><br><strong>Commit:</strong> <code>""" + sha + """</code></p>
-    <h2>Installed Activities</h2><ul>""" + activity_html + """</ul>
-    <p>Full Windows LabVIEW worker parity requires a registered Windows Docker GitLab Runner.</p>
-    </div></main></body></html>\n""", encoding="utf-8")
-
-    if __name__ == "__main__":
-      main()
-    `.replace(/^ {4}/gm, "");
+    function validateGitLabProvider(providerManifest) {
+      if (!providerManifest || typeof providerManifest !== "object" || !Array.isArray(providerManifest.files)) {
+        throw new Error("The selected tooling version has an invalid GitLab provider manifest.");
       }
-
-      function gitlabReadme() {
-        return "# LabVIEW CI for GitLab\n\n" +
-        "This directory contains the GitLab CI provider adapter generated by the LabVIEW CI configurator. " +
-        "The shared catalog, dashboard assets, and LabVIEW scripts remain versioned with the GitHub provider so both integrations stay in one release stream.\n\n" +
-        "Full Windows LabVIEW worker parity requires a registered Windows Docker GitLab Runner. The initial scaffold publishes the dashboard payload to GitLab Pages and reserves the provider boundary for worker jobs.\n";
+      if (providerManifest.targetRoot !== GITLAB_PROVIDER_TARGET) {
+        throw new Error(`The GitLab provider manifest must target ${GITLAB_PROVIDER_TARGET}.`);
       }
+      const listed = new Set(providerManifest.files);
+      providerManifest.files.forEach(relative => {
+        if (typeof relative !== "string" || !relative || relative.startsWith("/") || relative.includes("\\") || relative.split("/").includes("..")) {
+          throw new Error("The selected tooling version contains an unsafe GitLab provider file path.");
+        }
+      });
+      const mappings = providerManifest.capabilityTemplates || {};
+      Object.keys(mappings).forEach(activity => {
+        const mapping = mappings[activity];
+        if (!mapping || typeof mapping !== "object") {
+          throw new Error(`The GitLab provider mapping for ${activity} is invalid.`);
+        }
+        Object.keys(mapping).forEach(osName => {
+          if (typeof mapping[osName] !== "string" || !listed.has(mapping[osName])) {
+            throw new Error(`The GitLab provider template for ${activity} (${osName}) is not packaged.`);
+          }
+        });
+      });
+      return providerManifest;
+    }
+
+    function gitlabSupportedActivities(providerManifest, activities, osList) {
+      const mappings = providerManifest.capabilityTemplates || {};
+      const builtIn = new Set(providerManifest.builtInCapabilities || []);
+      return activities.filter(activity => {
+        if (builtIn.has(activity)) return true;
+        const cap = byId(activity);
+        if (!cap) return false;
+        const applicable = (cap.supportsOs || []).filter(osName => osList.includes(osName));
+        const mapping = mappings[activity];
+        if (!mapping || typeof mapping !== "object") {
+          throw new Error(`The GitLab provider has no native template mapping for ${activity}.`);
+        }
+        const missing = applicable.filter(osName => !mapping[osName]);
+        if (missing.length) {
+          throw new Error(`The GitLab provider lacks ${missing.join(", ")} template(s) for ${activity}.`);
+        }
+        if (!applicable.length) {
+          console.warn(`GitLab does not run ${activity} for the selected platform(s): ${osList.join(", ")}.`);
+          return false;
+        }
+        return true;
+      });
+    }
+
+    async function loadGitLabProvider() {
+      const manifestPath = `${GITLAB_PROVIDER_SOURCE}/files.json`;
+      const resp = await getResilient(rawUrl(manifestPath), "fetch the GitLab provider manifest");
+      if (!resp.ok) throw new Error("The selected tooling version does not contain a GitLab provider package.");
+      try {
+        return validateGitLabProvider(JSON.parse(await resp.text()));
+      } catch (e) {
+        if (e instanceof SyntaxError) throw new Error("The selected tooling version has an invalid GitLab provider manifest.");
+        throw e;
+      }
+    }
+
+    async function fetchGitLabProviderFiles(providerManifest, onProgress) {
+      const entries = gitlabProviderEntries(providerManifest);
+      const files = [];
+      for (let index = 0; index < entries.length; index++) {
+        const entry = entries[index];
+        if (onProgress) onProgress(index + 1, entries.length, entry.sourcePath);
+        const resp = await getResilient(rawUrl(entry.sourcePath), "fetch " + entry.sourcePath.split("/").pop());
+        if (!resp.ok) throw new Error(`GitLab provider file is missing from the selected tooling version: ${entry.sourcePath}`);
+        if (TEXT_EXTS.has(ext(entry.sourcePath))) {
+          files.push({ path: entry.targetPath, content: await resp.text(), isText: true });
+        } else {
+          files.push({ path: entry.targetPath, bytes: new Uint8Array(await resp.arrayBuffer()), isText: false });
+        }
+      }
+      return files;
+    }
 
     async function buildBundle() {
       const status = $("dlStatus");
@@ -947,7 +1028,12 @@
       status.className = "status"; status.textContent = "Preparing bundle…";
       const JSZip = await loadJSZip();
       const osList = [...osSel];
-      const wanted = providerFiles(resolveFiles([...selected], osList));
+      const requestedActivities = resolveActivities([...selected]);
+      const gitlabProvider = isGitLab() ? await loadGitLabProvider() : null;
+      const activities = isGitLab()
+        ? gitlabSupportedActivities(gitlabProvider, requestedActivities, osList)
+        : requestedActivities;
+      const wanted = providerFiles(resolveFiles(activities, osList));
       const subs = buildSubs();
 
       // Enumerate the repo tree once so directory entries (trailing /) expand.
@@ -974,12 +1060,17 @@
           zip.file(path, await resp.arrayBuffer());
         }
       }
-      zip.file(".github/labview-ci.yml", manifestYaml([...selected], osList, $("version").value));
+      zip.file(".github/labview-ci.yml", manifestYaml(activities, osList, $("version").value));
       if (isGitLab()) {
         zip.file(".gitlab-ci.yml", gitlabRootCi());
-        zip.file(".gitlab/labview-ci/pipeline.yml", gitlabPipelineYaml());
-        zip.file(".gitlab/labview-ci/build-dashboard.py", gitlabDashboardBuilderPy());
-        zip.file(".gitlab/labview-ci/README.md", gitlabReadme());
+        zip.file(`${GITLAB_PROVIDER_TARGET}/pipeline.yml`, gitlabPipelineYaml(activities, osList, $("version").value, gitlabProvider));
+        const providerFiles = await fetchGitLabProviderFiles(gitlabProvider, (index, count, sourcePath) => {
+          status.textContent = `Fetching GitLab provider ${index}/${count}: ${sourcePath.split("/").pop()}`;
+        });
+        providerFiles.forEach(file => {
+          if (file.isText) zip.file(file.path, file.content);
+          else zip.file(file.path, file.bytes);
+        });
       }
       // Same thin-dashboard substitution as the one-click install (see installToRepo).
       if (!isGitLab() && [...paths].some(p => p.endsWith(".github/workflows/dashboard-pages.yml"))) {
@@ -994,7 +1085,9 @@
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(a.href);
       status.className = "status ok";
-      status.textContent = `Bundle ready (${total} files). Unzip at your repo root, review, and commit.`;
+      status.textContent = isGitLab()
+        ? "Bundle ready. If the target already has .gitlab-ci.yml, preserve it and add the provider include rather than overwrite it."
+        : `Bundle ready (${total} files). Unzip at your repo root, review, and commit.`;
     }
 
     // ---- one-click install into the target repo (no download) ------------
@@ -1849,6 +1942,34 @@
         setup.workflowPerms = "done";
       } catch (e) { setup.workflowPerms = "manual"; if (e.status === 403 || e.status === 404) setup.adminMissing = true; }
 
+      // Container release pin. Choosing a NON-default release in the LabVIEW
+      // version dropdown pins this repo to it by pointing the base-image Actions
+      // variables at the per-release LCWC tags (published by the source repo's
+      // publish-base-images.yml); every image workflow (copy + bake, Windows +
+      // Linux) already resolves these variables first. The default choice sets
+      // nothing so the repo keeps tracking the qualified default as it advances.
+      // Best-effort like the permissions call: a token without the Variables
+      // permission records "manual" and the varsStep hint shows the gh commands.
+      const rel = selectedRelease();
+      if (rel && catalog.containers && rel.id !== catalog.containers.default) {
+        const srcGhcr = "ghcr.io/" + source().repo.toLowerCase();
+        const pins = [
+          ["LCWC_BASE_IMAGE", `${srcGhcr}-labview-base:${rel.id}`],
+          ["LCWC_LINUX_BASE_IMAGE", `${srcGhcr}-labview:linux-${rel.id}`],
+        ];
+        try {
+          for (const [name, value] of pins) {
+            const cr = await gh(`/repos/${repo}/actions/variables`, { method: "POST", body: { name, value } });
+            if (!cr.ok && cr.status !== 201) {
+              if (cr.status === 409) {
+                await ghJson(await gh(`/repos/${repo}/actions/variables/${name}`, { method: "PATCH", body: { name, value } }));
+              } else { await ghJson(cr); }
+            }
+          }
+          setup.containerPin = "done";
+        } catch (e) { setup.containerPin = "manual"; }
+      }
+
       if (!setup.hasDashboard) return;
       try {
         const pg = await gh(`/repos/${repo}/pages`);
@@ -1923,11 +2044,15 @@
 
     function installPrBody(acts, osList, ver, fileCount, removed, kept) {
       const s = source();
+      // `ver` may be a container release id on containers-aware catalogs; show
+      // the human release label in the PR body table when it is.
+      const relRow = containerReleases().find(r => r.id === ver);
+      const verLabel = relRow ? relRow.label : ver;
       const lines = [
         "## LabVIEW CI pipeline", "",
         "Opened by the **LabVIEW CI configurator** to add a containerized CI pipeline to this repository.", "",
         "| | |", "|---|---|",
-        "| LabVIEW version | `" + ver + "` |",
+        "| LabVIEW version | `" + verLabel + "` |",
         "| Platforms | " + (osList.join(", ") || "windows, linux") + " |",
         "| Capabilities | " + (acts.join(", ") || "dashboard") + " |",
         "| Files added | " + fileCount + " |",
@@ -1992,26 +2117,55 @@
     }
 
     async function dispatchWorkflow(repo, workflowFile, branch, inputs) {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const body = inputs ? { ref: branch, inputs: inputs } : { ref: branch };
-          const r = await gh(`/repos/${repo}/actions/workflows/${workflowFile}/dispatches`,
-            { method: "POST", body });
-          if (r.ok || r.status === 204) return true;
-          if (r.status !== 404) return false;
-        } catch (_) { /* transient network -- retry */ }
-        await sleep(3000);
+      // A 404 on dispatch means GitHub has not INDEXED the just-merged workflow
+      // file yet. On normal repos that takes seconds, but on FORKS a
+      // workflow_dispatch-only file can stay unindexed for many minutes (it never
+      // receives a push/PR event that would register it) -- a fork install's
+      // image-copy dispatch failed exactly this way after a 9-second retry
+      // window. So poll the workflow's registration first with a minutes-scale
+      // budget, then dispatch; between dispatch attempts keep re-checking
+      // registration rather than blind-retrying.
+      const registered = async () => {
+        try { return (await gh(`/repos/${repo}/actions/workflows/${workflowFile}`)).ok; }
+        catch (_) { return false; }
+      };
+      const deadline = Date.now() + 4 * 60 * 1000;
+      let delay = 3000;
+      for (;;) {
+        if (await registered()) {
+          try {
+            const body = inputs ? { ref: branch, inputs: inputs } : { ref: branch };
+            const r = await gh(`/repos/${repo}/actions/workflows/${workflowFile}/dispatches`,
+              { method: "POST", body });
+            if (r.ok || r.status === 204) return true;
+            if (r.status !== 404) return false;   // real error (e.g. perms) -- stop retrying
+          } catch (_) { /* transient network -- retry */ }
+        }
+        if (Date.now() >= deadline) return false;
+        await sleep(delay);
+        delay = Math.min(delay * 1.5, 20000);
       }
-      return false;
     }
 
     async function latestWorkflowRun(repo, workflowFile, branch, sinceMs) {
+      // The install merge can legitimately create TWIN runs of a copy workflow:
+      // this page dispatches it AND the file's own push trigger fires from the
+      // merge (the fork self-heal, #58). Their shared concurrency lane runs on
+      // twin and CANCELS the other while it is still pending -- and which twin
+      // dies is a race. Judging the NEWEST run alone therefore misreads a
+      // successful seed as "finished with cancelled" (observed on a fork
+      // install: the Linux dispatch run succeeded while its newer push twin was
+      // cancelled, and the watcher happened to track the twin). Prefer, among
+      // the runs since the cutoff: any SUCCESS, else any still-active run (keep
+      // waiting on it), else the newest completed one.
       try {
         const r = await gh(`/repos/${repo}/actions/workflows/${workflowFile}/runs?branch=${encodeURIComponent(branch)}&per_page=10`);
         if (!r.ok) return null;
         const cutoff = (sinceMs || 0) - 60000;
-        const runs = ((await r.json()).workflow_runs || []).filter(x => x && x.created_at);
-        return runs.find(x => Date.parse(x.created_at) >= cutoff) || null;
+        const runs = ((await r.json()).workflow_runs || []).filter(x => x && x.created_at && Date.parse(x.created_at) >= cutoff);
+        return runs.find(x => x.status === "completed" && x.conclusion === "success")
+            || runs.find(x => x.status !== "completed")
+            || runs[0] || null;
       } catch (_) { return null; }
     }
 
@@ -2842,7 +2996,10 @@
 
     async function collectGitLabInstallFiles() {
       const s = source();
-      const activities = [...selected], osList = [...osSel], version = $("version").value;
+      const osList = [...osSel], version = $("version").value;
+      const providerManifest = await loadGitLabProvider();
+      const requestedActivities = resolveActivities([...selected]);
+      const activities = gitlabSupportedActivities(providerManifest, requestedActivities, osList);
       const wanted = providerFiles(resolveFiles(activities, osList));
       const subs = buildSubs();
 
@@ -2872,11 +3029,16 @@
         }
       }
       files.push({ path: ".github/labview-ci.yml", content: manifestYaml(activities, osList, version), isText: true });
-      files.push({ path: ".gitlab-ci.yml", content: gitlabRootCi(), isText: true });
-      files.push({ path: ".gitlab/labview-ci/pipeline.yml", content: gitlabPipelineYaml(), isText: true });
-      files.push({ path: ".gitlab/labview-ci/build-dashboard.py", content: gitlabDashboardBuilderPy(), isText: true });
-      files.push({ path: ".gitlab/labview-ci/README.md", content: gitlabReadme(), isText: true });
-      return { files, activities, osList, version };
+      const providerFiles = await fetchGitLabProviderFiles(providerManifest, (index, count, sourcePath) => {
+        setInsStatus(`Fetching GitLab provider ${index}/${count}: ${esc(sourcePath.split("/").pop())}`, null);
+      });
+      files.push(...providerFiles);
+      files.push({
+        path: `${GITLAB_PROVIDER_TARGET}/pipeline.yml`,
+        content: gitlabPipelineYaml(activities, osList, version, providerManifest),
+        isText: true
+      });
+      return { files, activities, osList, version, providerManifest };
     }
 
     async function gitlabBranchTreeRef(projectKey, branch) {
@@ -2914,46 +3076,118 @@
       return paths;
     }
 
-    function gitlabCommitActions(files, existingPaths) {
-      return files.map(f => {
+    function gitlabRootDeclaresRequiredStages(content) {
+      const match = /^stages:\s*(\[[^\n]*\])?\s*(?:#.*)?$/m.exec(content);
+      if (!match) return false;
+      let names;
+      if (match[1]) {
+        names = new Set(match[1].slice(1, -1).split(",").map(name => name.trim().replace(/^['"]|['"]$/g, "")));
+      } else {
+        names = new Set();
+        const lines = content.slice(match.index + match[0].length).split(/\r?\n/);
+        for (const line of lines) {
+          if (/^\S/.test(line) && !line.startsWith("#")) break;
+          const stage = /^\s*-\s*([^\s#]+)/.exec(line);
+          if (stage) names.add(stage[1]);
+        }
+      }
+      return ["prepare", "verify", "pages"].every(stage => names.has(stage));
+    }
+
+    async function gitlabRootCiNeedsWrite(projectKey, targetBranch, existingPaths) {
+      if (!existingPaths || !existingPaths.has(".gitlab-ci.yml")) return true;
+      const filePath = encodeURIComponent(".gitlab-ci.yml");
+      const content = await glText(`/projects/${projectKey}/repository/files/${filePath}/raw?ref=${encodeURIComponent(targetBranch)}`, "read the GitLab root pipeline");
+      if (content == null) throw new Error("GitLab reported an existing .gitlab-ci.yml but could not read it.");
+      if (!content.includes(`${GITLAB_PROVIDER_TARGET}/pipeline.yml`)) {
+        throw new Error("This project already has .gitlab-ci.yml. The configurator will not replace it: add a local include for .gitlab/labview-ci/pipeline.yml yourself, then run Install again.");
+      }
+      if (/^stages:\s*/m.test(content) && !gitlabRootDeclaresRequiredStages(content)) {
+        throw new Error("This project already defines GitLab stages. Add prepare, verify, and pages to its root stages list, then run Install again.");
+      }
+      return false;
+    }
+
+    function gitlabCommitActions(files, existingPaths, removedPaths = []) {
+      const actions = files.map(f => {
         const action = existingPaths && existingPaths.has(f.path) ? "update" : "create";
         if (f.isText) return { action, file_path: f.path, content: f.content };
         return { action, file_path: f.path, content: b64bytes(f.bytes), encoding: "base64" };
       });
+      const writing = new Set(files.map(f => f.path));
+      [...new Set(removedPaths)].forEach(path => {
+        if (existingPaths && existingPaths.has(path) && !writing.has(path)) {
+          actions.push({ action: "delete", file_path: path });
+        }
+      });
+      return actions;
     }
 
     async function gitlabCommitInstallFiles(projectKey, branchName, built, existingPaths, startBranch, commitMessage) {
       const commitBody = {
         branch: branchName,
         commit_message: commitMessage,
-        actions: gitlabCommitActions(built.files, existingPaths)
+        actions: gitlabCommitActions(built.files, existingPaths, built.removed || [])
       };
       if (startBranch) commitBody.start_branch = startBranch;
       await glWrite(`/projects/${projectKey}/repository/commits`, { method: "POST", body: commitBody }, "create the GitLab install commit");
     }
 
-    async function gitlabNeedsDirectRepair(projectKey, targetBranch, existingPaths) {
-      if (!existingPaths || !existingPaths.has(".gitlab/labview-ci/build-dashboard.py")) return false;
-      const filePath = encodeURIComponent(".gitlab/labview-ci/build-dashboard.py");
-      const text = await glText(`/projects/${projectKey}/repository/files/${filePath}/raw?ref=${encodeURIComponent(targetBranch)}`, "read the GitLab dashboard builder");
-      return /^#![^\n]*\n {4}from __future__ import annotations/m.test(text || "");
+    async function gitlabLegacyProviderPaths(projectKey, targetBranch, existingPaths) {
+      if (!existingPaths || !existingPaths.has(GITLAB_LEGACY_DASHBOARD_BUILDER)) return [];
+      const filePath = encodeURIComponent(GITLAB_LEGACY_DASHBOARD_BUILDER);
+      let text;
+      try {
+        text = await glText(`/projects/${projectKey}/repository/files/${filePath}/raw?ref=${encodeURIComponent(targetBranch)}`, "read the GitLab dashboard builder");
+      } catch (_) {
+        return [];
+      }
+      const legacy = /^#![^\n]*\n\s*from __future__ import annotations/m.test(text || "")
+        && (text || "").includes('PAGES_SRC = ROOT / ".github" / "pages"')
+        && (text || "").includes('PUBLIC = ROOT / "public"');
+      return legacy ? [GITLAB_LEGACY_DASHBOARD_BUILDER] : [];
+    }
+
+    async function gitlabStaleProviderPaths(projectKey, targetBranch, existingPaths, providerManifest) {
+      const stale = new Set(await gitlabLegacyProviderPaths(projectKey, targetBranch, existingPaths));
+      const manifestPath = `${GITLAB_PROVIDER_TARGET}/files.json`;
+      if (!existingPaths || !existingPaths.has(manifestPath)) return [...stale];
+      let prior;
+      try {
+        const text = await glText(`/projects/${projectKey}/repository/files/${encodeURIComponent(manifestPath)}/raw?ref=${encodeURIComponent(targetBranch)}`, "read the installed GitLab provider manifest");
+        prior = JSON.parse(text);
+      } catch (_) {
+        return [...stale];
+      }
+      const priorFiles = prior && prior.targetRoot === GITLAB_PROVIDER_TARGET && Array.isArray(prior.files)
+        ? prior.files : null;
+      if (!priorFiles || !priorFiles.every(relative => typeof relative === "string" && relative && !relative.startsWith("/") && !relative.includes("\\") && !relative.split("/").includes(".."))) {
+        return [...stale];
+      }
+      const currentFiles = new Set(providerManifest.files || []);
+      priorFiles.forEach(relative => {
+        const path = `${GITLAB_PROVIDER_TARGET}/${relative}`;
+        if (!currentFiles.has(relative) && existingPaths.has(path)) stale.add(path);
+      });
+      return [...stale];
     }
 
     function gitlabMrBody(acts, osList, ver, fileCount) {
       const s = source();
+      const relRow = containerReleases().find(r => r.id === ver);
       return [
         "## LabVIEW CI pipeline", "",
         "Opened by the **LabVIEW CI configurator** to add the GitLab provider scaffold to this repository.", "",
         "| | |", "|---|---|",
-        "| LabVIEW version | `" + ver + "` |",
+        "| LabVIEW version | `" + (relRow ? relRow.label : ver) + "` |",
         "| Platforms | " + (osList.join(", ") || "windows, linux") + " |",
         "| Capabilities | " + (acts.join(", ") || "dashboard") + " |",
         "| Files added | " + fileCount + " |",
         "| Tooling source | `" + s.repo + "@" + s.ref + "` |", "",
         "### After you merge", "",
-        "1. GitLab runs the `pages` job to publish the dashboard payload.",
-        "2. Full Windows LabVIEW worker parity requires a registered Windows Docker GitLab Runner.",
-        "3. Optional GitLab CI/CD variables can override the installer defaults later.", ""
+        "1. GitLab runs the selected native LabVIEW CI jobs and then publishes report history through the `pages` job.",
+        "2. Windows jobs need a Windows Docker runner; Linux jobs need a privileged Docker-in-Docker runner.",
+        "3. On a fresh custom-image install, let the worker image job finish before workflows that need its baked dependencies.", ""
       ].join("\n");
     }
 
@@ -2980,7 +3214,7 @@
       const nextEl = $("insNext");
       if (nextEl) { nextEl.innerHTML = steps.map(s => `<li>${s}</li>`).join(""); nextEl.style.display = ""; }
       const note = $("insNote");
-      if (note) { note.innerHTML = `Full Windows LabVIEW jobs need a Windows Docker GitLab Runner registered to this project or group. The first scaffold focuses on the dashboard and provider boundary.`; note.style.display = ""; }
+      if (note) { note.innerHTML = `This install includes native GitLab jobs for the selected capabilities. Windows LabVIEW jobs need a Windows Docker runner; Linux jobs need a privileged Docker-in-Docker runner.`; note.style.display = ""; }
     }
 
     function gitlabInitialBranchSuccess(projectPath, branchName, fileCount) {
@@ -3004,7 +3238,7 @@
       const nextEl = $("insNext");
       if (nextEl) { nextEl.innerHTML = steps.map(s => `<li>${s}</li>`).join(""); nextEl.style.display = ""; }
       const note = $("insNote");
-      if (note) { note.innerHTML = `No merge request was needed because this GitLab project did not have an existing target branch yet. A Pages 404 after a green pipeline usually means GitLab is still publishing, Pages access is restricted, or GitLab chose a different final Pages URL; check <strong>Deploy &rsaquo; Pages</strong> for the authoritative URL. Full Windows LabVIEW jobs still need a Windows Docker GitLab Runner registered to this project or group.`; note.style.display = ""; }
+      if (note) { note.innerHTML = `No merge request was needed because this GitLab project did not have an existing target branch yet. A Pages 404 after a green pipeline usually means GitLab is still publishing, Pages access is restricted, or GitLab chose a different final Pages URL; check <strong>Deploy &rsaquo; Pages</strong> for the authoritative URL. Windows jobs need a Windows Docker runner; Linux jobs need a privileged Docker-in-Docker runner.`; note.style.display = ""; }
     }
 
     function gitlabRepairSuccess(projectPath, branchName, fileCount) {
@@ -3013,7 +3247,7 @@
       const projectUrl = gitlabProjectUrl(projectPath);
       setInsStatus(`&#10003; Repaired the GitLab install scaffold on <code class="inl">${esc(branchName)}</code> in <code class="inl">${esc(projectPath)}</code>. The dashboard URL can 404 until GitLab reruns the <code class="inl">pages</code> deployment.`, "warn");
       const done = [
-        `Updated ${fileCount} LabVIEW CI file${fileCount === 1 ? "" : "s"}, including the generated <code class="inl">.gitlab/labview-ci/build-dashboard.py</code>.`,
+        `Updated ${fileCount} LabVIEW CI file${fileCount === 1 ? "" : "s"}, including the native <code class="inl">.gitlab/labview-ci/</code> provider package.`,
         `GitLab Pages should publish at <code class="inl">${esc(url)}</code> once the next <code class="inl">pages</code> job deploys it.`
       ];
       const doneEl = $("insDone");
@@ -3057,6 +3291,10 @@
             setInsStatus("Repairing the GitLab install scaffold&hellip;", null);
             const treeRef = (targetInfo.commit && targetInfo.commit.id) || await gitlabBranchTreeRef(projectKey, targetBranch);
             const existingPaths = await gitlabExistingPaths(projectKey, treeRef);
+            built.removed = await gitlabStaleProviderPaths(projectKey, targetBranch, existingPaths, built.providerManifest);
+            if (await gitlabRootCiNeedsWrite(projectKey, "main", existingPaths)) {
+              built.files.unshift({ path: ".gitlab-ci.yml", content: gitlabRootCi(), isText: true });
+            }
             await gitlabCommitInstallFiles(projectKey, "main", built, existingPaths, null, "ci: repair LabVIEW CI GitLab scaffold");
             gitlabInitialBranchSuccess(projectPath, "main", built.files.length);
             return;
@@ -3069,8 +3307,12 @@
         setInsStatus("Reading your GitLab repository&hellip;", null);
         const treeRef = targetInfo ? ((targetInfo.commit && targetInfo.commit.id) || await gitlabBranchTreeRef(projectKey, targetBranch)) : null;
         const existingPaths = treeRef ? await gitlabExistingPaths(projectKey, treeRef) : new Set();
+        if (bootstrapInitialBranch || await gitlabRootCiNeedsWrite(projectKey, targetBranch, existingPaths)) {
+          built.files.unshift({ path: ".gitlab-ci.yml", content: gitlabRootCi(), isText: true });
+        }
         const acts = built.activities.filter(id => { const c = byId(id); return c && c.status !== "planned"; });
-        const repairExistingBranch = !bootstrapInitialBranch && await gitlabNeedsDirectRepair(projectKey, targetBranch, existingPaths);
+        built.removed = bootstrapInitialBranch ? [] : await gitlabStaleProviderPaths(projectKey, targetBranch, existingPaths, built.providerManifest);
+        const repairExistingBranch = built.removed.includes(GITLAB_LEGACY_DASHBOARD_BUILDER);
         const commitMessage = repairExistingBranch ? "ci: repair LabVIEW CI GitLab scaffold" : `ci: install LabVIEW CI pipeline (${acts.join(", ") || "dashboard"})`;
         const commitBranchName = repairExistingBranch ? targetBranch : branchName;
         const startBranch = bootstrapInitialBranch || repairExistingBranch ? null : targetBranch;

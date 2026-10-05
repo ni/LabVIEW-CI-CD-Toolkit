@@ -4403,7 +4403,7 @@
   },
   "source": {
     "comment": "Where the installer fetches tooling from and what the configurator links to. Point this at a dedicated tooling repo later without touching any other file.",
-    "repo": "elijah286/LabVIEW-CI-with-Containers",
+    "repo": "ni/LabVIEW-CI-CD-Toolkit",
     "ref": "main",
     "toolingDir": ".github"
   },
