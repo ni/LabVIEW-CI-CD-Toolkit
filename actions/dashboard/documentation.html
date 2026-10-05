@@ -1962,8 +1962,21 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
       <h2 id="versioning">18. Versioning &amp; updates <a class="anchor" href="#versioning">#</a></h2>
       <p><code>release.yml</code> runs for every eligible contributor push to <code>main</code>. It derives the next
         version from published tags, writes the matching catalog entry, and cuts the immutable tag and GitHub Release
-        in the same run. The minor alias advances to the newest patch on its line; the major alias advances only when
+        in the same run when the catalog push is permitted. On protected branches it opens a catalog pull request
+        instead and defers publication until that PR is reviewed and merged. The minor alias advances to the newest patch on its line; the major alias advances only when
         a release is promoted to stable. Release notes are generated from <code>history.releases[0]</code>.</p>
+      <p><code>release-catalog-pr.py</code> handles the protected-branch fallback for both release and promotion.
+        It opens a <code>lvci-release/</code> branch only for GitHub's explicit pull-request-required rejection;
+        authentication and other rule failures remain errors. Enable <strong>Allow GitHub Actions to create and
+        approve pull requests</strong> in the repository's Actions settings (subject to organization policy).
+        The workflows request <code>pull-requests: write</code> but never approve or merge their own PRs and
+        do not change branch protection.</p>
+      <p>After merging a prepared catalog PR, Release verifies that it was created by
+        <code>github-actions[bot]</code> in this repository and changes only the catalog and release-note fragments.
+        It publishes the prepared version without generating another bump. If the merge does not trigger Release,
+        run it manually on the default branch immediately after the merge, before other changes land. Review one
+        pending catalog PR at a time; regenerate a stale or conflicting proposal rather than changing historical
+        tags. Both release workflows must run on the default branch.</p>
       <h3>Canonical source and GitLab distribution</h3>
       <p>GitHub is the canonical source of implementation and releases. When the optional GitLab mirror is enabled,
         the release workflow runs <code>sync-gitlab-mirror.sh</code> after GitHub has published an immutable tag. It
@@ -1977,7 +1990,7 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         secret <code>GITLAB_MIRROR_TOKEN</code> (optionally <code>GITLAB_MIRROR_USERNAME</code>) to enable the
         post-release push. The token needs GitLab <code>write_repository</code> access, and a protected mirror
         <code>main</code> branch must permit that automation identity to force-update the release snapshot. An enabled
-        mirror failure leaves the release workflow visibly failed. If it needs recovery,
+        mirror failure produces a warning without invalidating the published release. If it needs recovery,
         the source-only <strong>Sync GitLab Distribution</strong> workflow accepts an immutable tag; it never
         manufactures a release or moves an immutable tag.</p>
       <p>A GitLab-only command-line install starts from the mirror's raw bootstrapper with
@@ -2042,7 +2055,8 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         &mdash; GitHub requires <code>Actions: write</code> on the source repo) with a <code>tier</code> input, which
         verifies the <code>v&lt;version&gt;</code> tag exists, runs the catalog/source-sync gate, edits the catalog via
         <code>promote-release.py --tier</code> (set the pointer, flag the entry, bump the version), and commits to the
-        default branch; the same buttons un-mark to roll a channel back to the previous build in that tier.</p>
+        default branch or opens a reviewable catalog PR when it is protected. Promotion remains pending until
+        that PR merges and Release publishes it; the same buttons un-mark to roll a channel back to the previous build in that tier.</p>
       <h3>Relocation pointer</h3>
       <p><code>.github/labview-ci/source.json</code> names the canonical NI repository, <code>ni/LabVIEW-CI-CD-Toolkit</code>,
         without breaking installs: if it names a different repo than the current one, the bootstrappers and the
