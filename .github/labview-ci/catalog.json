@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "4.18.4",
+  "version": "4.18.5",
   "stableVersion": "4.16.3",
   "betaVersion": "4.11.10",
   "name": "LabVIEW CI",
@@ -13,6 +13,7 @@
   "history": {
     "comment": "Release notes for the tooling, newest first. `version` (above) is the CURRENT published release and MUST equal releases[0].version. The dashboard version badge and the What's New dialog read these notes to tell a consumer what changed between the version they run and the latest this source repo publishes. Each published version should also be tagged v<version> in this repo so consumers can pin an update to a specific release. `stableVersion` (top level, optional) names the newest release the maintainer has promoted to the stable channel, and each such release entry is flagged \"stable\": true; installs and upgrades default to the stable channel and fall back to `version` (the beta tip) only while no stable release has been promoted yet. `betaVersion` is the same pointer for the beta (release-candidate) channel, with entries flagged \"beta\": true. The install/upgrade channel picker is cumulative: release only (stable), release+beta (beta), or release+beta+dev (every published build).",
     "releases": [
+      {"version": "4.18.5", "date": "2026-10-05", "notes": "Fix release and promotion for NI protected branches"},
       {"version": "4.18.4", "date": "2026-09-18", "notes": "dashboard: surface SBOM reports on GitHub Pages"},
       {"version": "4.18.3", "date": "2026-09-18", "notes": "Bug fix: dashboard's populate history checkboxes"},
       {"version": "4.18.2", "date": "2026-08-31", "notes": "Running CI on a fresh fork of a configured repository now works on the first try. A fork copies the workflows but never the worker container images, so every container activity used to fail on an opaque \"manifest unknown\" pull error. The dependency gate now detects that the worker image has never been built, starts the Build LabVIEW CI Image run itself, waits for it (a first build takes 80-100 minutes), and then continues. When it cannot start the build automatically, the job stops up front with instructions instead of a doomed pull, the commit status reads \"Worker image unavailable - build it via Configure Workers\" rather than a generic activity failure, and a pinned container tag that was never published is reported as a configuration error. Applies the same on any repository whose first worker build never ran."},
