@@ -10,7 +10,7 @@
 .EXAMPLE
     From the root of the repo you want to add CI to:
 
-    & ([scriptblock]::Create((irm https://raw.githubusercontent.com/elijah286/LabVIEW-CI-with-Containers/main/.github/labview-ci/install.ps1))) `
+    & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ni/LabVIEW-CI-CD-Toolkit/main/.github/labview-ci/install.ps1))) `
         --activities masscompile,vi-analyzer,vidiff,dashboard --os windows,linux --labview-version 2026
 
 .NOTES
@@ -29,7 +29,7 @@ param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest)
 $ErrorActionPreference = 'Stop'
 
 $SourceHost      = 'github'
-$SourceRepo      = 'elijah286/LabVIEW-CI-with-Containers'
+$SourceRepo      = 'ni/LabVIEW-CI-CD-Toolkit'
 $SourceRef       = 'main'
 $SourceGitLabUrl = 'https://gitlab.com'
 $SrcDir          = $null
@@ -97,7 +97,7 @@ if (-not $SrcDir -and $IsUpdate -and -not $ExplicitSource) {
 if ($SourceHost -notin @('github', 'gitlab')) {
     throw '--source-host must be github or gitlab.'
 }
-if ($SourceHost -eq 'gitlab' -and -not $ExplicitRepo -and $SourceRepo -eq 'elijah286/LabVIEW-CI-with-Containers') {
+if ($SourceHost -eq 'gitlab' -and -not $ExplicitRepo -and $SourceRepo -eq 'ni/LabVIEW-CI-CD-Toolkit') {
     $SourceRepo = 'elijah286/ci-for-labview'
 }
 

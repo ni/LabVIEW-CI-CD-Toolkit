@@ -48,6 +48,7 @@ concurrency:
 
 permissions:
   contents: write   # tags, releases, and the catalog commit (built-in token; no PAT)
+  pull-requests: write
 
 jobs:
   release:
@@ -56,8 +57,7 @@ jobs:
     # do not trigger workflows anyway) and honour an explicit opt-out.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (!contains(github.event.head_commit.message, '[skip release]') &&
-       github.event.head_commit.author.name != 'github-actions[bot]')
+      !contains(github.event.head_commit.message, '[skip release]')
     steps:
       - name: Checkout (full history + tags)
         uses: actions/checkout@v5
@@ -67,7 +67,17 @@ jobs:
       - name: Validate catalog/source sync
         run: python3 .github/labview/validate-catalog-source-sync.py
 
+      - name: Detect a merged prepared catalog PR
+        id: resume
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/labview/release-catalog-pr.py resume
+
+      - name: Test protected-branch release routing
+        run: python3 .github/labview/test-release-catalog-pr.py
+
       - name: Decide the bump level and the fallback note
+        if: steps.resume.outputs.prepared != 'true'
         id: plan
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -115,6 +125,7 @@ jobs:
           echo "Fallback note: $NOTE"
 
       - name: Write the next version into the catalog
+        if: steps.resume.outputs.prepared != 'true'
         id: apply
         env:
           # Via env, never interpolated into the script: the fallback note is a
@@ -140,8 +151,11 @@ jobs:
       - name: Re-validate before committing
         run: python3 .github/labview/validate-catalog-source-sync.py
 
-      - name: Commit the catalog to main
+      - name: Commit the catalog or open a review PR
+        if: steps.resume.outputs.prepared != 'true'
+        id: catalog
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.apply.outputs.version }}
         run: |
           set -euo pipefail
@@ -151,20 +165,11 @@ jobs:
           if git diff --cached --quiet; then
             echo "::error::version.py produced no catalog change"; exit 1
           fi
-          git commit -m "Release ${VERSION} [skip release]"
-          # main is hot: another merge may land between checkout and push.
-          # Rebasing is safe because this commit only touches the catalog and the
-          # consumed note fragments.
-          for i in 1 2 3 4 5; do
-            if git push origin "HEAD:${GITHUB_REF_NAME}"; then echo "pushed"; exit 0; fi
-            echo "push rejected (attempt $i); rebasing onto the latest ${GITHUB_REF_NAME}"
-            git fetch origin "${GITHUB_REF_NAME}"
-            git rebase "origin/${GITHUB_REF_NAME}" || { echo "::error::rebase conflict on the catalog"; exit 1; }
-            sleep 3
-          done
-          echo "::error::could not push the catalog after retries"; exit 1
+          git commit -m "Prepare release ${VERSION}"
+          python3 .github/labview/release-catalog-pr.py push --version "$VERSION"
 
       - name: Tag, move aliases, publish the release
+        if: steps.resume.outputs.prepared == 'true' || steps.catalog.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORCE_ALIASES: ${{ inputs.move_aliases }}
@@ -172,7 +177,7 @@ jobs:
 
       - name: Synchronize the GitLab distribution mirror
         id: gitlab_mirror
-        if: vars.GITLAB_MIRROR_ENABLED == 'true'
+        if: vars.GITLAB_MIRROR_ENABLED == 'true' && (steps.resume.outputs.prepared == 'true' || steps.catalog.outputs.published == 'true')
         # The release is fully published by this point, so a mirror hiccup (bad
         # token, GitLab outage) must not paint the whole run red — that reads as
         # a broken release on the dashboard when nothing about the release

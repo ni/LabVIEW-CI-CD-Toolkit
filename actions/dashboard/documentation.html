@@ -166,9 +166,9 @@
     <main class="content">
       <div class="repo-home">
         This documentation describes the
-        <a class="lvci-repo-link" data-show-name href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">LabVIEW-CI-with-Containers</a>
+        <a class="lvci-repo-link" data-show-name href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">LabVIEW-CI-CD-Toolkit</a>
         tooling, maintained by
-        <a class="lvci-owner-link" href="https://github.com/elijah286" target="_blank" rel="noopener">elijah286</a>.
+        <a class="lvci-owner-link" href="https://github.com/ni" target="_blank" rel="noopener">NI</a>.
         Looking for short answers instead? See the <a href="faq.html">FAQ</a>.
       </div>
 
@@ -504,7 +504,7 @@ flowchart TD
       <pre><code>schemaVersion: 1
     installedVersion: 4.17.4
 source:
-  repo: elijah286/LabVIEW-CI-with-Containers
+  repo: ni/LabVIEW-CI-CD-Toolkit
       ref:  v4.17.4            # pinned to an IMMUTABLE tag, never "main"
   distribution:            # archive origin chosen by the bootstrapper
     host: gitlab
@@ -655,7 +655,7 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
 
       <h3>Migrating or rehoming the project</h3>
       <p>A small relocation pointer (<code>.github/labview-ci/source.json</code>) lets the tooling's source move —
-        for example to an official NI repository — without breaking existing installs. If it names a different
+        now hosted at <code>ni/LabVIEW-CI-CD-Toolkit</code> — without breaking existing installs. If it names a different
         repo than the current one, the bootstrappers and the update workflow follow it automatically and re-pin a
         consumer's manifest to the new home on the next update. See <a href="#versioning">§18</a>.</p>
 
@@ -1962,8 +1962,21 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
       <h2 id="versioning">18. Versioning &amp; updates <a class="anchor" href="#versioning">#</a></h2>
       <p><code>release.yml</code> runs for every eligible contributor push to <code>main</code>. It derives the next
         version from published tags, writes the matching catalog entry, and cuts the immutable tag and GitHub Release
-        in the same run. The minor alias advances to the newest patch on its line; the major alias advances only when
+        in the same run when the catalog push is permitted. On protected branches it opens a catalog pull request
+        instead and defers publication until that PR is reviewed and merged. The minor alias advances to the newest patch on its line; the major alias advances only when
         a release is promoted to stable. Release notes are generated from <code>history.releases[0]</code>.</p>
+      <p><code>release-catalog-pr.py</code> handles the protected-branch fallback for both release and promotion.
+        It opens a <code>lvci-release/</code> branch only for GitHub's explicit pull-request-required rejection;
+        authentication and other rule failures remain errors. Enable <strong>Allow GitHub Actions to create and
+        approve pull requests</strong> in the repository's Actions settings (subject to organization policy).
+        The workflows request <code>pull-requests: write</code> but never approve or merge their own PRs and
+        do not change branch protection.</p>
+      <p>After merging a prepared catalog PR, Release verifies that it was created by
+        <code>github-actions[bot]</code> in this repository and changes only the catalog and release-note fragments.
+        It publishes the prepared version without generating another bump. If the merge does not trigger Release,
+        run it manually on the default branch immediately after the merge, before other changes land. Review one
+        pending catalog PR at a time; regenerate a stale or conflicting proposal rather than changing historical
+        tags. Both release workflows must run on the default branch.</p>
       <h3>Canonical source and GitLab distribution</h3>
       <p>GitHub is the canonical source of implementation and releases. When the optional GitLab mirror is enabled,
         the release workflow runs <code>sync-gitlab-mirror.sh</code> after GitHub has published an immutable tag. It
@@ -1977,7 +1990,7 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         secret <code>GITLAB_MIRROR_TOKEN</code> (optionally <code>GITLAB_MIRROR_USERNAME</code>) to enable the
         post-release push. The token needs GitLab <code>write_repository</code> access, and a protected mirror
         <code>main</code> branch must permit that automation identity to force-update the release snapshot. An enabled
-        mirror failure leaves the release workflow visibly failed. If it needs recovery,
+        mirror failure produces a warning without invalidating the published release. If it needs recovery,
         the source-only <strong>Sync GitLab Distribution</strong> workflow accepts an immutable tag; it never
         manufactures a release or moves an immutable tag.</p>
       <p>A GitLab-only command-line install starts from the mirror's raw bootstrapper with
@@ -2042,12 +2055,24 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         &mdash; GitHub requires <code>Actions: write</code> on the source repo) with a <code>tier</code> input, which
         verifies the <code>v&lt;version&gt;</code> tag exists, runs the catalog/source-sync gate, edits the catalog via
         <code>promote-release.py --tier</code> (set the pointer, flag the entry, bump the version), and commits to the
-        default branch; the same buttons un-mark to roll a channel back to the previous build in that tier.</p>
+        default branch or opens a reviewable catalog PR when it is protected. Promotion remains pending until
+        that PR merges and Release publishes it; the same buttons un-mark to roll a channel back to the previous build in that tier.</p>
       <h3>Relocation pointer</h3>
-      <p><code>.github/labview-ci/source.json</code> lets the project migrate (for example to an official NI repo)
+      <p><code>.github/labview-ci/source.json</code> names the canonical NI repository, <code>ni/LabVIEW-CI-CD-Toolkit</code>,
         without breaking installs: if it names a different repo than the current one, the bootstrappers and the
         update workflow follow it automatically, and a redirected update re-pins the consumer's manifest to the new
         home.</p>
+      <p>The source dashboard, documentation, FAQ, and installer are published at
+        <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/">ni.github.io/LabVIEW-CI-CD-Toolkit</a>.
+        GitHub repository redirects do not redirect the old GitHub Pages site, so published links must use this
+        new address. The pointer's GitHub distribution, the catalog's <code>source.repo</code>, and this repository's
+        install manifest all name the same NI source. That matching manifest makes the source dashboard publish
+        its current commit's page bundle rather than an older installed release; consumer dashboards still use
+        their opted-in tooling ref.</p>
+      <p>Immutable releases made before the transfer retain their original source metadata. Publish a release
+        containing the updated metadata and promote it to the desired install channel so new default installs
+        use the NI source. Keep legacy GitHub repository redirects reachable for existing clients following
+        the relocation pointer; do not rewrite historical tags or assume container packages moved with the repo.</p>
 
       <!-- 19 ──────────────────────────────────────────────────────────────── -->
       <h2 id="discovery">19. Client discovery <a class="anchor" href="#discovery">#</a></h2>
@@ -2305,7 +2330,7 @@ flowchart TD
         warm Docker layer cache, so the multi-gigabyte worker image is not re-pulled every job (see §22).</div>
 
       <p style="margin-top:40px"><a href="faq.html">← Back to the FAQ</a> &nbsp;·&nbsp;
-        <a class="lvci-repo-link" data-show-slug href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">View the source on GitHub →</a></p>
+        <a class="lvci-repo-link" data-show-slug href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">View the source on GitHub →</a></p>
     </main>
   </div>
 
@@ -2315,7 +2340,7 @@ flowchart TD
     // Resolve every repo link the same way faq.html does: read the repo this
     // dashboard was installed from (same-origin catalog.json), then follow the
     // relocation pointer (.github/labview-ci/source.json) to the canonical home.
-    var FALLBACK = { repo: "elijah286/LabVIEW-CI-with-Containers", ref: "main" };
+    var FALLBACK = { repo: "ni/LabVIEW-CI-CD-Toolkit", ref: "main" };
     function paint(repo) {
       var parts = String(repo).split("/"), owner = parts[0] || "", name = parts[1] || "";
       var url = "https://github.com/" + repo, slug = "github.com/" + repo;

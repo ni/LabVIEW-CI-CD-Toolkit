@@ -49,9 +49,9 @@
   <div class="wrap">
     <div class="repo-home">
       These tools were installed from the
-      <a class="lvci-repo-link" data-show-name href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">LabVIEW-CI-with-Containers</a>
+      <a class="lvci-repo-link" data-show-name href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">LabVIEW-CI-CD-Toolkit</a>
       repo, which are maintained by
-      <a class="lvci-owner-link" href="https://github.com/elijah286" target="_blank" rel="noopener">elijah286</a>.
+      <a class="lvci-owner-link" href="https://github.com/ni" target="_blank" rel="noopener">NI</a>.
     </div>
     <h1>Frequently Asked Questions</h1>
     <p class="intro">Common questions about LabVIEW CI setup, configuration, and operation. Want the deep, implementation-level details instead? Read the <a href="documentation.html">full Documentation</a>.</p>
@@ -325,7 +325,7 @@
       </div>
       <div class="faq-a">
         <p>LabVIEW CI is open-source on GitHub:</p>
-        <p><strong><a class="lvci-repo-link" data-show-slug href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">github.com/elijah286/LabVIEW-CI-with-Containers</a></strong></p>
+        <p><strong><a class="lvci-repo-link" data-show-slug href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">github.com/ni/LabVIEW-CI-CD-Toolkit</a></strong></p>
         <p>You can:</p>
         <ul>
           <li>Open an issue to report a bug or request a feature</li>
@@ -342,7 +342,7 @@
     // the same way every other surface does: read the repo this dashboard was
     // installed from (same-origin catalog.json), then follow the relocation pointer
     // (.github/labview-ci/source.json) to wherever the tooling officially lives now.
-    var FALLBACK = { repo: "elijah286/LabVIEW-CI-with-Containers", ref: "main" };
+    var FALLBACK = { repo: "ni/LabVIEW-CI-CD-Toolkit", ref: "main" };
     function paint(repo) {
       var parts = String(repo).split("/"), owner = parts[0] || "", name = parts[1] || "";
       var url = "https://github.com/" + repo, slug = "github.com/" + repo;

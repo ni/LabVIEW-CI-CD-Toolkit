@@ -5,14 +5,14 @@
 Push a commit and this pipeline spins up headless LabVIEW inside a throwaway Docker container on your GitHub Actions or GitLab CI runner, runs the code-quality checks you choose, and publishes the results as a polished Pages dashboard. There's no build server to babysit, no license server to wire up, and nothing running on anyone else's infrastructure — every container executes in *your* CI environment, under your account's limits.
 
 <p align="center">
-  <a href="https://elijah286.github.io/LabVIEW-CI-with-Containers/"><img src="https://img.shields.io/badge/View%20the%20Live%20Dashboard-1f6feb?style=for-the-badge&logo=githubpages&logoColor=white" alt="View the live LabVIEW CI dashboard" height="42"></a>
+  <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/"><img src="https://img.shields.io/badge/View%20the%20Live%20Dashboard-1f6feb?style=for-the-badge&logo=githubpages&logoColor=white" alt="View the live LabVIEW CI dashboard" height="42"></a>
   &nbsp;&nbsp;
-  <a href="https://elijah286.github.io/LabVIEW-CI-with-Containers/integrate.html"><img src="https://img.shields.io/badge/Apply%20to%20New%20Repo-238636?style=for-the-badge&logo=github&logoColor=white" alt="Apply LabVIEW CI to a new repository" height="42"></a>
+  <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/integrate.html"><img src="https://img.shields.io/badge/Apply%20to%20New%20Repo-238636?style=for-the-badge&logo=github&logoColor=white" alt="Apply LabVIEW CI to a new repository" height="42"></a>
 </p>
 
 <p align="center">
-  <a href="https://elijah286.github.io/LabVIEW-CI-with-Containers/documentation.html">Documentation</a> &nbsp;·&nbsp;
-  <a href="https://elijah286.github.io/LabVIEW-CI-with-Containers/faq.html">FAQ</a> &nbsp;·&nbsp;
+  <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/documentation.html">Documentation</a> &nbsp;·&nbsp;
+  <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/faq.html">FAQ</a> &nbsp;·&nbsp;
   <a href="example/README.md">Example project</a>
 </p>
 
@@ -54,13 +54,13 @@ Enable only the capabilities you want — each runs on its own and writes its ow
 
 The dashboard for this repo's own [example project](example/README.md) — a real ~54-VI LabVIEW application with a dozen revisions of genuine history — is published and continuously updated:
 
-**▶ [View the live dashboard](https://elijah286.github.io/LabVIEW-CI-with-Containers/)** — click any cell to open the underlying Mass Compile, VI Analyzer, VIDiff, or VI Browser report.
+**▶ [View the live dashboard](https://ni.github.io/LabVIEW-CI-CD-Toolkit/)** — click any cell to open the underlying Mass Compile, VI Analyzer, VIDiff, or VI Browser report.
 
 ## Add it to your repository
 
 The fastest path is the interactive installer — the same **Apply to New Repo** button you'll find on every dashboard:
 
-**➕ [Apply to New Repo](https://elijah286.github.io/LabVIEW-CI-with-Containers/integrate.html)** — pick your LabVIEW version, platforms, and capabilities; choose GitHub or GitLab; and open a reviewable install pull/merge request with everything wired up. GitHub installs can enable GitHub Pages and add a dashboard badge to your README in the same pull request.
+**➕ [Apply to New Repo](https://ni.github.io/LabVIEW-CI-CD-Toolkit/integrate.html)** — pick your LabVIEW version, platforms, and capabilities; choose GitHub or GitLab; and open a reviewable install pull/merge request with everything wired up. GitHub installs can enable GitHub Pages and add a dashboard badge to your README in the same pull request.
 
 **Private GitHub repositories are supported** — see [installing to a private GitHub repository](.github/labview-ci/README.md#installing-to-a-private-github-repository) for the token setup.
 
@@ -72,7 +72,7 @@ Prefer the command line, or want a thin GitHub reusable-workflow caller? Both ar
 # .github/workflows/labview-ci.yml
 jobs:
   labview-ci:
-    uses: elijah286/LabVIEW-CI-with-Containers/.github/workflows/labview-ci.reusable.yml@v4
+    uses: ni/LabVIEW-CI-CD-Toolkit/.github/workflows/labview-ci.reusable.yml@v4
     secrets: inherit
 ```
 
@@ -110,17 +110,17 @@ push / PR ─▶ reusable workflow ─▶ per-capability container jobs
 - **Your infrastructure, your control.** Everything runs on GitHub-hosted or self-hosted Actions runners, or GitLab runners under your account. Nothing touches NI's or the author's servers.
 - **Catalog-driven and versioned.** A single `catalog.json` is the source of truth for every capability; the configurator and installer both read it. GitHub clients can adopt updates from the dashboard; GitLab clients refresh from the distribution recorded in their manifest.
 
-The [Documentation](https://elijah286.github.io/LabVIEW-CI-with-Containers/documentation.html) tells the full implementation-level story.
+The [Documentation](https://ni.github.io/LabVIEW-CI-CD-Toolkit/documentation.html) tells the full implementation-level story.
 
 ## Documentation & help
 
-- **[Full Documentation](https://elijah286.github.io/LabVIEW-CI-with-Containers/documentation.html)** — an implementation-level reference for expert LabVIEW developers: how the worker images are built, how runners launch headless LabVIEW, how VIPM dependencies are baked in, the catalog model, the report data contracts, the security boundaries, and how to extend or adapt the system.
-- **[FAQ](https://elijah286.github.io/LabVIEW-CI-with-Containers/faq.html)** — short, practical answers about setup, configuration, and day-to-day operation.
+- **[Full Documentation](https://ni.github.io/LabVIEW-CI-CD-Toolkit/documentation.html)** — an implementation-level reference for expert LabVIEW developers: how the worker images are built, how runners launch headless LabVIEW, how VIPM dependencies are baked in, the catalog model, the report data contracts, the security boundaries, and how to extend or adapt the system.
+- **[FAQ](https://ni.github.io/LabVIEW-CI-CD-Toolkit/faq.html)** — short, practical answers about setup, configuration, and day-to-day operation.
 - **[Example project](example/README.md)** — the LabVIEW application this repo runs its own CI on.
 
 ## Contributing
 
-Contributions are welcome — issues, fixes, and new capabilities. GitHub is the canonical source; do not contribute independently to the GitLab distribution mirror. The architecture is built to make extension cheap: because the system is catalog-driven, adding a capability is usually a single entry in [`catalog.json`](.github/labview-ci/catalog.json) plus the action that implements it. Start with the [Documentation](https://elijah286.github.io/LabVIEW-CI-with-Containers/documentation.html) ("Capabilities in depth" and the architecture overview) to see how the pieces fit, then open an issue or pull request.
+Contributions are welcome — issues, fixes, and new capabilities. GitHub is the canonical source; do not contribute independently to the GitLab distribution mirror. The architecture is built to make extension cheap: because the system is catalog-driven, adding a capability is usually a single entry in [`catalog.json`](.github/labview-ci/catalog.json) plus the action that implements it. Start with the [Documentation](https://ni.github.io/LabVIEW-CI-CD-Toolkit/documentation.html) ("Capabilities in depth" and the architecture overview) to see how the pieces fit, then open an issue or pull request.
 
 Pull requests from forks run the same analysis and retain their report artifacts for review, but cannot update this repository's shared GitHub Pages dashboard. That is intentional: fork-provided code never receives permission to write here. After a reviewed PR merges, the `main` pipeline reruns with repository permissions and publishes the canonical report. Collaborators who need pre-merge dashboard publication should use feature branches in this repository rather than forks.
 

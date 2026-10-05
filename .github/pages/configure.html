@@ -265,7 +265,7 @@
   <script>
   (() => {
     "use strict";
-    const SOURCE_FALLBACK = { repo: "elijah286/LabVIEW-CI-with-Containers", ref: "main" };
+    const SOURCE_FALLBACK = { repo: "ni/LabVIEW-CI-CD-Toolkit", ref: "main" };
     const TOK_KEY = "lvci_dispatch_token";
     const ANTIDOC_PKG = "wovalab_lib_antidoc_cli";
 
@@ -1291,7 +1291,7 @@
     async function explainDispatch404(repo, file) {
       try {
         const r = await fetch("https://api.github.com/repos/" + repo + "/contents/.github/workflows/" + file, { headers: { "Accept": "application/vnd.github+json" }, cache: "no-cache" });
-        if (r.ok) return `Not a token problem - ${file} exists in this repository, but GitHub has not registered it as a runnable workflow, so dispatching it returns 404. This happens when workflow files were pushed while GitHub Actions was disabled (typical for fork installs). Fix: run What's New > Update now - tooling updates rewrite every workflow file (each carries a version stamp), and that push makes GitHub register them - or push any commit that edits .github/workflows/${file}, then retry.`;
+        if (r.ok) return "<strong>Not a token problem</strong> — <code class=\"inl\">" + escapeHtml(file) + "</code> exists in this repository, but GitHub has not registered it as a runnable workflow, so dispatching it returns 404. This happens when workflow files were pushed while GitHub Actions was disabled (typical for fork installs). Fix: run <strong>What's New ▸ Update now</strong> — tooling updates rewrite every workflow file (each carries a version stamp), and that push makes GitHub register them — or push any commit that edits <code class=\"inl\">.github/workflows/" + escapeHtml(file) + "</code>, then retry.";
       } catch (_) {}
       return "";
     }

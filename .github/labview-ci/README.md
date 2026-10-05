@@ -53,14 +53,14 @@ From the root of the repo you want to add CI to:
 
 ```bash
 # macOS / Linux / Git Bash
-curl -fsSL https://raw.githubusercontent.com/elijah286/LabVIEW-CI-with-Containers/main/.github/labview-ci/install.sh \
+curl -fsSL https://raw.githubusercontent.com/ni/LabVIEW-CI-CD-Toolkit/main/.github/labview-ci/install.sh \
   | bash -s -- --activities masscompile,vi-analyzer,vidiff,dashboard \
                --os windows,linux --labview-version 2026
 ```
 
 ```powershell
 # Windows PowerShell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/elijah286/LabVIEW-CI-with-Containers/main/.github/labview-ci/install.ps1))) `
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ni/LabVIEW-CI-CD-Toolkit/main/.github/labview-ci/install.ps1))) `
     --activities masscompile,vi-analyzer,vidiff,dashboard --os windows,linux --labview-version 2026
 ```
 
@@ -120,7 +120,7 @@ Private GitHub repositories are supported. The main difference is that GitHub
 cannot read or write a private target repository unless you authenticate with a
 fine-grained personal access token that has access to that specific repository.
 The easiest path is the published
-[Apply to New Repo page](https://elijah286.github.io/LabVIEW-CI-with-Containers/integrate.html),
+[Apply to New Repo page](https://ni.github.io/LabVIEW-CI-CD-Toolkit/integrate.html),
 which walks you through creating that token with the permissions pre-filled and
 then opens the install pull request for you.
 
@@ -149,7 +149,7 @@ bootstrapper from the private repo's working tree. The installer usually infers
 the GitHub repo from `origin`, but you can specify it explicitly when needed:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elijah286/LabVIEW-CI-with-Containers/main/.github/labview-ci/install.sh \
+curl -fsSL https://raw.githubusercontent.com/ni/LabVIEW-CI-CD-Toolkit/main/.github/labview-ci/install.sh \
   | bash -s -- --repo your-org/your-private-repo \
           --activities masscompile,vi-analyzer,vidiff,dashboard \
           --os windows,linux --labview-version 2026
@@ -173,7 +173,7 @@ repositories are not listed by the public client discovery page.
 | `--os windows,linux` | Target operating systems |
 | `--labview-version` | LabVIEW year (default 2026) |
 | `--image-name` | Worker image name override |
-| `--repo owner/name` | Target repo (default: inferred from the git remote); use the [Apply to New Repo page](https://elijah286.github.io/LabVIEW-CI-with-Containers/integrate.html) for a guided browser install |
+| `--repo owner/name` | Target repo (default: inferred from the git remote); use the [Apply to New Repo page](https://ni.github.io/LabVIEW-CI-CD-Toolkit/integrate.html) for a guided browser install |
 | `--provider github\|gitlab` | Target CI provider to scaffold (default: GitHub) |
 | `--source-host github\|gitlab` | Bootstrap distribution to fetch (default: GitHub) |
 | `--source-repo owner/name` | Tooling repository on that distribution |
@@ -191,7 +191,7 @@ A copy install is a snapshot. To pull later improvements **without losing your
 config**, re-run the bootstrapper (or `install.py`) with `--update`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/elijah286/LabVIEW-CI-with-Containers/main/.github/labview-ci/install.sh \
+curl -fsSL https://raw.githubusercontent.com/ni/LabVIEW-CI-CD-Toolkit/main/.github/labview-ci/install.sh \
   | bash -s -- --update
 ```
 
