@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "b1fbd533642824157066879493697e03459cd2e0",
+  "sha": "c50f706226e4ad341f5c5b20ee3653bed660e862",
   "revisions": [
+    {
+      "sha": "c50f706226e4ad341f5c5b20ee3653bed660e862",
+      "short": "c50f706",
+      "message": "Merge pull request #75 from ni/fix/protected-branch-release-prs",
+      "author": "Milena",
+      "date": "2026-10-05T19:47:17Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "f7a54ca5d65a83c30876e509399533830709bc27",
+      "short": "f7a54ca",
+      "message": "Fix release and promotion on PR-protected branches",
+      "author": "Elijah Kerry",
+      "date": "2026-10-05T19:41:31Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "b1fbd533642824157066879493697e03459cd2e0",
       "short": "b1fbd53",
@@ -882,24 +900,6 @@
       "message": "updated sbom generation yml",
       "author": "daniel-coons",
       "date": "2026-07-31T18:28:57Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "c9db59e73b37d31ea9eef71e0a22cb9fffe765f6",
-      "short": "c9db59e",
-      "message": "updated scripting based on other repo integration testing",
-      "author": "daniel-coons",
-      "date": "2026-07-31T18:27:45Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "baba8b6d5fbedf08bb20b658c4529c1f3df0f0fb",
-      "short": "baba8b6",
-      "message": "Merge pull request #2 from danielcoons/feature/#22-SBOM",
-      "author": "Daniel Coons",
-      "date": "2026-07-30T19:39:39Z",
       "project": false,
       "dep_only": false
     },
