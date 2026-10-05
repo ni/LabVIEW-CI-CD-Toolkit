@@ -505,6 +505,22 @@
       else setMonitorStatus(counts.monitored + " of " + counts.total + " dependency files monitored.", "ok");
     }
     function token(){ try { return localStorage.getItem(TOK_KEY) || ""; } catch (_) { return ""; } }
+    // A dispatch 404 has three distinct causes: the token cannot see the repo, the
+    // workflow file is not installed, or -- the sneaky one -- the file EXISTS but
+    // GitHub never registered it as a workflow. Fork installs push the pipeline
+    // while Actions is still disabled, and GitHub only registers a workflow file
+    // when a push touches it while Actions is enabled (or an event first runs it),
+    // so a dispatch-only workflow can 404 forever with a perfectly good token.
+    // Probe the file anonymously (works on public repos; on private repos this
+    // yields "" and the token guidance stands) so the fix offered is the right one.
+    async function explainDispatch404(file){
+      if (!repo.includes("/")) return "";
+      try {
+        const r = await fetch("https://api.github.com/repos/" + repo + "/contents/.github/workflows/" + file, { headers:{ "Accept":"application/vnd.github+json" }, cache:"no-cache" });
+        if (r.ok) return "<strong>Not a token problem</strong> — <code>" + esc(file) + "</code> exists in this repository, but GitHub has not registered it as a runnable workflow, so dispatching it returns 404. This happens when workflow files were pushed while GitHub Actions was disabled (typical for fork installs). Fix: run <strong>What's New ▸ Update now</strong> — tooling updates rewrite every workflow file (each carries a version stamp), and that push makes GitHub register them — or push any commit that edits <code>.github/workflows/" + esc(file) + "</code>, then retry.";
+      } catch (_) {}
+      return "";
+    }
     function workflowRef(){ return (generatedInventory && (generatedInventory.ref || generatedInventory.defaultBranch)) || "main"; }
     function workflowUrl(){ return repo.includes("/") ? "https://github.com/" + repo + "/actions/workflows/reconfigure.yml" : "https://github.com/actions/workflows/reconfigure.yml"; }
     function tokenUrl(){
@@ -548,7 +564,13 @@
         if (btn) btn.disabled = false;
         if (r.status === 401) { try { localStorage.removeItem(TOK_KEY); } catch (_) {} showTokenPanel("That token was rejected. Paste a valid fine-grained token with <strong>Actions: Read and write</strong> for this repository."); setMonitorStatus("Token rejected (401).", "err"); return; }
         if (r.status === 403) { showTokenPanel("The saved token cannot dispatch workflows here. Grant <strong>Actions: Read and write</strong> for <code>" + esc(repo) + "</code>."); setMonitorStatus("Dispatch forbidden (403).", "err"); return; }
-        if (r.status === 404) { showTokenPanel("The saved token cannot see <code>" + esc(repo) + "</code>, or this repo does not have <code>reconfigure.yml</code> installed."); setMonitorStatus("Workflow not found or repo not accessible (404).", "err"); return; }
+        if (r.status === 404) {
+          const unregistered = await explainDispatch404("reconfigure.yml");
+          if (unregistered) { hideTokenPanel(); setMonitorStatus(unregistered, "err"); return; }
+          showTokenPanel("The saved token cannot see <code>" + esc(repo) + "</code>, or this repo does not have <code>reconfigure.yml</code> installed.");
+          setMonitorStatus("Workflow not found or repo not accessible (404).", "err");
+          return;
+        }
         setMonitorStatus("Dispatch failed (HTTP " + r.status + ").", "err");
       } catch (e) {
         if (btn) { btn.disabled = false; btn.textContent = "Save monitored files"; }
@@ -764,7 +786,14 @@
           if (btn) { btn.disabled = false; btn.textContent = "Run the container update"; }
           if (r.status === 401) { try { localStorage.removeItem(TOK_KEY); } catch (_) {} pendingTokenAction = dispatchContainerUpdate; showTokenPanel("That token was rejected. Paste a valid fine-grained token with <strong>Actions: Read and write</strong> for this repository."); setUpdateStatus("Token rejected (401).", "err"); return; }
           if (r.status === 403) { pendingTokenAction = dispatchContainerUpdate; showTokenPanel("The saved token cannot dispatch workflows here. Grant <strong>Actions: Read and write</strong> for <code>" + esc(repo) + "</code>."); setUpdateStatus("Dispatch forbidden (403).", "err"); return; }
-          if (r.status === 404) { pendingTokenAction = dispatchContainerUpdate; showTokenPanel("The saved token cannot see <code>" + esc(repo) + "</code>, or this repo does not have <code>" + esc(t.file) + "</code> installed."); setUpdateStatus("Workflow <code>" + esc(t.file) + "</code> not found or repo not accessible (404).", "err"); return; }
+          if (r.status === 404) {
+            const unregistered = await explainDispatch404(t.file);
+            if (unregistered) { hideTokenPanel(); setUpdateStatus(unregistered, "err"); return; }
+            pendingTokenAction = dispatchContainerUpdate;
+            showTokenPanel("The saved token cannot see <code>" + esc(repo) + "</code>, or this repo does not have <code>" + esc(t.file) + "</code> installed.");
+            setUpdateStatus("Workflow <code>" + esc(t.file) + "</code> not found or repo not accessible (404).", "err");
+            return;
+          }
           setUpdateStatus("Dispatch of <code>" + esc(t.file) + "</code> failed (HTTP " + r.status + ").", "err");
           return;
         }

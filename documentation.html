@@ -149,6 +149,7 @@
             <li class="sub"><a href="#cap-unittests">Unit Tests (worked example)</a></li>
             <li class="sub"><a href="#cap-antidoc">Antidoc</a></li>
             <li class="sub"><a href="#cap-snapshots">VI Snapshots / Browser</a></li>
+            <li class="sub"><a href="#cap-sbom">SBOM Generation</a></li>
           </ol>
         </li>
         <li><a href="#contracts">17. Report data contracts</a></li>
@@ -165,9 +166,9 @@
     <main class="content">
       <div class="repo-home">
         This documentation describes the
-        <a class="lvci-repo-link" data-show-name href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">LabVIEW-CI-with-Containers</a>
+        <a class="lvci-repo-link" data-show-name href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">LabVIEW-CI-CD-Toolkit</a>
         tooling, maintained by
-        <a class="lvci-owner-link" href="https://github.com/elijah286" target="_blank" rel="noopener">elijah286</a>.
+        <a class="lvci-owner-link" href="https://github.com/ni" target="_blank" rel="noopener">NI</a>.
         Looking for short answers instead? See the <a href="faq.html">FAQ</a>.
       </div>
 
@@ -434,6 +435,18 @@ flowchart TD
         alternative is the <code>install.py</code> command-line installer. Both read the same catalog and produce
         the same result.</p>
 
+      <h3>GitLab CI</h3>
+      <p>Pass <code>--provider gitlab</code> to the command-line installer, or choose GitLab in the browser
+        configurator. It copies the portable LabVIEW drivers under <code>.github/</code>, a native provider package
+        under <code>.gitlab/labview-ci/</code>, and a generated provider pipeline. A new repository receives a small
+        <code>.gitlab-ci.yml</code> root file that includes <code>.gitlab/labview-ci/pipeline.yml</code>. The browser
+        flow creates a GitLab merge request using a token with the <code>api</code> scope.</p>
+      <p>An existing root pipeline is never text-merged. It must already include that local provider pipeline; if it
+        declares <code>stages</code>, its list must contain <code>prepare</code>, <code>verify</code>, and
+        <code>pages</code>. Otherwise the installer stops before writing anything and explains the manual include.
+        The command-line <code>--force</code> option deliberately replaces the root pipeline only when that is the
+        operator's intention. The browser performs the same compatibility check before it opens a merge request.</p>
+
       <h3>What you need first</h3>
       <ul>
         <li>A GitHub repository for your LabVIEW project (it can already have history).</li>
@@ -450,7 +463,7 @@ flowchart TD
       <table>
         <thead><tr><th>Layer</th><th>File(s)</th><th>Role</th></tr></thead>
         <tbody>
-          <tr><td>Entry point</td><td><code>install.sh</code> / <code>install.ps1</code></td><td>Fetch the tooling from GitHub, locate Python, forward to <code>install.py</code>.</td></tr>
+          <tr><td>Entry point</td><td><code>install.sh</code> / <code>install.ps1</code></td><td>Fetch the tooling from the selected GitHub or GitLab distribution, locate Python, forward to <code>install.py</code>.</td></tr>
           <tr><td>Brain</td><td><code>install.py</code> (stdlib only)</td><td>Resolve the file set from the catalog, apply text substitutions, write the manifest.</td></tr>
           <tr><td>Result</td><td>the target repo</td><td><code>.github/workflows/*.yml</code>, <code>.github/labview/*</code>, and the <code>.github/labview-ci.yml</code> manifest.</td></tr>
         </tbody>
@@ -489,10 +502,15 @@ flowchart TD
       <p>This one file is the control panel for your pipeline. Everything the Configure and Dependencies dialogs
         change ends up here, and every workflow reads it at run time.</p>
       <pre><code>schemaVersion: 1
-installedVersion: 3.24.5
+    installedVersion: 4.17.4
 source:
-  repo: elijah286/LabVIEW-CI-with-Containers
-  ref:  v3.24.5            # pinned to an IMMUTABLE tag, never "main"
+  repo: ni/LabVIEW-CI-CD-Toolkit
+      ref:  v4.17.4            # pinned to an IMMUTABLE tag, never "main"
+  distribution:            # archive origin chosen by the bootstrapper
+    host: gitlab
+    repo: elijah286/ci-for-labview
+    ref: main
+    url: https://gitlab.com
 config:
   labviewVersion: "2026"
   os: [windows, linux]
@@ -506,7 +524,9 @@ config:
 activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
       <p>Because <code>source.ref</code> is pinned to an immutable version tag, your pipeline
         <strong>never changes unless you explicitly update</strong> (see <a href="#versioning">§18</a>). That is a
-        deliberate safety property: a new release of the tooling cannot silently alter how your project is checked.</p>
+        deliberate safety property: a new release of the tooling cannot silently alter how your project is checked.
+        The nested <code>source.distribution</code> block records where the bootstrapper obtained that snapshot, so a
+        later bootstrap update can fetch from the same distribution rather than trusting a stale local installer.</p>
 
       <h3>Thin vs. fat installs</h3>
       <p>A <strong>thin</strong> install references the reusable workflow at a moving major tag
@@ -526,6 +546,53 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
       <p>The defaults target public repositories on GitHub-hosted runners because that path is free and
         zero-maintenance. But the architecture was designed to be adapted. This section covers the common
         &ldquo;my situation is different&rdquo; cases.</p>
+
+      <h3>GitLab-native provider</h3>
+      <p>GitLab does not execute GitHub Actions syntax, so it uses a source-owned adapter instead of trying to
+        translate workflows at run time. The source package at
+        <code>.github/labview-ci/providers/gitlab/</code> is copied unchanged to
+        <code>.gitlab/labview-ci/</code>. Its <code>files.json</code> manifest names every provider file and maps each
+        capability and operating system to a native GitLab template. The installer expands catalog
+        <code>requires</code> first, verifies those mappings, and fails rather than recording a capability that has no
+        native job. The source package is also vendored under <code>.github/labview-ci/</code> so a local install can
+        later be re-run with <code>--provider gitlab</code>. Its <code>files.json</code> ownership manifest is copied
+        into the target package too, so an update prunes only files a prior provider version declared as its own (plus
+        the recognized dashboard-only scaffold from the original preview).</p>
+      <p>The generated <code>pipeline.yml</code> owns <code>prepare</code>, <code>verify</code>, and
+        <code>pages</code> stages, common job primitives, the Pages publisher, and only the selected native templates.
+        It exports <code>GITHUB_REPOSITORY</code>, <code>GITHUB_SHA</code>, and <code>GITHUB_REF</code> from GitLab
+        <code>CI_*</code> variables so existing portable report drivers keep their established contract. It makes no
+        GitHub API calls, posts no GitHub commit statuses, and does not depend on workflow dispatch.</p>
+      <table>
+        <thead><tr><th>GitLab job type</th><th>Required runner</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Windows LabVIEW jobs</td><td>Self-managed Windows shell runner with Docker</td><td>Set <code>LVCI_WINDOWS_RUNNER_TAG</code> when the default <code>windows-docker</code> tag is not suitable.</td></tr>
+          <tr><td>Linux LabVIEW jobs</td><td>Privileged Docker-in-Docker-capable runner</td><td>Uses <code>docker:27-cli</code> plus <code>docker:27-dind</code>; override <code>LVCI_LINUX_RUNNER_TAG</code> as needed.</td></tr>
+          <tr><td>Pages publication</td><td>Any Linux runner that can run the Python Alpine job</td><td>GitLab's <strong>Deploy &rsaquo; Pages</strong> view is the authority for the final URL.</td></tr>
+        </tbody>
+      </table>
+      <p>Native Windows jobs clear <code>GIT_CLONE_PATH</code> at job scope. This isolates them from a
+        legacy root-level custom clone directory that a runner may reject, without changing the checkout path for
+        any existing project job.</p>
+      <p>Custom workers log in through <code>CI_REGISTRY</code>, <code>CI_REGISTRY_USER</code>, and
+        <code>CI_REGISTRY_PASSWORD</code>, then publish to <code>$CI_REGISTRY_IMAGE/labview</code>. The Windows job
+        publishes a base plus <code>windows-&lt;sha&gt;</code> and <code>windows-latest</code> worker tags; Linux publishes
+        <code>linux-&lt;sha&gt;</code> and <code>linux-latest</code>. Let a first worker build finish before a job that
+        needs baked dependencies consumes it. On a fresh installation, the default-branch pipeline starts that worker
+        because the manifest changed; for a web/manual pipeline, start the relevant <code>lvci:worker-*</code> job
+        first, then run the dependent verification job. The Linux Snapshots 2.0 renderer requires that custom Linux worker or
+        an explicit <code>LVCI_LINUX_IMAGE</code>; without either it records a diagnostic and skips rather than pulling
+        a non-existent registry tag.</p>
+      <p>GitLab Pages is durable rather than a per-pipeline report folder. The serialized <code>pages</code> job restores
+        the latest default-branch Pages artifact with its job token, merges job-local snapshot stores, stages new
+        reports directly below <code>public/</code>, and publishes the resulting site. This preserves earlier report
+        history despite GitLab artifacts normally being scoped to one pipeline.</p>
+      <div class="warn"><span class="lbl">Current GitLab parity boundary</span>
+        Native templates cover custom images, Mass Compile, VI Analyzer, Unit Tests, Antidoc, SBOM Generation,
+        Builds, VIDiff, classic Snapshots, and Snapshots 2.0. The GitLab dashboard is intentionally a basic static
+        index, not the GitHub dashboard's live status/configuration UI. GitLab currently does not add VIDiff merge
+        request comments, GitHub-style history backfills or manual configuration screens, or GitHub Release/generic
+        package promotion for Builds artifacts.</div>
 
       <h3>Private repositories</h3>
       <p>Everything works on a private repo with one caveat: <strong>GitHub Pages on a private repository requires
@@ -588,7 +655,7 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
 
       <h3>Migrating or rehoming the project</h3>
       <p>A small relocation pointer (<code>.github/labview-ci/source.json</code>) lets the tooling's source move —
-        for example to an official NI repository — without breaking existing installs. If it names a different
+        now hosted at <code>ni/LabVIEW-CI-CD-Toolkit</code> — without breaking existing installs. If it names a different
         repo than the current one, the bootstrappers and the update workflow follow it automatically and re-pin a
         consumer's manifest to the new home on the next update. See <a href="#versioning">§18</a>.</p>
 
@@ -851,6 +918,10 @@ flowchart TD
         disabled, <code>advanced</code> is opt-in, <code>stable</code> is offered by default. The
         <code>statusContext</code> string is the GitHub commit-status context the capability's workflow posts and
         the dashboard reads — that one string is how a result flows from a workflow to a dashboard cell.</p>
+      <p>The GitLab provider adds a second, explicit contract beside the catalog: its
+        <code>providers/gitlab/files.json</code> file lists the copied adapter files and capability-to-template map.
+        This prevents a new catalog capability from silently appearing installable on GitLab before a native job has
+        been supplied for every applicable platform.</p>
       <div class="tip"><span class="lbl">Why this matters for extension</span>
         Because the configurator and installer iterate the catalog generically, you never touch UI code to add a
         capability. See <a href="#extending">§20</a> for the full recipe.</div>
@@ -879,6 +950,10 @@ mass-compile:
         platform and the platform flag does the same. The <code>tooling-ref</code> output lets the consumer's
         manifest pin which version of the tooling scripts are checked out at run time (<code>ref:</code> in the
         config), decoupling capability versioning from GitHub's moving major-tag alias.</p>
+      <p>GitLab uses the same catalog selection but emits native template includes instead of a reusable workflow.
+        Its <code>workflow: rules</code> permits merge-request, default-branch, web, and scheduled pipelines; the
+        visible <code>pages</code> job uses <code>when: always</code> so a failed verification job does not suppress
+        publication of its report or the existing dashboard history.</p>
 
       <h3>Runners</h3>
       <p>Windows container jobs run on <code>windows-2022</code>; Linux jobs on <code>ubuntu-latest</code>. Both
@@ -923,6 +998,28 @@ mass-compile:
         <code>.github/docker/labview-ci-base.Dockerfile</code> &mdash; LabVIEW with VI Analyzer support, optional UTF
         support, VIPM, and Git already installed. Every client repo gets its worker from that base in one of two ways,
         and which one runs is the key distinction between <em>installation</em> and an <em>upgrade</em>.</p>
+      <p>On GitLab, native custom-image jobs build the local Dockerfile inputs and publish the finished worker to the
+        project's own Container Registry rather than GHCR. They use GitLab's per-job registry credentials and tags
+        keyed by <code>CI_COMMIT_SHA</code>, with moving <code>windows-latest</code> and <code>linux-latest</code>
+        tags for selected jobs. Each build reads the installed catalog's qualified <code>containers.default</code>
+        release and passes its pinned NI image tag to the Dockerfile; the Windows build also passes its paired NIPM
+        feed and VIPM installer. Set the GitLab CI/CD variable <code>LVCI_CONTAINER_RELEASE</code> to another
+        qualified catalog release id, such as <code>2026q1</code>, when a project must remain on that release.
+        A project can set <code>LVCI_WINDOWS_IMAGE</code> or <code>LVCI_LINUX_IMAGE</code> to consume an approved
+        external worker instead.</p>
+
+      <h3>Container releases &mdash; pinned, qualified, selectable</h3>
+      <p>The tooling supports a set of <strong>NI LabVIEW container releases</strong> (LabVIEW 2026&nbsp;Q1 and newer),
+        declared in the catalog's <code>containers</code> block. Each release is a pinned triple &mdash; NI container
+        tag, NIPM feed, and VIPM installer &mdash; that moves together and is <em>qualified</em> before clients can
+        select it: the source repo builds every release's base and runs a VIPM-startup probe inside it
+        (<code>publish-base-images.yml</code>), and the shared moving tags only advance after a full dependency bake
+        succeeds on the new base. Nothing floats on NI's <code>latest-*</code> tags &mdash; NI repointed
+        <code>latest-windows</code> from 2026&nbsp;Q1 to 2026&nbsp;Q3 on 2026-07-27 without notice, and a floating base
+        pin turned that into a fleet-wide bake outage. The configurator's <em>LabVIEW version</em> dropdown defaults to
+        the newest qualified release; choosing an older release pins the repository to it via the
+        <code>LCWC_BASE_IMAGE</code> / <code>LCWC_LINUX_BASE_IMAGE</code> Actions variables, which every image workflow
+        resolves first.</p>
 
       <h3>Installation vs. upgrade &mdash; how containers are managed</h3>
       <ul>
@@ -1115,6 +1212,9 @@ docker run --rm `
         destroyed when it ends; it is shared across all files in one action's run but never across actions or
         revisions. The snapshot renderer is the sole always-on exception — see <a href="#cap-snapshots">§16.6</a> —
         and the opt-in <strong>warm-container history backfills</strong> below are the other.</div>
+      <p>GitLab follows the same throwaway-container model. Its Windows shell runner invokes Docker directly, while
+        its Linux job talks to the Docker-in-Docker service. Job artifacts carry raw output and staged reports to the
+        serialized Pages publisher; there is no GitHub status or branch-push deploy step in that path.</p>
 
       <h3>Warm-container history backfills (opt-in)</h3>
       <p>Populating a long history one revision at a time pays the multi-GB image pull and the slow Windows LabVIEW
@@ -1202,9 +1302,27 @@ docker run --rm `
       <div class="note"><span class="lbl">Linux bakes the same dependencies</span>
         The Linux worker (<code>labview-ci-linux.Dockerfile</code>) installs VIPM from the native Debian package and
         applies the same staged repository <code>.vipc</code> files during its build via
-        <code>install-vipc-linux.sh</code> (VIPM CLI under <code>Xvfb</code> + headless LabVIEW), publishing a
+        <code>install-vipc-linux.sh</code> (VIPM CLI under <code>Xvfb</code> + headless LabVIEW). It clears the
+        runtime-only <code>LV_RTE_HEADLESS</code> default while VIPM starts, reads each VIPC's <code>config.xml</code>,
+        gives both VIPM operation and Desktop-liveliness checks a 900-second CI budget, and installs its
+        <code>name@version</code> package specs rather than calling VIPM's retired
+        <code>apply_vipc</code> verb. The hook forces VIPM phase progress in CI logs and fails the image build if a
+        package action fails; it publishes a
         <code>workers/linux</code> manifest just like Windows. So the Dependencies page shows real per-package Linux
         coverage and its columns are first-class, not &ldquo;pending&rdquo;.</div>
+      <div class="note"><span class="lbl">Package scripts remain package-owned</span>
+        <code>VIPM_NONINTERACTIVE</code> controls VIPM CLI prompts; it does not suppress a third-party package's
+        post-install VI. The worker never patches or skips those scripts. A live GitLab Linux validation of
+        <code>wovalab_lib_asciidoc_for_labview@1.12.1.492</code> downloaded and extracted the package, then timed out
+        at <code>Executing PostInstall Custom Action</code>. Its upstream shared component is a call-for-action dialog.
+        The worker records the VIPM phase plus LabVIEW/VIPM/Xvfb diagnostics and fails closed, so no incomplete image is
+        published. A package intended for Linux CI must make its install action headless-compatible, or be resolved
+        upstream before it can be baked.</div>
+      <p>GitLab custom-worker jobs stage repository <code>.vipc</code> and <code>.dragon</code> declarations into the
+        same worker build context and use these Dockerfiles. The Linux Dockerfile declares its pinned NI base tag before
+        every build stage, so Docker can resolve it in the final worker <code>FROM</code>; the provider does not yet expose
+        the GitHub Dependencies page's interactive review/update policy. Dependency, catalog-release, and installed
+        custom-worker-template changes trigger the matching worker job; it can also be triggered or retried in GitLab.</p>
       <ol>
         <li><strong>Use VIPM 2026 Q3</strong> from the JKI CDN — the older NI-feed CLI times out on
           <code>library_list</code> with no diagnostic.</li>
@@ -1213,13 +1331,30 @@ docker run --rm `
           from a real shallow clone (or a minimal fallback <code>.git</code>) of the public repository.</li>
         <li><strong>Non-interactive env</strong> (<code>VIPM_NONINTERACTIVE=1</code>, <code>VIPM_ASSUME_YES=1</code>,
           <code>NO_COLOR=1</code>) so the CLI never blocks on a prompt.</li>
+        <li><strong>Keep package install actions headless</strong> &mdash; a package's own post-install VI is outside the
+          CLI prompt contract. The Linux hook forces <code>--show-progress --verbose</code> so its phase is visible,
+          reports focused process/display diagnostics on failure, and preserves the nonzero result instead of publishing
+          a partial worker.</li>
         <li><strong>Seed <code>Settings.ini</code></strong> before installing — a fresh image lacks
           <code>C:\ProgramData\JKI\VIPM\Settings.ini</code>, without which the CLI aborts with an IO error.</li>
         <li><strong>Run LabVIEW headless first</strong> — the modern CLI installs <em>into a running LabVIEW</em> over
           VI Server, so the script launches <code>LabVIEW.exe --headless</code> and waits for port <code>3363</code>.</li>
-        <li><strong>Extend timeouts</strong> (<code>VIPM_TIMEOUT=900</code>) — cold first-run headless LabVIEW
-          exceeds the CLI's short defaults during a build, where <code>CI</code>/<code>GITHUB_ACTIONS</code> env hints
+        <li><strong>Extend timeouts</strong> (<code>VIPM_TIMEOUT=900</code> and Linux
+          <code>VIPM_DESKTOP_LIVELINESS_TIMEOUT=900</code>) — cold first-run headless LabVIEW and package downloads
+          exceed the CLI's short defaults during a build, where <code>CI</code>/<code>GITHUB_ACTIONS</code> env hints
           are absent.</li>
+        <li><strong>Never run the VIPM engine under a global headless default</strong> — the worker base bakes
+          <code>LV_RTE_HEADLESS=1</code> so g-cli/Antidoc launch LabVIEW headless at CI time, but the VIPM Desktop
+          engine is <em>itself</em> a LabVIEW-runtime app: under that default it runs yet never completes the CLI's
+          startup handshake, and every operation dies at <code>wait for VIPM startup</code>. This silently broke every
+          Windows dependency bake from 2026-08-01 to 2026-08-21 (NI's unannounced <code>latest-windows</code> repoint
+          to 2026&nbsp;Q3 landed the same week and masked it as a version mismatch). The install hook now clears the
+          variable for its own process tree on both Windows and Linux; the baked image ENV is untouched for runtime workflows.</li>
+        <li><strong>Give the build container enough memory</strong> — the VIPM Desktop engine's package-list refresh
+          alone peaks over 1.3&nbsp;GB on LabVIEW 2026&nbsp;Q3, and a memory-capped Windows <code>docker build</code>
+          container starves it into the identical <code>wait for VIPM startup</code> wedge. The image workflows build
+          with <code>docker build -m 8GB</code>, and the install hook's memory preflight fails fast with this diagnosis
+          when less than ~2.5&nbsp;GB is visible (<code>VIPM_ALLOW_LOW_MEMORY=1</code> overrides).</li>
         <li><strong>Fail fast on a dead Desktop engine</strong> — a refresh message containing
           <code>wait for VIPM startup</code> proves package installs will wait on the same unresponsive process. The
           hook restarts headless LabVIEW and VIPM once (<code>VIPM_MAX_REFRESH_RESTARTS=1</code> by default), then
@@ -1227,7 +1362,8 @@ docker run --rm `
           build instead of consuming repeated 15-minute install timeouts.</li>
         <li><strong>Use the modern command shape</strong> — <code>vipm refresh --force</code> is a standalone command;
           package installs use <code>vipm --labview-version 2026 --labview-bitness 64 install &lt;name&gt;@&lt;version&gt;</code>
-          or <code>vipm install -y project.vipc</code>. The old <code>install --refresh</code> form is rejected by VIPM 26.3.</li>
+          after extracting the package declarations from the VIPC. The old <code>install --refresh</code> form and
+          <code>apply_vipc</code> verb are rejected by VIPM 26.3.</li>
         <li><strong>Bypass the empty Free/Community resolver when needed</strong> — JKI's public Docker example notes
           that container use currently requires Pro activation and that Free/Community support is still being fixed.
           Our tests match that: desktop Free refresh downloads the NI Tool Network and VIPM Community indexes, but
@@ -1312,6 +1448,11 @@ docker run --rm `
           <code>files</code>) that wires it into the configurator, installer, and dashboard generically
           (<a href="#extending">§20</a>).</li>
       </ul>
+      <p>GitLab reuses the same drivers and report builders, but native templates stage their output as GitLab
+        artifacts before the Pages publisher aggregates it. The report paths remain Windows
+        <code>&lt;capability&gt;/&lt;sha&gt;/</code> and Linux <code>&lt;capability&gt;/&lt;sha&gt;/linux/</code>. VIDiff's
+        GitLab layout is SHA-based rather than GitHub's pull-request-number path, and it does not yet post a merge
+        request note.</p>
 
       <h3 id="cap-masscompile">16.1 Mass Compile <a class="anchor" href="#cap-masscompile">#</a></h3>
 
@@ -1755,6 +1896,28 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
       <p>Both 2.0 renderers <strong>auto-run on every new revision</strong> via a <code>workflow_run</code> trigger after the snapshot pipeline finishes, each behind a gate job that reads <code>config.viBrowser.positionAware</code>: the Linux workflow runs when it includes <code>linux</code>, the Windows workflow when it includes <code>windows</code> (the configurator default). Because renders are content-addressed by git blob SHA, the worklist skips every VI whose blob already has a render &mdash; <strong>unchanged VIs reuse their existing frames with no work</strong> &mdash; and queues only the new/changed blobs, so a VI a revision actually changed gets a fresh render automatically.</p>
       <p>The browser now remembers its viewer mode and 2.0 platform choice in local storage, defaults to 2.0 when a VI has a 2.0 render (preferring the Windows render when both platforms exist), and shows dismissible coaching tip strips for the block-diagram toggle and the case/event selector arrows. The 2.0 auto-default is now enforced on open whenever a 2.0 render exists (unless the URL explicitly pins <code>viewer</code>/<code>plat2</code>). Those tips are browser-local too: dismissing one with <strong>Never show this again</strong> hides it only in that browser profile, and the dismissal keys are versioned so a new coaching rollout can deliberately surface the tips once more for everyone.</p>
 
+      <h3 id="cap-sbom">16.7 SBOM Generation <a class="anchor" href="#cap-sbom">#</a></h3>
+      <h4>At a glance</h4>
+      <table>
+        <tbody>
+          <tr><th>Driver</th><td><code>.github/labview/run-sbom-generation.ps1</code> <span class="pill win">Windows</span></td></tr>
+          <tr><th>Report builder</th><td><code>.github/labview/build-sbom-report.py</code></td></tr>
+          <tr><th>Workflow</th><td><code>generate-sbom-windows-container.yml</code> <span class="pill win">windows-2022</span></td></tr>
+          <tr><th>Output &amp; status</th><td><code>sbom/&lt;sha&gt;/</code>; commit status <code>CI / SBOM Generation</code></td></tr>
+        </tbody>
+      </table>
+      <p>The Windows worker invokes the VIPM CLI to inventory the revision&rsquo;s resolved LabVIEW package
+        dependencies and preserves its native CycloneDX document at
+        <code>sbom/&lt;sha&gt;/results/sbom.json</code>. The host report builder normalises that inventory into
+        <code>results.json</code> and a navigable <code>index.html</code>, then the workflow uploads the whole
+        directory as an Actions artifact and publishes it to GitHub Pages.</p>
+      <p>The dashboard has a per-revision <strong>SBOM</strong> column. Its status pill links to the Pages report
+        inside the shared report viewer; the viewer&rsquo;s <strong>CycloneDX JSON</strong> action opens the native
+        machine-readable document. Empty cells can dispatch SBOM generation for that revision, and SBOM participates
+        in Populate history, the activity switcher, revision navigation, and regeneration controls. Historical
+        <code>CI / SBOM</code> statuses remain readable, while new runs use the catalog-declared
+        <code>CI / SBOM Generation</code> context.</p>
+
       <!-- 17 ──────────────────────────────────────────────────────────────── -->
       <h2 id="contracts">17. Report data contracts <a class="anchor" href="#contracts">#</a></h2>
       <p>Each capability writes a small, stable JSON document that the dashboard and the shared header consume. The
@@ -1768,13 +1931,18 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
           <tr><td><code>vidiff/&lt;segment&gt;/&lt;platform&gt;/vidiff/changes.json</code></td><td>VIDiff</td><td>Dashboard + VIDiff report</td></tr>
           <tr><td><code>unit-tests/&lt;sha&gt;/results.json</code></td><td>Unit-test report builder</td><td>Dashboard + report</td></tr>
           <tr><td><code>builds/&lt;sha&gt;/summary.json</code></td><td>Builds report builder</td><td>Dashboard cell (succeeded/failed split) + report</td></tr>
-          <tr><td><code>builds/&lt;sha&gt;/summary.json</code></td><td>Builds report builder</td><td>Dashboard cell (succeeded/failed split) + report</td></tr>
+          <tr><td><code>sbom/&lt;sha&gt;/results.json</code></td><td>SBOM report builder</td><td>Dashboard report availability + HTML report</td></tr>
+          <tr><td><code>sbom/&lt;sha&gt;/results/sbom.json</code></td><td>VIPM CLI</td><td>Native CycloneDX download</td></tr>
           <tr><td><code>vi-snapshots/&lt;sha&gt;/manifest.json</code></td><td>Snapshot gallery builder</td><td>VI Browser</td></tr>
           <tr><td><code>dependencies/index.json</code></td><td>Dashboard publisher</td><td>Dependencies page install-time inventory</td></tr>
           <tr><td><code>workers/&lt;platform&gt;/&lt;version&gt;/manifest.json</code></td><td>Worker image workflows</td><td>Dependencies page installed-package status</td></tr>
           <tr><td><code>catalog.json</code> (root)</td><td>Installer / integrate-deploy</td><td>Version badge, What's New</td></tr>
         </tbody>
       </table>
+      <p>GitLab publishes these same report paths directly below the Pages <code>public/</code> root, not below an
+        extra <code>reports/</code> directory. The provider restores the previous default-branch Pages artifact before
+        merging the current pipeline's output, and a <code>resource_group</code> prevents two publishers from racing;
+        report links therefore retain the same stable paths across pipelines.</p>
       <p>A per-revision report is considered "available" when its <code>summary.json</code> exists at
         <code>&lt;prefix&gt;/&lt;sha&gt;/</code>. The header's re-run action ("Re-run analysis", "Regenerate report",
         etc.) opens the dashboard's <strong>Populate history</strong> chooser <em>pre-scoped to exactly the report on
@@ -1796,7 +1964,35 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         version from published tags, writes the matching catalog entry, and cuts the immutable tag and GitHub Release
         in the same run. The minor alias advances to the newest patch on its line; the major alias advances only when
         a release is promoted to stable. Release notes are generated from <code>history.releases[0]</code>.</p>
-      <p>Clients update in one of two ways:</p>
+      <h3>Canonical source and GitLab distribution</h3>
+      <p>GitHub is the canonical source of implementation and releases. When the optional GitLab mirror is enabled,
+        the release workflow runs <code>sync-gitlab-mirror.sh</code> after GitHub has published an immutable tag. It
+        first pushes immutable <code>vMAJOR.MINOR.PATCH</code> tags without force, then force-updates the mirror's
+        <code>main</code> to that released commit and updates rolling aliases such as
+        <code>vMAJOR</code>, <code>beta</code>, <code>stable</code>, and <code>dev</code>. The GitLab project
+        <code>elijah286/ci-for-labview</code> is therefore a one-way distribution mirror, not a contribution branch
+        or a second codebase.</p>
+      <p>The mirror does not publish arbitrary GitHub <code>main</code> work: it advances only from a canonical
+        release tag. Set the GitHub Actions variable <code>GITLAB_MIRROR_ENABLED=true</code> and the write-capable
+        secret <code>GITLAB_MIRROR_TOKEN</code> (optionally <code>GITLAB_MIRROR_USERNAME</code>) to enable the
+        post-release push. The token needs GitLab <code>write_repository</code> access, and a protected mirror
+        <code>main</code> branch must permit that automation identity to force-update the release snapshot. An enabled
+        mirror failure leaves the release workflow visibly failed. If it needs recovery,
+        the source-only <strong>Sync GitLab Distribution</strong> workflow accepts an immutable tag; it never
+        manufactures a release or moves an immutable tag.</p>
+      <p>A GitLab-only command-line install starts from the mirror's raw bootstrapper with
+        <code>--source-host gitlab</code>; the bootstrapper follows its GitLab <code>source.json</code>
+        distribution entry and downloads its archive through the GitLab API. It writes a
+        <code>source.distribution</code> block in the target manifest. The browser configurator remains served from
+        GitHub Pages and records GitHub as its origin even when it creates a GitLab target, leaving the command-line
+        installer as the GitHub-free route without maintaining two implementations.</p>
+      <p>To update a GitLab-distribution target, run its <code>install.sh --update</code> or
+        <code>install.ps1 --update</code> bootstrapper. It reads <code>source.distribution</code>, fetches fresh
+        tooling from GitLab, and then runs the archive-sourced <code>install.py --update</code> to refresh
+        <code>.gitlab/labview-ci/</code>. Direct <code>install.py --update</code> operates only on the source
+        checkout already on disk. The GitHub-only one-click Update now workflow and Dependabot flow are not GitLab
+        update mechanisms.</p>
+      <p>GitHub clients update in one of two ways:</p>
       <ul>
         <li><strong>One-click "Update now"</strong> (<code>apply-tooling-update.yml</code>, launched from the What's
           New dialog) reads the manifest, follows the relocation pointer if present, fetches the latest tooling, runs
@@ -1848,10 +2044,21 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         <code>promote-release.py --tier</code> (set the pointer, flag the entry, bump the version), and commits to the
         default branch; the same buttons un-mark to roll a channel back to the previous build in that tier.</p>
       <h3>Relocation pointer</h3>
-      <p><code>.github/labview-ci/source.json</code> lets the project migrate (for example to an official NI repo)
+      <p><code>.github/labview-ci/source.json</code> names the canonical NI repository, <code>ni/LabVIEW-CI-CD-Toolkit</code>,
         without breaking installs: if it names a different repo than the current one, the bootstrappers and the
         update workflow follow it automatically, and a redirected update re-pins the consumer's manifest to the new
         home.</p>
+      <p>The source dashboard, documentation, FAQ, and installer are published at
+        <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/">ni.github.io/LabVIEW-CI-CD-Toolkit</a>.
+        GitHub repository redirects do not redirect the old GitHub Pages site, so published links must use this
+        new address. The pointer's GitHub distribution, the catalog's <code>source.repo</code>, and this repository's
+        install manifest all name the same NI source. That matching manifest makes the source dashboard publish
+        its current commit's page bundle rather than an older installed release; consumer dashboards still use
+        their opted-in tooling ref.</p>
+      <p>Immutable releases made before the transfer retain their original source metadata. Publish a release
+        containing the updated metadata and promote it to the desired install channel so new default installs
+        use the NI source. Keep legacy GitHub repository redirects reachable for existing clients following
+        the relocation pointer; do not rewrite historical tags or assume container packages moved with the repo.</p>
 
       <!-- 19 ──────────────────────────────────────────────────────────────── -->
       <h2 id="discovery">19. Client discovery <a class="anchor" href="#discovery">#</a></h2>
@@ -1869,6 +2076,8 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         another project that added this stack); a fork of this framework repo itself is not, since it carries our
         own catalog verbatim. Private repositories are never indexed or listed. See the
         <a href="faq.html#discovery">FAQ discovery entry</a> for the privacy details.</p>
+      <p>GitLab projects are not currently part of that GitHub search-based discovery index. Installing the GitLab
+        provider does not report back to this source repository or expose project metadata to the Clients page.</p>
 
       <!-- 20 ──────────────────────────────────────────────────────────────── -->
       <h2 id="extending">20. Extending the system <a class="anchor" href="#extending">#</a></h2>
@@ -2107,7 +2316,7 @@ flowchart TD
         warm Docker layer cache, so the multi-gigabyte worker image is not re-pulled every job (see §22).</div>
 
       <p style="margin-top:40px"><a href="faq.html">← Back to the FAQ</a> &nbsp;·&nbsp;
-        <a class="lvci-repo-link" data-show-slug href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">View the source on GitHub →</a></p>
+        <a class="lvci-repo-link" data-show-slug href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">View the source on GitHub →</a></p>
     </main>
   </div>
 
@@ -2117,7 +2326,7 @@ flowchart TD
     // Resolve every repo link the same way faq.html does: read the repo this
     // dashboard was installed from (same-origin catalog.json), then follow the
     // relocation pointer (.github/labview-ci/source.json) to the canonical home.
-    var FALLBACK = { repo: "elijah286/LabVIEW-CI-with-Containers", ref: "main" };
+    var FALLBACK = { repo: "ni/LabVIEW-CI-CD-Toolkit", ref: "main" };
     function paint(repo) {
       var parts = String(repo).split("/"), owner = parts[0] || "", name = parts[1] || "";
       var url = "https://github.com/" + repo, slug = "github.com/" + repo;

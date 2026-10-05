@@ -43,7 +43,7 @@
         return s;
       };
       var dec = function (raw, fb) { if (!raw) return fb; try { return decodeURIComponent(raw); } catch (e) { return fb; } };
-      var KNOWN = { 'masscompile-report': 1, 'vi-analyzer-report': 1, 'unit-tests-report': 1, 'antidoc-report': 1 };
+      var KNOWN = { 'masscompile-report': 1, 'vi-analyzer-report': 1, 'unit-tests-report': 1, 'antidoc-report': 1, 'sbom-report': 1 };
       var type = dec(p.get('type'), '');
       window.LVCI = {
         context: KNOWN[type] ? type : 'report-viewer',
@@ -110,7 +110,8 @@
           'masscompile-report': 'masscompile',
           'vi-analyzer-report': 'vi-analyzer',
           'unit-tests-report': 'unit-tests',
-          'antidoc-report': 'antidoc'
+          'antidoc-report': 'antidoc',
+          'sbom-report': 'sbom-generation'
         })[type] || '';
       }
       function populateHistoryUrl() {

@@ -91,7 +91,7 @@
   // fallback rides onto every consumer dashboard still pointing at the root, the
   // same way faq.html / integrate.html anchor their links. loadVersion() refines
   // it from the same-origin catalog (and any relocation pointer it follows).
-  var SOURCE_FALLBACK_REPO = 'elijah286/LabVIEW-CI-with-Containers';
+  var SOURCE_FALLBACK_REPO = 'ni/LabVIEW-CI-CD-Toolkit';
   var srcRepo = SOURCE_FALLBACK_REPO;
   var srcRef = 'main';
 
@@ -522,6 +522,7 @@
     vibrowser: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="M21 15l-4.5-4.5L7 19"/></svg>',
     vianalyzer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/><path d="M7.8 10.6l2 2 3.2-3.6"/></svg>',
     builds: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7L12 12l8.7-5"/><path d="M12 22V12"/></svg>',
+    sbom: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/></svg>',
     update: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
     about: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><line x1="12" y1="16" x2="12" y2="11.5"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
     clients: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-6A3.5 3.5 0 0 0 4 18.5V20"/><circle cx="10.5" cy="8" r="3.5"/><path d="M21 20v-1.5a3.5 3.5 0 0 0-2.6-3.4"/><path d="M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/></svg>',
@@ -621,6 +622,7 @@
     'unit-tests-report': 'dashboard',
     'antidoc-report': 'dashboard',
     'builds-report': 'dashboard',
+    'sbom-report': 'dashboard',
     'unit-tests-config': 'settings',
     'worker-manifest': 'dashboard',
     'report-viewer': 'dashboard',
@@ -672,13 +674,19 @@
       regenLabel: 'Rebuild', rawLabel: 'Build log', rawName: 'builds.log',
       workflow: { windows: 'build-binaries-windows-container.yml',
                   linux:   'build-binaries-linux-container.yml' }
+    },
+    'sbom-report': {
+      prefix: 'sbom', cap: 'sbom-generation', label: 'SBOM',
+      regenLabel: 'Regenerate SBOM', rawLabel: 'CycloneDX JSON', rawName: 'results/sbom.json',
+      probeName: 'results.json',
+      workflow: { windows: 'generate-sbom-windows-container.yml' }
     }
   };
   var DOC = DOCTYPES[ctx] || null;   // non-null only on a per-revision report
 
   // Order the per-revision activities appear in the context-bar Activity picker
   // (the report half of the unified Activity switcher; per-VI lenses join later).
-  var LENS_ORDER = ['snapshots', 'masscompile-report', 'vi-analyzer-report', 'unit-tests-report', 'antidoc-report', 'builds-report'];
+  var LENS_ORDER = ['snapshots', 'masscompile-report', 'vi-analyzer-report', 'unit-tests-report', 'antidoc-report', 'builds-report', 'sbom-report'];
 
   var SHA_RE = /^[0-9a-f]{7,40}$/i;
   var revisionListCache = {};
@@ -808,7 +816,8 @@
       { label: 'VI Analyzer', svg: ICON.vianalyzer, activity: 'vi-analyzer-report' },
       { label: 'Unit Tests', svg: ICON.tests, activity: 'unit-tests-report' },
       { label: 'Antidoc', svg: ICON.docs, activity: 'antidoc-report' },
-      { label: 'Builds', svg: ICON.builds, activity: 'builds-report' }
+      { label: 'Builds', svg: ICON.builds, activity: 'builds-report' },
+      { label: 'SBOM', svg: ICON.sbom, activity: 'sbom-report' }
     ];
   }
 
@@ -1464,7 +1473,7 @@
   function reportExists(d, sha) {
     if (!d || !sha) return Promise.resolve(false);
     var root = base + '/' + d.prefix + '/' + sha + '/';
-    return fetch(root + 'summary.json', { method: 'HEAD', cache: 'no-cache' })
+    return fetch(root + (d.probeName || 'summary.json'), { method: 'HEAD', cache: 'no-cache' })
       .then(function (r) { return r.ok ? true : fetch(root + 'index.html', { method: 'HEAD', cache: 'no-cache' }).then(function (rr) { return rr.ok; }); })
       .catch(function () { return fetch(root + 'index.html', { method: 'HEAD', cache: 'no-cache' }).then(function (r) { return r.ok; }).catch(function () { return false; }); });
   }
@@ -1485,7 +1494,7 @@
     var LENS_GROUPS = [
       { label: 'Code & changes', keys: ['snapshots'] },
       { label: 'Quality',        keys: ['masscompile-report', 'vi-analyzer-report', 'unit-tests-report'] },
-      { label: 'Artifacts',      keys: ['antidoc-report', 'builds-report'] }
+      { label: 'Artifacts',      keys: ['antidoc-report', 'builds-report', 'sbom-report'] }
     ];
     function lensLabel(key) {
       if (key === 'snapshots') return 'Snapshots';
@@ -2315,6 +2324,14 @@
   // Global attention bar: the most-recent still-failing workflows, with a
   // per-failure dismiss remembered in localStorage (a NEW failure re-appears).
   var ALERT_DKEY = 'lvci_alert_dismissed';
+  // Owner-only maintenance chores, keyed by workflow file basename. A failed run
+  // of one of these is actionable only by the maintainer (a mirror token, not
+  // this repo's CI health), so it never feeds the public failure banner or the
+  // pill's fail segment — the owner still sees it under GitHub's Actions tab.
+  var MAINT_WORKFLOWS = { 'sync-gitlab-distribution.yml': 1 };
+  function isMaintWorkflow(w) {
+    return !!MAINT_WORKFLOWS[String(w.path || '').split('/').pop().toLowerCase()];
+  }
   function alertDismissedIds() {
     try { var a = JSON.parse(localStorage.getItem(ALERT_DKEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
   }
@@ -2385,13 +2402,14 @@
         // Failed activities (newest run per workflow that ended in failure) feed
         // BOTH the pill's fail segment and the global attention bar. The runs list
         // is newest-first, so the first run seen per workflow is its latest; a
-        // workflow that has since gone green is therefore not flagged.
+        // workflow that has since gone green is therefore not flagged, and
+        // maintenance workflows (MAINT_WORKFLOWS) are never flagged at all.
         var seenWf = {}, fails = [];
         (d.workflow_runs || []).forEach(function (w) {
           var key = w.path || w.name || ('wf' + w.workflow_id);
           if (seenWf[key]) return;
           seenWf[key] = 1;
-          if (w.status === 'completed' && w.conclusion === 'failure') fails.push(w);
+          if (w.status === 'completed' && w.conclusion === 'failure' && !isMaintWorkflow(w)) fails.push(w);
         });
         failState.list = fails;
         renderBadge();
