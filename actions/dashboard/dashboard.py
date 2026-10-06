@@ -62,7 +62,7 @@ def gh_get(path, _tries=4):
             if transient:
                 _API['degraded'] = True
             return None
-        except (urllib.error.URLError, TimeoutError) as e:
+        except (urllib.error.URLError, OSError) as e:
             if attempt < n_tries - 1:
                 time.sleep(2 ** attempt)
                 continue

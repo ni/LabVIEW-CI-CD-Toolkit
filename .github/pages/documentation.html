@@ -740,7 +740,8 @@ flowchart TD
         keeps paging back through history — past the recent window it retains <em>only</em> project revisions —
         until it has collected the project's revisions or reaches a large safety cap on how many commits it will
         classify. Reading that history is resilient to a transient GitHub&nbsp;API failure: rate-limited
-        (<code>HTTP&nbsp;403</code>/<code>429</code>), server, and network errors are retried with backoff
+        (<code>HTTP&nbsp;403</code>/<code>429</code>), server, and network errors (including dropped connections)
+        are retried with backoff
         (honoring <code>Retry-After</code>/<code>X-RateLimit-Reset</code>), and if a call still fails so the
         revision list would be incomplete, the build <strong>refuses to publish</strong> and exits &mdash; the
         previous good dashboard stays live and rebuilds automatically once the API recovers, so a burst of
