@@ -1,0 +1,199 @@
+# Composite action: LabVIEW Unit Tests
+#
+# Step-level action that runs ONE LabVIEW unit-test framework headlessly inside a
+# container and publishes a friendly HTML report, so a consumer repo can run tests
+# in CI by adding this single step (plus actions/checkout) and nothing else.
+#
+# Framework-general by design: `framework` + `command` are wired straight through
+# to the bundled run-unit-tests.ps1, which already supports Caraya / JKI VI Tester
+# (both via g-cli), NI UTF and Astemes LUnit (both via native LabVIEWCLI
+# operations), or any other headless test runner via a `command` template
+# ({ver}{dir}{out}{lv} tokens). The framework's OWN tooling (g-cli plugin, VI
+# Tester package, UTF toolkit, astemes_lib_lunit_cli, ...) must be baked into
+# `image` - this action does not install it. When it's missing, the report shows
+# a "container is missing this tooling" banner instead of a bare "no tests found".
+#
+# Follows the actions/masscompile pattern: mounts BOTH the workspace and
+# ${{ github.action_path }} into the container so the bundled runner script
+# travels WITH the action; the consumer repo holds no copy of it. Pin this
+# action by tag (@v1) to receive updates.
+#
+# After extraction, keep the bundled scripts in sync with .github/labview/:
+#   cp <source>/.github/labview/run-unit-tests.ps1        actions/unit-tests/run-unit-tests.ps1
+#   cp <source>/.github/labview/build-unittest-report.py  actions/unit-tests/build-unittest-report.py
+name: 'LabVIEW Unit Tests'
+description: 'Run a LabVIEW unit-test framework inside a container and publish an HTML report.'
+author: 'labview-ci'
+
+inputs:
+  image:
+    description: 'Container image to run in. Must have the chosen framework''s tooling baked in.'
+    required: true
+  framework:
+    description: >
+      Test framework to run: 'caraya', 'vi-tester', 'utf', or 'lunit'. Any other
+      value is accepted too, as long as `command` is also set.
+    required: true
+  test-dir:
+    description: 'Test location (directory, glob, or .lvproj) relative to the workspace. Empty = whole project.'
+    required: false
+    default: ''
+  command:
+    description: >
+      Override headless command template for `framework` (tokens: {ver}=LabVIEW
+      year, {dir}=resolved test directory, {out}=JUnit output path, {lv}=LabVIEW.exe
+      path, {cli}=LabVIEWCLI path, {proj}=.lvproj path for utf). Required for any
+      framework other than caraya/vi-tester/utf/lunit; optional override otherwise.
+    required: false
+    default: ''
+  labview-version:
+    description: 'LabVIEW year (drives the in-container LabVIEW.exe path).'
+    required: false
+    default: '2026'
+  report-dir:
+    description: 'Report output directory (relative to the workspace).'
+    required: false
+    default: 'ci-out/unit-tests'
+  pages-url:
+    description: 'Base GitHub Pages URL (for report nav/snapshot links). Defaults to https://<owner>.github.io/<repo>.'
+    required: false
+    default: ''
+  fail-on-test-failure:
+    description: 'Fail this step when one or more tests fail.'
+    required: false
+    default: 'true'
+
+outputs:
+  report-exists:
+    description: 'true when a report index.html was produced.'
+    value: ${{ steps.check.outputs.exists }}
+  tests:
+    description: 'Total tests run (from results.json), or empty.'
+    value: ${{ steps.check.outputs.tests }}
+  passed:
+    description: 'Passed test count, or empty.'
+    value: ${{ steps.check.outputs.passed }}
+  failed:
+    description: 'Failed + errored test count, or empty.'
+    value: ${{ steps.check.outputs.failed }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Unit Tests inside container
+      shell: powershell
+      # Action inputs reach this step as env vars rather than textual ${{ }}
+      # interpolation into the script body: templating unsanitised input straight
+      # into a shell script is an injection risk.
+      env:
+        UT_IMAGE:      ${{ inputs.image }}
+        UT_REPORT_DIR: ${{ inputs.report-dir }}
+        UT_LV_VERSION: ${{ inputs.labview-version }}
+        UT_FRAMEWORK:  ${{ inputs.framework }}
+        UT_TEST_DIR:   ${{ inputs.test-dir }}
+        UT_COMMAND:    ${{ inputs.command }}
+      run: |
+        docker pull "$env:UT_IMAGE"
+
+        # framework / test-dir / command reach the container as ENVIRONMENT
+        # VARIABLES via --env-file, never as command-line arguments. Windows
+        # PowerShell 5.1 (the `shell: powershell` host on windows-2022) cannot pass
+        # these values on a native command line correctly:
+        #   * an EMPTY value is dropped from the argument list entirely, so the
+        #     following -Param is consumed as the missing value and the script dies
+        #     with "Missing an argument for parameter ...". This hits the DEFAULT
+        #     path, where `command` (and often `test-dir`) is unset.
+        #   * EMBEDDED DOUBLE QUOTES are stripped, silently corrupting a command
+        #     template:  --directory "{dir}"  ->  --directory {dir}  , which then
+        #     breaks as soon as a resolved test path contains a space.
+        # Quoting the arguments does not help (""  is still dropped). docker parses
+        # --env-file itself, so no shell quoting applies on any hop.
+        $tmp = $env:RUNNER_TEMP; if (-not $tmp) { $tmp = $env:TEMP }
+        $envFile = Join-Path $tmp 'lvci-unit-tests.env'
+        # docker's env-file format is one VAR=value per line, value taken literally
+        # to end of line - so a newline in a value would corrupt the file. Flatten.
+        $lines = [string[]]@(
+          "LVCI_FRAMEWORK=$($env:UT_FRAMEWORK -replace '[\r\n]+', ' ')"
+          "LVCI_TEST_DIR=$($env:UT_TEST_DIR   -replace '[\r\n]+', ' ')"
+          "LVCI_COMMAND=$($env:UT_COMMAND     -replace '[\r\n]+', ' ')"
+        )
+        # UTF-8 *without* BOM: PS 5.1's -Encoding utf8 emits a BOM, which docker
+        # would read as part of the first variable's NAME.
+        [System.IO.File]::WriteAllLines($envFile, $lines, (New-Object System.Text.UTF8Encoding($false)))
+
+        # Mount the workspace AND this action's directory (which carries the script)
+        # into the container. ${{ github.action_path }} is the checked-out action on
+        # the runner host; mounting it makes run-unit-tests.ps1 available at C:\ci-action.
+        docker run --rm `
+          -e "GITHUB_REPOSITORY=${{ github.repository }}" `
+          -e "GITHUB_SHA=${{ github.sha }}" `
+          --env-file "$envFile" `
+          -v "${{ github.workspace }}:C:\workspace" `
+          -v "${{ github.action_path }}:C:\ci-action" `
+          "$env:UT_IMAGE" `
+          powershell -NonInteractive -ExecutionPolicy Bypass `
+            -File "C:\ci-action\run-unit-tests.ps1" `
+            -WorkspaceRoot  "C:\workspace" `
+            -ResultsDir     "C:\workspace\$env:UT_REPORT_DIR\results" `
+            -LabVIEWVersion "$env:UT_LV_VERSION" `
+            -LabVIEWPath    "C:\Program Files\National Instruments\LabVIEW $env:UT_LV_VERSION\LabVIEW.exe"
+
+    # Turn the plain JUnit dump into a navigable report (failures first, snapshot
+    # drawer, deep links into the VI Browser). Runs on the runner host (not in the
+    # container) so it can enumerate the workspace; the bundled
+    # build-unittest-report.py is kept in sync with .github/labview/.
+    - name: Build friendly Unit Tests report
+      shell: bash
+      continue-on-error: true
+      env:
+        UT_REPORT_DIR: ${{ inputs.report-dir }}
+        UT_PAGES_URL:  ${{ inputs.pages-url }}
+        UT_LV_VERSION: ${{ inputs.labview-version }}
+      run: |
+        OUT="${{ github.workspace }}/$UT_REPORT_DIR"
+        PAGES="$UT_PAGES_URL"
+        if [ -z "$PAGES" ]; then
+          owner="${GITHUB_REPOSITORY%%/*}"; repo="${GITHUB_REPOSITORY#*/}"
+          PAGES="https://${owner}.github.io/${repo}"
+        fi
+        python "${{ github.action_path }}/build-unittest-report.py" \
+          --results   "$OUT/results" \
+          --out       "$OUT" \
+          --workspace "${{ github.workspace }}" \
+          --sha       "${{ github.sha }}" \
+          --platform  windows \
+          --repo      "${{ github.repository }}" \
+          --pages-url "$PAGES" \
+          --labview-version "$UT_LV_VERSION" \
+          --commit-msg "$(git log -1 --pretty=%s)" \
+          --author     "$(git log -1 --pretty=%an)" \
+          --date       "$(git log -1 --pretty=%cI)"
+
+    - name: Check report directory
+      id: check
+      shell: bash
+      env:
+        UT_REPORT_DIR: ${{ inputs.report-dir }}
+      run: |
+        OUT="${{ github.workspace }}/$UT_REPORT_DIR"
+        if [ -f "$OUT/index.html" ]; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+        TESTS=""; PASSED=""; FAILED=""
+        if [ -f "$OUT/results.json" ]; then
+          TESTS=$(jq -r '.summary.tests // 0' "$OUT/results.json")
+          PASSED=$(jq -r '.summary.passed // 0' "$OUT/results.json")
+          FAILED=$(jq -r '((.summary.failed // 0) + (.summary.errored // 0))' "$OUT/results.json")
+        fi
+        echo "tests=$TESTS"   >> "$GITHUB_OUTPUT"
+        echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+        echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+    - name: Fail on test failures
+      if: inputs.fail-on-test-failure == 'true' && steps.check.outputs.failed != '' && steps.check.outputs.failed != '0'
+      shell: bash
+      run: |
+        echo "::error::${{ steps.check.outputs.failed }} unit test(s) failed (${{ steps.check.outputs.passed }} passed). See the Unit Tests report artifact/deploy for details."
+        exit 1

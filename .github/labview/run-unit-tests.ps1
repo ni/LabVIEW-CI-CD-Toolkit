@@ -32,14 +32,32 @@
     vitester*/vi-tester* -> VI Tester, utf*/unit-test* -> UTF).
 
 .PARAMETER ConfigPath
-    Path to labview-ci.yml. Default: <WorkspaceRoot>\.github\labview-ci.yml.
+    Path to labview-ci.yml. Default: <WorkspaceRoot>\.github\labview-ci.yml. Ignored
+    when -Framework is set.
+
+.PARAMETER Framework
+    When set, bypasses ConfigPath/labview-ci.yml entirely and runs exactly ONE tool:
+    'caraya', 'vi-tester', 'utf', 'lunit', or an arbitrary id paired with -Command.
+    Used by actions/unit-tests (the step-level composite action), which takes the
+    framework as an action input instead of a repo-committed config file.
+
+.PARAMETER TestDir
+    -Framework only: a single test location (directory, glob, or .lvproj), same
+    contract as a config tool's `locations[0]`. Empty = whole project/workspace.
+
+.PARAMETER Command
+    -Framework only: overrides that tool's default command template (tokens
+    {ver}{dir}{out}{lv}, or {cli}{proj} for utf/lunit). Empty = built-in default.
 #>
 param(
     [string]$WorkspaceRoot  = 'C:\workspace',
     [string]$ResultsDir     = 'C:\workspace\ci-out\unit-tests\results',
     [string]$ConfigPath     = '',
     [string]$LabVIEWVersion = '2026',
-    [string]$LabVIEWPath    = ''
+    [string]$LabVIEWPath    = '',
+    [string]$Framework      = '',
+    [string]$TestDir        = '',
+    [string]$Command        = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -588,7 +606,25 @@ function Invoke-LUnitTests($tool, [int]$index) {
 }
 
 # -- Main ---------------------------------------------------------------------
-$tools = Read-UnitTestTools $ConfigPath
+# actions/unit-tests passes the framework selection as ENVIRONMENT VARIABLES
+# (docker --env-file) rather than as -Framework/-TestDir/-Command arguments,
+# because Windows PowerShell 5.1 mangles such values on a native command line: an
+# empty one is dropped (breaking parameter binding) and embedded double quotes -
+# which every default command template contains, e.g. --junit "{out}" - are
+# stripped. An explicit parameter still wins, so the script stays directly
+# invokable with -Framework for local runs and other callers.
+if (-not $Framework -and $env:LVCI_FRAMEWORK) { $Framework = $env:LVCI_FRAMEWORK }
+if (-not $TestDir   -and $env:LVCI_TEST_DIR)  { $TestDir   = $env:LVCI_TEST_DIR }
+if (-not $Command   -and $env:LVCI_COMMAND)   { $Command   = $env:LVCI_COMMAND }
+
+# -Framework runs a single tool straight from parameters (no config file / YAML
+# parsing involved), which is what actions/unit-tests uses. Otherwise fall back
+# to the repo's own config.unitTests.tools[] as before.
+if ($Framework) {
+    $tools = @([ordered]@{ tool = $Framework.ToLower(); enabled = $true; command = $Command; locations = @($TestDir) })
+} else {
+    $tools = Read-UnitTestTools $ConfigPath
+}
 if (-not $tools -or $tools.Count -eq 0) {
     Write-Warning "No config.unitTests.tools configured in $ConfigPath - nothing to run."
     Write-Host "Wrote 0 JUnit file(s) to $ResultsDir."
