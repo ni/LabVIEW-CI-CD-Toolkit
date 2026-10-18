@@ -1,5 +1,5 @@
 # Reusable workflow (lives at .github/workflows/ in the standalone labview-ci repo).
-# Consumers call this with `uses: your-org/labview-ci/.github/workflows/labview-ci.reusable.yml@v1`.
+# Consumers call this with `uses: your-org/labview-ci/.github/workflows/labview-ci.reusable.yml@v4`.
 #
 # This is where repo settings actually DRIVE behavior: a `config` job reads the
 # consumer's .github/labview-ci.yml via the load-config action, and each activity
@@ -44,21 +44,24 @@ jobs:
       # own .github/labview-ci.yml (source.ref). The capability jobs check out the
       # tooling at this ref and run it, so a repo only changes versions when it
       # edits that config file (via the token-free "Update now" button) — never
-      # automatically. Defaults to v1 when the config omits a ref.
+      # automatically. Defaults to v4 (the current stable alias) when the config
+      # omits a ref.
       tooling-ref:     ${{ steps.ref.outputs.ref }}
     steps:
       - uses: actions/checkout@v5
       - id: cfg
         # Full repo path (not ./actions/...): inside a reusable workflow a ./ path
         # resolves against the CALLER's checked-out workspace, which doesn't contain
-        # this repo's actions. Pin to the same major alias consumers use (@v1).
-        uses: elijah286/LabVIEW-CI-with-Containers/actions/load-config@v1
+        # this repo's actions. Pin to the same major alias consumers use (@v4) —
+        # an older alias here silently pairs current workflow logic with an
+        # earlier major's action, so this must move with every major bump.
+        uses: elijah286/LabVIEW-CI-with-Containers/actions/load-config@v4
       - id: ref
         shell: bash
         run: |
           REF=$(awk '/^[[:space:]]*ref:[[:space:]]/{print $2; exit}' .github/labview-ci.yml 2>/dev/null)
-          echo "ref=${REF:-v1}" >> "$GITHUB_OUTPUT"
-          echo "Capability version (source.ref) this repo opted into: ${REF:-v1}"
+          echo "ref=${REF:-v4}" >> "$GITHUB_OUTPUT"
+          echo "Capability version (source.ref) this repo opted into: ${REF:-v4}"
 
   # 1b) Dependency gate. If a worker rebuild is in progress for this SHA (an
   #     opt-in dependency update, or a worker-input change), the container
