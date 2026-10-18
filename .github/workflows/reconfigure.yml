@@ -260,6 +260,18 @@ jobs:
               else (['windows', 'linux'] if oss == 'both' else [oss])
           acts = [a.strip() for a in acts_in.split(',') if a.strip()] \
               or prev['activities'] or ['dashboard', 'masscompile', 'vi-analyzer', 'vidiff']
+          # Capabilities the catalog marks `required` are installed in every
+          # repository (VI Snapshots 2.0), so the manifest must list them even when
+          # it was written before the capability existed -- otherwise the next
+          # tooling update reads this file back and skips them again.
+          try:
+              _cat = json.loads(pathlib.Path('.github/labview-ci/catalog.json').read_text(encoding='utf-8'))
+              for _cap in _cat.get('capabilities', []):
+                  if _cap.get('required') and _cap.get('status') not in ('planned', 'experimental') \
+                          and _cap.get('id') not in acts:
+                      acts.append(_cap['id'])
+          except Exception:
+              pass
           now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
           max_parallel = int(runners) if runners.isdigit() and int(runners) > 0 else (prev.get('maxParallel') or 5)
 

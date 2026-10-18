@@ -4498,6 +4498,12 @@
       ".github/actions/publish-gh-pages/action.yml"
     ]
   },
+  "retiredFiles": {
+    "comment": "Tooling files the source has retired. Installs and updates delete them from a target repository, so a workflow the tooling no longer ships cannot keep firing (and failing) in a client repo forever. Only ever list paths this repository no longer contains.",
+    "files": [
+      ".github/workflows/build-toimages-image.yml"
+    ]
+  },
   "capabilities": [
     {
       "id": "dashboard",
@@ -4700,7 +4706,8 @@
       "name": "VI Snapshots 2.0",
       "summary": "Cross-platform, position-aware VI Browser 2.0 rendering. A vendored Go engine renders each VI's block diagram in place and publishes frames JSON on Windows and Linux, so the VI Browser can show an interactive, zoomable diagram beside the classic gallery.",
       "status": "stable",
-      "recommended": false,
+      "recommended": true,
+      "required": true,
       "supportsOs": [
         "windows",
         "linux"
@@ -4727,7 +4734,7 @@
           ".github/workflows/vi-snapshots-json.yml"
         ]
       },
-      "notes": "Cross-platform position-aware renderer. The Linux path runs the render engine that is BAKED INTO the Linux worker image (no separate build -- it is copied with the worker); the Windows path runs the same Go engine in the stock NI Windows container (unless EXPERIMENTAL_WINDOWS_IMAGE is set). Renders publish <blob>.json (Linux) and <blob>.windows.json (Windows) beside the gallery."
+      "notes": "Always installed - every repository gets VI Browser 2.0, so the viewer's 2.0 tab always has a workflow to run. Cross-platform position-aware renderer. The Linux path runs the render engine that is BAKED INTO the Linux worker image (no separate build -- it is copied with the worker); the Windows path runs the same Go engine in the stock NI Windows container (unless EXPERIMENTAL_WINDOWS_IMAGE is set). Renders publish <blob>.json (Linux) and <blob>.windows.json (Windows) beside the gallery."
     },
     {
       "id": "unit-tests",
