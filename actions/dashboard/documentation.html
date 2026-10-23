@@ -2001,6 +2001,12 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         approve pull requests</strong> in the repository's Actions settings (subject to organization policy).
         The workflows request <code>pull-requests: write</code> but never approve or merge their own PRs and
         do not change branch protection.</p>
+      <p>If an earlier preparation already occupies <code>lvci-release/&lt;kind&gt;-&lt;version&gt;</code> and
+        rejects the new catalog with a non-fast-forward error, the helper retries on a branch suffixed with
+        the full prepared commit SHA. It never force-pushes or rewrites the older review branch. It creates
+        or reuses the PR for that exact retry branch, and reports other push failures with their Git output.
+        Close superseded catalog PRs after checking that the new proposal includes the current release notes;
+        merge only the current proposal. Release-routing regressions run in the Catalog Source Sync PR gate.</p>
       <p>After merging a prepared catalog PR, Release verifies that it was created by
         <code>github-actions[bot]</code> in this repository and changes only the catalog and release-note fragments.
         It publishes the prepared version without generating another bump. If the merge does not trigger Release,
