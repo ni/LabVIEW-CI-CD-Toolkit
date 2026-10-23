@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "2dba9cda7d17e6d7e3105a9e80830cb7f93eeaec",
+  "sha": "af1abd8e4a4135318c2e362c0d62f4f0331a0e07",
   "revisions": [
+    {
+      "sha": "af1abd8e4a4135318c2e362c0d62f4f0331a0e07",
+      "short": "af1abd8",
+      "message": "Merge pull request #81 from ni/lvci-release/release-4.18.6",
+      "author": "Elijah Kerry",
+      "date": "2026-10-23T18:24:10Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "3215ff29ef013db515b5fd61171dbe126b611aaa",
+      "short": "3215ff2",
+      "message": "Prepare release 4.18.6",
+      "author": "github-actions[bot]",
+      "date": "2026-10-23T18:19:55Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "2dba9cda7d17e6d7e3105a9e80830cb7f93eeaec",
       "short": "2dba9cd",
@@ -882,24 +900,6 @@
       "message": "Extra logic in build-ProjectConfig() to remove ambiguity for a custom via-config with items to analyze, since <AnalyzeProject? is set to true.",
       "author": "MIpetrov-NI",
       "date": "2026-08-03T19:03:13Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "016322233dd49f2959060b5560feb14c88c85f38",
-      "short": "0163222",
-      "message": "so i am going to try to not auto approve this accidentally",
-      "author": "daniel-coons",
-      "date": "2026-07-31T19:53:14Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "cc3ad976c36aeacc5d7d3e8651832c6cd15a48c1",
-      "short": "cc3ad97",
-      "message": "Merge branch 'elijah286:main' into main",
-      "author": "Daniel Coons",
-      "date": "2026-07-31T19:48:45Z",
       "project": false,
       "dep_only": false
     },
