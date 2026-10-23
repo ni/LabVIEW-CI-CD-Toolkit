@@ -1394,13 +1394,15 @@ docker run --rm `
         without a captured VIPM list are treated conservatively by the dashboard, with only the known
         Windows core tooling VIPC inferred as installed.</p>
       <div class="note"><span class="lbl">Required essentials vs. best-effort tooling</span>
-        <code>install-vipc.ps1</code> installs the UTF JUnit essentials
+        <code>install-vipc.ps1</code> installs Caraya <code>1.4.4.148</code> and the UTF JUnit essentials
         (<code>ni_lib_utf_junit_report</code> + its <code>ni_lib_junit_results_api</code> /
         <code>ni_lib_simple_xml</code> deps) <strong>first</strong> as <em>required</em>, then applies project
-        <code>.vipc</code> files (also required). Tooling VIPCs (<code>ci-tooling*.vipc</code>, e.g. Antidoc / Caraya /
+        <code>.vipc</code> files (also required). Other tooling VIPCs (<code>ci-tooling*.vipc</code>, e.g. Antidoc /
         VI Tester / LUnit) are <em>best-effort</em>: if a heavy add-on wedges the headless VIPM engine it is logged as a warning
-        and the build still publishes a working, UTF-capable image. Override the required set with
-        <code>VIPM_REQUIRED_PACKAGES</code>.</div>
+        and the build still publishes an image only if the required dependency bake succeeded.
+        The Docker hook propagates a failed installer exit rather than silently publishing an incomplete worker.
+        Override the required set with <code>VIPM_REQUIRED_PACKAGES</code>. A seed-only registry copy does not
+        apply these dependencies: rebuild the project worker before relying on Caraya being present.</div>
       <div class="note"><span class="lbl">Public-index fallback</span>
         The resolver-bypass fallback covers packages in the built-in NI LabVIEW Tools Network and VIPM Community
         repositories, including old OpenG <code>sf://opengtoolkit</code> URLs and the legacy
@@ -1667,14 +1669,14 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         </tbody>
       </table>
 
-      <h4>The four frameworks &amp; the exact headless command each runs</h4>
+      <h4>The four frameworks &amp; their headless commands</h4>
       <p>Each enabled tool is driven by a per-tool command <strong>template</strong> that <code>run-unit-tests.ps1</code>
         applies verbatim after token substitution. Any template can be overridden per tool with a <code>command:</code>
         key in the config, so a precise invocation can be corrected on a real worker with no script change.</p>
       <table>
         <thead><tr><th>Framework</th><th>Test unit it discovers</th><th>Runs via</th><th>Default command template</th></tr></thead>
         <tbody>
-          <tr><td><strong>Caraya</strong> (JKI)</td><td>VIs containing Caraya assertions, under a directory</td><td><code>g-cli</code></td><td><code>g-cli --lv-ver {ver} -- caraya -- --directory "{dir}" --junit "{out}"</code></td></tr>
+          <tr><td><strong>Caraya</strong> (JKI)</td><td>A project-owned runner with an explicit test inventory</td><td>native <code>LabVIEWCLI RunVI</code> through <code>command:</code></td><td>Use a wrapper that disables Caraya's interactive dialog, writes JUnit to <code>{out}</code>, checks its assertion inventory, and propagates CLI failures (example below). The legacy <code>g-cli ... caraya</code> default is an unverified extension scaffold, not provided by the Caraya package itself.</td></tr>
           <tr><td><strong>LUnit</strong> (Astemes)</td><td>Test Case classes (<code>.lvclass</code>), under a directory</td><td>native <code>LabVIEWCLI</code></td><td><code>"{cli}" -LogToConsole TRUE -OperationName LUnit -Path "{dir}" -ReportPath "{out}" -LabVIEWPath "{lv}" -Headless</code></td></tr>
           <tr><td><strong>VI Tester</strong> (JKI)</td><td>xUnit TestCase classes, under a directory <em>(scaffold)</em></td><td><code>g-cli</code></td><td><code>g-cli --lv-ver {ver} -- vitester -- --directory "{dir}" --junit "{out}"</code></td></tr>
           <tr><td><strong>NI UTF</strong></td><td><code>.lvtest</code> items inside a <code>.lvproj</code></td><td>native <code>LabVIEWCLI</code></td><td><code>"{cli}" -LogToConsole TRUE -OperationName RunUnitTests -ProjectPath "{proj}" -JUnitReportPath "{out}" -LabVIEWPath "{lv}" -Headless</code></td></tr>
@@ -1718,7 +1720,23 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       locations: []</code></pre>
       <p>Only tools with <code>enabled: true</code> run. A <code>location</code> may be a directory (recursed), a glob
         / extension pattern (each match&rsquo;s parent directory becomes a test root), or &mdash; for UTF &mdash; a
-        <code>.lvproj</code> path.</p>
+        <code>.lvproj</code> path. The driver reads indentation relative to <code>unitTests:</code>, including the
+        canonical <code>config.unitTests.tools</code> nesting, preserves quoted command arguments, and stops at
+        sibling blocks.</p>
+      <p>A native Caraya integration can use this override under <code>config.unitTests.tools</code>:</p>
+      <pre><code>caraya:
+  enabled: true
+  locations:
+    - "tests"
+  command: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{dir}\Invoke-CoreTests.ps1" -ResultsPath "{out}" -LabVIEWPath "{lv}" -Headless</code></pre>
+      <p><code>Invoke-CoreTests.ps1</code> is supplied by the project, not generated by the toolkit. Its
+        <code>Run Tests.vi</code> must implement the installed <code>RunVI</code> connector contract and explicitly
+        select test VIs; fixtures and the runner are not independent tests. Local headless validation against the
+        Measurement Utility Reference working tree passed eight suites / 44 assertions on 2026-10-23 without
+        g-cli. This does not certify a clean container. The historical <code>6d69ccd</code> worker failed with
+        LabVIEW error <code>1003</code>; its mass-compile report identified missing Caraya runner VIs and Linked
+        Network Actor dependencies. Bake both the test framework and the project's full dependency closure,
+        including authorized private/offline dependencies that are not in the public VIPM indexes.</p>
 
       <h4>How the workflow composes the runner (per commit)</h4>
       <p>The whole job runs on one <span class="pill win">windows-2022</span> runner and follows a fixed step order
@@ -1762,14 +1780,26 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       <p>The container emits raw JUnit XML; the host builder normalises it. Two files matter:</p>
       <ul>
         <li><strong><code>&lt;ResultsDir&gt;/&lt;tool&gt;-&lt;n&gt;.xml</code></strong> &mdash; one JUnit file per tool per test-root. The report builder infers the framework from the filename (<code>caraya*</code>, <code>lunit*</code>, <code>vi-tester*</code>/<code>vitester*</code>, <code>utf*</code>).</li>
+        <li><strong>Runner diagnostics</strong> &mdash; a failed command, unresolved location, missing CLI, or absent
+          report produces <code>&lt;tool&gt;-runner-&lt;n&gt;.xml</code> with a clearly labelled runner-error case,
+          not a fabricated test assertion. <code>&lt;tool&gt;-&lt;n&gt;.log</code> retains command output and the LabVIEW
+          CLI session log when available. The driver owns <code>ResultsDir</code> and clears prior XML/log files
+          before each run, continues other configured tools after a command failure, and exits nonzero.</li>
         <li><strong><code>unit-tests/&lt;sha&gt;/results.json</code></strong> &mdash; the merged model: per-tool suites, per-case status, and a <code>summary</code> of <code>{tests, passed, failed, errored, skipped}</code>. Each failing case deep-links the test VI (and, when derivable by stripping affixes like <code>Foo Tests.vi &rarr; Foo.vi</code>, the VI <em>under test</em>) into the VI Browser for that revision.</li>
       </ul>
       <p>The commit status is derived straight from <code>results.json</code> so it always matches the report:</p>
       <ul>
-        <li><code>tests == 0</code> &rarr; <strong>success</strong>, &ldquo;No unit tests found&rdquo;.</li>
+        <li><code>tests == 0</code> &rarr; <strong>failure</strong>, &ldquo;No unit tests found&rdquo;.</li>
+        <li>All cases skipped, or the container runner failed &rarr; <strong>failure</strong>, even if a partial JUnit file exists.</li>
         <li><code>failed + errored == 0</code> &rarr; <strong>success</strong>, &ldquo;<em>N</em> passed&rdquo;.</li>
         <li>otherwise &rarr; <strong>failure</strong>, &ldquo;<em>N</em> failed, <em>M</em> passed&rdquo;.</li>
       </ul>
+      <p>Malformed, empty, non-JUnit, or count-inconsistent XML is represented as an explicit report-validation
+        error. An existing empty report renders its zero counts instead of claiming the Windows report is absent.
+        Runner/report errors contribute to <code>summary.errored</code>; assertion results remain separate cases.
+        The workflow fails the job as well as the commit status, and test-script/inventory edits under
+        <code>tests/</code> trigger a run. Regression checks run without LabVIEW in the Windows
+        <code>Unit Test Runner Checks</code> workflow; locally run <code>python .github/labview/test-unit-tests.py</code>.</p>
       <p>The dashboard colours the Unit Tests badge from the <code>passedPercent</code> thresholds above (green at or
         above 100%, yellow at or above 80%, red below 80%). When Linux results are present the cell shows the same
         two-number Windows/Linux pill as Mass Compile.</p>

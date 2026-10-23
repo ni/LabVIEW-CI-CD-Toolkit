@@ -11,7 +11,8 @@
     a glob / file-extension pattern) and invokes that tool's headless runner via
     g-cli (already baked into the CI image), writing JUnit XML.
 
-    Caraya is the reference implementation, driven via g-cli. NI UTF runs through the
+    Caraya supports a project-owned native LabVIEWCLI RunVI wrapper through command:.
+    Its legacy g-cli default is an unverified extension scaffold. NI UTF runs through the
     built-in LabVIEWCLI RunUnitTests operation (see Invoke-UtfTests); LUnit (Astemes)
     runs through the native LabVIEWCLI "LUnit" operation the same way (see
     Invoke-LUnitTests); JKI VI Tester is scaffolded with the same contract. The exact
@@ -21,7 +22,7 @@
 
     HEADLESS: LabVIEW must run -Headless in LabVIEW 2026+ Windows containers (same
     constraint run-vi-analyzer.ps1 documents) or VI Server fails with -350000. g-cli
-    launches LabVIEW the same way, so we pass the LabVIEW path/version through.
+    extensions must be verified separately; native wrappers must pass -Headless.
 
 .PARAMETER WorkspaceRoot
     Absolute path to the checked-out project inside the container. Default C:\workspace.
@@ -47,6 +48,9 @@ $ProgressPreference    = 'SilentlyContinue'
 
 if (-not $ConfigPath) { $ConfigPath = Join-Path $WorkspaceRoot '.github\labview-ci.yml' }
 New-Item -ItemType Directory -Force -Path $ResultsDir | Out-Null
+Get-ChildItem -LiteralPath $ResultsDir -File | Where-Object {
+    $_.Extension -in @('.xml', '.log') -or $_.Name -eq '_tooling.json'
+} | Remove-Item -Force
 
 # Tracks tools that were configured + attempted but could not run because the
 # selected container lacks the required tooling (e.g. the NI Unit Test Framework
@@ -236,8 +240,15 @@ function Read-UnitTestTools([string]$path) {
     $cur = $null
     foreach ($raw in (Get-Content -LiteralPath $path)) {
         $line = ($raw -replace '\t', '    ')
-        if ($line -match '^\s*unitTests:\s*$') { $inUT = $true; $inTools = $false; $inLoc = $false; $cur = $null; continue }
+        if ($line -match '^(\s*)unitTests:\s*$') { $utIndent = $Matches[1].Length; $inUT = $true; $inTools = $false; $inLoc = $false; $cur = $null; continue }
         if (-not $inUT) { continue }
+        if (-not $line.Trim() -or $line.TrimStart().StartsWith('#')) { continue }
+        if (($line.Length - $line.TrimStart().Length) -le $utIndent) {
+            if ($cur -and $cur.enabled) { $tools += $cur }
+            $cur = $null; $inUT = $false; $inTools = $false; $inLoc = $false
+            continue
+        }
+        $line = $line.Substring($utIndent)
         if ($line -match '^\s{2}tools:\s*$')   { $inTools = $true; continue }
 
         # A tool entry is a map key under tools:, e.g. "    caraya:" (4-space indent).
@@ -250,19 +261,26 @@ function Read-UnitTestTools([string]$path) {
         }
         if ($null -ne $cur) {
             if ($line -match '^\s{6}enabled:\s*(true|false)\s*$') { $cur.enabled = ($Matches[1] -eq 'true'); $inLoc = $false; continue }
-            $cm = [regex]::Match($line, '^\s{6}command:\s*"?(.+?)"?\s*$')
-            if ($cm.Success) { $cur.command = $cm.Groups[1].Value; $inLoc = $false; continue }
+            $cm = [regex]::Match($line, '^\s{6}command:\s*(.+?)\s*$')
+            if ($cm.Success) {
+                $command = $cm.Groups[1].Value
+                if (($command.StartsWith('"') -and $command.EndsWith('"')) -or
+                    ($command.StartsWith("'") -and $command.EndsWith("'"))) {
+                    $command = $command.Substring(1, $command.Length - 2)
+                }
+                $cur.command = $command; $inLoc = $false; continue
+            }
             if ($line -match '^\s{6}locations:\s*\[\s*\]\s*$') { $cur.locations = @(); $inLoc = $false; continue }
             if ($line -match '^\s{6}locations:\s*$') { $inLoc = $true; continue }
             if ($inLoc) {
-                $lm = [regex]::Match($line, '^\s{8}-\s*"?([^"]+?)"?\s*$')
-                if ($lm.Success) { $cur.locations += $lm.Groups[1].Value; continue }
+                $lm = [regex]::Match($line, '^\s{8}-\s*(.+?)\s*$')
+                if ($lm.Success) { $cur.locations += $lm.Groups[1].Value.Trim('"', "'"); continue }
             }
         }
         # A top-level key (column 0) ends the unitTests block.
-        if ($line -match '^\S') {
+        if ($line -match '^\s{2}\S') {
             if ($cur -and $cur.enabled) { $tools += $cur }
-            $cur = $null; $inUT = $false; $inTools = $false; $inLoc = $false
+            $cur = $null; $inTools = $false; $inLoc = $false
         }
     }
     if ($cur -and $cur.enabled) { $tools += $cur }
@@ -281,8 +299,8 @@ function Resolve-TestRoots([string[]]$locations) {
         }
         # Glob / extension: expand and take each match's parent directory.
         try {
-            $matches = Get-ChildItem -Path (Join-Path $WorkspaceRoot $rel) -Recurse -File -ErrorAction SilentlyContinue
-            foreach ($f in $matches) { $roots.Add($f.DirectoryName) }
+            $matchedFiles = Get-ChildItem -Path (Join-Path $WorkspaceRoot $rel) -Recurse -File -ErrorAction SilentlyContinue
+            foreach ($file in $matchedFiles) { $roots.Add($file.DirectoryName) }
         } catch { }
     }
     return ($roots | Sort-Object -Unique)
@@ -323,33 +341,72 @@ $UTF_DEFAULT_CMD = '"{cli}" -LogToConsole TRUE -OperationName RunUnitTests -Proj
 # {ver}=LabVIEW year. Override per tool with the config `command:` key.
 $LUNIT_DEFAULT_CMD = '"{cli}" -LogToConsole TRUE -OperationName LUnit -Path "{dir}" -ReportPath "{out}" -LabVIEWPath "{lv}" -Headless'
 
+$Script:RunnerFailed = $false
+function Write-RunnerFailure([string]$id, [int]$index, [string]$detail) {
+    $Script:RunnerFailed = $true
+    Write-Warning "[$id] $detail"
+    $document = New-Object System.Xml.XmlDocument
+    $suite = $document.CreateElement('testsuite')
+    $suite.SetAttribute('name', "$id runner")
+    $suite.SetAttribute('tests', '1')
+    $suite.SetAttribute('errors', '1')
+    $case = $document.CreateElement('testcase')
+    $case.SetAttribute('name', 'Runner execution (not a test assertion)')
+    $errorNode = $document.CreateElement('error')
+    $errorNode.SetAttribute('message', ($detail -split '\r?\n')[0])
+    $errorNode.InnerText = $detail
+    [void]$case.AppendChild($errorNode)
+    [void]$suite.AppendChild($case)
+    [void]$document.AppendChild($suite)
+    $document.Save((Join-Path $ResultsDir "$id-runner-$index.xml"))
+}
+
 function Invoke-Tool($tool, [int]$index) {
     $id   = $tool.tool
     $tmpl = if ($tool.command) { $tool.command } elseif ($DEFAULT_CMD.ContainsKey($id)) { $DEFAULT_CMD[$id] } else { '' }
     $locs = @($tool.locations | Where-Object { $_ -and $_.Trim() })
     # Empty locations means "the whole project" (the config page documents this).
-    $roots = if ($locs.Count -gt 0) { Resolve-TestRoots $locs } else { @($WorkspaceRoot) }
+    $roots = @(if ($locs.Count -gt 0) { Resolve-TestRoots $locs } else { $WorkspaceRoot })
 
     Write-Host "--- tool: $id ---"
-    if ($roots.Count -eq 0) { Write-Warning "  no test locations resolved for '$id' (locations: $($tool.locations -join ', ')) - skipping."; return }
-    if (-not $tmpl)         { Write-Warning "  no headless command known for '$id' yet (set config.unitTests.tools[].command to enable) - skipping."; return }
-    if (-not $GCli -and $tmpl -match '(^|\s)g-cli(\s|$)') { Write-Warning "  g-cli not found on PATH; cannot run '$id'."; return }
+    if ($roots.Count -eq 0) { Write-RunnerFailure $id $index "No test locations resolved (locations: $($tool.locations -join ', '))."; return }
+    if (-not $tmpl) { Write-RunnerFailure $id $index 'No headless command configured. Set config.unitTests.tools.<tool>.command.'; return }
+    if (-not $GCli -and $tmpl -match '(^|\s)g-cli(\s|$)') {
+        Write-RunnerFailure $id $index 'g-cli is not installed. Configure a project-owned LabVIEWCLI runner with command:, or bake and verify the required g-cli extension.'
+        return
+    }
 
     $i = 0
     foreach ($dir in $roots) {
         $out = Join-Path $ResultsDir ("{0}-{1}.xml" -f $id, ($index * 100 + $i))
-        $cmd = $tmpl.Replace('{ver}', $LabVIEWVersion).Replace('{dir}', $dir).Replace('{out}', $out).Replace('{lv}', $LabVIEWPath)
+        $failurePath = Join-Path $ResultsDir ("{0}-runner-{1}.xml" -f $id, ($index * 100 + $i))
+        foreach ($previous in @($out, $failurePath)) {
+            if (Test-Path -LiteralPath $previous) { Remove-Item -LiteralPath $previous }
+        }
+        $cmd = $tmpl.Replace('{ver}', $LabVIEWVersion).Replace('{dir}', $dir).Replace('{out}', $out).Replace('{lv}', $LabVIEWPath).Replace('{cli}', $CliExe)
         Write-Host "  [$id] $cmd"
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        $runnerOutput = ''; $exitCode = -1
         try {
-            & cmd.exe /c $cmd 2>&1 | Out-Host
-            Write-Host ("  [$id] exit={0}" -f $LASTEXITCODE)
+            $runnerOutput = (& cmd.exe /d /c $cmd 2>&1 | Out-String)
+            $exitCode = $LASTEXITCODE
         } catch {
-            Write-Warning "  [$id] runner error: $($_.Exception.Message)"
+            $runnerOutput += $_.Exception.Message
+        } finally {
+            $ErrorActionPreference = $prevEAP
         }
-        $ErrorActionPreference = $prevEAP
-        if (Test-Path -LiteralPath $out) { Write-Host "  [$id] wrote $out" }
-        else { Write-Warning "  [$id] produced no JUnit at $out (check the command/plugin for this tool)." }
+        $logMatch = [regex]::Match($runnerOutput, '(?im)started logging in file:\s*([^\r\n]+\.log)')
+        if ($logMatch.Success -and (Test-Path -LiteralPath $logMatch.Groups[1].Value.Trim())) {
+            $runnerOutput += "`nLabVIEW CLI session log:`n" + (Get-Content -LiteralPath $logMatch.Groups[1].Value.Trim() -Raw)
+        }
+        $runnerOutput | Set-Content -LiteralPath ([System.IO.Path]::ChangeExtension($out, '.log')) -Encoding UTF8
+        Write-Host $runnerOutput
+        Write-Host "  [$id] exit=$exitCode"
+        if ($exitCode -ne 0) {
+            Write-RunnerFailure $id ($index * 100 + $i) "Runner exited with code $exitCode. A LabVIEW error 1003 means the entry VI is broken; check its dependencies in this worker image.`n$runnerOutput"
+        } elseif (-not (Test-Path -LiteralPath $out)) {
+            Write-RunnerFailure $id ($index * 100 + $i) "Runner produced no JUnit at $out.`n$runnerOutput"
+        } else { Write-Host "  [$id] wrote $out" }
         $i++
     }
 }
@@ -590,9 +647,8 @@ function Invoke-LUnitTests($tool, [int]$index) {
 # -- Main ---------------------------------------------------------------------
 $tools = Read-UnitTestTools $ConfigPath
 if (-not $tools -or $tools.Count -eq 0) {
-    Write-Warning "No config.unitTests.tools configured in $ConfigPath - nothing to run."
-    Write-Host "Wrote 0 JUnit file(s) to $ResultsDir."
-    exit 0
+    Write-RunnerFailure 'unit-tests' 0 "No enabled config.unitTests.tools found in $ConfigPath. Enable a framework and configure its test locations."
+    exit 1
 }
 
 Write-Host ("Configured tools: {0}" -f (($tools | ForEach-Object { $_.tool }) -join ', '))
@@ -614,8 +670,5 @@ if ($Script:ToolingIssues.Count -gt 0) {
     (@{ missing = @($Script:ToolingIssues) } | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $toolingPath -Encoding ascii
     Write-Host "Recorded $($Script:ToolingIssues.Count) missing-tooling finding(s) -> $toolingPath"
 }
-# Always exit 0: pass/fail is derived from the JUnit content by
-# build-unittest-report.py (its summary.json drives the commit status), exactly
-# like the Mass Compile report. A runner-level error surfaces as a missing/empty
-# report, not a hard CI failure here.
+if ($Script:RunnerFailed) { exit 1 }
 exit 0

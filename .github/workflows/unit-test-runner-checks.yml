@@ -1,0 +1,35 @@
+name: Unit Test Runner Checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/labview/run-unit-tests.ps1'
+      - '.github/labview/build-unittest-report.py'
+      - '.github/labview/test-unit-tests.py'
+      - '.github/labview/vipm/install-vipc.ps1'
+      - '.github/docker/labview-ci.Dockerfile'
+      - '.github/workflows/unit-test-runner-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/labview/run-unit-tests.ps1'
+      - '.github/labview/build-unittest-report.py'
+      - '.github/labview/test-unit-tests.py'
+      - '.github/labview/vipm/install-vipc.ps1'
+      - '.github/docker/labview-ci.Dockerfile'
+      - '.github/workflows/unit-test-runner-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-checks:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Check runner and JUnit report contracts without LabVIEW
+        run: python .github/labview/test-unit-tests.py
