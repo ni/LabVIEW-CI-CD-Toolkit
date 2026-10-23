@@ -97,6 +97,78 @@ class ReleaseCatalogPrTests(unittest.TestCase):
         self.assertEqual(command.call_count, 3)
         output.assert_any_call('pr_url', 'existing-pr')
 
+    def test_stale_preparation_branch_gets_a_commit_scoped_review_branch(self):
+        commit = 'a' * 40
+        branch = f'lvci-release/release-4.18.5-{commit}'
+
+        def commands(*args, check=True):
+            if args == ('git', 'push', 'origin', 'HEAD:main'):
+                return subprocess.CompletedProcess(args, 1, '', 'GH013: Changes must be made through a pull request')
+            if args == ('git', 'push', 'origin', 'HEAD:refs/heads/lvci-release/release-4.18.5'):
+                return subprocess.CompletedProcess(args, 1, '', 'non-fast-forward')
+            if args == ('git', 'rev-parse', 'HEAD'):
+                return subprocess.CompletedProcess(args, 0, commit + '\n', '')
+            if args == ('git', 'push', 'origin', f'HEAD:refs/heads/{branch}'):
+                return subprocess.CompletedProcess(args, 0, '', '')
+            if args[:3] == ('gh', 'pr', 'list'):
+                self.assertIn(branch, args)
+                return subprocess.CompletedProcess(args, 0, '[]', '')
+            if args[:3] == ('gh', 'pr', 'create'):
+                self.assertIn(branch, args)
+                return subprocess.CompletedProcess(args, 0, 'new-review-pr\n', '')
+            self.fail(f'Unexpected command: {args}')
+
+        with patch.object(RELEASE_PR, 'run', side_effect=commands) as command:
+            with patch.object(RELEASE_PR, 'output') as output:
+                RELEASE_PR.push('ni/LabVIEW-CI-CD-Toolkit', 'main', '4.18.5', 'release')
+        self.assertFalse(any('--force' in argument for call in command.call_args_list for argument in call.args))
+        output.assert_any_call('published', 'false')
+        output.assert_any_call('pr_url', 'new-review-pr')
+
+    def test_preparation_authentication_failure_does_not_try_another_branch(self):
+        results = [
+            subprocess.CompletedProcess([], 1, '', 'GH013: Changes must be made through a pull request'),
+            subprocess.CompletedProcess([], 1, '', 'Authentication failed'),
+        ]
+        with patch.object(RELEASE_PR, 'run', side_effect=results) as command:
+            with patch.object(RELEASE_PR, 'output') as output:
+                with self.assertRaisesRegex(RuntimeError, 'Authentication failed'):
+                    RELEASE_PR.push('ni/LabVIEW-CI-CD-Toolkit', 'main', '4.18.5', 'release')
+        self.assertEqual(command.call_count, 2)
+        output.assert_not_called()
+
+    def test_commit_scoped_push_failure_does_not_open_pr(self):
+        results = [
+            subprocess.CompletedProcess([], 1, '', 'GH013: Changes must be made through a pull request'),
+            subprocess.CompletedProcess([], 1, '', 'non-fast-forward'),
+            subprocess.CompletedProcess([], 0, 'a' * 40 + '\n', ''),
+            subprocess.CompletedProcess([], 1, '', 'remote rejected: protected branch'),
+        ]
+        with patch.object(RELEASE_PR, 'run', side_effect=results) as command:
+            with patch.object(RELEASE_PR, 'output') as output:
+                with self.assertRaisesRegex(RuntimeError, 'remote rejected: protected branch'):
+                    RELEASE_PR.push('ni/LabVIEW-CI-CD-Toolkit', 'main', '4.18.5', 'release')
+        self.assertEqual(command.call_count, 4)
+        output.assert_not_called()
+
+    def test_commit_scoped_promotion_branch_reuses_its_existing_pr(self):
+        commit = 'a' * 40
+        branch = f'lvci-release/promotion-4.18.5-{commit}'
+        results = [
+            subprocess.CompletedProcess([], 1, '', 'GH013: Changes must be made through a pull request'),
+            subprocess.CompletedProcess([], 1, '', 'fetch first'),
+            subprocess.CompletedProcess([], 0, commit + '\n', ''),
+            subprocess.CompletedProcess([], 0, '', ''),
+            subprocess.CompletedProcess([], 0, '[{"url":"existing-promotion-pr"}]', ''),
+        ]
+        with patch.object(RELEASE_PR, 'run', side_effect=results) as command:
+            with patch.object(RELEASE_PR, 'output') as output:
+                RELEASE_PR.push('ni/LabVIEW-CI-CD-Toolkit', 'main', '4.18.5', 'promotion')
+        self.assertEqual(command.call_args_list[3].args,
+                         ('git', 'push', 'origin', f'HEAD:refs/heads/{branch}'))
+        self.assertEqual(command.call_count, 5)
+        output.assert_any_call('pr_url', 'existing-promotion-pr')
+
     def test_pr_creation_failure_does_not_claim_publication(self):
         results = [
             subprocess.CompletedProcess([], 1, '', 'GH013: Changes must be made through a pull request'),

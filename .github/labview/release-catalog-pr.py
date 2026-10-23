@@ -64,7 +64,15 @@ def push(repo, base, version, kind):
             return
         if requires_pr(result):
             branch = f'lvci-release/{kind}-{version}'
-            run('git', 'push', 'origin', f'HEAD:refs/heads/{branch}')
+            prepared = run('git', 'push', 'origin', f'HEAD:refs/heads/{branch}', check=False)
+            print(prepared.stdout + prepared.stderr)
+            if prepared.returncode != 0 and ('non-fast-forward' in prepared.stderr or 'fetch first' in prepared.stderr):
+                commit = run('git', 'rev-parse', 'HEAD').stdout.strip()
+                branch = f'{branch}-{commit}'
+                prepared = run('git', 'push', 'origin', f'HEAD:refs/heads/{branch}', check=False)
+                print(prepared.stdout + prepared.stderr)
+            if prepared.returncode != 0:
+                raise RuntimeError(f'Prepared catalog branch push failed:\n{prepared.stdout}{prepared.stderr}')
             existing = json.loads(run('gh', 'pr', 'list', '--repo', repo, '--head', branch,
                                       '--base', base, '--json', 'url').stdout)
             if existing:
