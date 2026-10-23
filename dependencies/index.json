@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "c50f706226e4ad341f5c5b20ee3653bed660e862",
+  "sha": "84f3acaf96467866f69c2df0aa6dce52459b8eb0",
   "revisions": [
+    {
+      "sha": "84f3acaf96467866f69c2df0aa6dce52459b8eb0",
+      "short": "84f3aca",
+      "message": "Merge pull request #78 from ni/fix/caraya-runner-diagnostics",
+      "author": "Elijah Kerry",
+      "date": "2026-10-23T17:24:51Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "86f14ab8f5acdb326e585a564a6c642d45c64ea0",
+      "short": "86f14ab",
+      "message": "Fix Caraya runner diagnostics and unit-test failure reporting",
+      "author": "Elijah Kerry",
+      "date": "2026-10-23T17:22:29Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "c50f706226e4ad341f5c5b20ee3653bed660e862",
       "short": "c50f706",
@@ -882,24 +900,6 @@
       "message": "Merge pull request #42 from danielcoons/feature/#22-SBOM",
       "author": "Daniel Coons",
       "date": "2026-07-31T19:40:38Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "847103e9914faeafef60d7a6bf4ce76ddd3540db",
-      "short": "847103e",
-      "message": "update of high-level automation calls file naming",
-      "author": "daniel-coons",
-      "date": "2026-07-31T19:37:39Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "7830d780250129b6ac63e2bb105243b67fc59813",
-      "short": "7830d78",
-      "message": "updated sbom generation yml",
-      "author": "daniel-coons",
-      "date": "2026-07-31T18:28:57Z",
       "project": false,
       "dep_only": false
     },
