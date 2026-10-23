@@ -49,6 +49,7 @@ from urllib.parse import quote
 
 # ── tool identity ────────────────────────────────────────────────────────────
 TOOLS = {
+    "runner":    {"id": "runner",    "label": "Unit test runner"},
     "caraya":    {"id": "caraya",    "label": "Caraya"},
     "vi-tester": {"id": "vi-tester", "label": "VI Tester"},
     "lunit":     {"id": "lunit",     "label": "LUnit"},
@@ -65,6 +66,8 @@ STATUS_META = {
 
 def tool_for_filename(name: str) -> str:
     n = name.lower()
+    if n.startswith("unit-tests-runner"):
+        return "runner"
     if "caraya" in n:
         return "caraya"
     if "vitester" in n or "vi-tester" in n or "vi_tester" in n:
@@ -146,21 +149,46 @@ def _text(el) -> str:
     return (el.text or "").strip() if el is not None else ""
 
 
+def report_error(tool: str, name: str, message: str) -> dict:
+    return {
+        "tool": tool, "name": name,
+        "tests": 1, "failures": 0, "errors": 1, "skipped": 0, "time": 0.0,
+        "cases": [{
+            "name": "JUnit report validation (not a test assertion)",
+            "classname": "", "status": "error", "time": 0.0,
+            "message": message, "details": message,
+            "test_vi_rel": "", "test_vi_name": "",
+            "target_vi_rel": "", "target_vi_name": "",
+        }],
+    }
+
+
 def parse_junit(xml_path: Path, tool: str, by_base: dict[str, list[str]]) -> list[dict]:
     """Parse one JUnit XML file into a list of suite dicts for `tool`."""
     try:
         root = ET.parse(str(xml_path)).getroot()
     except Exception as e:  # malformed XML shouldn't sink the whole report
-        return [{
-            "tool": tool, "name": f"(could not parse {xml_path.name})",
-            "tests": 0, "failures": 0, "errors": 0, "skipped": 0, "time": 0.0,
-            "cases": [], "parse_error": str(e),
-        }]
+        return [report_error(tool, xml_path.name, f"Could not parse JUnit: {e}")]
 
-    suites_el = root.iter("testsuite") if root.tag != "testsuite" else [root]
+    if root.tag not in ("testsuite", "testsuites") or not list(root.iter("testcase")):
+        return [report_error(tool, xml_path.name, "Runner produced no JUnit test cases.")]
+
+    suites_el = root.iter("testsuite")
     out: list[dict] = []
+    count_errors = []
     for s in suites_el:
         sname = s.get("name") or "(unnamed suite)"
+        descendants = list(s.iter("testcase"))
+        observed = {
+            "tests": len(descendants),
+            "failures": sum(case.find("failure") is not None for case in descendants),
+            "errors": sum(case.find("error") is not None for case in descendants),
+            "skipped": sum(case.find("skipped") is not None for case in descendants),
+        }
+        for attribute, actual in observed.items():
+            declared = s.get(attribute)
+            if declared is not None and (not declared.isdigit() or int(declared) != actual):
+                count_errors.append(f"{sname}: declared {attribute}={declared}, found {actual}.")
         cases = []
         for c in s.findall("testcase"):
             name = c.get("name") or "(unnamed test)"
@@ -217,6 +245,10 @@ def parse_junit(xml_path: Path, tool: str, by_base: dict[str, list[str]]) -> lis
             "time": _to_float(s.get("time")),
             "cases": cases,
         })
+    if not out:
+        return [report_error(tool, xml_path.name, "JUnit contains no test suites.")]
+    if count_errors:
+        out.append(report_error(tool, xml_path.name, "\n".join(count_errors)))
     return out
 
 
@@ -256,7 +288,7 @@ def classify(passed: int, failed: int, errored: int, total: int) -> tuple[str, i
     if total == 0:
         return "empty", 0
     percent = round(100 * passed / total)
-    if failed == 0 and errored == 0:
+    if failed == 0 and errored == 0 and passed > 0:
         return "passed", percent
     return "failed", percent
 
@@ -629,7 +661,7 @@ function renderAll(){
   document.getElementById('platnote').textContent = s.duration ? `Ran in ${s.duration}s on ${PLAT_LABEL[CUR]||CUR}.` : '';
   const sb = document.getElementById('statusbadge');
   sb.style.display='inline-block';
-  sb.textContent = s.status==='passed'?'all passing':(s.status==='empty'?'no tests':`${s.percent}% passing`);
+    sb.textContent = s.status==='passed'&&!s.skipped?'all passing':(s.status==='empty'?'no tests':`${s.percent}% passing`);
   sb.style.background = STATUS_BADGE[s.status] || '#6e7681';
 
   const cards=[
@@ -753,7 +785,7 @@ document.getElementById('backdrop').addEventListener('click',closeSnap);
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeSnap(); });
 
 renderToggle();
-if(D.suites.length || D.summary.tests) renderAll(); else showEmpty(SELF_PLATFORM);
+renderAll();
 </script>
 </body>
 </html>

@@ -998,18 +998,18 @@ try {
     # list with VIPM_REQUIRED_PACKAGES (comma/semicolon separated name@version); set
     # it to a single '-' to disable the required pre-install entirely.
     $requiredRaw = if ($null -ne $Env:VIPM_REQUIRED_PACKAGES) { $Env:VIPM_REQUIRED_PACKAGES } else {
-        'ni_lib_utf_junit_report@1.0.1.43,ni_lib_junit_results_api@1.0.1.6,ni_lib_simple_xml@1.0.0.4'
+        'ni_lib_utf_junit_report@1.0.1.43,ni_lib_junit_results_api@1.0.1.6,ni_lib_simple_xml@1.0.0.4,jki_lib_caraya@1.4.4.148'
     }
     $requiredSpecs = @($requiredRaw -split '[,;]' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne '-' })
     if ($requiredSpecs.Count -gt 0) {
-        Write-Host ("Installing REQUIRED UTF essentials first: " + ($requiredSpecs -join ', '))
+        Write-Host ("Installing REQUIRED unit-test essentials first: " + ($requiredSpecs -join ', '))
         if ($script:VipmEngineDead) {
-            Write-Warning 'Skipping REQUIRED UTF essentials because VIPM Desktop did not start during the refresh health check.'
+            Write-Warning 'Skipping REQUIRED unit-test essentials because VIPM Desktop did not start during the refresh health check.'
             $applyFailed = $true
         } elseif (Install-VipmSpecs $requiredSpecs) {
-            Write-Host 'REQUIRED UTF essentials installed.'
+            Write-Host 'REQUIRED unit-test essentials installed.'
         } else {
-            Write-Warning 'One or more REQUIRED UTF essentials failed to install; headless UTF (RunUnitTests) will fail with -350053.'
+            Write-Warning 'One or more REQUIRED unit-test essentials failed to install; UTF may fail with -350053 and Caraya entry VIs may be broken (1003).'
             $applyFailed = $true
         }
     }
