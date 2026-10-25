@@ -205,18 +205,41 @@ def build_substitutions(catalog: dict, owner: str | None, name: str | None,
     return subs
 
 
-def default_activities(catalog: dict) -> list[str]:
+def required_activities(catalog: dict) -> list[str]:
+    """Capabilities every installation gets, whatever the caller asked for.
+
+    A capability flagged `required` in the catalog is not a choice: VI Snapshots
+    2.0 is one, because the VI Browser's 2.0 tab is always visible and needs its
+    render workflow to exist in the repository. Without this, a repo installed
+    before the capability existed never gained it -- updates reuse the manifest's
+    activity list, so the omission is self-perpetuating and the viewer's Run
+    button 404s forever on a workflow that was never vendored.
+    """
     return [
         c["id"] for c in catalog.get("capabilities", [])
-        if c.get("recommended") and c.get("status", "stable") not in DEFAULT_EXCLUDED_STATUSES
+        if c.get("required") and c.get("status", "stable") not in DEFAULT_EXCLUDED_STATUSES
     ]
 
 
+def default_activities(catalog: dict) -> list[str]:
+    defaults = [
+        c["id"] for c in catalog.get("capabilities", [])
+        if c.get("recommended") and c.get("status", "stable") not in DEFAULT_EXCLUDED_STATUSES
+    ]
+    return defaults + [a for a in required_activities(catalog) if a not in defaults]
+
+
 def resolve_activities(catalog: dict, activities: list[str]) -> list[str]:
-    """Expand hard capability dependencies, preserving the requested order."""
+    """Expand hard capability dependencies, preserving the requested order.
+
+    Required capabilities are appended to whatever was requested, so an older
+    manifest (or an explicit --activities list that predates them) still heals on
+    the next install or update.
+    """
     by_id = {c["id"]: c for c in catalog.get("capabilities", [])}
     selected: list[str] = []
     stack = list(activities)
+    stack.extend(a for a in required_activities(catalog) if a not in stack)
     while stack:
         cid = stack.pop(0)
         if cid in selected:
@@ -609,6 +632,35 @@ def gitlab_legacy_dashboard_builder(path: Path) -> bool:
         and 'PAGES_SRC = ROOT / ".github" / "pages"' in text
         and 'PUBLIC = ROOT / "public"' in text
     )
+
+
+def prune_retired_files(catalog: dict, target_root: Path, keep: set[str],
+                        dry_run: bool, stats: dict) -> None:
+    """Delete tooling files this repository no longer ships.
+
+    A retired workflow keeps firing in a client repo long after the source has
+    dropped it -- build-toimages-image.yml outlived the render engine it built
+    and failed on every push. The configurator's stale-file scan only recognises
+    files by content signature, so anything that never mentioned the tooling by
+    name survived every reinstall. This list is the explicit backstop.
+    """
+    for rel in catalog.get("retiredFiles", {}).get("files", []):
+        if rel in keep:
+            warn(f"retired file {rel} is still installed by the catalog - skipping.")
+            continue
+        target = target_root / rel
+        if not target.is_file():
+            continue
+        if dry_run:
+            stats["planned"] += 1
+            log(f"  would prune     {rel} (retired)")
+            continue
+        try:
+            target.unlink()
+            stats["pruned"] += 1
+            log(f"  prune (retired) {rel}")
+        except OSError as exc:
+            warn(f"could not prune {rel}: {exc}")
 
 
 def prune_gitlab_provider_files(target_root: Path, provider: dict, dry_run: bool,
@@ -1163,6 +1215,7 @@ def main() -> int:
     for entry in file_list:
         copy_entry(entry, source_root, target_root, subs, force, args.dry_run, stats,
                    preserve, update, stamp_version)
+    prune_retired_files(catalog, target_root, set(file_list), args.dry_run, stats)
 
     # The dashboard generator (actions/dashboard) is a local path that only exists
     # in the tooling repo and can't be rebranded into a consumer, so the vendored
@@ -1201,7 +1254,8 @@ def main() -> int:
         add_paths = ".github .gitlab .gitlab-ci.yml" if provider == "gitlab" else ".github"
         log(f"  2. Commit the update:    git add {add_paths} && git commit -m \"Update LabVIEW CI\" && git push")
         return 0
-    log(f"Installed {stats['installed']} file(s); {stats['skipped']} skipped (already present).")
+    pruned = f"; {stats['pruned']} retired file(s) removed" if stats["pruned"] else ""
+    log(f"Installed {stats['installed']} file(s); {stats['skipped']} skipped (already present){pruned}.")
     if stats["skipped"]:
         log("Use --force to overwrite skipped files.")
     if provider == "gitlab":

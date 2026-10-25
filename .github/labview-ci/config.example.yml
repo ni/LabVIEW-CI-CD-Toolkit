@@ -80,11 +80,14 @@ config:
       vidiff: base
 
 # Installed capabilities (see .github/labview-ci/catalog.json for the full list).
+# Capabilities the catalog marks `required` are installed in every repository and
+# are added back on the next install or update even if you delete them here.
 activities:
   - dashboard
   - masscompile
   - vi-analyzer
   - vidiff
+  - snapshots-2
 
 # ----------------------------------------------------------------------------
 # GitHub Actions variables the GitHub workflows honor at runtime (set with

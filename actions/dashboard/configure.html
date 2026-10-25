@@ -460,6 +460,13 @@
     // never gates config.os).
     const OS_COLS = [["linux", "Linux"], ["windows", "Windows"]];
     function capById(id) { return (catalog.capabilities || []).find(c => c.id === id); }
+    // Capabilities the catalog marks `required` are installed in every repository
+    // (VI Snapshots 2.0 is one), so they are added to the selection even when the
+    // manifest this page loaded predates them.
+    function requiredIds() {
+      return (catalog.capabilities || []).filter(c => c.required && c.status !== "planned").map(c => c.id);
+    }
+    function addRequiredActs() { requiredIds().forEach(id => actSel.add(id)); }
     function defaultOsFor(cap) {
       const sup = cap.supportsOs || [];
       const within = sup.filter(o => osPref.has(o));
@@ -1396,6 +1403,7 @@
         if (m.version) renderVersions(m.version);
         osPref.clear(); (m.os.length ? m.os : ["windows"]).forEach(o => osPref.add(o));
         if (m.activities.length) { actSel.clear(); m.activities.forEach(a => actSel.add(a)); }
+        addRequiredActs();
         actionOs.clear();
         actSel.forEach(id => {
           const cap = capById(id); if (!cap) return;
@@ -1492,6 +1500,7 @@
       // Pre-select recommended activities; seed each one's platforms from the
       // default OS preference; load the default dependency manifest.
       catalog.capabilities.filter(c => c.recommended && c.status !== "planned").forEach(c => actSel.add(c.id));
+      addRequiredActs();
       seedActionOs(); recomputeOsSel();
       renderVersions(); renderActivities();
       pkgObj = await loadDefaultPackages();

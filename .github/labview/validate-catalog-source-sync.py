@@ -363,6 +363,40 @@ def main() -> int:
         if obsolete:
             failures.append(f"custom-image still vendors obsolete worker files: {obsolete!r}")
 
+    # A `required` capability is installed in every repository, so it must be
+    # something a client can actually receive: shipping one that is planned, or
+    # flagged defaultOff, would install a contradiction on every consumer.
+    required_caps = [cap for cap in capabilities if cap.get("required")]
+    if not required_caps:
+        failures.append(
+            "no capability is marked required. VI Snapshots 2.0 is installed "
+            "everywhere so the VI Browser's 2.0 tab always has a workflow to run; "
+            "dropping the flag silently makes it optional again."
+        )
+    for capability in required_caps:
+        capability_id = capability.get("id", "<unknown>")
+        if capability.get("status") in ("planned", "experimental"):
+            failures.append(
+                f"capability {capability_id!r} is required but {capability.get('status')!r}"
+            )
+        if capability.get("defaultOff"):
+            failures.append(f"capability {capability_id!r} is both required and defaultOff")
+
+    # Retired files are deleted from consumers on install/update, so a path here
+    # must be gone from the source and installed by nothing.
+    installable = set((catalog.get("base") or {}).get("files") or [])
+    for capability in capabilities:
+        for relpaths in (capability.get("files") or {}).values():
+            installable.update(relpaths or [])
+    for relpath in (catalog.get("retiredFiles") or {}).get("files") or []:
+        if path_exists(relpath):
+            failures.append(
+                f"retired file still exists in the source: {relpath}. Installs delete "
+                "it from every consumer, so it cannot also be a file this repo ships."
+            )
+        if relpath in installable:
+            failures.append(f"retired file is still installed by the catalog: {relpath}")
+
     for capability in capabilities:
         capability_id = capability.get("id", "<unknown>")
         files = capability.get("files") or {}

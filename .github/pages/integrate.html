@@ -76,6 +76,7 @@
     .badge.adv{color:#9a6700;border-color:#9a6700}
     .badge.planned{color:#bf8700;border-color:#bf8700}
     .badge.exp{color:#cf222e;border-color:#cf222e}
+    .badge.always{color:#fff;background:var(--fg-muted);border-color:transparent}
     .badge.os{color:var(--fg-muted)}
     .note{font-size:.78em;color:var(--fg-muted);margin-top:6px}
     .exp-details{margin-top:8px;font-size:.84em;color:var(--fg-muted)}
@@ -588,6 +589,11 @@
     }
 
     function isPlanned(cap) { return cap && cap.status === "planned"; }
+    // Capabilities the catalog marks `required` are not a choice. VI Snapshots 2.0
+    // is one: the VI Browser always shows a 2.0 tab, so every repository needs its
+    // render workflow. They are checked, locked, and force-added to a kept manifest.
+    function isRequired(cap) { return !!(cap && cap.required && !isPlanned(cap)); }
+    function requiredIds() { return (catalog.capabilities || []).filter(isRequired).map(c => c.id); }
 
     function renderCaps() {
       const host = $("caps");
@@ -598,10 +604,13 @@
         const wrap = document.createElement("label");
         wrap.className = "cap" + (planned ? " disabled" : "");
         const cb = document.createElement("input");
-        cb.type = "checkbox"; cb.value = cap.id; cb.disabled = planned;
+        const required = isRequired(cap);
+        cb.type = "checkbox"; cb.value = cap.id; cb.disabled = planned || required;
         // Capabilities are on by default unless the catalog flags one defaultOff
         // (opt-in), like Antidoc, which needs the shared image + network at run time.
-        cb.checked = !planned && !cap.defaultOff;
+        // A `required` capability cannot be turned off at all.
+        cb.checked = required || (!planned && !cap.defaultOff);
+        if (required) cb.title = "Always installed \u2014 this action cannot be turned off.";
         if (cb.checked) selected.add(cap.id);
         cb.addEventListener("change", () => {
           markCapabilityChoicesChanged();
@@ -611,7 +620,8 @@
         });
         const body = document.createElement("div");
         const badges = [];
-        if (cap.recommended) badges.push('<span class="badge rec">Recommended</span>');
+        if (required) badges.push('<span class="badge always">Always installed</span>');
+        else if (cap.recommended) badges.push('<span class="badge rec">Recommended</span>');
         if (cap.status === "advanced") badges.push('<span class="badge adv">Advanced</span>');
         if (planned) badges.push('<span class="badge planned">Coming soon</span>');
         const osBadges = (cap.supportsOs || []).map(o => `<span class="badge os">${o}</span>`).join("");
@@ -679,7 +689,10 @@
     // ---- file resolution (mirrors install.py) ----------------------------
     function resolveActivities(activities) {
       const map = {}; catalog.capabilities.forEach(c => map[c.id] = c);
+      // Mirrors install.py: hard requires are expanded, and required capabilities
+      // are appended whatever the caller asked for.
       const chosen = []; const stack = [...activities];
+      requiredIds().forEach(id => { if (!stack.includes(id)) stack.push(id); });
       while (stack.length) {
         const id = stack.shift();
         if (chosen.includes(id)) continue;
@@ -2605,6 +2618,9 @@
         // locked to the supported year (see renderVersions), so reinstalling a repo
         // that was pinned to an unsupported year heals it instead of re-breaking.
       }
+      // A required capability is added even when the prior manifest predates it —
+      // otherwise "keep current settings" carries the omission forward forever.
+      requiredIds().forEach(id => { if (!activities.includes(id)) activities.push(id); });
       return { activities, osList, version };
     }
 
