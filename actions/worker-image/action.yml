@@ -1,0 +1,302 @@
+# Composite action: LabVIEW Worker Image (create / update / no-op)
+#
+# Builds (or reuses) the LabVIEW CI worker image a repo's other actions
+# (unit-tests, vi-analyzer, ...) pull and run against. Unlike those actions,
+# which only ever `docker pull`, this one actually produces the image.
+#
+# Create / update / no-op, not "always rebuild": every input that affects the
+# image's content (the base image's digest, this action's own Dockerfile +
+# install-vipc.ps1, and whatever .vipc/.dragon/.vip files get staged) is hashed
+# into a deterministic content tag (`win-<12 hex>`; same inputs -> same tag,
+# always). Before building, the action checks via `crane digest` whether THAT
+# EXACT tag already exists in the registry:
+#   - not found & the image has never been published  -> CREATE
+#   - not found because content changed since last run -> UPDATE (rebuild)
+#   - found                                            -> NO-OP (just retag
+#     the floating tags onto the existing digest; no docker build/push)
+# This existence check is the one genuinely new mechanism here — the content
+# hash scheme itself mirrors build-labview-image.yml's "Compute worker
+# version" step, which computes the same fingerprint but (today) only ever
+# uses it to NAME an unconditional rebuild, never to skip one.
+#
+# This action always acts as a CLIENT of the shared LCWC base image (reads its
+# digest via crane; never builds/publishes the base itself via
+# labview-ci-base.Dockerfile). Publishing that shared base remains the source
+# tooling repo's own internal concern.
+#
+# Windows-only for now (mirrors masscompile/vi-analyzer/unit-tests/build).
+# Linux support (a genuinely different Dockerfile/base-layering shape, not
+# just a shell swap) is left for a later action if a real second consumer
+# shows up.
+#
+# No .github/labview-ci.yml config-file reading (no monitor/monitorOn/
+# rebuildPolicy parsing). The caller passes an explicit `deps-dir` input
+# instead — a directory it has already staged .vipc/.dragon/.vip files into
+# (via actions/checkout + its own step, same as any other composite action
+# here). Whether/when to even call this action (on push, on a schedule, gated
+# by a diff) is entirely the caller workflow's decision.
+#
+# Bundled files must be kept in sync with their vendored originals:
+#   cp <source>/.github/docker/labview-ci.Dockerfile        actions/worker-image/Dockerfile
+#   cp <source>/.github/labview/vipm/install-vipc.ps1        actions/worker-image/install-vipc.ps1
+#   cp <source>/.github/labview/vipm/ci-tooling.vipc          actions/worker-image/ci-tooling.vipc
+#   cp <source>/.github/labview/ensure-docker.ps1             actions/worker-image/ensure-docker.ps1
+#
+# The caller's workflow must grant `permissions: packages: write` (GHCR push)
+# and, if using `deps-dir`, must have already checked out the repo.
+name: 'LabVIEW Worker Image'
+description: 'Create, update, or no-op the shared LabVIEW CI worker image in GHCR.'
+author: 'labview-ci'
+
+inputs:
+  image:
+    description: >
+      Target image name, WITHOUT registry/owner prefix or tag (e.g. 'myrepo-labview').
+      Empty = auto-derive '<repo>-labview' from the calling repository.
+    required: false
+    default: ''
+  labview-version:
+    description: 'LabVIEW year. Used as a floating tag and passed through to install-vipc.ps1.'
+    required: false
+    default: '2026'
+  base-image:
+    description: 'The shared LCWC base image to build the VIPC layer on top of.'
+    required: false
+    default: 'ghcr.io/elijah286/labview-ci-with-containers-labview-base:2026'
+  deps-dir:
+    description: >
+      Directory (relative to the workspace) already staged with .vipc/.dragon/.vip
+      files to bake in. Empty = no project-specific dependencies (ci-tooling only).
+    required: false
+    default: ''
+  include-ci-tooling:
+    description: >
+      Bake this action's bundled ci-tooling.vipc (Caraya / VI Tester / LUnit CLI /
+      UTF essentials) in alongside anything in deps-dir. Set 'false' only if the
+      caller wants a worker with no unit-test framework tooling at all.
+    required: false
+    default: 'true'
+  tag-latest:
+    description: 'Also move a floating :latest tag onto the current content.'
+    required: false
+    default: 'true'
+
+outputs:
+  image:
+    description: 'Resolved image name (registry + owner + name, no tag).'
+    value: ${{ steps.resolve.outputs.image }}
+  tag:
+    description: 'The deterministic content-hash tag for this build (win-<12hex>).'
+    value: ${{ steps.ver.outputs.version }}
+  digest:
+    description: 'Manifest digest of the published (or already-existing) image.'
+    value: ${{ steps.build.outputs.digest || steps.check.outputs.digest }}
+  built:
+    description: "'true' if a build+push actually ran, 'false' if the no-op path was taken."
+    value: ${{ steps.check.outputs.outdated }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Resolve image name
+      id: resolve
+      shell: bash
+      env:
+        IMAGE_OVERRIDE: ${{ inputs.image }}
+      run: |
+        owner=$(printf '%s' "${GITHUB_REPOSITORY%%/*}" | tr '[:upper:]' '[:lower:]')
+        name="${IMAGE_OVERRIDE:-${GITHUB_REPOSITORY##*/}-labview}"
+        name=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
+        echo "image=ghcr.io/${owner}/${name}" >> "$GITHUB_OUTPUT"
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    # windows-2022 runners intermittently start a job before the Docker engine
+    # is up (actions/runner-images#14252, #13888). Wait for/start it before the
+    # first real docker-daemon interaction (the build below); crane and docker
+    # login don't necessarily touch the local engine, so this is the first step
+    # that would actually surface the problem.
+    - name: Ensure Docker daemon is running
+      shell: powershell
+      run: '& "${{ github.action_path }}\ensure-docker.ps1"'
+
+    # The bundled Dockerfile is byte-identical to .github/docker/labview-ci.Dockerfile,
+    # including its `COPY .github/labview/vipm/ C:/vipm/` — so the scratch build
+    # context must reproduce that EXACT relative path (not just a top-level
+    # 'vipm' folder), or Docker's COPY source never exists in the context.
+    - name: Stage build context
+      id: stage
+      shell: pwsh
+      run: |
+        $ctx = Join-Path $env:RUNNER_TEMP 'worker-image-ctx'
+        $vipmDir = Join-Path $ctx '.github\labview\vipm'
+        New-Item -ItemType Directory -Force -Path $vipmDir | Out-Null
+
+        # Copy the Dockerfile INTO the context (not just reference it from the
+        # action path) so `docker build -f` always points at a file within the
+        # context being built, matching the vendored workflow's proven layout.
+        Copy-Item -Path (Join-Path '${{ github.action_path }}' 'Dockerfile') -Destination $ctx -Force
+
+        Copy-Item -Path (Join-Path '${{ github.action_path }}' 'install-vipc.ps1') -Destination $vipmDir -Force
+
+        if ('${{ inputs.include-ci-tooling }}' -eq 'true') {
+          Copy-Item -Path (Join-Path '${{ github.action_path }}' 'ci-tooling.vipc') -Destination $vipmDir -Force
+        }
+
+        $depsDir = '${{ inputs.deps-dir }}'
+        if ($depsDir) {
+          $depsPath = Join-Path '${{ github.workspace }}' $depsDir
+          if (Test-Path $depsPath) {
+            Get-ChildItem -Path $depsPath -File | Where-Object { $_.Extension -in '.vipc', '.dragon', '.vip' } |
+              ForEach-Object {
+                Copy-Item -Path $_.FullName -Destination $vipmDir -Force
+                Write-Host "Staged: $($_.Name)"
+              }
+          } else {
+            Write-Warning "deps-dir '$depsDir' not found at $depsPath; skipping."
+          }
+        }
+
+        "ctx=$ctx" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        "vipm_dir=$vipmDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+    # crane (go-containerregistry) reads/copies/tags registry content without
+    # pulling multi-GB images to the runner. Same tool/version/source as
+    # build-labview-image.yml's "Set up crane" step.
+    - name: Set up crane
+      shell: pwsh
+      run: |
+        $ver = 'v0.20.2'
+        $url = "https://github.com/google/go-containerregistry/releases/download/$ver/go-containerregistry_Windows_x86_64.tar.gz"
+        $tgz = Join-Path $env:RUNNER_TEMP 'crane.tar.gz'
+        $dir = Join-Path $env:RUNNER_TEMP 'crane'
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        Invoke-WebRequest -Uri $url -OutFile $tgz -UseBasicParsing
+        tar -xzf $tgz -C $dir
+        "$dir" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+        & (Join-Path $dir 'crane.exe') version
+
+    - name: Resolve base image digest
+      id: base
+      shell: pwsh
+      run: |
+        $baseImage = '${{ inputs.base-image }}'
+        $digest = (crane digest $baseImage 2>$null)
+        if (-not $digest) {
+          throw "Could not read base image '$baseImage' from the registry. Confirm it is public/readable or set 'base-image' to a readable base image."
+        }
+        "digest=$digest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        Write-Host "Base image: $baseImage  digest: $digest"
+
+    # Worker version = short SHA-256 over the base image ref+digest, this
+    # action's own Dockerfile, and every file staged into vipm/ (which
+    # already includes install-vipc.ps1 and, by default, ci-tooling.vipc).
+    # Same inputs -> same tag, deterministically -- this IS the fingerprint
+    # the existence check below queries the registry for.
+    - name: Compute worker version
+      id: ver
+      shell: pwsh
+      run: |
+        $vipmDir = '${{ steps.stage.outputs.vipm_dir }}'
+        $files = @(Get-ChildItem -Path $vipmDir -File | Sort-Object Name)
+
+        $dockerfileHash = (Get-FileHash -LiteralPath (Join-Path '${{ github.action_path }}' 'Dockerfile') -Algorithm SHA256).Hash.ToLower()
+        $parts = @(
+          "base-image=${{ inputs.base-image }}",
+          "base-digest=${{ steps.base.outputs.digest }}",
+          "Dockerfile=$dockerfileHash"
+        )
+        foreach ($f in $files) {
+          $h = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower()
+          $parts += ('{0}={1}' -f $f.Name, $h)
+        }
+
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes(($parts -join "`n"))
+        $digestBytes = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
+        $hex = -join ($digestBytes | ForEach-Object { $_.ToString('x2') })
+        $version = 'win-' + $hex.Substring(0, 12)
+        "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        Write-Host "Computed worker version: $version"
+
+    # THE existence/staleness check. Success = this exact content was already
+    # published under this tag (no-op: just move the floating tags onto it).
+    # Failure = never published before, either because the image is new or
+    # because the content changed since the last build (create/update).
+    - name: Check if already up to date
+      id: check
+      shell: pwsh
+      run: |
+        $image = '${{ steps.resolve.outputs.image }}'
+        $version = '${{ steps.ver.outputs.version }}'
+        $existingDigest = (crane digest "${image}:${version}" 2>$null)
+        # A "not found" here is an EXPECTED, non-error outcome (it's how we detect
+        # create/update), but crane still exits non-zero for it, and PowerShell
+        # cmdlets below (Write-Host/Out-File) never touch $LASTEXITCODE - so
+        # without this reset, GitHub Actions' pwsh wrapper would fail this step
+        # every time the answer is "needs building" (i.e. every create/update).
+        $LASTEXITCODE = 0
+        if ($existingDigest) {
+          Write-Host "::notice::'${image}:${version}' already exists (digest $existingDigest). Nothing changed since the last build; skipping."
+          "outdated=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "digest=$existingDigest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+          $moveTags = @('${{ inputs.labview-version }}')
+          if ('${{ inputs.tag-latest }}' -eq 'true') { $moveTags += 'latest' }
+          foreach ($t in $moveTags) {
+            crane tag "${image}:${version}" $t
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Write-Host "Retagged ${image}:${t} -> ${version}"
+          }
+        } else {
+          Write-Host "::notice::'${image}:${version}' not found; building."
+          "outdated=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        }
+
+    - name: Build and push
+      id: build
+      if: steps.check.outputs.outdated == 'true'
+      shell: pwsh
+      run: |
+        $image = '${{ steps.resolve.outputs.image }}'
+        $version = '${{ steps.ver.outputs.version }}'
+        $baseImage = '${{ inputs.base-image }}'
+        $vipmDir = '${{ steps.stage.outputs.vipm_dir }}'
+        $ctx = '${{ steps.stage.outputs.ctx }}'
+
+        $tags = @("${image}:${version}", "${image}:${{ inputs.labview-version }}")
+        if ('${{ inputs.tag-latest }}' -eq 'true') { $tags += "${image}:latest" }
+
+        $depCount = @(Get-ChildItem -Path $vipmDir -File -ErrorAction SilentlyContinue |
+          Where-Object { $_.Extension -in '.vipc', '.dragon' }).Count
+
+        if ($depCount -eq 0) {
+          Write-Host "::notice::No .vipc/.dragon dependencies staged; publishing as a registry copy of the base image."
+          crane copy $baseImage "${image}:${version}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($t in $tags[1..($tags.Count - 1)]) {
+            $tagOnly = ($t -split ':')[-1]
+            crane tag "${image}:${version}" $tagOnly
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+        } else {
+          $tagFlags = ($tags | ForEach-Object { '-t', $_ })
+          docker build -f (Join-Path $ctx 'Dockerfile') `
+            --build-arg LCWC_BASE_IMAGE=$baseImage `
+            --build-arg CI_WORKER_VERSION=$version @tagFlags $ctx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($t in $tags) {
+            Write-Host "Pushing $t"
+            docker push $t
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+        }
+
+        $finalDigest = (crane digest "${image}:${version}" 2>$null)
+        $LASTEXITCODE = 0
+        "digest=$finalDigest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        Write-Host "Published ${image}:${version} (digest $finalDigest)"
