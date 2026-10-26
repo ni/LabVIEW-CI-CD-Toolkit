@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -165,12 +166,13 @@ class UnitRunnerTests(unittest.TestCase):
         encoded = base64.b64encode(body.encode('utf-16-le')).decode('ascii')
         return f'powershell.exe -NoProfile -NonInteractive -EncodedCommand {encoded}'
 
-    def run_driver(self):
+    def run_driver(self, env=None):
         return subprocess.run(
             ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
              '-File', str(ROOT / 'run-unit-tests.ps1'), '-WorkspaceRoot', str(self.workspace),
              '-ResultsDir', str(self.results), '-ConfigPath', str(self.config),
-             '-LabVIEWPath', sys.executable], capture_output=True, text=True, timeout=45)
+             '-LabVIEWPath', sys.executable], capture_output=True, text=True, timeout=45,
+            stdin=subprocess.DEVNULL, env=env)
 
     def errors(self):
         return [node for path in self.results.glob('*.xml')
@@ -212,6 +214,66 @@ class UnitRunnerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(self.errors())
         self.assertEqual(REPORT.tool_for_filename('unit-tests-runner-0.xml'), 'runner')
+
+    def write_utf_project(self):
+        (self.workspace / 'Demo.lvproj').write_text(
+            '<Project><Item Name="My Computer" Type="My Computer">'
+            '<Item Name="Doubler.lvtest" Type="TestItem" URL="../Doubler.lvtest"/>'
+            '</Item></Project>', encoding='utf-8')
+
+    def fake_cli_env(self):
+        # Quick-failing stand-ins so a dev box's real LabVIEWCLI / g-cli are never launched.
+        fake = self.workspace / 'fakecli'
+        fake.mkdir()
+        whoami = Path(os.environ['SystemRoot']) / 'System32' / 'whoami.exe'
+        for name in ('LabVIEWCLI.exe', 'g-cli.exe'):
+            shutil.copy(whoami, fake / name)
+        return fake, dict(os.environ, PATH=f'{fake}{os.pathsep}{os.environ["PATH"]}')
+
+    def write_vi(self, relative, linker_string):
+        path = self.workspace / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'RSRC\x00\x00' + linker_string.encode('ascii') + b'\x00\x01')
+
+    def test_unconfigured_repo_with_utf_project_auto_runs_utf(self):
+        self.config.write_text('config:\n  labviewVersion: "2026"\n', encoding='utf-8')
+        self.write_utf_project()
+        fake, env = self.fake_cli_env()
+        result = self.run_driver(env)
+        self.assertIn('auto-detected frameworks: utf', result.stdout)
+        self.assertIn(str(fake / 'LabVIEWCLI.exe'), result.stdout)
+        self.assertIn('Configured tools: utf', result.stdout)
+        self.assertFalse((self.results / 'unit-tests-runner-0.xml').exists())
+
+    def test_unconfigured_repo_auto_runs_every_detected_framework(self):
+        self.config.write_text('config:\n  labviewVersion: "2026"\n', encoding='utf-8')
+        self.write_utf_project()
+        self.write_vi('caraya tests/Test Add.vi', 'Caraya.lvlib')
+        self.write_vi('caraya tests/nested/Test Sub.vi', 'Caraya.lvlib')
+        self.write_vi('lunit tests/Math Tests.lvclass/test add.vi', 'LUnit.lvlib')
+        self.write_vi('src/Plain.vi', 'Something.lvlib')
+        self.write_vi('.github/labview/Tooling.vi', 'TestCase.lvclass')
+        _, env = self.fake_cli_env()
+        result = self.run_driver(env)
+        self.assertIn('Configured tools: utf, caraya, lunit', result.stdout)
+        self.assertIn('  caraya: caraya tests\n', result.stdout)
+        self.assertNotIn('vi-tester', result.stdout)
+        self.assertIn('[lunit] path: ' + str(self.workspace / 'lunit tests' / 'Math Tests.lvclass'), result.stdout)
+        self.assertTrue(list(self.results.glob('caraya-runner-*.xml')))
+
+    def test_explicit_empty_unit_tests_block_disables_auto_detection(self):
+        self.config.write_text('config:\n  unitTests:\n    tools: {}\n', encoding='utf-8')
+        self.write_utf_project()
+        result = self.run_driver()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('auto-detected', result.stdout)
+        self.assertTrue((self.results / 'unit-tests-runner-0.xml').exists())
+
+    def test_unconfigured_repo_without_utf_project_fails(self):
+        self.config.write_text('config:\n  labviewVersion: "2026"\n', encoding='utf-8')
+        result = self.run_driver()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((self.results / 'unit-tests-runner-0.xml').exists())
 
     def test_unresolved_location_is_reported_and_fails(self):
         self.configure('cmd.exe /c exit 0', 'missing')

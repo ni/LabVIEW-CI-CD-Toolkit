@@ -646,8 +646,58 @@ function Invoke-LUnitTests($tool, [int]$index) {
     }
 }
 
+# -- Framework auto-detection (used only when config has no unitTests: block) --
+# UTF: a .lvproj with .lvtest items. The others: a VI whose linker strings name the
+# framework's library/base class (stored as plain ASCII in the VI's link info).
+$FRAMEWORK_SIGNATURES = [ordered]@{
+    'caraya'    = 'Caraya.lvlib'
+    'lunit'     = 'LUnit.lvlib'
+    'vi-tester' = 'TestCase.lvclass'
+}
+
+function Find-UnitTestFrameworks {
+    $found  = [ordered]@{}
+    $wsFull = (Resolve-Path -LiteralPath $WorkspaceRoot).Path.TrimEnd('\')
+    $exclRe = '(?i)[\\/](\.github|ci-out|build|\.git)[\\/]'
+    if (@(Resolve-UtfProjects @()).Count -gt 0) { $found['utf'] = @() }
+
+    $dirs = @{}
+    foreach ($id in $FRAMEWORK_SIGNATURES.Keys) { $dirs[$id] = New-Object 'System.Collections.Generic.HashSet[string]' }
+    Get-ChildItem -LiteralPath $wsFull -Recurse -File -Filter '*.vi' -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch $exclRe } | ForEach-Object {
+            $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($_.FullName))
+            foreach ($id in $FRAMEWORK_SIGNATURES.Keys) {
+                if ($text.IndexOf($FRAMEWORK_SIGNATURES[$id], [System.StringComparison]::Ordinal) -ge 0) { [void]$dirs[$id].Add($_.DirectoryName) }
+            }
+        }
+
+    # Locations are the outermost directories holding matching VIs, relative to the workspace.
+    foreach ($id in $FRAMEWORK_SIGNATURES.Keys) {
+        if ($dirs[$id].Count -eq 0) { continue }
+        $kept = @()
+        foreach ($d in ($dirs[$id] | Sort-Object Length)) {
+            if (-not ($kept | Where-Object { $d -eq $_ -or $d.StartsWith($_ + '\') })) { $kept += $d }
+        }
+        $found[$id] = @($kept | ForEach-Object { if ($_ -eq $wsFull) { '.' } else { $_.Substring($wsFull.Length + 1) } })
+    }
+    return $found
+}
+
 # -- Main ---------------------------------------------------------------------
 $tools = Read-UnitTestTools $ConfigPath
+# Never configured (no unitTests: block at all): run every framework detected in
+# the repo. An explicit unitTests: block with nothing enabled is respected as-is.
+$hasUnitTestsBlock = (Test-Path -LiteralPath $ConfigPath) -and [bool](Select-String -LiteralPath $ConfigPath -Pattern '^\s*unitTests:\s*$' -Quiet)
+if ((-not $tools -or $tools.Count -eq 0) -and -not $hasUnitTestsBlock) {
+    $detected = Find-UnitTestFrameworks
+    if ($detected.Count -gt 0) {
+        Write-Host ("No config.unitTests block in {0}; auto-detected frameworks: {1}" -f $ConfigPath, (@($detected.Keys) -join ', '))
+        $tools = @(foreach ($id in $detected.Keys) {
+            Write-Host ("  {0}: {1}" -f $id, $(if (@($detected[$id]).Count) { @($detected[$id]) -join '; ' } else { '<whole repo>' }))
+            [ordered]@{ tool = $id; enabled = $true; command = ''; locations = @($detected[$id]) }
+        })
+    }
+}
 if (-not $tools -or $tools.Count -eq 0) {
     Write-RunnerFailure 'unit-tests' 0 "No enabled config.unitTests.tools found in $ConfigPath. Enable a framework and configure its test locations."
     exit 1
