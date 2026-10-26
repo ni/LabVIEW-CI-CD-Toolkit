@@ -663,13 +663,14 @@ function Find-UnitTestFrameworks {
 
     $dirs = @{}
     foreach ($id in $FRAMEWORK_SIGNATURES.Keys) { $dirs[$id] = New-Object 'System.Collections.Generic.HashSet[string]' }
-    Get-ChildItem -LiteralPath $wsFull -Recurse -File -Filter '*.vi' -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch $exclRe } | ForEach-Object {
-            $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($_.FullName))
-            foreach ($id in $FRAMEWORK_SIGNATURES.Keys) {
-                if ($text.IndexOf($FRAMEWORK_SIGNATURES[$id], [System.StringComparison]::Ordinal) -ge 0) { [void]$dirs[$id].Add($_.DirectoryName) }
-            }
+    # .NET enumeration keeps $wsFull's exact spelling (Get-ChildItem expands 8.3 short names).
+    foreach ($vi in [System.IO.Directory]::EnumerateFiles($wsFull, '*.vi', [System.IO.SearchOption]::AllDirectories)) {
+        if ($vi -match $exclRe) { continue }
+        $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($vi))
+        foreach ($id in $FRAMEWORK_SIGNATURES.Keys) {
+            if ($text.IndexOf($FRAMEWORK_SIGNATURES[$id], [System.StringComparison]::Ordinal) -ge 0) { [void]$dirs[$id].Add([System.IO.Path]::GetDirectoryName($vi)) }
         }
+    }
 
     # Locations are the outermost directories holding matching VIs, relative to the workspace.
     foreach ($id in $FRAMEWORK_SIGNATURES.Keys) {
