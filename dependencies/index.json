@@ -1,8 +1,35 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "cbd5d84c0d6118fae27b810e027c0c9876ef12b3",
+  "sha": "8221d6c62bfb35f32b8af485152c86f4e6736067",
   "revisions": [
+    {
+      "sha": "8221d6c62bfb35f32b8af485152c86f4e6736067",
+      "short": "8221d6c",
+      "message": "Merge pull request #84 from ni/feat/auto-detect-unit-test-frameworks",
+      "author": "Elijah Kerry",
+      "date": "2026-10-26T18:36:41Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "1f9ecb7679588356bd8d3a52cdbe32140272047b",
+      "short": "1f9ecb7",
+      "message": "Keep workspace path spelling during framework detection (8.3 short-name fix)",
+      "author": "Elijah Kerry",
+      "date": "2026-10-26T18:35:44Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "5d322ea6d39f31626cb6d6d0ae30c55cad3f982c",
+      "short": "5d322ea",
+      "message": "Auto-detect and run every unit-test framework when unitTests is unconfigured",
+      "author": "Elijah Kerry",
+      "date": "2026-10-26T18:09:00Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "cbd5d84c0d6118fae27b810e027c0c9876ef12b3",
       "short": "cbd5d84",
@@ -873,33 +900,6 @@
       "message": "Added <Path>\".\"<Path> to .viancfg under test",
       "author": "MIpetrov-NI",
       "date": "2026-08-07T14:47:24Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "3b680d39f0a8b143855d1d94162b44bd1450453e",
-      "short": "3b680d3",
-      "message": "\\\\ instead of \\ for parsing .viancfg",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-07T02:14:12Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "e666fef4fb299b99cf0deced4021b56deb476e47",
-      "short": "e666fef",
-      "message": "Update the Shell script to match changes in run-vi-analyzer.ps1",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-07T00:10:13Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "1568462d1149e36f8c4c6b3688aa4092afc46006",
-      "short": "1568462",
-      "message": "AnalyzeProject=FALSE + directory <Item> avoids error, but detects 0 VIs. It seems that the headless CLI cannot recurse directory items. Trying now to parse through individual VI files with AnalyzePRoject set to FALSE.",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-03T21:01:50Z",
       "project": false,
       "dep_only": false
     },
