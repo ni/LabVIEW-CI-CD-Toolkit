@@ -720,6 +720,16 @@ flowchart TD
         in one click and preserves your configuration; it never rebuilds your containers. Because your manifest is
         pinned to an immutable tag, updates are always something you choose, never something that happens to you.
         See <a href="#versioning">§18</a>.</p>
+      <p>The manifest writer preserves project-owned <code>config</code> blocks verbatim, including
+        <code>unitTests</code>, <code>container</code>, <code>builds</code>, and <code>concurrency</code>, while
+        refreshing the installer-owned LabVIEW version, branch, and OS fields. An existing image name is kept
+        unless explicitly overridden. This prevents an upgrade from silently disabling a native Caraya runner
+        or dropping its dependency selection. If an earlier upgrade already removed those blocks, restore them
+        from the last known-good manifest; preservation cannot reconstruct settings that are no longer present.</p>
+      <p>The legacy top-level <code>unitTests</code> block produced by Configure Pipeline is retained too.
+        Its JSON settings input accepts a single-line per-tool <code>command</code>; the workflow quotes it
+        safely and the runner decodes escaped paths and quotes before token substitution. Restore the native
+        wrapper command as well as enabling Caraya; enabling the framework alone selects its default scaffold.</p>
 
       <!-- 9 ───────────────────────────────────────────────────────────────── -->
       <h2 id="pages">9. The dashboard &amp; Pages site <a class="anchor" href="#pages">#</a></h2>
@@ -2054,6 +2064,9 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         <li><strong>Dependabot</strong> opens a PR whenever the pinned major alias tag moves; merging it is the
           opt-in.</li>
       </ul>
+      <p>Upgrade preservation covers the complete existing project configuration, not just runner concurrency.
+        <code>Unit Test Runner Checks</code> exercises manifest upgrades alongside execution and report regressions,
+        and is triggered by installer changes as well as unit-test runtime changes.</p>
       <p>The major alias <code>@v&lt;major&gt;</code> tracks the newest release <em>promoted to stable</em>, not the
         newest release published. Every merge to the source repo is tagged and released, but a release only reaches
         <code>@v4</code> once the maintainer blesses it — so consumers on the major alias receive reviewed work, not

@@ -406,11 +406,39 @@ def write_manifest(target_root: Path, catalog: dict, activities: list[str], os_l
     ]
     if image_name:
         lines.append(f"  imageName: {image_name}")
+    dst = target_root / ".github" / "labview-ci.yml"
+    previous = dst.read_text(encoding="utf-8").splitlines() if dst.is_file() else []
+    if previous:
+        managed = {"labviewVersion", "branch", "os"}
+        if image_name:
+            managed.add("imageName")
+        in_config = False
+        preserve = False
+        for line in previous:
+            if re.match(r"^config:\s*$", line):
+                in_config = True
+                continue
+            if not in_config:
+                continue
+            if line and not line[0].isspace() and not line.startswith("#"):
+                break
+            key = re.match(r"^  ([A-Za-z0-9_-]+):", line)
+            if key:
+                preserve = key.group(1) not in managed
+            if preserve:
+                lines.append(line)
     lines.append("activities:")
     for a in activities:
         lines.append(f"  - {a}")
+    in_tests = False
+    for line in previous:
+        if re.match(r"^unitTests:\s*$", line):
+            in_tests = True
+        elif in_tests and line and not line[0].isspace() and not line.startswith("#"):
+            in_tests = False
+        if in_tests:
+            lines.append(line)
     content = "\n".join(lines) + "\n"
-    dst = target_root / ".github" / "labview-ci.yml"
     if dry_run:
         log(f"  would write     .github/labview-ci.yml")
         return
