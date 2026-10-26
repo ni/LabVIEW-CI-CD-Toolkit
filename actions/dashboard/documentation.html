@@ -1733,6 +1733,17 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         <code>.lvproj</code> path. The driver reads indentation relative to <code>unitTests:</code>, including the
         canonical <code>config.unitTests.tools</code> nesting, preserves quoted command arguments, and stops at
         sibling blocks.</p>
+      <p><strong>Unconfigured fallback.</strong> When <code>.github/labview-ci.yml</code> has <em>no</em>
+        <code>unitTests:</code> block at all (the <code>unit-tests</code> activity is installed but the Unit Testing
+        settings page was never saved), the driver auto-detects <em>every</em> framework present and runs them all:
+        NI UTF (empty <code>locations</code>) when any <code>.lvproj</code> references a <code>.lvtest</code> /
+        <code>TestItem</code>; Caraya, LUnit and VI Tester when a <code>.vi</code>&rsquo;s linker strings name
+        <code>Caraya.lvlib</code>, <code>LUnit.lvlib</code> or <code>TestCase.lvclass</code> respectively, using the
+        outermost directories holding those VIs as <code>locations</code> (<code>.github</code>, <code>ci-out</code>,
+        <code>build</code> and <code>.git</code> are skipped). The Caraya signature was checked against real Caraya test
+        VIs; the LUnit and VI Tester signatures have not yet been checked against real projects. Any explicit
+        <code>unitTests:</code> block &mdash; even one with every tool disabled &mdash; is respected as-is and produces
+        the &ldquo;No enabled config.unitTests.tools&rdquo; runner error instead.</p>
       <p>A native Caraya integration can use this override under <code>config.unitTests.tools</code>:</p>
       <pre><code>caraya:
   enabled: true
