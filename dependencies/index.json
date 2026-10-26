@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "af1abd8e4a4135318c2e362c0d62f4f0331a0e07",
+  "sha": "cbd5d84c0d6118fae27b810e027c0c9876ef12b3",
   "revisions": [
+    {
+      "sha": "cbd5d84c0d6118fae27b810e027c0c9876ef12b3",
+      "short": "cbd5d84",
+      "message": "Merge pull request #82 from ni/fix/preserve-caraya-configuration",
+      "author": "Elijah Kerry",
+      "date": "2026-10-26T13:38:41Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "48062fa523b452ee36a5c3935c7a25b3ca68aa75",
+      "short": "48062fa",
+      "message": "Preserve native Caraya configuration across upgrades and reconfiguration",
+      "author": "Elijah Kerry",
+      "date": "2026-10-26T13:07:08Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "af1abd8e4a4135318c2e362c0d62f4f0331a0e07",
       "short": "af1abd8",
@@ -882,24 +900,6 @@
       "message": "AnalyzeProject=FALSE + directory <Item> avoids error, but detects 0 VIs. It seems that the headless CLI cannot recurse directory items. Trying now to parse through individual VI files with AnalyzePRoject set to FALSE.",
       "author": "MIpetrov-NI",
       "date": "2026-08-03T21:01:50Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "bc16c85081001dce168483a95cd448cce1ce54eb",
-      "short": "bc16c85",
-      "message": "According to Forums: VI-Analyzer API VI's do not support project based viancfg files, shifting to a directory based viancfg by changing <AnalyzeProject> from TRUE to FALSE",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-03T20:31:04Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "f3e6a1459340b43cdceaf4cfe0c269a4d9ba45ab",
-      "short": "f3e6a14",
-      "message": "Extra logic in build-ProjectConfig() to remove ambiguity for a custom via-config with items to analyze, since <AnalyzeProject? is set to true.",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-03T19:03:13Z",
       "project": false,
       "dep_only": false
     },
