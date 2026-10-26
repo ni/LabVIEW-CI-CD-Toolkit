@@ -3,6 +3,8 @@ name: Unit Test Runner Checks
 on:
   pull_request:
     paths:
+      - '.github/labview-ci/install.py'
+      - '.github/workflows/reconfigure.yml'
       - '.github/labview/run-unit-tests.ps1'
       - '.github/labview/build-unittest-report.py'
       - '.github/labview/test-unit-tests.py'
@@ -12,6 +14,8 @@ on:
   push:
     branches: [main]
     paths:
+      - '.github/labview-ci/install.py'
+      - '.github/workflows/reconfigure.yml'
       - '.github/labview/run-unit-tests.ps1'
       - '.github/labview/build-unittest-report.py'
       - '.github/labview/test-unit-tests.py'

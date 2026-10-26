@@ -567,6 +567,11 @@ jobs:
                   locs = [str(x).strip() for x in raw_locs if str(x).strip()]
                   out.append(f'    {key}:')
                   out.append(f"      enabled: {'true' if enabled else 'false'}")
+                  command = cfg.get('command')
+                  if command:
+                      if not isinstance(command, str) or '\n' in command or '\r' in command:
+                          raise ValueError(f'command for {key} must be a single-line string')
+                      out.append('      command: ' + json.dumps(command))
                   if locs:
                       out.append('      locations:')
                       for loc in locs:

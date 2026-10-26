@@ -1,12 +1,15 @@
 import argparse
+import ast
 import base64
 import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 import xml.etree.ElementTree as ET
 
@@ -16,6 +19,79 @@ ROOT = Path(os.environ.get('LVCI_UNIT_TEST_RUNTIME_ROOT', Path(__file__).parent)
 SPEC = importlib.util.spec_from_file_location('unit_report', ROOT / 'build-unittest-report.py')
 REPORT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(REPORT)
+
+
+class UnitTestUpgradeTests(unittest.TestCase):
+    def test_configure_pipeline_preserves_native_command_input(self):
+        workflow = (ROOT.parent / 'workflows' / 'reconfigure.yml').read_text(encoding='utf-8')
+        script = workflow.split("          python3 - <<'PY'\n", 1)[1].split('\n          PY', 1)[0]
+        tree = ast.parse(textwrap.dedent(script))
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                        and node.name == '_unit_tests_block_from_json')
+        namespace = {'json': json, 're': re}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), 'reconfigure.yml', 'exec'), namespace)
+        command = 'powershell -File "{dir}\\Invoke-CoreTests.ps1" -ResultsPath "{out}"'
+        block = namespace['_unit_tests_block_from_json'](json.dumps({
+            'tools': {'caraya': {'enabled': True, 'locations': ['tests'], 'command': command}}}))
+        self.assertIn('      command: ' + json.dumps(command), block)
+        with self.assertRaisesRegex(ValueError, 'single-line string'):
+            namespace['_unit_tests_block_from_json'](json.dumps({
+                'caraya': {'enabled': True, 'command': 'first\nsecond'}}))
+
+    def test_upgrade_preserves_legacy_top_level_unit_tests(self):
+        installer_spec = importlib.util.spec_from_file_location(
+            'unit_test_installer', ROOT.parent / 'labview-ci' / 'install.py')
+        installer = importlib.util.module_from_spec(installer_spec)
+        installer_spec.loader.exec_module(installer)
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            manifest = workspace / '.github' / 'labview-ci.yml'
+            manifest.parent.mkdir()
+            tests = ('unitTests:\n  tools:\n    caraya:\n      enabled: true\n'
+                     '      command: powershell -File "{dir}\\Invoke-CoreTests.ps1"\n')
+            manifest.write_text('config:\n  os: [windows]\nactivities:\n  - unit-tests\n' +
+                                tests, encoding='utf-8')
+            installer.write_manifest(workspace, {'version': '4.18.6'}, ['unit-tests'],
+                                     ['windows'], '2026', None, 'main', False)
+            self.assertTrue(manifest.read_text(encoding='utf-8').endswith(tests))
+
+    def test_upgrade_preserves_caraya_and_project_configuration(self):
+        installer_spec = importlib.util.spec_from_file_location(
+            'unit_test_installer', ROOT.parent / 'labview-ci' / 'install.py')
+        installer = importlib.util.module_from_spec(installer_spec)
+        installer_spec.loader.exec_module(installer)
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            manifest = workspace / '.github' / 'labview-ci.yml'
+            manifest.parent.mkdir()
+            project_config = (
+                '  imageName: project-worker\n'
+                '  unitTests:\n    tools:\n      caraya:\n        enabled: true\n'
+                '        command: powershell -File "{dir}\\Invoke-CoreTests.ps1" -ResultsPath "{out}"\n'
+                '        locations:\n          - "tests"\n'
+                '  container:\n    vipc:\n      - path: "tests/Dependencies.vipc"\n        monitor: true\n'
+                '  builds:\n    runAll: false\n'
+                '  concurrency:\n    maxParallel: 2\n')
+            manifest.write_text(
+                'schemaVersion: 1\nconfig:\n  labviewVersion: "2025"\n'
+                '  branch: old\n  os: [linux]\n' + project_config +
+                'activities:\n  - unit-tests\n', encoding='utf-8')
+            installer.write_manifest(workspace, {'version': '4.18.6'}, ['unit-tests'],
+                                     ['windows'], '2026', None, 'main', False)
+            updated = manifest.read_text(encoding='utf-8')
+            self.assertIn(project_config, updated)
+            self.assertIn('  labviewVersion: "2026"\n', updated)
+            self.assertIn('  os: [windows]\n', updated)
+            self.assertNotIn('  branch: old\n', updated)
+            installer.write_manifest(workspace, {'version': '4.18.6'}, ['unit-tests'],
+                                     ['windows'], '2026', 'replacement-worker', 'main', False)
+            updated = manifest.read_text(encoding='utf-8')
+            self.assertIn('  imageName: replacement-worker\n', updated)
+            self.assertNotIn('project-worker', updated)
+            self.assertIn(project_config.split('\n', 1)[1], updated)
+            installer.write_manifest(workspace, {'version': 'next'}, ['unit-tests'],
+                                     ['windows'], '2027', None, 'other', True)
+            self.assertEqual(manifest.read_text(encoding='utf-8'), updated)
 
 
 class UnitReportTests(unittest.TestCase):
@@ -172,8 +248,8 @@ class UnitRunnerTests(unittest.TestCase):
             "if (-not (Test-Path -LiteralPath $LabVIEWPath)) { exit 7 }\n"
             "[System.IO.File]::WriteAllText($ResultsPath, '<testsuite><testcase name=\"quoted\"/></testsuite>')",
             encoding='utf-8')
-        self.configure('powershell.exe -NoProfile -NonInteractive -File "{dir}\\Invoke-CoreTests.ps1" '
-                       '-ResultsPath "{out}" -LabVIEWPath "{lv}"')
+        self.configure(json.dumps('powershell.exe -NoProfile -NonInteractive -File "{dir}\\Invoke-CoreTests.ps1" '
+                      '-ResultsPath "{out}" -LabVIEWPath "{lv}"'))
         result = self.run_driver()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue((self.results / 'caraya-0.xml').exists())

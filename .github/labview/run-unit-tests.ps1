@@ -264,8 +264,10 @@ function Read-UnitTestTools([string]$path) {
             $cm = [regex]::Match($line, '^\s{6}command:\s*(.+?)\s*$')
             if ($cm.Success) {
                 $command = $cm.Groups[1].Value
-                if (($command.StartsWith('"') -and $command.EndsWith('"')) -or
-                    ($command.StartsWith("'") -and $command.EndsWith("'"))) {
+                if ($command.StartsWith('"') -and $command.EndsWith('"')) {
+                    try { $command = ConvertFrom-Json -InputObject $command -ErrorAction Stop }
+                    catch { $command = $command.Substring(1, $command.Length - 2) }
+                } elseif ($command.StartsWith("'") -and $command.EndsWith("'")) {
                     $command = $command.Substring(1, $command.Length - 2)
                 }
                 $cur.command = $command; $inLoc = $false; continue
