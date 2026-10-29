@@ -23,6 +23,41 @@ The configurator now refuses this, and `catalog-source-sync` fails the PR if the
 source-only files go missing. **To test the pipeline, install it into a separate
 scratch repository.**
 
+## Describe pull requests in terms of user outcomes
+
+PR titles and opening summaries must explain the features, fixes, or capabilities
+being delivered and why they matter to toolkit users. Do not lead with agent
+roles, handoffs, coordination, integration chores, or release mechanics. PR titles
+can become release notes, so they must make sense without session context.
+
+- Start the title with the concrete change. For documentation-only changes, say
+  "Document" rather than implying the documented feature is implemented here.
+- Open the body with user-visible behavior and benefits, grouped by capability.
+  Explain the previous problem and the new behavior for fixes.
+- Distinguish changes in the actual PR diff from features already on the base
+  branch or in another PR. Put related release context in a separate section;
+  do not claim those implementations are introduced by this PR.
+- Put tests, evidence, compatibility limits, and unresolved validation gaps after
+  the feature/fix summary. Keep coordination policies and release mechanics in
+  a short supporting section when relevant, never as the headline.
+- Describe genuine process-only changes honestly; do not invent product
+  features to make them sound user-facing.
+- Use direct clickable links whenever referencing a PR in descriptions, comments,
+  or user-facing status reports.
+
+For example:
+
+- Avoid: "Release: integrate fleet handoffs and enforce dashboard mirror parity".
+- Prefer: "Fix dependency dispatch guidance and document snapshot and VIDiff
+  improvements". Explain which dashboard behavior changes in this PR and which
+  snapshot/VIDiff capabilities are already implemented and being documented.
+
+Use the [PR template](pull_request_template.md). Before opening or updating a PR,
+compare its title and summary with the actual base-to-head diff. A reviewer must
+be able to identify the user benefit, the exact scope, and any verification gaps
+without reading agent handoffs or commit history. Apply the same user-outcome
+standard to release-note fragments.
+
 ## Never edit `catalog.json`
 
 `.github/labview-ci/catalog.json` → `version` is the version of record: the
