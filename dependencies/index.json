@@ -1,8 +1,44 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "229513e67a867eb6067e32190b77a07183e775de",
+  "sha": "7ce369fe2022dcc641b10fdd9ba3252d6e833efb",
   "revisions": [
+    {
+      "sha": "7ce369fe2022dcc641b10fdd9ba3252d6e833efb",
+      "short": "7ce369f",
+      "message": "Merge pull request #88 from ni/captain/ship-fleet-2026-10-29",
+      "author": "Elijah Kerry",
+      "date": "2026-10-29T22:04:54Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "4ae85938a9d3b714314fa501831c940c867a2827",
+      "short": "4ae8593",
+      "message": "Require feature-focused PR descriptions and scope checks",
+      "author": "elijah286",
+      "date": "2026-10-29T22:00:11Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "a811a22e0946aa1c2348bd96151055632822b870",
+      "short": "a811a22",
+      "message": "Synchronize dependency page copies and enforce dashboard asset parity",
+      "author": "elijah286",
+      "date": "2026-10-29T20:18:01Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "d4e9697fb4fb86a81fff16d6270f7cdbb3336e25",
+      "short": "d4e9697",
+      "message": "Coordinate fleet integration and document snapshot and VIDiff changes",
+      "author": "elijah286",
+      "date": "2026-10-29T20:16:21Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "229513e67a867eb6067e32190b77a07183e775de",
       "short": "229513e",
@@ -883,24 +919,6 @@
       "author": "MIpetrov-NI",
       "date": "2026-08-07T18:43:44Z",
       "project": true,
-      "dep_only": false
-    },
-    {
-      "sha": "d88df15896b71fc12f396a675346a083d0b0b6ec",
-      "short": "d88df15",
-      "message": "Merge branch 'via-debug' of https://github.com/elijah286/LabVIEW-CI-with-Containers into via-debug",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-07T17:09:07Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b5884b76ae2f23e48ec2dc9c26fec988743dbede",
-      "short": "b5884b7",
-      "message": "remove garbage",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-07T17:08:50Z",
-      "project": false,
       "dep_only": false
     },
     {
