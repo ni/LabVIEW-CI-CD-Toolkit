@@ -10,6 +10,16 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const browser = read('actions/snapshots/vi-browser.html');
 const configure = read('actions/dashboard/configure.html');
 
+test('shared dashboard assets match their canonical sources byte-for-byte', () => {
+  for (const entry of fs.readdirSync(path.join(root, '.github/pages'), {withFileTypes: true})) {
+    const canonical = path.join(root, '.github/pages', entry.name);
+    const bundled = path.join(root, 'actions/dashboard', entry.name);
+    if (entry.isFile() && fs.existsSync(bundled)) {
+      assert.deepEqual(fs.readFileSync(canonical), fs.readFileSync(bundled), entry.name);
+    }
+  }
+});
+
 function functionSource(source, name) {
   const start = source.indexOf('function ' + name + '(');
   assert.notEqual(start, -1, name);
