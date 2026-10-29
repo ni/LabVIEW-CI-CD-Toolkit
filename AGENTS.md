@@ -62,6 +62,16 @@ Ready for captain review: yes / no
 7. Report the integrated commits or PR, validation results, release status, and
    unresolved blockers to the user. If remote checks are pending, say so.
 
+## PR communication gate
+
+Follow the user-outcome PR policy in
+[.github/CONTRIBUTING.md](.github/CONTRIBUTING.md#describe-pull-requests-in-terms-of-user-outcomes)
+and the [PR template](.github/pull_request_template.md) when creating or updating
+a PR. Lead with concrete features/fixes and their user benefit, not captain
+roles, fleet handoffs, or release mechanics. Check the actual base-to-head diff
+and explicitly distinguish new implementation from already-landed release
+context. Keep validation limits visible and always link PR references.
+
 ## Release boundaries
 
 - GitHub is canonical; do not contribute independently to the GitLab mirror.

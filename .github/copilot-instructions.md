@@ -62,3 +62,12 @@ When you add a **new** bundled page, also:
 - The FAQ (`faq.html`) links to the Documentation, and the Documentation links
   back to the FAQ. Keep both links working.
 - The top-level `README.md` links to the live Documentation page. Keep it valid.
+
+## Rule 4 — PRs explain features and fixes first
+
+When creating or updating a PR, follow the
+[user-outcome PR policy](CONTRIBUTING.md#describe-pull-requests-in-terms-of-user-outcomes)
+and [PR template](pull_request_template.md). Titles and opening summaries explain
+concrete capabilities, fixes, and user benefits, not agent coordination or release
+mechanics. Match claims to the actual PR diff, separate already-landed features
+from new changes, disclose validation gaps, and link every PR reference.
