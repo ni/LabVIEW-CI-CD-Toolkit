@@ -2913,7 +2913,7 @@
         // (or an older tooling version) may have shipped files the current tooling has
         // since REMOVED. Left inside a vendored directory they can break the build --
         // e.g. an orphaned viserver_windows.go duplicated Go declarations and broke the
-        // Windows VI Browser 2.0 render after that file was dropped. Delete target files
+        // Windows VI Browser render after that file was dropped. Delete target files
         // under each installed dir entry that the source no longer ships, except the
         // consumer's own preserved config files. Mirrors install.py's update-mode prune
         // so the browser "Apply" path stays in sync with "Update now". Best-effort: a
