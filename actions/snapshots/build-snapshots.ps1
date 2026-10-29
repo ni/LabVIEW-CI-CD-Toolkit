@@ -31,6 +31,9 @@
 .PARAMETER TargetSha
     head mode: commit to render. Default: current HEAD.
 
+.PARAMETER Shas
+    Exact space-separated commit SHAs in processing order. Overrides Mode and MaxCommits.
+
 .PARAMETER OutDir
     Staging dir to publish (…/ci-out/vi-snapshots). Default under WorkspaceRoot.
 
@@ -52,6 +55,7 @@ param(
     [string]$Mode              = 'head',
     [string]$WorkspaceRoot     = (Get-Location).Path,
     [string]$TargetSha         = '',
+    [string]$Shas              = '',
     [string]$OutDir            = '',
     [string]$ExistingByBlobDir = '',
     [string]$Image             = 'nationalinstruments/labview:latest-windows',
@@ -132,7 +136,15 @@ foreach ($dir in @($ExistingByBlobDir, $ByBlobDir)) {
 Write-Host "Seeded $($Rendered.Count) already-rendered blob(s)."
 
 # ── Determine commit list ────────────────────────────────────────────────────
-if ($Mode -eq 'head') {
+if (-not [string]::IsNullOrWhiteSpace($Shas)) {
+    $Commits = @($Shas -split '\s+' | Where-Object { $_ } | Select-Object -Unique)
+    foreach ($commit in $Commits) {
+        if ($commit -notmatch '^[0-9a-fA-F]{40}$') { throw "Invalid snapshot commit SHA: $commit" }
+        & git -C $WorkspaceRoot cat-file -e "${commit}^{commit}"
+        if ($LASTEXITCODE -ne 0) { throw "Snapshot commit not found: $commit" }
+    }
+}
+elseif ($Mode -eq 'head') {
     if ($TargetSha -eq '') { $TargetSha = (& git -C $WorkspaceRoot rev-parse HEAD).Trim() }
     $Commits = @($TargetSha)
 }

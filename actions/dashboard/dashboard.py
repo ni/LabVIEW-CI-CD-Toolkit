@@ -532,14 +532,7 @@ RUN_TARGETS = {
         'windows': {'wf': 'vidiff-windows-container.yml', 'inputs': {'head_sha': '{sha}', 'base_sha': '{parent}'}},
         'linux':   {'wf': 'vidiff-linux-container.yml',   'inputs': {'head_sha': '{sha}', 'base_sha': '{parent}'}}}},
     'snapshots': {'label': 'VI Snapshots', 'platforms': {
-        # Snapshots are content-addressed and deduped, so a single backfill renders
-        # exactly the MISSING VIs across all history (already-rendered blobs are
-        # skipped instantly). Dispatching backfill — not head — means clicking Run
-        # on an empty snapshot cell actually fills that revision (head would only
-        # ever re-render the current HEAD). 'backfill' is a long-standing input on
-        # every consumer's vi-snapshots.yml (the "Populate history" card uses it),
-        # so this needs no workflow-file change to reach existing installs.
-        'all': {'wf': 'vi-snapshots.yml', 'inputs': {'mode': 'backfill'}}}},
+        'all': {'wf': 'vi-snapshots.yml', 'inputs': {'mode': 'backfill', 'shas': '{sha}'}}}},
       'snapshots2': {'label': 'VI Browser 2.0 Snapshots', 'platforms': {
         'windows': {'wf': 'vi-snapshots-json-windows.yml', 'inputs': {'target_sha': '{sha}'}},
         'linux':   {'wf': 'vi-snapshots-json.yml',         'inputs': {'mode': 'head', 'target_sha': '{sha}'}}}},
@@ -692,16 +685,14 @@ _CAP_RUN_LABEL = {'masscompile': 'compile', 'vi-analyzer': 'analyze', 'vidiff': 
 _WAITING_RUN_STATUSES = {'queued', 'requested', 'waiting', 'pending'}
 
 def _target_shas_for_run(run, cap):
-    # Which revision row(s) a run belongs to. A snapshots-gallery dispatch covers
-    # every row ('*'). Any other workflow_dispatch run is matched by the full
-    # 40-hex SHA(s) embedded in its run-name — a warm-container backfill lists
-    # several, so it maps onto every revision it walks. Push/PR runs key off
-    # head_sha. An unattributable run maps to no row (empty list).
-    if cap == 'snapshots' and run.get('event') == 'workflow_dispatch':
-        return ['*']
     if run.get('event') == 'workflow_dispatch':
         text = ' '.join(str(run.get(k) or '') for k in ('display_title', 'name'))
-        return [s.lower() for s in re.findall(r'\b[0-9a-f]{40}\b', text, re.I)]
+        shas = [s.lower() for s in re.findall(r'\b[0-9a-f]{40}\b', text, re.I)]
+        if shas:
+            return shas
+        if cap == 'snapshots' and re.search(r'\bbackfill\b', text, re.I):
+            return ['*']
+        return []
     return [run['head_sha']] if run.get('head_sha') else []
 
 def fetch_active_runs():
@@ -1310,9 +1301,6 @@ for c in commits_data:
     # Snapshots column: how many of this revision's VIs have a rendered snapshot
     # (content-addressed by git blob), linking into the VI Browser for the commit.
     # Snapshots are a single content-addressed gallery (not per-platform) and are
-    # independent of VIDiff. None yet -> one-click run; partial coverage is flagged
-    # amber so the missing VIs are visible (fill them by running this revision, or
-    # via "Populate history" — a backfill renders all history oldest -> newest).
     if not is_project:
         snap_badge = '<td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>'
     else:
@@ -2175,10 +2163,6 @@ run_dialog = (r"""
       });
     }
     function captureSnapshotRun(t0, attempt){
-      // The "Populate history" backfill is ONE snapshots run that walks the whole
-      // history, so every "snapshots|<sha>" entry shares it. captureRuns' per-cell
-      // claim would hand the single run to just the first sha, so look it up once
-      // and write it into EVERY snapshot entry still missing a run id.
       var tok = getTok(); if(!tok) return;
       t0 = t0 || Date.now(); attempt = attempt || 1;
       fetch('https://api.github.com/repos/'+REPO+'/actions/workflows/'+encodeURIComponent('vi-snapshots.yml')+'/runs?event=workflow_dispatch&per_page=20',
@@ -2186,18 +2170,27 @@ run_dialog = (r"""
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(j){
           var runs = (j && j.workflow_runs) || [];
-          var run = runs.filter(function(rn){
+          runs = runs.filter(function(rn){
             return Date.parse(rn.created_at || rn.run_started_at || 0) >= (t0 - 12000);
-          }).sort(function(a,b){ return Date.parse(b.created_at) - Date.parse(a.created_at); })[0];
-          if(!run){ if(attempt < 4){ setTimeout(function(){ captureSnapshotRun(t0, attempt+1); }, 2500); } return; }
+          }).sort(function(a,b){ return Date.parse(b.created_at) - Date.parse(a.created_at); });
           var o = qLoad(); var changed = false;
+          var missing = false;
           Object.keys(o).forEach(function(key){
             if(key.indexOf('snapshots|') !== 0) return;
             var e = o[key]; if(!e || (e.runs||[]).length) return;
+            var sha = key.slice('snapshots|'.length).toLowerCase();
+            var run = runs.filter(function(rn){
+              var title = String(rn.display_title||'')+' '+String(rn.name||'');
+              var shas = title.toLowerCase().match(/\b[0-9a-f]{40}\b/g) || [];
+              return Date.parse(rn.created_at || rn.run_started_at || 0) >= ((e.ts||t0) - 12000)
+                && (shas.indexOf(sha)>=0 || (!shas.length && /\bbackfill\b/i.test(title)));
+            })[0];
+            if(!run){ missing = true; return; }
             e.runs = [{ wf:'vi-snapshots.yml', plat:'all', id:run.id, url:run.html_url, status:run.status }];
             changed = true;
           });
           if(changed) qSave(o);
+          if(missing && attempt < 4){ setTimeout(function(){ captureSnapshotRun(t0, attempt+1); }, 2500); }
         }).catch(function(){});
     }
     function captureBatchRun(wf, t0, attempt){
@@ -2631,15 +2624,6 @@ run_dialog = (r"""
     });
     document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ if(qModalOpen()) cidashQClose(); else cidashRunClose(); } });
     // ── "Run all history" backfill card ──────────────────────────────
-    // On a fresh dashboard (gated server-side: no results, nothing running) the
-    // card offers to queue CI for the WHOLE history in one click, oldest commit
-    // first. Snapshots are not per-commit (every snapshot cell dispatches the same
-    // gallery workflow), so instead of one run per row we fire a SINGLE run in the
-    // workflow's "backfill" mode — it walks history oldest→newest and seeds from
-    // the already-deployed gallery, so nothing is rendered twice. Mass Compile /
-    // VI Analyzer / VIDiff are per-revision, so those are dispatched once each,
-    // oldest first and gently throttled. The card self-hides once anything is
-    // queued and can be dismissed (remembered per repo).
     var BF_DISMISS_KEY = "lvci_backfill_dismissed";
     function bfCard(){ return document.getElementById('lvci-backfill'); }
     function bfDismissed(){ try{ return localStorage.getItem(BF_DISMISS_KEY) === REPO; }catch(e){ return false; } }
@@ -2678,12 +2662,6 @@ run_dialog = (r"""
     }
     function bfFill(t, sha, parent){ return String(t).replace(/\{sha\}/g, sha).replace(/\{parent\}/g, parent||''); }
     function bfInputs(p, sha, parent){ var o={}; Object.keys(p.inputs).forEach(function(k){ o[k]=bfFill(p.inputs[k], sha, parent); }); return o; }
-    // Shared dispatch engine for BOTH the fresh-install backfill card and the
-    // Populate-history dialog: queue a set of empty run-cells, snapshots as ONE
-    // backfill run (the workflow walks the whole history oldest->newest and dedupes)
-    // and the per-revision activities oldest-first, gently throttled so a long
-    // history doesn't trip GitHub's secondary rate limits. Resolves with an
-    // {ok, err, total} tally; the caller owns its own status line + buttons.
     // Turn collected dispatch failures into an accurate message. A 404 means the
     // targeted workflow is not RUNNABLE on this repo -- the file is not installed
     // (tooling out of date), or it exists but GitHub never registered it as a
@@ -2738,9 +2716,9 @@ run_dialog = (r"""
     function dispatchCells(cells, statusFn, opts){
       opts = opts || {}; var reuse = !!opts.reuse;
       var perRev=[]; var snapShas=[]; var sawSnap=false; var snapForce=false;
-      cells.forEach(function(x){
+      cells.slice().sort(function(a,b){ return b.order - a.order; }).forEach(function(x){
         if(x.cap==='snapshots'){
-          sawSnap=true; snapShas.push(x.sha);
+          sawSnap=true; if(snapShas.indexOf(x.sha)<0) snapShas.push(x.sha);
           if(x.mode==='rerun' || x.done) snapForce=true;
         }
         else if(!(x.cap==='vidiff' && !x.parent)){ perRev.push(x); }   // a root commit has no base to diff
@@ -2795,10 +2773,9 @@ run_dialog = (r"""
       }
       statusFn('Queuing '+total+' workflow'+(total>1?'s':'')+'\u2026', null);
       var chain=Promise.resolve();
-      // 1) Snapshots — one backfill run for the whole history (oldest→newest, deduped).
       if(sawSnap){
         chain=chain.then(function(){
-          var inputs={ mode:'backfill' }; if(snapForce) inputs.force='true';
+          var inputs={ mode:'backfill', shas:snapShas.join(' ') }; if(snapForce) inputs.force='true';
           return dispatchOne('vi-snapshots.yml', inputs).then(function(r){
             done++;
             if(r.ok){ ok++; captureSnapshotRun(t0); }

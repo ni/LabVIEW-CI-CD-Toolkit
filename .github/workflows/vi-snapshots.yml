@@ -1,5 +1,5 @@
 name: VI Snapshots and VI Browser
-run-name: VI Snapshots and Browser - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'backfill' && 'backfill' || github.sha }}
+run-name: VI Snapshots and Browser - ${{ inputs.shas || (github.event_name == 'workflow_dispatch' && inputs.mode == 'backfill' && 'backfill') || github.sha }}
 
 on:
   # Auto-runs only on real LabVIEW source changes — never on the tooling files an
@@ -29,6 +29,10 @@ on:
         description: "backfill: cap to most recent N VI-touching commits (0 = all)"
         required: false
         default: '0'
+      shas:
+        description: "Exact space-separated revision SHAs to render; blank uses mode/max_commits"
+        required: false
+        default: ''
       max_vis:
         description: "smoke test: cap NEW VIs rendered per commit (0 = all)"
         required: false
@@ -141,12 +145,15 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNAPSHOT_SHAS: ${{ inputs.shas || github.sha }}
         run: |
-          curl -s -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"VI Snapshots in progress\",\"context\":\"CI / VI Snapshots\"}"
+          for sha in $SNAPSHOT_SHAS; do
+            curl -s -X POST \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/statuses/$sha" \
+              -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"VI Snapshots in progress\",\"context\":\"CI / VI Snapshots\"}"
+          done
 
       - name: Resolve VI Browser 2.0 (Windows) setting from config
         id: vbcfg
@@ -177,11 +184,14 @@ jobs:
       - name: Build VI snapshots (incremental, content-addressed)
         id: snapshots
         shell: powershell
+        env:
+          SNAPSHOT_SHAS: ${{ inputs.shas }}
         run: |
           & .github\labview\build-snapshots.ps1 `
             -Mode              '${{ github.event.inputs.mode || 'head' }}' `
             -WorkspaceRoot     '${{ github.workspace }}' `
             -TargetSha         '${{ github.sha }}' `
+            -Shas              "$Env:SNAPSHOT_SHAS" `
             -OutDir            '${{ github.workspace }}\ci-out\vi-snapshots' `
             -ExistingByBlobDir '${{ github.workspace }}\_pages\vi-snapshots\by-blob' `
             -Image             "$Env:LABVIEW_CONTAINER_IMAGE" `
@@ -214,6 +224,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNAPSHOT_SHAS: ${{ inputs.shas || github.sha }}
         run: |
           REPORT_URL="${{ env.PAGES_URL }}/vi-snapshots/index.html"
           if [ "${{ steps.snapshots.outcome }}" = "success" ] && [ "${{ steps.verify.outputs.ok }}" = "true" ]; then
@@ -221,11 +232,13 @@ jobs:
           else
             STATE="failure"
           fi
-          curl -s -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -d "{\"state\":\"$STATE\",\"target_url\":\"$REPORT_URL\",\"description\":\"VI Snapshots $STATE\",\"context\":\"CI / VI Snapshots\"}"
+          for sha in $SNAPSHOT_SHAS; do
+            curl -s -X POST \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/statuses/$sha" \
+              -d "{\"state\":\"$STATE\",\"target_url\":\"$REPORT_URL\",\"description\":\"VI Snapshots $STATE\",\"context\":\"CI / VI Snapshots\"}"
+          done
 
       - name: Fail job if snapshots failed
         if: steps.snapshots.outcome != 'success' || steps.verify.outputs.ok != 'true'

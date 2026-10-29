@@ -25,6 +25,10 @@ inputs:
     description: 'Commit SHA to snapshot (defaults to github.sha).'
     required: false
     default: ''
+  shas:
+    description: 'Exact space-separated revision SHAs; blank uses mode/max-commits.'
+    required: false
+    default: ''
   out-dir:
     description: 'Gallery output directory (relative to the workspace).'
     required: false
@@ -57,11 +61,14 @@ runs:
     - name: Build VI snapshots (incremental, content-addressed)
       id: snapshots
       shell: powershell
+      env:
+        SNAPSHOT_SHAS: ${{ inputs.shas }}
       run: |
         & "${{ github.action_path }}\build-snapshots.ps1" `
           -Mode              '${{ inputs.mode }}' `
           -WorkspaceRoot     '${{ github.workspace }}' `
           -TargetSha         '${{ inputs.target-sha || github.sha }}' `
+          -Shas              "$Env:SNAPSHOT_SHAS" `
           -OutDir            "${{ github.workspace }}\${{ inputs.out-dir }}" `
           -ExistingByBlobDir '${{ inputs.existing-by-blob-dir }}' `
           -OpsDir            "${{ github.action_path }}" `
