@@ -1,8 +1,17 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "0e9500410d30587d175345e46b704c625d81ab26",
+  "sha": "229513e67a867eb6067e32190b77a07183e775de",
   "revisions": [
+    {
+      "sha": "229513e67a867eb6067e32190b77a07183e775de",
+      "short": "229513e",
+      "message": "Unify snapshots around rich interactive code views",
+      "author": "elijah286",
+      "date": "2026-10-29T20:03:52Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "0e9500410d30587d175345e46b704c625d81ab26",
       "short": "0e95004",
@@ -895,15 +904,6 @@
       "dep_only": false
     },
     {
-      "sha": "e98ea6d708e16a5bdc9a80d032e3bbb0c2f31898",
-      "short": "e98ea6d",
-      "message": "Remove default viAnalyzer configuration",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-07T16:00:56Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
       "sha": "c3394babc0e984a45c9bb2854ab5b54693b6cb29",
       "short": "c3394ba",
       "message": "Added a Build Spec",
@@ -1354,7 +1354,7 @@
   },
   "system": [
     {
-      "name": "VI Browser 2.0 toimages runner",
+      "name": "VI Browser toimages runner",
       "source": "Repository Go code",
       "path": ".github/labview/toimages/main.go",
       "details": "Batch runner compiled from repo Go source; Linux uses the toimages GHCR image and Windows builds runner.exe in the workflow.",
@@ -1373,7 +1373,7 @@
       "name": "lvctl render engine",
       "source": "Repository Go code + embedded VIs",
       "path": ".github/labview/toimages/_ni/labview/lvctl",
-      "details": "Renderer used by VI Browser 2.0 to drive LabVIEW and emit position-aware frame JSON.",
+      "details": "Renderer used by VI Browser to drive LabVIEW and emit position-aware frame JSON.",
       "platforms": {
         "windows": {
           "present": true,

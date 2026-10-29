@@ -28,8 +28,9 @@
 <body>
   <div id="toolbar">
     <h1 id="vi-name">VI Viewer</h1>
+    <button type="button" id="front-panel">Front Panel</button>
+    <button type="button" id="block-diagram">Block Diagram</button>
     <a href="javascript:history.back()">← Back</a>
-    <a id="raw-link" href="#" target="_blank">Open snapshot directly ↗</a>
     <a href="index.html">VI Browser</a>
     <a href="../">CI Dashboard</a>
     <span id="mode-hint" style="margin-left:auto;color:#8b949e;display:none">
@@ -40,7 +41,6 @@
        frames JSON is available. -->
   <div id="frame-wrap">
     <div id="canvas" style="position:absolute;inset:0;display:none"></div>
-    <iframe id="viewer" title="VI Snapshot" allowfullscreen></iframe>
   </div>
   <div id="error" style="display:none">
     <p>No VI file specified. Use <code>?frames=path/to/frames.json</code> or <code>?file=path/to/snapshot.html</code></p>
@@ -49,13 +49,23 @@
   <script src="vi-render.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
-    // Preferred: a position-aware frames JSON (lvctl `toimages` schema) renders
-    // the diagram in place. Legacy: ?file= iframes the flat "Print to HTML" export.
-    // ?frames= may be given explicitly, or derived from a ?file= snapshot's sibling
-    // <name>.json, so a single link upgrades automatically when the JSON exists.
     const explicitFrames = params.get('frames');
     const file = params.get('file');
     const derivedFrames = file ? file.replace(/\.html$/i, '.json') : null;
+    let activeFrames = null;
+    let controller = null;
+    let pane = params.get('pane') === 'bd' ? 'bd' : 'fp';
+
+    function renderPane() {
+      if (!activeFrames) return;
+      if (controller) controller.destroy();
+      controller = window.LVRender.render(document.getElementById('canvas'), activeFrames, { rootIndex: pane === 'bd' && activeFrames.length > 1 ? 1 : 0 });
+      document.getElementById('block-diagram').disabled = activeFrames.length < 2;
+      document.getElementById('front-panel').setAttribute('aria-pressed', pane === 'fp');
+      document.getElementById('block-diagram').setAttribute('aria-pressed', pane === 'bd');
+    }
+    document.getElementById('front-panel').onclick = () => { pane = 'fp'; renderPane(); };
+    document.getElementById('block-diagram').onclick = () => { pane = 'bd'; renderPane(); };
 
     function setName(src) {
       const name = src.split('/').pop().replace(/\.(json|html)$/i, '').replace(/-/g, '/');
@@ -65,37 +75,30 @@
     function showError() {
       document.getElementById('frame-wrap').style.display = 'none';
       document.getElementById('error').style.display = 'block';
+      if (explicitFrames || file) document.getElementById('error').textContent = 'This snapshot has not been rendered yet. Open the VI Browser to generate it.';
     }
-    function showIframe(htmlSrc) {
-      const src = new URL(htmlSrc, window.location.href).href;
-      document.getElementById('canvas').style.display = 'none';
-      const vw = document.getElementById('viewer');
-      vw.style.display = 'block';
-      vw.src = src;
-      document.getElementById('raw-link').href = src;
-      setName(htmlSrc);
-    }
-    function showFrames(framesSrc, rawHtmlSrc) {
+    function showFrames(framesSrc) {
       const url = new URL(framesSrc, window.location.href).href;
       return fetch(url, { cache: 'no-store' })
         .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(frames => {
+          if (!Array.isArray(frames) || !frames.length || !window.LVRender) throw new Error('No snapshot frames');
           const canvas = document.getElementById('canvas');
-          document.getElementById('viewer').style.display = 'none';
           canvas.style.display = 'block';
-          window.LVRender.render(canvas, frames, {});
+          activeFrames = frames;
+          if (frames.length < 2) pane = 'fp';
+          renderPane();
           document.getElementById('mode-hint').style.display = 'inline';
-          document.getElementById('raw-link').href = new URL(rawHtmlSrc || framesSrc, window.location.href).href;
           setName(framesSrc);
           return true;
         });
     }
 
     if (explicitFrames) {
-      showFrames(explicitFrames, file).catch(() => file ? showIframe(file) : showError());
+      showFrames(explicitFrames).catch(showError);
     } else if (file) {
-      // Try the position-aware sibling JSON first; fall back to the flat snapshot.
-      showFrames(derivedFrames, file).catch(() => showIframe(file));
+      showFrames(derivedFrames.replace(/\.json$/i, '.windows.json'))
+        .catch(() => showFrames(derivedFrames)).catch(showError);
     } else {
       showError();
     }
