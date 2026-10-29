@@ -71,3 +71,13 @@ and [PR template](pull_request_template.md). Titles and opening summaries explai
 concrete capabilities, fixes, and user benefits, not agent coordination or release
 mechanics. Match claims to the actual PR diff, separate already-landed features
 from new changes, disclose validation gaps, and link every PR reference.
+
+## Rule 5 — Every PR identifies the containing release
+
+Follow the [release-impact policy](CONTRIBUTING.md#every-pr-identifies-its-release-version-and-update-type).
+After the feature summary, state the explicit target version, update type
+(major, minor, or incremental/patch), matching bump label, published baseline,
+availability, and exact client update guidance. Mark estimates as projected;
+refresh before merge and confirm the first containing immutable release after
+publication. A successful merge or workflow does not prove availability, and
+publication does not imply beta/stable promotion. CI still owns versioning.

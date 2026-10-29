@@ -58,6 +58,44 @@ be able to identify the user benefit, the exact scope, and any verification gaps
 without reading agent handoffs or commit history. Apply the same user-outcome
 standard to release-note fragments.
 
+## Every PR identifies its release version and update type
+
+Every PR, including documentation, maintenance, and bot-generated PRs, must have
+a **Release impact** section immediately after its feature/fix summary. Authors
+and reviewers must fill in missing bot metadata before approval. Include:
+
+- **Target version:** an explicit `vMAJOR.MINOR.PATCH`, marked **projected** until
+  CI prepares it. Link the latest published release used as the baseline and any
+  matching release-preparation PR. A projection is not a reservation: merge order
+  and concurrent publications can change it. Refresh it before merge.
+- **Update type:** **major**, **minor**, or **incremental (patch)**, with a reason.
+  Major means an incompatible change; minor means a backward-compatible new
+  capability; patch means a backward-compatible fix or docs/maintenance update.
+  Apply the matching `release:major`, `release:minor`, or `release:patch` label;
+  the workflow also defaults an unlabeled PR to patch.
+- **Availability:** **projected**, **prepared / not published**, or **published**.
+  A merged feature PR or green workflow is not proof of publication. Once CI
+  prepares a version, link that proposal; once it publishes, update the feature
+  PR with the exact first containing release and its immutable tag/release link.
+  Verify that the release actually contains the PR's changes before confirming.
+- **Client update guidance:** give the exact immutable tooling version to select
+  once published. State separately whether the client's chosen `dev`, `beta`,
+  `stable`, or rolling alias resolves to a release containing the fix. Never
+  imply that publication promotes a channel, or that updating any channel
+  automatically includes it. Check the installed tooling version after updating.
+
+Keep the feature/fix headline first; do not substitute a version-only title.
+Compute projected targets from published tags and the intended bump, never by
+hand-editing the catalog. For an explicitly skipped release, state **no release
+from this PR** and **containing version unassigned** rather than promising a
+version; record the actual containing release when it becomes available.
+Promotion-only PRs must identify the already-published version being promoted,
+the channel, and any separate metadata-release version; they are not new fixes.
+
+For example: **Target: v4.18.7 (projected), incremental (patch)**; **Availability:
+not published**; **Client update: select v4.18.7 after publication; beta/stable
+inclusion is not implied**. Replace these values with the PR's verified facts.
+
 ## Never edit `catalog.json`
 
 `.github/labview-ci/catalog.json` → `version` is the version of record: the
@@ -71,7 +109,7 @@ catalog cannot roll the version backwards. That's deliberate: on 2026-07-30 a
 hand-edited copy took the version from 4.12.4 to 4.11.10 and stalled every client
 release for two weeks.
 
-What you supply instead, both optional:
+What you supply instead:
 
 **A release note.** Drop a `.md` file in `.github/labview-ci/notes/` describing
 your change in prose, as a client would read it. One file per PR, so two PRs can
@@ -79,9 +117,11 @@ never conflict. CI folds pending fragments into the release and deletes them. Se
 [the notes README](labview-ci/notes/README.md). Forget one and the release still
 happens, falling back to your PR title.
 
-**A bump level.** Label the PR `release:minor` for a new capability or
-`release:major` for a breaking change. No label means patch, which is right most
-of the time. Major moves `@v<major>`, so it should be rare.
+**A bump level.** As required by the release-impact policy, label the PR
+`release:patch` for an incremental fix, documentation, or maintenance update,
+`release:minor` for a new capability, or `release:major` for a breaking change.
+The workflow retains its patch default for legacy unlabeled PRs. Major moves
+`@v<major>`, so it should be rare.
 
 To land something without publishing, put `[skip release]` in the merge commit
 message — but use it sparingly. Everything being published is what makes
@@ -93,8 +133,9 @@ Publishing is automatic and unconditional. Deciding a version is *good* is a
 separate, manual, retroactive act: `promote-release.yml` moves the rolling
 `stable` and `beta` tags to an already-published release. Nothing is rebuilt.
 
-So don't agonise over a version number — it's a counter. The thing that decides
-what a client actually receives is which release the channel points at.
+The immutable version identifies the released contents; the selected channel
+decides which version a client is offered. Record both when explaining whether
+an update will deliver a particular fix.
 
 ## Reverts
 
