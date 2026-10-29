@@ -2038,6 +2038,20 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         run it manually on the default branch immediately after the merge, before other changes land. Review one
         pending catalog PR at a time; regenerate a stale or conflicting proposal rather than changing historical
         tags. Both release workflows must run on the default branch.</p>
+      <h3>Knowing which release contains a fix</h3>
+      <p>Every pull request includes a <strong>Release impact</strong> section after its feature summary:
+        an explicit target <code>vMAJOR.MINOR.PATCH</code>, update type, published baseline, availability,
+        and client update guidance. <strong>Major</strong> identifies incompatible changes;
+        <strong>minor</strong> identifies backward-compatible new capabilities; and
+        <strong>incremental (patch)</strong> identifies backward-compatible fixes or documentation/maintenance
+        updates. The corresponding <code>release:major</code>, <code>release:minor</code>, or
+        <code>release:patch</code> label records the intended bump; no label still defaults to patch.</p>
+      <p>A projected version can change with merge order. A prepared catalog PR is not a published release.
+        After publication, the feature PR must link the verified first containing immutable release.
+        Client owners should select that exact tooling version once available and confirm the installed
+        version after updating. A rolling channel or alias is not proof that a fix is included: check its
+        resolved release separately. Publication does not promote beta or stable. Explicitly skipped
+        releases have no assigned containing version until a subsequent release is verified.</p>
       <h3>Canonical source and GitLab distribution</h3>
       <p>GitHub is the canonical source of implementation and releases. When the optional GitLab mirror is enabled,
         the release workflow runs <code>sync-gitlab-mirror.sh</code> after GitHub has published an immutable tag. It

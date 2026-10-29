@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "7ce369fe2022dcc641b10fdd9ba3252d6e833efb",
+  "sha": "c5d89fe8896fe878cb3e1c98a9d050643b3ecb16",
   "revisions": [
+    {
+      "sha": "c5d89fe8896fe878cb3e1c98a9d050643b3ecb16",
+      "short": "c5d89fe",
+      "message": "Merge pull request #90 from ni/captain/ship-fleet-2026-10-29",
+      "author": "Elijah Kerry",
+      "date": "2026-10-29T23:11:46Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "5d8b1e9e861b1135ddde3779324b9b359c6ad999",
+      "short": "5d8b1e9",
+      "message": "Require PR release versions and client update guidance",
+      "author": "elijah286",
+      "date": "2026-10-29T22:09:00Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "7ce369fe2022dcc641b10fdd9ba3252d6e833efb",
       "short": "7ce369f",
@@ -882,24 +900,6 @@
       "message": "pass --allow-missing-files to override",
       "author": "MIpetrov-NI",
       "date": "2026-08-10T21:14:41Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "4a14d64ddd9d8a57f1e95a52eb3316b0ff0e0573",
-      "short": "4a14d64",
-      "message": "Should detect LabVIEW version installed in the container, then pass this version to VIPM CLI.",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-10T20:53:03Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "34ca150dc89039426f128b89f1010e496e1cba93",
-      "short": "34ca150",
-      "message": "Error handling: SBOM workflow fails if VIPM CLI errors to avoid generating misleading output files",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-10T19:57:36Z",
       "project": false,
       "dep_only": false
     },
