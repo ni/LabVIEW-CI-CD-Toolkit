@@ -1,8 +1,17 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "8221d6c62bfb35f32b8af485152c86f4e6736067",
+  "sha": "0e9500410d30587d175345e46b704c625d81ab26",
   "revisions": [
+    {
+      "sha": "0e9500410d30587d175345e46b704c625d81ab26",
+      "short": "0e95004",
+      "message": "Fix snapshot history population to respect selected revisions",
+      "author": "elijah286",
+      "date": "2026-10-29T07:45:37Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "8221d6c62bfb35f32b8af485152c86f4e6736067",
       "short": "8221d6c",
@@ -891,15 +900,6 @@
       "message": "Remove default viAnalyzer configuration",
       "author": "MIpetrov-NI",
       "date": "2026-08-07T16:00:56Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "fae088fb547923107f438c06b44d4a1ad6cf7e19",
-      "short": "fae088f",
-      "message": "Added <Path>\".\"<Path> to .viancfg under test",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-07T14:47:24Z",
       "project": false,
       "dep_only": false
     },

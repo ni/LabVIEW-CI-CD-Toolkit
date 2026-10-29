@@ -280,7 +280,7 @@
   </div>
   <script>
   (function(){
-    var RT = {"masscompile": {"label": "Mass Compile", "platforms": {"windows": {"wf": "masscompile-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "masscompile-backfill-windows.yml", "shas_input": "shas"}}, "linux": {"wf": "masscompile-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "vi-analyzer": {"label": "VI Analyzer", "platforms": {"windows": {"wf": "run-vi-analyzer-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "vi-analyzer-backfill-windows.yml", "shas_input": "shas"}}, "linux": {"wf": "run-vi-analyzer-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "vidiff": {"label": "VIDiff", "platforms": {"windows": {"wf": "vidiff-windows-container.yml", "inputs": {"head_sha": "{sha}", "base_sha": "{parent}"}}, "linux": {"wf": "vidiff-linux-container.yml", "inputs": {"head_sha": "{sha}", "base_sha": "{parent}"}}}}, "snapshots": {"label": "VI Snapshots", "platforms": {"all": {"wf": "vi-snapshots.yml", "inputs": {"mode": "backfill"}}}}, "snapshots2": {"label": "VI Browser 2.0 Snapshots", "platforms": {"windows": {"wf": "vi-snapshots-json-windows.yml", "inputs": {"target_sha": "{sha}"}}, "linux": {"wf": "vi-snapshots-json.yml", "inputs": {"mode": "head", "target_sha": "{sha}"}}}}, "unit-tests": {"label": "Unit Tests", "platforms": {"windows": {"wf": "unit-tests-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "unit-tests-backfill-windows.yml", "shas_input": "shas"}}}}, "antidoc": {"label": "Antidoc", "platforms": {"windows": {"wf": "run-antidoc-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "antidoc-backfill-windows.yml", "shas_input": "shas"}}}}, "builds": {"label": "Builds", "platforms": {"windows": {"wf": "build-binaries-windows-container.yml", "inputs": {"commit_sha": "{sha}"}}, "linux": {"wf": "build-binaries-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "sbom-generation": {"label": "SBOM Generation", "platforms": {"windows": {"wf": "generate-sbom-windows-container.yml", "inputs": {"commit_sha": "{sha}"}}}}};
+    var RT = {"masscompile": {"label": "Mass Compile", "platforms": {"windows": {"wf": "masscompile-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "masscompile-backfill-windows.yml", "shas_input": "shas"}}, "linux": {"wf": "masscompile-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "vi-analyzer": {"label": "VI Analyzer", "platforms": {"windows": {"wf": "run-vi-analyzer-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "vi-analyzer-backfill-windows.yml", "shas_input": "shas"}}, "linux": {"wf": "run-vi-analyzer-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "vidiff": {"label": "VIDiff", "platforms": {"windows": {"wf": "vidiff-windows-container.yml", "inputs": {"head_sha": "{sha}", "base_sha": "{parent}"}}, "linux": {"wf": "vidiff-linux-container.yml", "inputs": {"head_sha": "{sha}", "base_sha": "{parent}"}}}}, "snapshots": {"label": "VI Snapshots", "platforms": {"all": {"wf": "vi-snapshots.yml", "inputs": {"mode": "backfill", "shas": "{sha}"}}}}, "snapshots2": {"label": "VI Browser 2.0 Snapshots", "platforms": {"windows": {"wf": "vi-snapshots-json-windows.yml", "inputs": {"target_sha": "{sha}"}}, "linux": {"wf": "vi-snapshots-json.yml", "inputs": {"mode": "head", "target_sha": "{sha}"}}}}, "unit-tests": {"label": "Unit Tests", "platforms": {"windows": {"wf": "unit-tests-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "unit-tests-backfill-windows.yml", "shas_input": "shas"}}}}, "antidoc": {"label": "Antidoc", "platforms": {"windows": {"wf": "run-antidoc-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "antidoc-backfill-windows.yml", "shas_input": "shas"}}}}, "builds": {"label": "Builds", "platforms": {"windows": {"wf": "build-binaries-windows-container.yml", "inputs": {"commit_sha": "{sha}"}}, "linux": {"wf": "build-binaries-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "sbom-generation": {"label": "SBOM Generation", "platforms": {"windows": {"wf": "generate-sbom-windows-container.yml", "inputs": {"commit_sha": "{sha}"}}}}};
     var RT_TIMING = {"masscompile": {"windows": {"total": 1038.0, "work": 21.0}, "linux": {"total": 100.0, "work": 21.0}}, "vi-analyzer": {"windows": {"total": 1356.5, "work": null}, "linux": {"total": 219.0, "work": null}}, "vidiff": {"windows": {"total": 991.0, "work": null}, "linux": {"total": 73.0, "work": null}}, "snapshots2": {"windows": {"total": 1110.0, "work": null}, "linux": {"total": 80.0, "work": null}}, "unit-tests": {"windows": {"total": 1063.0, "work": null}}, "antidoc": {"windows": {"total": 1093.0, "work": null}}, "builds": {"windows": {"total": 1073.0, "work": null}, "linux": {"total": null, "work": null}}, "sbom-generation": {"windows": {"total": 1026.5, "work": null}}};
     var REPO = "ni/LabVIEW-CI-CD-Toolkit";
     var BRANCH = "main";
@@ -588,10 +588,6 @@
       });
     }
     function captureSnapshotRun(t0, attempt){
-      // The "Populate history" backfill is ONE snapshots run that walks the whole
-      // history, so every "snapshots|<sha>" entry shares it. captureRuns' per-cell
-      // claim would hand the single run to just the first sha, so look it up once
-      // and write it into EVERY snapshot entry still missing a run id.
       var tok = getTok(); if(!tok) return;
       t0 = t0 || Date.now(); attempt = attempt || 1;
       fetch('https://api.github.com/repos/'+REPO+'/actions/workflows/'+encodeURIComponent('vi-snapshots.yml')+'/runs?event=workflow_dispatch&per_page=20',
@@ -599,18 +595,27 @@
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(j){
           var runs = (j && j.workflow_runs) || [];
-          var run = runs.filter(function(rn){
+          runs = runs.filter(function(rn){
             return Date.parse(rn.created_at || rn.run_started_at || 0) >= (t0 - 12000);
-          }).sort(function(a,b){ return Date.parse(b.created_at) - Date.parse(a.created_at); })[0];
-          if(!run){ if(attempt < 4){ setTimeout(function(){ captureSnapshotRun(t0, attempt+1); }, 2500); } return; }
+          }).sort(function(a,b){ return Date.parse(b.created_at) - Date.parse(a.created_at); });
           var o = qLoad(); var changed = false;
+          var missing = false;
           Object.keys(o).forEach(function(key){
             if(key.indexOf('snapshots|') !== 0) return;
             var e = o[key]; if(!e || (e.runs||[]).length) return;
+            var sha = key.slice('snapshots|'.length).toLowerCase();
+            var run = runs.filter(function(rn){
+              var title = String(rn.display_title||'')+' '+String(rn.name||'');
+              var shas = title.toLowerCase().match(/\b[0-9a-f]{40}\b/g) || [];
+              return Date.parse(rn.created_at || rn.run_started_at || 0) >= ((e.ts||t0) - 12000)
+                && (shas.indexOf(sha)>=0 || (!shas.length && /\bbackfill\b/i.test(title)));
+            })[0];
+            if(!run){ missing = true; return; }
             e.runs = [{ wf:'vi-snapshots.yml', plat:'all', id:run.id, url:run.html_url, status:run.status }];
             changed = true;
           });
           if(changed) qSave(o);
+          if(missing && attempt < 4){ setTimeout(function(){ captureSnapshotRun(t0, attempt+1); }, 2500); }
         }).catch(function(){});
     }
     function captureBatchRun(wf, t0, attempt){
@@ -1044,15 +1049,6 @@
     });
     document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ if(qModalOpen()) cidashQClose(); else cidashRunClose(); } });
     // ── "Run all history" backfill card ──────────────────────────────
-    // On a fresh dashboard (gated server-side: no results, nothing running) the
-    // card offers to queue CI for the WHOLE history in one click, oldest commit
-    // first. Snapshots are not per-commit (every snapshot cell dispatches the same
-    // gallery workflow), so instead of one run per row we fire a SINGLE run in the
-    // workflow's "backfill" mode — it walks history oldest→newest and seeds from
-    // the already-deployed gallery, so nothing is rendered twice. Mass Compile /
-    // VI Analyzer / VIDiff are per-revision, so those are dispatched once each,
-    // oldest first and gently throttled. The card self-hides once anything is
-    // queued and can be dismissed (remembered per repo).
     var BF_DISMISS_KEY = "lvci_backfill_dismissed";
     function bfCard(){ return document.getElementById('lvci-backfill'); }
     function bfDismissed(){ try{ return localStorage.getItem(BF_DISMISS_KEY) === REPO; }catch(e){ return false; } }
@@ -1091,12 +1087,6 @@
     }
     function bfFill(t, sha, parent){ return String(t).replace(/\{sha\}/g, sha).replace(/\{parent\}/g, parent||''); }
     function bfInputs(p, sha, parent){ var o={}; Object.keys(p.inputs).forEach(function(k){ o[k]=bfFill(p.inputs[k], sha, parent); }); return o; }
-    // Shared dispatch engine for BOTH the fresh-install backfill card and the
-    // Populate-history dialog: queue a set of empty run-cells, snapshots as ONE
-    // backfill run (the workflow walks the whole history oldest->newest and dedupes)
-    // and the per-revision activities oldest-first, gently throttled so a long
-    // history doesn't trip GitHub's secondary rate limits. Resolves with an
-    // {ok, err, total} tally; the caller owns its own status line + buttons.
     // Turn collected dispatch failures into an accurate message. A 404 means the
     // targeted workflow is not RUNNABLE on this repo -- the file is not installed
     // (tooling out of date), or it exists but GitHub never registered it as a
@@ -1151,9 +1141,9 @@
     function dispatchCells(cells, statusFn, opts){
       opts = opts || {}; var reuse = !!opts.reuse;
       var perRev=[]; var snapShas=[]; var sawSnap=false; var snapForce=false;
-      cells.forEach(function(x){
+      cells.slice().sort(function(a,b){ return b.order - a.order; }).forEach(function(x){
         if(x.cap==='snapshots'){
-          sawSnap=true; snapShas.push(x.sha);
+          sawSnap=true; if(snapShas.indexOf(x.sha)<0) snapShas.push(x.sha);
           if(x.mode==='rerun' || x.done) snapForce=true;
         }
         else if(!(x.cap==='vidiff' && !x.parent)){ perRev.push(x); }   // a root commit has no base to diff
@@ -1208,10 +1198,9 @@
       }
       statusFn('Queuing '+total+' workflow'+(total>1?'s':'')+'\u2026', null);
       var chain=Promise.resolve();
-      // 1) Snapshots — one backfill run for the whole history (oldest→newest, deduped).
       if(sawSnap){
         chain=chain.then(function(){
-          var inputs={ mode:'backfill' }; if(snapForce) inputs.force='true';
+          var inputs={ mode:'backfill', shas:snapShas.join(' ') }; if(snapForce) inputs.force='true';
           return dispatchOne('vi-snapshots.yml', inputs).then(function(r){
             done++;
             if(r.ok){ ok++; captureSnapshotRun(t0); }
@@ -1911,7 +1900,7 @@
   </div>
   <script>
   (function(){
-    var RT = {"masscompile": {"label": "Mass Compile", "platforms": {"windows": {"wf": "masscompile-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "masscompile-backfill-windows.yml", "shas_input": "shas"}}, "linux": {"wf": "masscompile-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "vi-analyzer": {"label": "VI Analyzer", "platforms": {"windows": {"wf": "run-vi-analyzer-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "vi-analyzer-backfill-windows.yml", "shas_input": "shas"}}, "linux": {"wf": "run-vi-analyzer-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "vidiff": {"label": "VIDiff", "platforms": {"windows": {"wf": "vidiff-windows-container.yml", "inputs": {"head_sha": "{sha}", "base_sha": "{parent}"}}, "linux": {"wf": "vidiff-linux-container.yml", "inputs": {"head_sha": "{sha}", "base_sha": "{parent}"}}}}, "snapshots": {"label": "VI Snapshots", "platforms": {"all": {"wf": "vi-snapshots.yml", "inputs": {"mode": "backfill"}}}}, "snapshots2": {"label": "VI Browser 2.0 Snapshots", "platforms": {"windows": {"wf": "vi-snapshots-json-windows.yml", "inputs": {"target_sha": "{sha}"}}, "linux": {"wf": "vi-snapshots-json.yml", "inputs": {"mode": "head", "target_sha": "{sha}"}}}}, "unit-tests": {"label": "Unit Tests", "platforms": {"windows": {"wf": "unit-tests-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "unit-tests-backfill-windows.yml", "shas_input": "shas"}}}}, "antidoc": {"label": "Antidoc", "platforms": {"windows": {"wf": "run-antidoc-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "antidoc-backfill-windows.yml", "shas_input": "shas"}}}}, "builds": {"label": "Builds", "platforms": {"windows": {"wf": "build-binaries-windows-container.yml", "inputs": {"commit_sha": "{sha}"}}, "linux": {"wf": "build-binaries-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "sbom-generation": {"label": "SBOM Generation", "platforms": {"windows": {"wf": "generate-sbom-windows-container.yml", "inputs": {"commit_sha": "{sha}"}}}}};
+    var RT = {"masscompile": {"label": "Mass Compile", "platforms": {"windows": {"wf": "masscompile-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "masscompile-backfill-windows.yml", "shas_input": "shas"}}, "linux": {"wf": "masscompile-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "vi-analyzer": {"label": "VI Analyzer", "platforms": {"windows": {"wf": "run-vi-analyzer-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "vi-analyzer-backfill-windows.yml", "shas_input": "shas"}}, "linux": {"wf": "run-vi-analyzer-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "vidiff": {"label": "VIDiff", "platforms": {"windows": {"wf": "vidiff-windows-container.yml", "inputs": {"head_sha": "{sha}", "base_sha": "{parent}"}}, "linux": {"wf": "vidiff-linux-container.yml", "inputs": {"head_sha": "{sha}", "base_sha": "{parent}"}}}}, "snapshots": {"label": "VI Snapshots", "platforms": {"all": {"wf": "vi-snapshots.yml", "inputs": {"mode": "backfill", "shas": "{sha}"}}}}, "snapshots2": {"label": "VI Browser 2.0 Snapshots", "platforms": {"windows": {"wf": "vi-snapshots-json-windows.yml", "inputs": {"target_sha": "{sha}"}}, "linux": {"wf": "vi-snapshots-json.yml", "inputs": {"mode": "head", "target_sha": "{sha}"}}}}, "unit-tests": {"label": "Unit Tests", "platforms": {"windows": {"wf": "unit-tests-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "unit-tests-backfill-windows.yml", "shas_input": "shas"}}}}, "antidoc": {"label": "Antidoc", "platforms": {"windows": {"wf": "run-antidoc-windows-container.yml", "inputs": {"commit_sha": "{sha}"}, "batch": {"wf": "antidoc-backfill-windows.yml", "shas_input": "shas"}}}}, "builds": {"label": "Builds", "platforms": {"windows": {"wf": "build-binaries-windows-container.yml", "inputs": {"commit_sha": "{sha}"}}, "linux": {"wf": "build-binaries-linux-container.yml", "inputs": {"commit_sha": "{sha}"}}}}, "sbom-generation": {"label": "SBOM Generation", "platforms": {"windows": {"wf": "generate-sbom-windows-container.yml", "inputs": {"commit_sha": "{sha}"}}}}};
     var HIST = [{"sha": "d0e080c128589707c82a13a45d842952fb3a5fc8", "short": "d0e080c", "msg": "Merge remote-tracking branch 'origin/main' into via-debug", "dep_only": false, "snapshots2": {"windows": {"have": 50, "total": 50}, "linux": {"have": 49, "total": 50}}}, {"sha": "d2e8e2806db14819bcd5d12b541ed5567ff07a86", "short": "d2e8e28", "msg": "Merge pull request #44 from danielcoons/main", "dep_only": false, "snapshots2": {"windows": {"have": 50, "total": 50}, "linux": {"have": 49, "total": 50}}}, {"sha": "a882308a3602eee952a3b6af04639437ee94ca1c", "short": "a882308", "msg": "changed a VI to test the SBOM workflow trigger", "dep_only": false, "snapshots2": {"windows": {"have": 50, "total": 50}, "linux": {"have": 49, "total": 50}}}, {"sha": "225dc86ea7d781a6941f9fddfb174a2b4f3f932e", "short": "225dc86", "msg": "changed main.vi (added a comment, nuthn special) to test the sbom workflow trigg", "dep_only": false, "snapshots2": {"windows": {"have": 49, "total": 50}, "linux": {"have": 49, "total": 50}}}, {"sha": "c3394babc0e984a45c9bb2854ab5b54693b6cb29", "short": "c3394ba", "msg": "Added a Build Spec", "dep_only": false, "snapshots2": {"windows": {"have": 49, "total": 50}, "linux": {"have": 49, "total": 50}}}, {"sha": "00839e49ffd3f8c73e18bb4b4d67a6df69433359", "short": "00839e4", "msg": "Keep example VIPC in Linux-proven artifact shape (v3.39.3)", "dep_only": true, "snapshots2": {"windows": {"have": 50, "total": 50}, "linux": {"have": 50, "total": 50}}}, {"sha": "87482e2bb0ee7084a21cf5814f4f5081e862fc4e", "short": "87482e2", "msg": "G Image moves into the core CI tooling VIPC (v3.39.2)", "dep_only": true, "snapshots2": {"windows": {"have": 50, "total": 50}, "linux": {"have": 50, "total": 50}}}, {"sha": "d56ded46d6b3c8626d3aefd616ee76ae2d4ff4c5", "short": "d56ded4", "msg": "Restore Linux-applicable example VIPC artifact (v3.39.1)", "dep_only": true, "snapshots2": {"windows": {"have": 50, "total": 50}, "linux": {"have": 50, "total": 50}}}, {"sha": "197c1be98a17e40b88c4473157fe8aa008acbb3a", "short": "197c1be", "msg": "Clean up dependency management around VIPC files as the source of truth (v3.39.0", "dep_only": true, "snapshots2": {"windows": {"have": 50, "total": 50}, "linux": {"have": 50, "total": 50}}}, {"sha": "590495f94bf466cf7803e75e075177dd95b19f08", "short": "590495f", "msg": "example: add UTF JUnit reporter deps to Dependencies.vipc", "dep_only": true, "snapshots2": {"windows": {"have": 50, "total": 50}, "linux": {"have": 50, "total": 50}}}, {"sha": "eb2240d106503d2e207374ae8e0c7119af656a45", "short": "eb2240d", "msg": "example: run UTF tests from Example project", "dep_only": false, "snapshots2": {"windows": {"have": 50, "total": 50}, "linux": {"have": 50, "total": 50}}}, {"sha": "3d67c5ad9a7394f0fde051389ca3e0f45f98f5bf", "short": "3d67c5a", "msg": "Add VIPC-baked Windows base image workflow", "dep_only": true, "snapshots2": {"windows": {"have": 44, "total": 44}, "linux": {"have": 44, "total": 44}}}, {"sha": "12553d67f22d02885acfd455c1d68381e8702aca", "short": "12553d6", "msg": "added utf files", "dep_only": false, "snapshots2": {"windows": {"have": 44, "total": 44}, "linux": {"have": 44, "total": 44}}}, {"sha": "df868ea07cef49f7ed721442b627ec78ba306e7f", "short": "df868ea", "msg": "resized the graph", "dep_only": false, "snapshots2": {"windows": {"have": 41, "total": 41}, "linux": {"have": 41, "total": 41}}}, {"sha": "c433e9e5e28492955ffa4d83f0434159b64d3fb7", "short": "c433e9e", "msg": "moved a constant", "dep_only": false, "snapshots2": {"windows": {"have": 40, "total": 41}, "linux": {"have": 41, "total": 41}}}, {"sha": "d1705cb4e4bf97878034ace4aa9ddd2d53bf29d1", "short": "d1705cb", "msg": "moved the send command button", "dep_only": false, "snapshots2": {"windows": {"have": 39, "total": 41}, "linux": {"have": 41, "total": 41}}}, {"sha": "d1a86a8741bec13cfa11446d0e72d12479a209ae", "short": "d1a86a8", "msg": "fixed errors in motor VIs", "dep_only": false, "snapshots2": {"windows": {"have": 39, "total": 41}, "linux": {"have": 41, "total": 41}}}, {"sha": "2b5f1aa1c18f9777042c0f63fa7174d9c2e0d5b6", "short": "2b5f1aa", "msg": "Minor refinements", "dep_only": false, "snapshots2": {"windows": {"have": 34, "total": 41}, "linux": {"have": 41, "total": 41}}}, {"sha": "3d513473c8dce75e22b08294b87de2fb37fd9798", "short": "3d51347", "msg": "Excercise manual correction", "dep_only": false, "snapshots2": {"windows": {"have": 31, "total": 41}, "linux": {"have": 41, "total": 41}}}, {"sha": "1b00b2d59dd388f8fb93de6661d429025e320a6b", "short": "1b00b2d", "msg": "Copy of excercise generated", "dep_only": false, "snapshots2": {"windows": {"have": 31, "total": 42}, "linux": {"have": 42, "total": 42}}}, {"sha": "f4640dad9ee5e8dcc8cdc87917e97a08f0233ba5", "short": "f4640da", "msg": "Added new excercises", "dep_only": false, "snapshots2": {"windows": {"have": 29, "total": 42}, "linux": {"have": 42, "total": 42}}}, {"sha": "f96842dc7fd776c01e186bb089eb7079444390f1", "short": "f96842d", "msg": "improved resize appearance", "dep_only": false, "snapshots2": {"windows": {"have": 15, "total": 21}, "linux": {"have": 21, "total": 21}}}, {"sha": "e2ee064d41e45456d7d51afd63c3fce28713fc94", "short": "e2ee064", "msg": "mass compiled on windows", "dep_only": false, "snapshots2": {"windows": {"have": 15, "total": 21}, "linux": {"have": 21, "total": 21}}}, {"sha": "abb3a165d423dff26829fa296e1039bbc3903ece", "short": "abb3a16", "msg": "Windows bug", "dep_only": false, "snapshots2": {"windows": {"have": 10, "total": 21}, "linux": {"have": 21, "total": 21}}}, {"sha": "7599b047409f6801f226b06159da3036986c5bb8", "short": "7599b04", "msg": "debugging the assignment of visa resources to curriculum code", "dep_only": false, "snapshots2": {"windows": {"have": 10, "total": 21}, "linux": {"have": 21, "total": 21}}}];
     var REPO = "ni/LabVIEW-CI-CD-Toolkit";
     var BRANCH = "main";
@@ -2092,7 +2081,7 @@
   </script>
   <main class="lvci-main">
   <h1>CI Dashboard — LabVIEW-CI-CD-Toolkit</h1>
-  <div class="sub">Last updated: 2026-10-29 10:12 UTC &nbsp;|&nbsp; Auto-refreshes every 15 min</div>
+  <div class="sub">Last updated: 2026-10-29 10:45 UTC &nbsp;|&nbsp; Auto-refreshes every 15 min</div>
   <div class="nav">
     <a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit">GitHub</a>
     <a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit/actions">Actions</a>
@@ -2138,6 +2127,26 @@
       </tr>
     </thead>
     <tbody>
+    <tr data-project="false" data-deponly="false">
+      <td class="cidash-rev">
+        <div class="cidash-rev-wrap">
+          <span class="cidash-avatar" style="background:hsl(61,42%,45%)" title="elijah286" aria-hidden="true">E</span>
+          <div class="cidash-rev-body">
+            <div class="cidash-rev-line1"><a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/vi-snapshots/index.html?sha=0e9500410d30587d175345e46b704c625d81ab26" class="cidash-rev-msg" title="Fix snapshot history population to respect selected revisions">Fix snapshot history population to respect selected revisions</a></div>
+            <div class="cidash-rev-meta"><a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/vi-snapshots/index.html?sha=0e9500410d30587d175345e46b704c625d81ab26" class="cidash-rev-sha" title="Browse this revision's VIs in the VI Browser">0e95004</a><span class="cidash-rev-dot">&middot;</span>elijah286<span class="cidash-rev-dot">&middot;</span>2026-10-29</div>
+          </div>
+        </div>
+      </td>
+      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
+      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
+      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
+      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
+      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
+      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
+      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
+      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
+    </tr>
+
     <tr data-project="false" data-deponly="false">
       <td class="cidash-rev">
         <div class="cidash-rev-wrap">
@@ -4105,26 +4114,6 @@
           <div class="cidash-rev-body">
             <div class="cidash-rev-line1"><a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/vi-snapshots/index.html?sha=e98ea6d708e16a5bdc9a80d032e3bbb0c2f31898" class="cidash-rev-msg" title="Remove default viAnalyzer configuration">Remove default viAnalyzer configuration</a></div>
             <div class="cidash-rev-meta"><a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/vi-snapshots/index.html?sha=e98ea6d708e16a5bdc9a80d032e3bbb0c2f31898" class="cidash-rev-sha" title="Browse this revision's VIs in the VI Browser">e98ea6d</a><span class="cidash-rev-dot">&middot;</span>MIpetrov-NI<span class="cidash-rev-dot">&middot;</span>2026-08-07</div>
-          </div>
-        </div>
-      </td>
-      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
-      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
-      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
-      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
-      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
-      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
-      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
-      <td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>
-    </tr>
-
-    <tr data-project="false" data-deponly="false">
-      <td class="cidash-rev">
-        <div class="cidash-rev-wrap">
-          <span class="cidash-avatar" style="background:hsl(298,42%,45%)" title="MIpetrov-NI" aria-hidden="true">M</span>
-          <div class="cidash-rev-body">
-            <div class="cidash-rev-line1"><a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/vi-snapshots/index.html?sha=fae088fb547923107f438c06b44d4a1ad6cf7e19" class="cidash-rev-msg" title="Added &lt;Path&gt;&quot;.&quot;&lt;Path&gt; to .viancfg under test">Added &lt;Path&gt;&quot;.&quot;&lt;Path&gt; to .viancfg under test</a></div>
-            <div class="cidash-rev-meta"><a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/vi-snapshots/index.html?sha=fae088fb547923107f438c06b44d4a1ad6cf7e19" class="cidash-rev-sha" title="Browse this revision's VIs in the VI Browser">fae088f</a><span class="cidash-rev-dot">&middot;</span>MIpetrov-NI<span class="cidash-rev-dot">&middot;</span>2026-08-07</div>
           </div>
         </div>
       </td>

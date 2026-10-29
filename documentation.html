@@ -1901,6 +1901,15 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         may assist tooling but does not override the committed VIPC.</p>
 
       <h3 id="cap-snapshots">16.6 VI Snapshots &amp; VI Browser <a class="anchor" href="#cap-snapshots">#</a></h3>
+      <p><strong>Populate history respects the selected revisions.</strong> The classic snapshot workflow receives
+        an explicit space-separated <code>shas</code> list, oldest first, and renders only those commits in one run.
+        Choosing only the newest revision does not walk older history; Fill excludes completed cells, while Re-run
+        forces rendering only within the selection. A single cell&rsquo;s Run action also passes that revision&rsquo;s SHA.
+        The workflow&rsquo;s run name carries the selected SHAs so queued, running, and failed badges belong only to
+        those rows. Direct workflow dispatches without <code>shas</code> retain the manual <code>head</code> and
+        unrestricted <code>backfill</code> modes, with <code>max_commits</code> applying only to the latter.
+        Update installed tooling to receive both the dashboard and the workflow&rsquo;s new input together; an older
+        workflow rejects the input rather than silently expanding the requested scope.</p>
 
       <h4>At a glance</h4>
       <table>
