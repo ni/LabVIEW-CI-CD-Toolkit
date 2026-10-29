@@ -1,0 +1,78 @@
+{
+ "meta": {
+  "sha": "229513e67a867eb6067e32190b77a07183e775de",
+  "short": "229513e",
+  "platform": "windows",
+  "repo": "ni/LabVIEW-CI-CD-Toolkit",
+  "pages_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit",
+  "snap_base": "https://ni.github.io/LabVIEW-CI-CD-Toolkit/vi-snapshots/",
+  "dash_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit/",
+  "labview_version": "2026",
+  "tools": [],
+  "commit": {
+   "message": "Unify snapshots around rich interactive code views",
+   "author": "elijah286",
+   "date": "2026-10-29T15:03:52-05:00"
+  },
+  "generated_utc": "2026-10-29 20:57 UTC"
+ },
+ "summary": {
+  "tests": 0,
+  "passed": 0,
+  "failed": 0,
+  "errored": 0,
+  "skipped": 0,
+  "percent": 0,
+  "status": "empty",
+  "duration": 0.0
+ },
+ "status_order": [
+  "failed",
+  "error",
+  "skipped",
+  "passed"
+ ],
+ "status_meta": {
+  "failed": {
+   "label": "Failed",
+   "color": "#da3633",
+   "blurb": "An assertion failed."
+  },
+  "error": {
+   "label": "Errored",
+   "color": "#bb8009",
+   "blurb": "The test raised an unexpected error."
+  },
+  "skipped": {
+   "label": "Skipped",
+   "color": "#6e7681",
+   "blurb": "The test was skipped."
+  },
+  "passed": {
+   "label": "Passed",
+   "color": "#2ea043",
+   "blurb": "The test passed."
+  }
+ },
+ "platforms": [
+  {
+   "id": "windows",
+   "url": null
+  },
+  {
+   "id": "linux",
+   "url": "linux/results.json"
+  }
+ ],
+ "suites": [],
+ "tooling": {
+  "missing": [
+   {
+    "tool": "utf",
+    "name": "NI Unit Test Framework",
+    "kind": "missing-tooling",
+    "detail": "The NI Unit Test Framework toolkit is not installed in this container, so the LabVIEW CLI RunUnitTests operation could not load (error -350053)."
+   }
+  ]
+ }
+}

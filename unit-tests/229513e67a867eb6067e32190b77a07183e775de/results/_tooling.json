@@ -1,0 +1,10 @@
+{
+    "missing":  [
+                    {
+                        "tool":  "utf",
+                        "name":  "NI Unit Test Framework",
+                        "kind":  "missing-tooling",
+                        "detail":  "The NI Unit Test Framework toolkit is not installed in this container, so the LabVIEW CLI RunUnitTests operation could not load (error -350053)."
+                    }
+                ]
+}
