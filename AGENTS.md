@@ -72,6 +72,14 @@ roles, fleet handoffs, or release mechanics. Check the actual base-to-head diff
 and explicitly distinguish new implementation from already-landed release
 context. Keep validation limits visible and always link PR references.
 
+Every PR must also follow the
+[release-impact policy](.github/CONTRIBUTING.md#every-pr-identifies-its-release-version-and-update-type):
+state the explicit target version, major/minor/incremental (patch) classification
+and matching label, baseline release, publication status, and client update
+guidance. Refresh projections before merge and record the verified first
+containing immutable release after publication. Do not equate merge, publication,
+and channel promotion. Include this information in captain status reports too.
+
 ## Release boundaries
 
 - GitHub is canonical; do not contribute independently to the GitLab mirror.
