@@ -59,7 +59,7 @@ lvci:snapshots-windows:
       $valid = (Test-Path (Join-Path $outDir 'commits.json')) -and (Test-Path (Join-Path $outDir 'by-blob'))
       python .gitlab\labview-ci\scripts\stage-tree.py `
         --source $outDir `
-        --destination 'ci-out/gitlab-pages/snapshots-classic/vi-snapshots'
+        --destination 'ci-out/gitlab-pages/snapshots-windows/vi-snapshots'
       $ErrorActionPreference = 'Stop'
       if ($renderExit -ne 0 -or -not $valid) { exit 1 }
   artifacts:
@@ -67,4 +67,4 @@ lvci:snapshots-windows:
     expire_in: 30 days
     paths:
       - ci-out/vi-snapshots/
-      - ci-out/gitlab-pages/snapshots-classic/
+      - ci-out/gitlab-pages/snapshots-windows/

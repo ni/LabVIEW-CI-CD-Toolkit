@@ -155,24 +155,27 @@ jobs:
               -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"VI Snapshots in progress\",\"context\":\"CI / VI Snapshots\"}"
           done
 
-      - name: Resolve VI Browser 2.0 (Windows) setting from config
+      - name: Resolve VI Snapshots (Windows) setting from config
         id: vbcfg
         shell: bash
         run: |
-          # config.viBrowser.positionAware in .github/labview-ci.yml decides whether
-          # this Windows run also emits the position-aware VI Browser 2.0 frames JSON
+          # config.viBrowser.platforms in .github/labview-ci.yml decides whether
+          # this Windows run also emits the position-aware VI Snapshots frames JSON
           # (the PrintToImagesJson op). Default (no config) = emit, preserving prior
           # behaviour. The VI Browser tab on the Configure page writes this setting.
           emit=true
           cfg=.github/labview-ci.yml
           if [ -f "$cfg" ]; then
-            pa=$(sed -n 's/^[[:space:]]*positionAware:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+            pa=$(sed -n 's/^[[:space:]]*platforms:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+            [ -n "$pa" ] || pa=$(sed -n 's/^[[:space:]]*positionAware:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+            [ "$pa" != "none" ] || pa=""
+            [ -n "$pa" ] || pa=$(sed -n 's/^[[:space:]]*os:[[:space:]]*\[\([^]]*\)\].*/\1/p' "$cfg" | head -1 | tr -d '[:space:]' | tr \, +)
             if [ -n "$pa" ]; then
               if printf '%s' "$pa" | tr '+' '\n' | grep -qx 'windows'; then emit=true; else emit=false; fi
             fi
           fi
           echo "emit_frames_json=$emit" >> "$GITHUB_OUTPUT"
-          echo "VI Browser 2.0 frames JSON on Windows: $emit"
+          echo "VI Snapshots frames JSON on Windows: $emit"
 
       - name: Wait for worker image build
         shell: bash
@@ -180,6 +183,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bash .github/labview/wait-for-worker-image.sh "${{ github.sha }}" "${{ github.event.before }}"
+
+      - name: Set up the snapshot render toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .github/labview/toimages/go.mod
 
       - name: Build VI snapshots (incremental, content-addressed)
         id: snapshots
@@ -243,5 +251,3 @@ jobs:
       - name: Fail job if snapshots failed
         if: steps.snapshots.outcome != 'success' || steps.verify.outputs.ok != 'true'
         run: exit 1
-
-

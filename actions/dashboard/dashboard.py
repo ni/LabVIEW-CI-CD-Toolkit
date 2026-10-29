@@ -140,11 +140,11 @@ def snapshot_coverage(sha):
     # have = those whose content blob is in the rendered set.
     if sha in _snap_cov_cache:
         return _snap_cov_cache[sha]
-    vis = vi_tree(sha)
+    vis = [entry for entry in vi_tree(sha) if str(entry.get('vi_rel', '')).lower().endswith('.vi')]
     total = len(vis)
     have = 0
     if total:
-        rb = rendered_blobs()
+        rb = rendered_json_blobs('windows') | rendered_json_blobs('linux')
         if rb:
             have = sum(1 for v in vis if v.get('blob') in rb)
     res = (have, total)
@@ -533,7 +533,7 @@ RUN_TARGETS = {
         'linux':   {'wf': 'vidiff-linux-container.yml',   'inputs': {'head_sha': '{sha}', 'base_sha': '{parent}'}}}},
     'snapshots': {'label': 'VI Snapshots', 'platforms': {
         'all': {'wf': 'vi-snapshots.yml', 'inputs': {'mode': 'backfill', 'shas': '{sha}'}}}},
-      'snapshots2': {'label': 'VI Browser 2.0 Snapshots', 'platforms': {
+      'snapshots2': {'label': 'VI Snapshots', 'platforms': {
         'windows': {'wf': 'vi-snapshots-json-windows.yml', 'inputs': {'target_sha': '{sha}'}},
         'linux':   {'wf': 'vi-snapshots-json.yml',         'inputs': {'mode': 'head', 'target_sha': '{sha}'}}}},
     # Unit tests run in the Windows worker only: Caraya, VI Tester and LUnit are
@@ -679,7 +679,7 @@ for _cap, _d in RUN_TARGETS.items():
         if _p.get('batch') and _p['batch'].get('wf'):
             _WF_TO_CAP[_p['batch']['wf']] = _cap
 _CAP_RUN_LABEL = {'masscompile': 'compile', 'vi-analyzer': 'analyze', 'vidiff': 'diff',
-                  'snapshots': 'snapshots', 'snapshots2': '2.0 snapshots',
+                  'snapshots': 'snapshots', 'snapshots2': 'snapshots',
                   'unit-tests': 'tests', 'antidoc': 'docs',
                   'sbom-generation': 'SBOM'}
 _WAITING_RUN_STATUSES = {'queued', 'requested', 'waiting', 'pending'}
@@ -1306,14 +1306,14 @@ for c in commits_data:
     else:
         _snap_run = fresh_pending('CI / VI Snapshots')
         _have, _total = snapshot_coverage(sha)
-        _snap_live = active_run_cell('snapshots', 'snapshots')
+        _snap_live = active_run_cell('snapshots2', 'snapshots')
         if _snap_run is not None:
             caps_ran.add('snapshots')
             snap_badge = running_cell('snapshots', _snap_run.get('target_url', ''), cap='snapshots')
         elif _snap_live is not None:
             snap_badge = _snap_live
         elif _have <= 0:
-            snap_badge = run_cell('snapshots')
+            snap_badge = run_cell('snapshots2')
         else:
             any_output['on'] = True
             caps_ran.add('snapshots')
@@ -1327,7 +1327,7 @@ for c in commits_data:
                         f'- run this revision or use Populate history to backfill')
             _snap_ts = (pick_status('CI / VI Snapshots') or {}).get('created_at', '')
             _snap_done = 'true' if _have >= _total else 'false'
-            snap_badge = (f'<td style="text-align:center" class="cidash-cap-cell" data-cap="snapshots" '
+            snap_badge = (f'<td style="text-align:center" class="cidash-cap-cell" data-cap="snapshots2" '
                     f'data-sha="{sha}" data-parent="{parent}" data-short="{short}" data-ts="{_snap_ts}" data-done="{_snap_done}">'
                           f'{_chip(_kind, _txt, _href, _tip)}</td>')
 
@@ -1777,6 +1777,11 @@ run_dialog_css = (
     # Intro line + the Activities header row (label on the left, quick-preset chips
     # on the right).
     '.cidash-hist-intro{margin:0 0 16px;color:var(--fg-muted);font-size:.86em;line-height:1.55}'
+    '.cidash-hist-snapshot-advice{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-start;padding:12px 14px;margin:0 0 16px;border:1px solid rgba(56,139,253,.4);border-left:3px solid var(--link);border-radius:8px;background:rgba(56,139,253,.08);font-size:.83em;line-height:1.5}'
+    '.cidash-hist-snapshot-advice[hidden]{display:none}'
+    '.cidash-hist-snapshot-advice-copy{flex:1 1 270px;min-width:0}'
+    '.cidash-hist-snapshot-advice p{margin:5px 0 0;color:var(--fg-muted)}'
+    '.cidash-hist-snapshot-advice .cidash-btn{font-size:.9em;padding:5px 9px}'
     '.cidash-hist-actshead{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 10px;margin:0 0 9px}'
     '.cidash-hist-quick{display:flex;flex-wrap:wrap;gap:6px}'
     '.cidash-hist-chip{border:1px solid var(--border);background:var(--bg);color:var(--fg);border-radius:999px;padding:4px 11px;font-size:.76em;font-weight:600;cursor:pointer;font-family:inherit}'
@@ -2871,8 +2876,7 @@ run_dialog = (r"""
     var HIST = __HIST__;                        // [{sha, short, msg}] newest-first (project revisions)
     var RAN = __CAPS_RAN__;                     // {cap:1} caps with a result/active run somewhere in history
     var CAP_META = {                            // label + sub for each known capability
-      'snapshots':   ['VI Snapshots', 'Renders every changed VI (classic HTML snapshots)'],
-      'snapshots2':  ['VI Browser 2.0 Snapshots', 'Renders position-aware snapshots for the VI Browser 2.0 view'],
+      'snapshots2':  ['VI Snapshots', 'Renders interactive front panels and block diagrams'],
       'vidiff':      ['VIDiff',       'Visual diff of the VIs each revision changed'],
       'masscompile': ['Mass Compile', 'Compiles the whole project, each revision'],
       'vi-analyzer': ['VI Analyzer',  'Runs the VI Analyzer suite, each revision'],
@@ -2881,7 +2885,7 @@ run_dialog = (r"""
       'builds':      ['Builds',       'Runs the project build specifications (EXE, PPL, ...), each revision'],
       'sbom-generation': ['SBOM Generation', 'Generates a CycloneDX dependency report, each revision']
     };
-    var CAP_ORDER = ['snapshots','snapshots2','vidiff','masscompile','vi-analyzer','unit-tests','antidoc','builds','sbom-generation'];
+    var CAP_ORDER = ['snapshots2','vidiff','masscompile','vi-analyzer','unit-tests','antidoc','builds','sbom-generation'];
     var DIFF_CAPS = { snapshots:1, snapshots2:1, vidiff:1 };  // the lean "diff-based" subset
     var PLATFORM_CAPS = { snapshots2:1, vidiff:1, masscompile:1, 'vi-analyzer':1, builds:1 };
     var platState = {};                         // cap id -> selected platform keys for history rows
@@ -2924,6 +2928,7 @@ run_dialog = (r"""
     }
     function histTokPanel(show){ var p=document.getElementById('cidash-hist-tok'); if(p) p.style.display = show ? 'block' : 'none'; }
     var actMode = {};                           // cap -> 'off' | 'fill' | 'rerun' (per-activity choice)
+    var snapshotAdviceDismissed = false;
     var reuseWarm = false;                       // opt-in: keep ONE container warm across the queued revisions
     // ── Warm-container reuse + time estimate ───────────────────────────────
     // A (cap, platform) is "batch-capable" when its run target carries a 'batch'
@@ -3155,6 +3160,40 @@ run_dialog = (r"""
       if(mode==='rerun')    return (c.done>0 || c.fill>0) ? 'rerun' : 'off';
       return c.fill>0 ? 'fill' : 'off';
     }
+    function histSnapshotAdviceCount(){
+      if(snapshotAdviceDismissed) return 0;
+      var included=histIncludedShas(); var newestSelected=-1; var older={};
+      HIST.forEach(function(revision, index){
+        if(included[revision.sha] && newestSelected<0) newestSelected=index;
+        older[revision.sha]={index:index, depOnly:!!revision.dep_only};
+      });
+      if(newestSelected<0) return 0;
+      var enabled={};
+      histInstalledCaps().forEach(function(capId){
+        if((capId==='snapshots' || capId==='snapshots2') && (actMode[capId]||'off')!=='off') enabled[capId]=1;
+      });
+      var missing={}; var queued=qLoad();
+      histAllCells().forEach(function(cell){
+        var revision=older[cell.sha];
+        if(!enabled[cell.cap] || cell.done || included[cell.sha] || !revision || revision.index<=newestSelected) return;
+        if(revision.depOnly && !histInclDep) return;
+        if(cell.platform && histSelectedPlatforms(cell.cap).indexOf(cell.platform)<0) return;
+        var entry=queued[cell.cap+'|'+cell.sha];
+        if(entry && !entry.failed && !entry.done) return;
+        missing[cell.sha]=1;
+      });
+      return Object.keys(missing).length;
+    }
+    function histSnapshotAdviceRefresh(){
+      var banner=document.getElementById('cidash-hist-snapshot-advice'); if(!banner) return;
+      var count=histSnapshotAdviceCount(); banner.hidden=!count;
+      var title=document.getElementById('cidash-hist-snapshot-advice-title');
+      if(title && count) title.textContent=count+' older revision'+(count===1?' still needs':'s still need')+' snapshots';
+    }
+    function histSnapshotAdviceDismiss(){
+      snapshotAdviceDismissed=true;
+      histSnapshotAdviceRefresh();
+    }
     function histRefresh(){
       // Recompute everything that depends on the current selection: each row's count
       // hint + segment availability + active state, then the summary and Queue button.
@@ -3225,6 +3264,7 @@ run_dialog = (r"""
         }
       }
       var go=document.getElementById('cidash-hist-go'); if(go) go.disabled = !runs;
+      histSnapshotAdviceRefresh();
     }
     function histSetMode(cap, mode){
       actMode[cap]=mode; histRefresh();
@@ -3244,6 +3284,7 @@ run_dialog = (r"""
     }
     function histRender(){
       var body=document.getElementById('cidash-hist-body'); if(!body) return;
+      snapshotAdviceDismissed=false;
       var h='';
       h += '<p class="cidash-hist-intro">Queue CI for revisions that already exist so the dashboard fills in. Runs <strong>oldest \u2192 newest</strong>. For each activity, choose to <b>Fill</b> only the missing results or <b>Re-run</b> every selected revision.</p>';
       var anyDep = HIST.some(function(r){ return r.dep_only; });
@@ -3275,7 +3316,14 @@ run_dialog = (r"""
           + '<button type="button" class="cidash-hist-chip" data-preset="clear" title="Set every activity to Skip">Clear</button>'
           + '</div>';
       }
-      h += '</div><div class="cidash-hist-acts">';
+      h += '</div>';
+      h += '<aside id="cidash-hist-snapshot-advice" class="cidash-hist-snapshot-advice" role="status" aria-live="polite" hidden>'
+        + '<div class="cidash-hist-snapshot-advice-copy"><strong id="cidash-hist-snapshot-advice-title"></strong>'
+        + '<p>Filling snapshot history can be efficient: <b>Fill</b> reuses snapshots for unchanged VI files and renders only missing file content. More revisions can still mean more workflow runs.</p>'
+        + '<p>To cover history, clear any revision search, choose <b>All revisions</b> and <b>Fill</b> for snapshots. Other enabled activities will use that wider scope too.</p>'
+        + '<p>Your current selection is unchanged &mdash; you can still queue only these revisions.</p></div>'
+        + '<button type="button" class="cidash-btn cidash-ghost" id="cidash-hist-snapshot-advice-dismiss">Keep selected revisions</button></aside>';
+      h += '<div class="cidash-hist-acts">';
       if(!instCaps.length){
         h += '<div class="cidash-hist-actsempty">No runnable activities found for this repository.</div>';
       } else instCaps.forEach(function(cap){
@@ -3318,6 +3366,8 @@ run_dialog = (r"""
       h += '<button class="cidash-btn cidash-go" id="cidash-hist-go">\u25B6 Queue runs</button>';
       h += '<button class="cidash-btn cidash-ghost" id="cidash-hist-cancel">Cancel</button></div>';
       body.innerHTML=h;
+      var adviceDismiss=document.getElementById('cidash-hist-snapshot-advice-dismiss');
+      if(adviceDismiss) adviceDismiss.addEventListener('click', histSnapshotAdviceDismiss);
       // Mirror the dashboard's current dependency-only filter so the dialog shows
       // the same revisions the table does; populate the pickers from the visible set.
       var _dd=document.getElementById('show-deponly'); histInclDep=!!(_dd && _dd.checked);
@@ -3492,7 +3542,7 @@ debug_dialog = (r"""
     var BRANCH = "__BRANCH__";
     var TOK_KEY = "lvci_dispatch_token";
     var WF = "debug-session.yml";
-    var CAP_LABEL = { masscompile:'Mass Compile', vidiff:'VIDiff', snapshots2:'VI Browser 2.0 Snapshots', builds:'Builds' };
+    var CAP_LABEL = { masscompile:'Mass Compile', vidiff:'VIDiff', snapshots2:'VI Snapshots', builds:'Builds' };
     function $(id){ return document.getElementById(id); }
     function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
     function getTok(){ try{ return localStorage.getItem(TOK_KEY)||localStorage.getItem("lvci_install_token")||''; }catch(e){ return ''; } }
@@ -4726,7 +4776,7 @@ def _system_dependencies():
   has_linux = os.path.isfile('.github/workflows/vi-snapshots-json.yml')
   return [
     {
-      'name': 'VI Browser 2.0 toimages runner',
+      'name': 'VI Browser toimages runner',
       'source': 'Repository Go code',
       'path': '.github/labview/toimages/main.go',
       'details': 'Batch runner compiled from repo Go source; Linux uses the toimages GHCR image and Windows builds runner.exe in the workflow.',
@@ -4739,7 +4789,7 @@ def _system_dependencies():
       'name': 'lvctl render engine',
       'source': 'Repository Go code + embedded VIs',
       'path': '.github/labview/toimages/_ni/labview/lvctl',
-      'details': 'Renderer used by VI Browser 2.0 to drive LabVIEW and emit position-aware frame JSON.',
+      'details': 'Renderer used by VI Browser to drive LabVIEW and emit position-aware frame JSON.',
       'platforms': {
         'windows': {'present': has_windows, 'label': 'workflow-built' if has_windows else ''},
         'linux': {'present': has_linux, 'label': 'toimages image' if has_linux else ''},

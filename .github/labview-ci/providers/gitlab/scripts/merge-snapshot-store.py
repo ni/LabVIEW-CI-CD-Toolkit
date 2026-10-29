@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 
-STORES = ("snapshots-classic", "snapshots-2-linux", "snapshots-2-windows")
+STORES = ("snapshots-classic", "snapshots-2-linux", "snapshots-2-windows", "snapshots-windows", "snapshots-linux")
 
 
 def copy_contents(source: Path, destination: Path) -> None:

@@ -364,7 +364,7 @@ flowchart TD
   VA --> JOB
   VD --> JOB
   SN --> JOB
-  IMG["images&lt;br/&gt;ghcr.io/owner/repo-labview &mdash; build-labview-image (Windows) / build-labview-linux-image (Linux, incl. VI Browser 2.0 engine)&lt;br/&gt;nationalinstruments/labview &mdash; base layer (public)"] -.->|"pulled by"| JOB
+  IMG["images&lt;br/&gt;ghcr.io/owner/repo-labview &mdash; build-labview-image (Windows) / build-labview-linux-image (Linux, incl. VI Browser engine)&lt;br/&gt;nationalinstruments/labview &mdash; base layer (public)"] -.->|"pulled by"| JOB
   JOB -->|"commit status"| ST["status event"]
   ST --> DP["dashboard-pages.yml&lt;br/&gt;actions/dashboard"]
   DP --> GHP["gh-pages root&lt;br/&gt;index.html, reports, snapshots"]
@@ -379,7 +379,7 @@ flowchart TD
         <li><strong>Per-revision reports</strong> under content paths keyed by commit SHA
           (<code>masscompile/&lt;sha&gt;/</code>, <code>vi-analyzer/&lt;sha&gt;/</code>,
           <code>vidiff/&lt;segment&gt;/</code>).</li>
-        <li><strong>Content-addressed snapshots</strong> under <code>vi-snapshots/by-blob/&lt;ab&gt;/&lt;blob&gt;.html</code>.</li>
+        <li><strong>Content-addressed snapshots</strong> under <code>vi-snapshots/by-blob/&lt;ab&gt;/&lt;blob&gt;.json</code>.</li>
       </ul>
       <p class="plain"><span class="lbl">Where things actually run</span>
         Nothing in this picture runs on the tooling author's servers or NI's. The runner is GitHub's (or yours, if
@@ -401,8 +401,7 @@ flowchart TD
           <tr><td><strong>VIDiff</strong></td><td>Generates visual, side-by-side front-panel + block-diagram diffs of changed VIs between commits.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
           <tr><td><strong>Unit Tests</strong></td><td>Runs Caraya / LUnit / VI Tester / NI Unit Test Framework headlessly and merges JUnit output into one report.</td><td><span class="pill win">Win</span></td></tr>
           <tr><td><strong>Antidoc</strong></td><td>Generates project documentation from the VI hierarchy using Wovalab's Antidoc CLI.</td><td><span class="pill win">Win</span></td></tr>
-          <tr><td><strong>VI Snapshots / Browser</strong></td><td>Renders every VI to a content-addressed HTML snapshot gallery (the classic VI Browser).</td><td><span class="pill win">Win</span></td></tr>
-          <tr><td><strong>VI Snapshots 2.0</strong></td><td>Position-aware, in-place VI Browser frames (JSON) rendered by the cross-platform toimages engine.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
+          <tr><td><strong>VI Snapshots</strong></td><td>Position-aware, in-place VI Browser frames (JSON) rendered by the cross-platform toimages engine.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
           <tr><td><strong>Dashboard</strong></td><td>Aggregates everything above into a single status page on GitHub Pages.</td><td>runner host</td></tr>
         </tbody>
       </table>
@@ -580,7 +579,7 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
         <code>linux-&lt;sha&gt;</code> and <code>linux-latest</code>. Let a first worker build finish before a job that
         needs baked dependencies consumes it. On a fresh installation, the default-branch pipeline starts that worker
         because the manifest changed; for a web/manual pipeline, start the relevant <code>lvci:worker-*</code> job
-        first, then run the dependent verification job. The Linux Snapshots 2.0 renderer requires that custom Linux worker or
+        first, then run the dependent verification job. The Linux snapshot renderer requires that custom Linux worker or
         an explicit <code>LVCI_LINUX_IMAGE</code>; without either it records a diagnostic and skips rather than pulling
         a non-existent registry tag.</p>
       <p>GitLab Pages is durable rather than a per-pipeline report folder. The serialized <code>pages</code> job restores
@@ -589,7 +588,7 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
         history despite GitLab artifacts normally being scoped to one pipeline.</p>
       <div class="warn"><span class="lbl">Current GitLab parity boundary</span>
         Native templates cover custom images, Mass Compile, VI Analyzer, Unit Tests, Antidoc, SBOM Generation,
-        Builds, VIDiff, classic Snapshots, and Snapshots 2.0. The GitLab dashboard is intentionally a basic static
+        Builds, VIDiff, and Snapshots. The GitLab dashboard is intentionally a basic static
         index, not the GitHub dashboard's live status/configuration UI. GitLab currently does not add VIDiff merge
         request comments, GitHub-style history backfills or manual configuration screens, or GitHub Release/generic
         package promotion for Builds artifacts.</div>
@@ -1105,12 +1104,12 @@ flowchart TD
 </div>
 
       <p>Linux builds are handled by <code>build-labview-linux-image.yml</code> on the same model. The Linux worker and
-        the standalone VI&nbsp;Browser&nbsp;2.0 render image also bake a set of X11 core and TrueType fonts (DejaVu,
+        the standalone VI&nbsp;Browser&nbsp;snapshot render image also bake a set of X11 core and TrueType fonts (DejaVu,
         Liberation, Noto, and the 75/100&nbsp;dpi <code>xfonts-*</code> families) &mdash; NI&rsquo;s minimal Linux base
         ships almost none, and without them LabVIEW&rsquo;s UI controls and rendered VI text (VI&nbsp;Browser snapshots
         and the Debug&nbsp;Run desktop) come out blank. Images are pushed to <strong>your</strong> GitHub Container
         Registry (GHCR) as packages attached to your repo:</p>
-      <pre><code>ghcr.io/&lt;owner&gt;/&lt;repo&gt;-labview      # your LabVIEW worker (copied from the base, or base + your deps; the Linux worker also bakes the VI Browser 2.0 render engine)
+      <pre><code>ghcr.io/&lt;owner&gt;/&lt;repo&gt;-labview      # your LabVIEW worker (copied from the base, or base + your deps; the Linux worker also bakes the VI Browser render engine)
 ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, owned &amp; published by the source repo</code></pre>
       <p>The image inherits your repository's visibility and is authenticated with the job's built-in
         <code>GITHUB_TOKEN</code>. GHCR rejects uppercase names, so the owner/repo are lowercased at build time.</p>
@@ -1641,6 +1640,19 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
     -ReportDir "C:\workspace\ci-out\vidiff" -LabVIEWPath "...\LabVIEW.exe"</code></pre>
 
       <h4>Output &amp; dashboard</h4>
+      <p>For modified VIs, the Linux runner requests LabVIEW&rsquo;s <code>XML</code> comparison output and
+        renders it as static HTML with <code>build-vidiff-report.py</code>. This avoids native HTML report
+        generation crashes reproduced in LabVIEW&nbsp;26.3. Functional, cosmetic, and VI attribute changes
+        retain their descriptions and all available before/after screenshots; when LabVIEW supplies no image
+        for a change, the report explicitly says so. The source <code>comparison.xml</code> is retained for
+        inspection. These static reports do not include the native HTML renderer&rsquo;s interactive sub-VI
+        hotspots. Added/deleted VIs still use <code>PrintToSingleFileHtml</code>.</p>
+      <p>The Linux runner preserves per-VI <code>cli-attempt-1.log</code> (and, when retried,
+        <code>cli-attempt-2.log</code>) in the report artifact. CLI error&nbsp;66 (connection lost during an operation)
+        or &minus;350000 (VI Server connection failure) resets the container&rsquo;s LabVIEW process
+        using <code>pkill</code> and retries the same VI once. An exhausted retry also resets the session
+        before processing the next VI, but still fails the job; other operation errors are not retried.
+        A successful CLI exit without a nonempty report, or malformed comparison XML, is also treated as failure.</p>
       <ul>
         <li>Reports land at <code>vidiff/&lt;pr-N|push-sha&gt;/&lt;platform&gt;/vidiff/</code> with a
           <code>changes.json</code> manifest (<code>{modified, added, deleted}</code>). <code>vidiff-deploy.yml</code>
@@ -1901,7 +1913,7 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         may assist tooling but does not override the committed VIPC.</p>
 
       <h3 id="cap-snapshots">16.6 VI Snapshots &amp; VI Browser <a class="anchor" href="#cap-snapshots">#</a></h3>
-      <p><strong>Populate history respects the selected revisions.</strong> The classic snapshot workflow receives
+      <p><strong>Populate history respects the selected revisions.</strong> The snapshot workflow receives
         an explicit space-separated <code>shas</code> list, oldest first, and renders only those commits in one run.
         Choosing only the newest revision does not walk older history; Fill excludes completed cells, while Re-run
         forces rendering only within the selection. A single cell&rsquo;s Run action also passes that revision&rsquo;s SHA.
@@ -1910,51 +1922,34 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         unrestricted <code>backfill</code> modes, with <code>max_commits</code> applying only to the latter.
         Update installed tooling to receive both the dashboard and the workflow&rsquo;s new input together; an older
         workflow rejects the input rather than silently expanding the requested scope.</p>
-
-      <h4>At a glance</h4>
-      <table>
-        <tbody>
-          <tr><th>Drivers</th><td><code>build-snapshots.ps1</code> (orchestrator) &rarr; <code>render-snapshots.ps1</code> (per-VI); gallery <code>build-gallery.py</code>; 2.0 engine <code>toimages</code> / <code>lvctl toimages</code></td></tr>
-          <tr><th>Workflows</th><td><code>vi-snapshots.yml</code> <span class="pill win">windows-2022</span>; 2.0 <code>vi-snapshots-json.yml</code> <span class="pill lin">Linux</span> / <code>vi-snapshots-json-windows.yml</code> <span class="pill win">Windows</span></td></tr>
-          <tr><th>Output &amp; status</th><td><code>vi-snapshots/</code> (content-addressed <code>by-blob/&lt;ab&gt;/&lt;blob&gt;.html|.json</code>); status <code>CI / VI Snapshots</code></td></tr>
-        </tbody>
-      </table>
-      <p>This is the one place that deliberately reuses a warm container. Snapshots are <strong>content-addressed by
-        git blob SHA</strong>, so each unique VI is rendered exactly once &mdash; ever &mdash; and reused across every
-        commit that contains it. If an older revision references a snapshot or report document not yet published, the VI
-        Browser and framed report viewer show an in-page missing-document state with a Populate history link instead of
-        framing a GitHub Pages 404.</p>
-
-      <h4>The warm-container pattern</h4>
-      <p>Both phases start one long-lived container and push every VI through it with <code>docker exec</code> &mdash;
-        no per-VI or per-commit container churn:</p>
-      <pre><code>docker run -d --name &lt;name&gt; ... $Image powershell -NoProfile `
-  -Command "while ($true) { Start-Sleep -Seconds 3600 }"
-docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # per worklist entry</code></pre>
-
-      <h4>Phase 1 — HTML snapshots and Windows 2.0 frames <span class="pill win">Windows</span></h4>
-      <p>Orchestrated by <code>build-snapshots.ps1</code>, which starts a single long-lived container
-        (<code>docker run -d … while true sleep</code>) and renders many commits through it via
-        <code>docker exec</code> calling <code>render-snapshots.ps1</code> — no per-VI or per-commit container
-        churn. A TSV worklist (<code>&lt;blob&gt;\t&lt;rel-path&gt;</code>) drives rendering;
-        <code>render-snapshots.ps1</code> skips any blob already present in the deployed
-        <code>by-blob</code> store (seeded from <code>gh-pages</code>) and writes a placeholder HTML for any VI that
-        fails to render, so the gallery is never broken by a single bad VI. When
-        <code>config.viBrowser.positionAware</code> includes <code>windows</code> and the bundled
-        <code>PrintToImagesJson</code> operation is available, the same workflow also writes Windows 2.0 frame
-        JSON beside the HTML as <code>&lt;blob&gt;.windows.json</code>. <code>build-gallery.py</code> emits the
-        per-commit <code>manifest.json</code> (VI → by-blob HTML), the rolling <code>commits.json</code>, and the
-        Windows JSON index used by the in-place browser.</p>
-      <h4>Phase 2 — position-aware JSON (VI Snapshots 2.0) <span class="pill win">Windows</span> <span class="pill lin">Linux</span></h4>
-      <p>Phase 2 is the separate <strong>VI Snapshots 2.0</strong> capability, selectable on Windows and Linux (the classic gallery above is Windows-only). The <code>vi-snapshots-json.yml</code> (Linux) and <code>vi-snapshots-json-windows.yml</code> (Windows) workflows render
-        position-aware frame JSON for the in-place browser. The render engine is <strong>baked into the Linux worker image</strong> (and runs in the stock NI image on Windows) &mdash; a Go batch runner
-        (<code>main.go</code>) reads the same TSV worklist and shells out to <code>lvctl toimages</code> — a native
-        Go VI-Server TCP client that launches LabVIEW under Xvfb, captures the front panel and block diagram as
-        positioned frames, and emits a JSON array. Output is written to
-        <code>by-blob/&lt;ab&gt;/&lt;blob&gt;.json</code>, deployed alongside the 1.0 HTML so any VI without JSON
-        gracefully falls back to the classic view.</p>
-      <p>Both 2.0 renderers <strong>auto-run on every new revision</strong> via a <code>workflow_run</code> trigger after the snapshot pipeline finishes, each behind a gate job that reads <code>config.viBrowser.positionAware</code>: the Linux workflow runs when it includes <code>linux</code>, the Windows workflow when it includes <code>windows</code> (the configurator default). Because renders are content-addressed by git blob SHA, the worklist skips every VI whose blob already has a render &mdash; <strong>unchanged VIs reuse their existing frames with no work</strong> &mdash; and queues only the new/changed blobs, so a VI a revision actually changed gets a fresh render automatically.</p>
-      <p>The browser now remembers its viewer mode and 2.0 platform choice in local storage, defaults to 2.0 when a VI has a 2.0 render (preferring the Windows render when both platforms exist), and shows dismissible coaching tip strips for the block-diagram toggle and the case/event selector arrows. The 2.0 auto-default is now enforced on open whenever a 2.0 render exists (unless the URL explicitly pins <code>viewer</code>/<code>plat2</code>). Those tips are browser-local too: dismissing one with <strong>Never show this again</strong> hides it only in that browser profile, and the dismissal keys are versioned so a new coaching rollout can deliberately surface the tips once more for everyone.</p>
+      <p>The Populate history chooser offers an advisory banner when older, unselected revisions are missing
+        snapshots for an enabled snapshot activity and selected platform. It counts revisions once, excludes hidden
+        dependency-only revisions and browser-tracked queued work, and explains that <strong>Fill</strong> reuses
+        snapshots for unchanged file content. The banner recommends All revisions plus Fill while noting that more
+        revisions may start more workflows and that other enabled activities follow the same revision scope.
+        It never changes the selection or queues work. <strong>Keep selected revisions</strong> dismisses the tip
+        for that dialog session; opening the chooser again enables it again.</p>
+      <p>Snapshots are interactive views of a VI's front panel and block diagram. Pan and zoom the code,
+        switch between the front panel and block diagram, and navigate cases, events, and sequences directly
+        on the diagram without opening LabVIEW. The same viewer is used in the VI Browser, standalone links,
+        and report previews. Snapshots and Diff are the only viewer choices.</p>
+      <h4>Rendering and reuse</h4>
+      <p>The <strong>VI Snapshots</strong> capability installs the browser, revision metadata, and frame renderers.
+        Configure selects the Windows and/or Linux render platforms under <code>config.viBrowser.platforms</code>.
+        Windows uses <code>vi-snapshots-json-windows.yml</code>; Linux uses <code>vi-snapshots-json.yml</code>
+        and the render engine baked into the Linux worker. The gallery workflow is <code>vi-snapshots.yml</code>.
+        The gallery workflow renders Windows frames directly; platform render workflows can fill missing frames for a selected revision.</p>
+      <p>Frames are content-addressed by git blob SHA: <code>by-blob/&lt;ab&gt;/&lt;blob&gt;.windows.json</code>
+        on Windows and <code>by-blob/&lt;ab&gt;/&lt;blob&gt;.json</code> on Linux. Unchanged VIs reuse frames across
+        revisions. Each job keeps a warm container to avoid per-VI startup costs. The dashboard counts frame
+        coverage, not exported HTML files.</p>
+      <h4>Browsing and missing snapshots</h4>
+      <p>When both platforms have frames, the browser initially prefers Windows; a platform-specific shared
+        link preserves its selected render. Front Panel and Block Diagram controls choose the pane, and
+        share links preserve the revision, VI, pane, and platform. Coaching tips can be dismissed locally.</p>
+      <p>A VI without frames shows a render-needed, running, or failed state with a link to the render workflow.
+        There is no static-image fallback. Use Populate history to generate snapshots for older revisions.
+        Older snapshot links and saved configuration are accepted and open the interactive viewer.</p>
 
       <h3 id="cap-sbom">16.7 SBOM Generation <a class="anchor" href="#cap-sbom">#</a></h3>
       <h4>At a glance</h4>
@@ -2299,7 +2294,7 @@ flowchart TD
         behavior of the Windows worker. It also accepts the same <code>update_mode</code> dispatch input
         (<code>replace</code> rebuilds the moving <code>linux-latest</code>/<code>linux-&lt;year&gt;</code> tags in place;
         <code>new</code> publishes a fresh <code>&lt;tag&gt;-deps-&lt;date&gt;</code> tag alongside without moving them).
-        (The Linux&nbsp;Beta builds directly on <code>ubuntu-latest</code> with no separate gate; the VI&nbsp;Browser 2.0 render engine is now baked into the Linux worker, so there is no separate render image.)</div>
+        (The Linux&nbsp;Beta builds directly on <code>ubuntu-latest</code> with no separate gate; the VI&nbsp;Browser render engine is now baked into the Linux worker, so there is no separate render image.)</div>
       <div class="note"><span class="lbl">On-demand updates cover both workers</span>
         The Dependencies page&rsquo;s &ldquo;Run the container update&rdquo; flow lets you rebuild the
         <strong>Windows</strong> worker, the <strong>Linux</strong> worker, or both: a &ldquo;Containers to rebuild&rdquo;
@@ -2350,9 +2345,9 @@ flowchart TD
           <tr><td>VIDiff Report — Linux Container</td><td><span class="pill lin">ubuntu-latest</span></td><td>PR / push <code>**.vi/.ctl</code>, dispatch</td><td>Linux counterpart.</td></tr>
           <tr><td>Run Unit Tests — Windows Container</td><td><span class="pill win">windows-2022</span></td><td>PR / push (VIs, <code>**.lvtest</code>), dispatch</td><td>Windows-only (depends on baked VIPM/UTF tooling).</td></tr>
           <tr><td>Run Antidoc — Windows Container</td><td><span class="pill win">windows-2022</span></td><td>push to default branch, dispatch (no PR)</td><td>Windows-only; heavier doc render, so no per-PR run.</td></tr>
-          <tr><td>VI Snapshots and VI Browser</td><td><span class="pill win">windows-2022</span></td><td>push VI source (excl. <code>.github/</code>), dispatch (head / backfill)</td><td>Renders HTML snapshots + Windows 2.0 frames in one warm container.</td></tr>
-          <tr><td>VI Snapshots JSON (VI Browser 2.0, Linux)</td><td><span class="pill lin">ubuntu-latest</span></td><td><code>workflow_run</code> after snapshots, dispatch</td><td>Gate job decides; auto-runs only when <code>positionAware</code> includes <code>linux</code>.</td></tr>
-          <tr><td>VI Browser 2.0 render (Windows container)</td><td><span class="pill win">windows-2022</span></td><td><code>workflow_run</code> after snapshots, dispatch</td><td>Gate job decides; auto-runs only when <code>positionAware</code> includes <code>windows</code> (the configurator default). Additive Windows frames via COM in the stock NI image.</td></tr>
+          <tr><td>VI Snapshots and VI Browser</td><td><span class="pill win">windows-2022</span></td><td>push VI source (excl. <code>.github/</code>), dispatch (head / backfill)</td><td>Builds revision metadata and queues interactive snapshot rendering.</td></tr>
+          <tr><td>VI Snapshots JSON (VI Browser, Linux)</td><td><span class="pill lin">ubuntu-latest</span></td><td><code>workflow_run</code> after snapshots, dispatch</td><td>Gate job decides; auto-runs only when <code>positionAware</code> includes <code>linux</code>.</td></tr>
+          <tr><td>VI Browser render (Windows container)</td><td><span class="pill win">windows-2022</span></td><td><code>workflow_run</code> after snapshots, dispatch</td><td>Gate job decides; auto-runs only when <code>positionAware</code> includes <code>windows</code> (the configurator default). Additive Windows frames via COM in the stock NI image.</td></tr>
         </tbody>
       </table>
 
@@ -2362,7 +2357,7 @@ flowchart TD
         <tbody>
           <tr><td>Build LabVIEW CI Image (Windows worker)</td><td><span class="pill lin">ubuntu-latest</span> gate + coordinate, <span class="pill win">windows-2022</span> build</td><td>dispatch (dashboard &ldquo;Review &amp; update dependencies&rdquo; or manual), monthly cron, and a push that changes a <strong>monitored</strong> <code>.vipc</code>/<code>.dragon</code></td><td>Dependency bake. On a push the gate rebuilds only if a changed dependency file is <code>monitor: true</code>; otherwise it skips. Always builds on <span class="pill win">windows-2022</span>; with no dependencies declared it falls back to a plain crane copy of the base.</td></tr>
           <tr><td>Copy LabVIEW CI Image (install seed)</td><td><span class="pill lin">ubuntu-latest</span></td><td>dispatch (the installer dispatches it on a fresh install)</td><td>Seeds a fresh worker by copying the LCWC base into the repo&rsquo;s GHCR with crane &mdash; no LabVIEW build; the install-time counterpart to the dependency build above.</td></tr>
-          <tr><td>Build LabVIEW CI Image &mdash; Linux</td><td><span class="pill lin">ubuntu-latest</span> (gate + build)</td><td>dispatch (dashboard or manual), monthly cron, and a push that changes a <strong>monitored</strong> <code>.vipc</code></td><td>Dependency bake (mirrors the Windows worker); also bakes the VI&nbsp;Browser 2.0 render engine into the worker. On a push the gate rebuilds only if a changed <code>.vipc</code> is <code>monitor: true</code>; otherwise it skips.</td></tr>
+          <tr><td>Build LabVIEW CI Image &mdash; Linux</td><td><span class="pill lin">ubuntu-latest</span> (gate + build)</td><td>dispatch (dashboard or manual), monthly cron, and a push that changes a <strong>monitored</strong> <code>.vipc</code></td><td>Dependency bake (mirrors the Windows worker); also bakes the VI&nbsp;Browser render engine into the worker. On a push the gate rebuilds only if a changed <code>.vipc</code> is <code>monitor: true</code>; otherwise it skips.</td></tr>
           <tr><td>Copy LabVIEW CI Image &mdash; Linux (install seed)</td><td><span class="pill lin">ubuntu-latest</span></td><td>dispatch (the installer dispatches it on a fresh install)</td><td>Seeds a fresh Linux worker by copying the LCWC Linux base into the repo&rsquo;s GHCR with crane &mdash; no build; the Linux counterpart to the Copy workflow above.</td></tr>
           <tr><td>Bake VIPC Windows Base Image</td><td><span class="pill win">windows-2022</span></td><td>dispatch only</td><td>Proof-and-promote: verifies a VIPC installs before pushing tags.</td></tr>
         </tbody>

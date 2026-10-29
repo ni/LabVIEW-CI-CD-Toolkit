@@ -1,0 +1,31 @@
+name: VIDiff Runner Checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/labview/vidiff.sh'
+      - '.github/labview/build-vidiff-report.py'
+      - '.github/labview/test-vidiff.py'
+      - '.github/workflows/vidiff-runner-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/labview/vidiff.sh'
+      - '.github/labview/build-vidiff-report.py'
+      - '.github/labview/test-vidiff.py'
+      - '.github/workflows/vidiff-runner-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Check Linux VIDiff recovery without LabVIEW
+        run: python .github/labview/test-vidiff.py

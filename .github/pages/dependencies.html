@@ -273,7 +273,7 @@
           let m = line.match(/^\s{6}([A-Za-z0-9_.-]+):\s*"?([^"#]+)"?/); if (m) out.actions[m[1]] = m[2].trim();
           if (/^\s{0,4}\S/.test(line)) sec = "container";
         } else if (sec === "viBrowser") {
-          let m = line.match(/^\s{4}(classic|positionAware):\s*"?([^"#]+)"?/); if (m) out.viBrowser[m[1]] = m[2].trim();
+          let m = line.match(/^\s{4}(classic|positionAware|platforms):\s*"?([^"#]+)"?/); if (m) out.viBrowser[m[1]] = m[2].trim();
         }
       });
       return out;
@@ -1146,7 +1146,7 @@
       const hasToimages = Array.from(paths).some(p => p.startsWith('.github/labview/toimages/'));
       const version = goVersion ? 'Go ' + goVersion : 'Go toolchain';
       const out = [];
-      if (hasToimages) out.push({ key:'toimages', name:'VI Browser 2.0 toimages renderer', source:'.github/labview/toimages', windows:has('.github/workflows/vi-snapshots-json-windows.yml') ? 'built in workflow' : '', linux:has('.github/workflows/vi-snapshots-json.yml') ? 'baked into Linux worker' : '' });
+      if (hasToimages) out.push({ key:'toimages', name:'VI Browser toimages renderer', source:'.github/labview/toimages', windows:has('.github/workflows/vi-snapshots-json-windows.yml') ? 'built in workflow' : '', linux:has('.github/workflows/vi-snapshots-json.yml') ? 'baked into Linux worker' : '' });
       if (hasToimages) out.push({ key:'go', name:version, source:'Go build/runtime for toimages', windows:has('.github/workflows/vi-snapshots-json-windows.yml') ? 'actions/setup-go' : '', linux:has('.github/labview/toimages/Dockerfile') ? 'Docker build stage' : '' });
       return out;
     }

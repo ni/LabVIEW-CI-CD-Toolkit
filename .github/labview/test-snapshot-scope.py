@@ -28,24 +28,29 @@ def javascript_function(name):
 class SnapshotScopeTests(unittest.TestCase):
     def run_javascript(self, body):
         functions = ['bfFill', 'bfInputs', 'dispatchTotal', 'dispatchCells',
-                     'histIncludedShas', 'histIdxIn', 'histCells', 'captureSnapshotRun']
+                     'histIncludedShas', 'histIdxIn', 'histCells', 'captureSnapshotRun',
+                     'histSnapshotAdviceCount', 'histSnapshotAdviceRefresh', 'histSnapshotAdviceDismiss']
         harness = '''
 const assert = require('node:assert/strict');
 const RT = TARGETS;
 const newest = NEWEST, middle = MIDDLE, oldest = OLDEST;
 const HIST = [newest, middle, oldest].map(sha => ({sha}));
+let visibleHistory = HIST;
 let scope = 'specific', selected = [newest], from = '', to = '';
 let cells = HIST.map((revision, order) => ({cap:'snapshots', sha:revision.sha, order}));
 let actMode = {snapshots:'fill'};
+let snapshotAdviceDismissed = false, histInclDep = false;
+let platforms = {};
 let store = {}, dispatched = [], response = {ok:true};
 const document = {
   querySelectorAll: () => selected.map(value => ({value})),
   getElementById: id => ({value:id==='cidash-hist-from' ? from : to})
 };
 const histScopeMode = () => scope;
-const histVisible = () => HIST;
+const histVisible = () => visibleHistory;
 const histAllCells = () => cells;
-const histSelectedPlatforms = cap => Object.keys(RT[cap].platforms);
+const histSelectedPlatforms = cap => platforms[cap] || Object.keys(RT[cap].platforms);
+const histInstalledCaps = () => Object.keys(actMode).filter(cap => RT[cap]);
 const cellPlatforms = cell => cell.platform ? [cell.platform] : histSelectedPlatforms(cell.cap);
 const markQueued = (cap, sha, plats, parent, ts) => { store[cap+'|'+sha] = {plats, parent, ts}; };
 const qLoad = () => store;
@@ -83,6 +88,88 @@ scope = 'range'; from = middle; to = newest;
 await dispatchCells(histCells(), () => {});
 assert.equal(dispatched[0].inputs.shas, middle+' '+newest);
 assert.equal(store['snapshots|'+oldest], undefined);
+''')
+
+    def test_snapshot_advice_counts_older_missing_revisions_without_expanding_scope(self):
+        self.run_javascript('''
+assert.equal(histSnapshotAdviceCount(), 2);
+await dispatchCells(histCells(), () => {});
+assert.equal(dispatched.length, 1);
+assert.equal(dispatched[0].inputs.shas, newest);
+assert.deepEqual(selected, [newest]);
+assert.equal(scope, 'specific');
+''')
+
+    def test_snapshot_advice_disappears_when_history_is_selected_or_complete(self):
+        self.run_javascript('''
+scope = 'all';
+assert.equal(histSnapshotAdviceCount(), 0);
+scope = 'specific';
+cells[1].done = true; cells[2].done = true;
+assert.equal(histSnapshotAdviceCount(), 0);
+''')
+
+    def test_snapshot_advice_only_counts_older_unselected_revisions(self):
+        self.run_javascript('''
+selected = [middle];
+assert.equal(histSnapshotAdviceCount(), 1);
+selected = [oldest];
+assert.equal(histSnapshotAdviceCount(), 0);
+selected = [];
+assert.equal(histSnapshotAdviceCount(), 0);
+''')
+
+    def test_snapshot_advice_tracks_activity_and_platform_selection(self):
+        self.run_javascript('''
+actMode = {snapshots2:'fill'}; platforms.snapshots2 = ['windows'];
+cells = [
+  {cap:'snapshots2', sha:middle, platform:'windows', done:true},
+  {cap:'snapshots2', sha:middle, platform:'linux', done:false},
+  {cap:'snapshots2', sha:oldest, platform:'windows', done:false},
+  {cap:'snapshots2', sha:oldest, platform:'linux', done:false}
+];
+assert.equal(histSnapshotAdviceCount(), 1);
+platforms.snapshots2 = ['windows', 'linux'];
+assert.equal(histSnapshotAdviceCount(), 2);
+platforms.snapshots2 = [];
+assert.equal(histSnapshotAdviceCount(), 0);
+platforms.snapshots2 = ['windows'];
+actMode.snapshots2 = 'off';
+assert.equal(histSnapshotAdviceCount(), 0);
+''')
+
+    def test_snapshot_advice_detects_history_hidden_by_revision_search(self):
+        self.run_javascript('''
+scope = 'all'; visibleHistory = [HIST[0]];
+assert.equal(histSnapshotAdviceCount(), 2);
+await dispatchCells(histCells(), () => {});
+assert.equal(dispatched[0].inputs.shas, newest);
+''')
+
+    def test_snapshot_advice_respects_dependency_filter_and_queued_revisions(self):
+        self.run_javascript('''
+HIST[2].dep_only = true;
+assert.equal(histSnapshotAdviceCount(), 1);
+histInclDep = true;
+assert.equal(histSnapshotAdviceCount(), 2);
+store['snapshots|'+middle] = {ts:Date.now()};
+assert.equal(histSnapshotAdviceCount(), 1);
+store['snapshots|'+middle].failed = true;
+assert.equal(histSnapshotAdviceCount(), 2);
+''')
+
+    def test_snapshot_advice_dismissal_preserves_modes_and_queue(self):
+        self.run_javascript('''
+const banner = {hidden:false}, title = {};
+document.getElementById = id => id==='cidash-hist-snapshot-advice' ? banner : title;
+histSnapshotAdviceRefresh();
+assert.equal(banner.hidden, false);
+assert.equal(title.textContent, '2 older revisions still need snapshots');
+histSnapshotAdviceDismiss();
+assert.equal(banner.hidden, true);
+assert.deepEqual(actMode, {snapshots:'fill'});
+await dispatchCells(histCells(), () => {});
+assert.equal(dispatched[0].inputs.shas, newest);
 ''')
 
     def test_all_history_is_still_an_explicit_selection(self):

@@ -42,8 +42,6 @@
         --error:#cf222e;
       }
     }
-    /* Re-assert page-specific tokens the shared header's theme toggle doesn't
-       manage, so a forced Light/Dark choice fully re-themes this page. */
     :root[data-lvci-theme=dark]{--sidebar:#161b22;--sidebar-hover:#1c2128;--sidebar-active:#1f6feb33;--item:#c9d1d9;--viewer-bg:#ffffff;--error:#da3633}
     :root[data-lvci-theme=light]{--sidebar:#f6f8fa;--sidebar-hover:#eef2f6;--sidebar-active:#0969da22;--item:#1f2328;--viewer-bg:#ffffff;--error:#cf222e}
     *{box-sizing:border-box;margin:0;padding:0}
@@ -85,7 +83,6 @@
     .chg.modified{background:#9a6700}.chg.added{background:#1a7f37}.chg.deleted{background:#cf222e}
     .chg:hover{filter:brightness(1.15)}
     .chg-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:#9a6700;opacity:.85}
-    /* "2.0" availability glyph - lights up when a file's blob has a position-aware render */
     .g2{flex:0 0 auto;font-size:.6em;font-weight:700;padding:1px 5px;border-radius:9px;
         background:var(--link);color:#fff;letter-spacing:.02em;cursor:default;
         font-variant-numeric:tabular-nums}
@@ -95,7 +92,6 @@
     .changed-toggle input{margin:0;accent-color:var(--link)}
     .changed-toggle .count{color:var(--fg-muted);font-weight:600}
 
-    /* ── Resizable divider ── */
     #divider{width:6px;background:var(--border);cursor:col-resize;user-select:none;flex:0 0 auto;
              transition:background .15s ease;border-left:1px solid rgba(255,255,255,.05);border-right:1px solid rgba(255,255,255,.05)}
     #divider:hover{background:var(--link);opacity:.6}
@@ -116,7 +112,6 @@
     #plat-toggle button.active{background:var(--link);color:#fff}
     #plat-toggle button:disabled{opacity:.4;cursor:default}
     #plat-toggle .sep{width:1px;background:var(--border)}
-    /* 1.0 / 2.0 VI Browser switch — classic flat viewer vs the in-place renderer */
     #viewer-toggle-label{color:var(--fg-muted);font-size:.8em;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
     #viewer-toggle{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:7px;
                    overflow:hidden;font-size:.92em}
@@ -126,7 +121,6 @@
     #viewer-toggle button.active{background:var(--link);color:#fff}
     #viewer-toggle button.is-disabled{opacity:.4;cursor:default}
     #viewer-toggle .sep{width:1px;background:var(--border)}
-    /* Front Panel / Block Diagram sub-switch (2.0 in-place view) */
     #pane-toggle{display:none;align-items:center;border:1px solid var(--border);border-radius:7px;
                  overflow:hidden;font-size:.92em}
     #pane-toggle.show{display:inline-flex}
@@ -136,7 +130,6 @@
     #pane-toggle button.active{background:var(--link);color:#fff}
     #pane-toggle button:disabled{opacity:.4;cursor:default}
     #pane-toggle .sep{width:1px;background:var(--border)}
-    /* Linux / Windows platform sub-switch (2.0 in-place view; shown when a Windows render exists) */
     #vb2-plat-toggle{display:none;align-items:center;border:1px solid var(--border);border-radius:7px;
                  overflow:hidden;font-size:.92em}
     #vb2-plat-toggle.show{display:inline-flex}
@@ -278,10 +271,8 @@
   <div id="toolbar">
     <button type="button" id="mobile-files" aria-expanded="false" aria-label="Show or hide the VI list" title="Show or hide the VI list"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 3.5h12v2H2zM2 7h12v2H2zM2 10.5h12v2H2z"/></svg>VIs</button>
     <span id="viewer-toggle-label">Viewer</span>
-    <span id="viewer-toggle" title="Switch between the classic VI Browser (1.0), the in-place renderer (2.0), and this VI's side-by-side diff">
-      <button type="button" data-viewer="1" title="1.0 — classic gallery: front panel + block diagram, with each structure's cases in a stepper below the diagram">1.0</button>
-      <span class="sep"></span>
-      <button type="button" data-viewer="2" title="2.0 — in-place renderer: Case / Event structures navigated on the diagram itself, like the LabVIEW editor">2.0</button>
+    <span id="viewer-toggle" title="Show this VI's snapshot or side-by-side diff">
+      <button type="button" data-viewer="snapshot" title="Interactive snapshot: navigate structures directly on the diagram">Snapshot</button>
       <span class="sep"></span>
       <button type="button" data-viewer="diff" class="is-disabled" aria-disabled="true" title="Select a changed VI to view its diff">Diff</button>
     </span>
@@ -290,7 +281,7 @@
       <span class="sep"></span>
       <button type="button" data-pane="bd" title="Block diagram — the VI's code; Case/Event structures navigate in place">Block&nbsp;Diagram</button>
     </span>
-    <span id="vb2-plat-toggle" title="Show the 2.0 render from the Linux or the Windows container">
+    <span id="vb2-plat-toggle" title="Show the render from the Linux or the Windows container">
       <button type="button" data-plat2="linux" title="Linux container render">Linux</button>
       <span class="sep"></span>
       <button type="button" data-plat2="windows" title="Windows container render">Windows</button>
@@ -315,14 +306,7 @@
   </div>
   <div id="viewer" style="display:none">
     <iframe id="vi-frame" title="VI Snapshot"></iframe>
-    <!-- Position-aware in-place renderer. Preferred whenever a frames JSON sits
-         beside the snapshot HTML; otherwise the iframe above shows the flat snapshot. -->
     <div id="vi-canvas" style="position:absolute;inset:0;display:none;z-index:2"></div>
-    <!-- 2.0 selected but this VI has no frames JSON yet. 2.0 renders from this
-         repository's OWN image - built by "Build VI Browser 2.0 render image" and
-         pulled with the built-in token, so there is no render token or private
-         image to set up. Show a state panel (no render yet / running / failed)
-         with a one-click run, instead of silently falling back to 1.0. -->
     <div id="vi-needtoken" style="position:absolute;inset:0;display:none;z-index:3;overflow:auto;padding:28px;box-sizing:border-box;background:var(--bg)">
       <div style="max-width:560px;margin:7vh auto 0;text-align:center">
         <!-- STATE VIEW: shown when a VI has no frames yet (no render yet / running / finished-no-frames / failed). The action button dispatches the snapshot-to-JSON workflow with an Actions:write token. -->
@@ -355,8 +339,8 @@
           <button id="dr-rev" type="button" style="padding:9px 18px;border:0;border-radius:8px;background:#2da44e;color:#fff;font-weight:600;font-size:1em;cursor:pointer">Run for the entire revision</button>
         </div>
         <div id="dr-status" role="status" style="font-size:.85em;margin-top:12px;min-height:1.1em;color:var(--fg-muted)"></div>
-        <div style="margin-top:10px"><a id="dr-snap" href="#" style="color:var(--link);font-size:.85em">View the flat snapshot instead</a></div>
-        <!-- one-time dispatch-token prompt (Actions: write); reuses the 2.0 wizard's stored token -->
+        <div style="margin-top:10px"><a id="dr-snap" href="#" style="color:var(--link);font-size:.85em">View the snapshot instead</a></div>
+        <!-- one-time dispatch-token prompt (Actions: write); reuses the wizard's stored token -->
         <div id="dr-tokp" style="display:none;margin:16px auto 0;max-width:470px;padding:11px 12px;border:1px solid var(--border,#d0d7de);border-radius:9px;background:rgba(127,127,127,.06);text-align:left">
           <div id="dr-tokp-msg" style="font-size:.85em;margin-bottom:7px"></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -415,14 +399,12 @@ let diffPlatform = (new URLSearchParams(location.search).get('plat') === 'linux'
 let commitPlatforms = new Set(); // which platforms published a report for the active commit
 let currentDiffVi = null;        // vi_rel of the diff currently shown (so the toggle can reload it)
 let currentDiffRow = null;       // the tree row backing the current view (for re-activation)
-// VI Browser viewer mode: '1' = classic flat gallery (enhanceSnapshot iframe),
-// '2' = in-place renderer (vi-render.js). Persists via ?viewer=. Defaults to 1.0
-// (the proven classic view); switch to 2.0 to evaluate the in-place renderer. 2.0
-// uses each VI's frames JSON and gracefully falls back to 1.0 when none exists yet.
-let viewerMode = (new URLSearchParams(location.search).get('viewer') === '2') ? '2' : '1';
-let currentSnapshot = null;      // { html, title } of the open plain snapshot (re-rendered on a 1.0/2.0 switch)
-let frameRequestId = 0;          // cancels stale async 1.0 snapshot preflight results
-// VI Browser 2.0 sub-view: 'fp' = front panel (frames[0]), 'bd' = block diagram
+const viewerMode = 'snapshot';
+let currentSnapshot = null;
+let json2Set = null;
+let json2WinSet = null;
+let frameRequestId = 0;
+let snapshotPlatformChosen = false;
 // (frames[1] + its nested case frames). Sticky across VIs; defaults to the front
 // panel so the in-place view opens on what the previous build already showed.
 // Restored from ?pane= so a shared block-diagram link opens on the block diagram.
@@ -440,18 +422,12 @@ let curLens = 'snapshots';
 const INIT_VI = new URLSearchParams(location.search).get('vi') || '';
 const INIT_VIEW = (new URLSearchParams(location.search).get('view') === 'diff') ? 'diff' : 'snapshot';
 const INIT_LENS = new URLSearchParams(location.search).get('lens') || '';
-let json2Set = null;             // blobs that have a 2.0 JSON (from json-blobs.json); drives the live "2.0" glyph
-// VI Browser 2.0 render platform: 'linux' (default, the original) or 'windows'.
 // A preference, restored from ?plat2=. The selected platform is authoritative:
-// if its JSON is missing, the viewer shows the 2.0 empty panel for that platform
 // instead of silently falling back to the other renderer.
 let vb2Plat = (new URLSearchParams(location.search).get('plat2') === 'windows') ? 'windows' : 'linux';
-let json2WinSet = null;          // blobs that ALSO have a Windows 2.0 render (json-blobs.windows.json); null = none published
 let vb2DidWinRestore = false;    // one-shot: honor a ?plat2=windows deep link once the Windows index loads
-const VB2_VIEWER_KEY = 'lvci_vi_browser_viewer_mode';
 const VB2_PLAT_KEY = 'lvci_vi_browser_vb2_plat';
 const VB2_TIP_KEYS = { bd: 'lvci_vi_browser_tip_block_diagram_v2', selectors: 'lvci_vi_browser_tip_selectors_v2' };
-const VB2_HAS_VIEWER_QUERY = new URLSearchParams(location.search).has('viewer');
 const VB2_HAS_PLAT2_QUERY = new URLSearchParams(location.search).has('plat2');
 
 const ICON = {
@@ -474,6 +450,12 @@ function vb2TipClear(key) {
   if (target) { target.classList.remove('lvci-tip-target'); target.removeAttribute('data-tip-key'); }
 }
 function vb2TipClearAll() { vb2TipClear('bd'); vb2TipClear('selectors'); }
+function populateHistoryUrl() {
+  const root = BASE.replace(/vi-snapshots\/$/, '');
+  const sha = (document.getElementById('commit-select') || {}).value || '';
+  return root + '?lvci-populate=1' + (sha ? '&sha=' + encodeURIComponent(sha) : '');
+}
+
 function vb2TipShow(key, target, title, body, left, top) {
   if (!target || vb2TipHidden(key)) return;
   const layer = document.getElementById('tip-layer');
@@ -498,12 +480,6 @@ function vb2TipShow(key, target, title, body, left, top) {
   const never = tip.querySelector('input[data-never="1"]');
   const dismiss = () => { if (never && never.checked) vb2LsSet(VB2_TIP_KEYS[key], '1'); vb2TipClear(key); };
   if (close) close.addEventListener('click', dismiss);
-}
-
-function populateHistoryUrl() {
-  const root = BASE.replace(/vi-snapshots\/$/, '');
-  const sha = (document.getElementById('commit-select') || {}).value || '';
-  return root + '?lvci-populate=1' + (sha ? '&sha=' + encodeURIComponent(sha) : '');
 }
 
 // Build a folder tree from the flat manifest using each VI's on-disk relative path.
@@ -833,10 +809,8 @@ function renderList(filter) {
   decorate2();
 }
 
-// ── VI Browser 2.0 availability glyph ─────────────────────────────────────
 // json-blobs.json (written by the toimages pipeline) is a flat array of every
 // blob that has a position-aware <blob>.json. We fetch it, mark each file whose
-// blob is in the set with a small "2.0" glyph, and poll so the glyphs light up
 // one-by-one as a render run publishes results - no manual reload.
 let json2Poll = null;
 function rowBlob(row) {
@@ -845,14 +819,14 @@ function rowBlob(row) {
   return m ? m[1].toLowerCase() : '';
 }
 function decorate2() {
-  if (!json2Set) return;
+  if (!json2Set && !json2WinSet) return;
   document.querySelectorAll('#vi-list .tree-row.file').forEach(row => {
-    const has = json2Set.has(rowBlob(row));
+    const has = !!(json2Set && json2Set.has(rowBlob(row))) || !!(json2WinSet && json2WinSet.has(rowBlob(row)));
     let g = row.querySelector('.g2');
     if (has && !g) {
       g = document.createElement('span');
-      g.className = 'g2'; g.textContent = '2.0';
-      g.title = 'Position-aware 2.0 render available';
+      g.className = 'g2'; g.textContent = 'Snapshot';
+      g.title = 'Interactive snapshot available';
       const label = row.querySelector('.label');
       row.insertBefore(g, label ? label.nextSibling : null);
     } else if (!has && g) { g.remove(); }
@@ -866,7 +840,7 @@ async function loadJson2Index() {
   try {
     const win = await fetchJson(BASE + 'json-blobs.windows.json');
     if (Array.isArray(win)) json2WinSet = new Set(win.map(b => String(b).toLowerCase()));
-  } catch (e) { /* no Windows index published yet — the 2.0 view stays Linux-only */ }
+  } catch (e) {}
   decorate2();
   syncVb2PlatToggle();
   if (vb2Prefer2Default() && currentSnapshot && !currentDiffVi) openSnapshot(currentSnapshot.html, currentSnapshot.title);
@@ -874,7 +848,7 @@ async function loadJson2Index() {
   // known and the open VI does have a Windows render, upgrade it to the Windows view.
   if (!vb2DidWinRestore && json2WinSet) {
     vb2DidWinRestore = true;
-    if (vb2Plat === 'windows' && viewerMode === '2' && currentSnapshot && !currentDiffVi
+    if (vb2Plat === 'windows' && viewerMode === 'snapshot' && currentSnapshot && !currentDiffVi
         && vb2WinAvail(vb2BlobOf(currentSnapshot.html))) {
       openSnapshot(currentSnapshot.html, currentSnapshot.title);
     }
@@ -895,52 +869,41 @@ function setViewerLoading(on) {
   if (el) el.classList.toggle('show', !!on);
 }
 
-// Open a plain VI snapshot. Prefer the position-aware frames JSON (in-place
-// renderer) when one sits beside the snapshot HTML; otherwise fall back to the
-// flat-HTML iframe + enhanceSnapshot (unchanged behaviour). The JSON is content-
-// addressed next to the .html (by-blob/<ab>/<blob>.json), so a VI auto-upgrades to
-// the in-place view the moment its frames JSON is rendered — no gallery changes.
-// The 2.0 frames JSON sits beside the snapshot HTML, content-addressed by git blob.
-// Linux renders are <blob>.json; Windows renders are <blob>.windows.json.
 function vb2BlobOf(url) { const m = String(url || '').match(/([0-9a-f]{40})\.html$/i); return m ? m[1].toLowerCase() : ''; }
 function vb2WinAvail(blob) { return !!(json2WinSet && blob && json2WinSet.has(blob)); }
 function vb2EffPlat(_htmlUrl) { return vb2Plat === 'windows' ? 'windows' : 'linux'; }
 function vb2JsonUrl(htmlUrl) { return htmlUrl.replace(/\.html$/i, vb2EffPlat(htmlUrl) === 'windows' ? '.windows.json' : '.json'); }
 
 function vb2Prefer2Default() {
-  if (VB2_HAS_VIEWER_QUERY || VB2_HAS_PLAT2_QUERY) return false;
+  if (VB2_HAS_PLAT2_QUERY || snapshotPlatformChosen) return false;
   if (!currentSnapshot || currentDiffVi) return false;
   const blob = vb2BlobOf(currentSnapshot.html);
   if (!blob) return false;
   const win = vb2WinAvail(blob);
   const lin = !!(json2Set && json2Set.has(blob));
   if (!win && !lin) return false;
-  viewerMode = '2';
+  if (vb2Plat === (win ? 'windows' : 'linux')) return false;
   vb2Plat = win ? 'windows' : 'linux';
-  vb2LsSet(VB2_VIEWER_KEY, '2');
   vb2LsSet(VB2_PLAT_KEY, vb2Plat);
   return true;
 }
 
 let lvController = null;
 function openSnapshot(htmlUrl, title) {
-  // 1.0 (classic): always the flat-HTML iframe + enhanceSnapshot stepper view.
-  if (viewerMode !== '2') { setViewerModeNote(''); vb2TipClearAll(); showInFrame(htmlUrl, title); return; }
-  // 2.0 (in-place): prefer the position-aware frames JSON; gracefully fall back to
-  // the classic view when this VI has no frames JSON yet (e.g. before the backend
-  // that emits <blob>.json has rendered it).
+  vb2Prefer2Default();
+  const requestId = ++frameRequestId;
   const jsonUrl = vb2JsonUrl(htmlUrl);
   setViewerLoading(true);
   fetch(jsonUrl, { cache: 'no-store' })
     .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
     .then(frames => {
+      if (requestId !== frameRequestId) return;
       if (!window.LVRender || !Array.isArray(frames) || !frames.length) throw new Error('no frames');
       setViewerModeNote('');
       showInPlace(frames, htmlUrl, title);
     })
     .catch(() => {
-      // 2.0 selected but this VI has no frames JSON yet. Show the 2.0 empty state
-      // (no render yet / running / failed) instead of silently using 1.0.
+      if (requestId !== frameRequestId) return;
       setViewerModeNote('');
       showNeedsToken(htmlUrl, title);
     });
@@ -951,7 +914,7 @@ function showInPlace(frames, htmlUrl, title) {
   frameRequestId++;
   document.getElementById('vi-title').textContent = title;
   const open = document.getElementById('open-link');
-  open.href = htmlUrl; open.style.display = 'inline';
+  open.href = 'vi-interactive.html?frames=' + encodeURIComponent(vb2JsonUrl(htmlUrl)) + '&pane=' + vb2Pane; open.style.display = 'inline';
   const hint = document.getElementById('viewer-hint');
   if (hint) hint.style.display = 'inline-block';
   document.getElementById('empty').style.display  = 'none';
@@ -967,13 +930,13 @@ function showInPlace(frames, htmlUrl, title) {
   setViewerLoading(false);
 }
 
-// The 2.0 frames array is ordered [0] = front panel, [1] = block-diagram root
 // (its nested Case / Event / Sequence cases follow as child frames). The sub-toggle
 // renders one pane or the other in place; both pan & zoom via the same renderer.
 function vb2HasBD() { return Array.isArray(vb2Frames) && vb2Frames.length > 1; }
 
 function renderActivePane() {
   if (!Array.isArray(vb2Frames) || !vb2Frames.length || !window.LVRender) return;
+  if (currentSnapshot) document.getElementById('open-link').href = 'vi-interactive.html?frames=' + encodeURIComponent(vb2JsonUrl(currentSnapshot.html)) + '&pane=' + vb2Pane;
   const showBD = vb2Pane === 'bd' && vb2HasBD();
   const canvas = document.getElementById('vi-canvas');
   canvas.style.display = 'block';
@@ -1001,7 +964,7 @@ function hidePaneToggle() {
 
 function vb2SyncTips() {
   vb2TipClearAll();
-  if (viewerMode !== '2' || !currentSnapshot || currentDiffVi) return;
+  if (viewerMode !== 'snapshot' || !currentSnapshot || currentDiffVi) return;
   const main = document.getElementById('main');
   if (!main) return;
   if (vb2Pane !== 'bd') {
@@ -1012,7 +975,7 @@ function vb2SyncTips() {
         const host = main.getBoundingClientRect();
         vb2TipShow('bd', btn,
           'Open the block diagram',
-          'This button switches the 2.0 viewer from the front panel to the VI\'s block diagram, where the case and event selectors live.',
+          'This button switches the viewer from the front panel to the VI\'s block diagram, where the case and event selectors live.',
           (r.left - host.left) + 8,
           (r.bottom - host.top) + 12);
       }
@@ -1031,20 +994,18 @@ function vb2SyncTips() {
   }
 }
 
-// Linux / Windows platform sub-switch for the 2.0 view. It stays available even
 // when one platform has not rendered this VI yet; selecting the missing side opens
-// the 2.0 empty panel with a prompt to queue that platform's render.
 function syncVb2PlatToggle() {
   const wrap = document.getElementById('vb2-plat-toggle');
   if (!wrap) return;
-  if (viewerMode !== '2' || !currentSnapshot || currentDiffVi) { wrap.classList.remove('show'); return; }
+  if (viewerMode !== 'snapshot' || !currentSnapshot || currentDiffVi) { wrap.classList.remove('show'); return; }
   wrap.classList.add('show');
   const blob = currentSnapshot ? vb2BlobOf(currentSnapshot.html) : '';
   const winOk = vb2WinAvail(blob);
   const winBtn = wrap.querySelector('button[data-plat2="windows"]');
   if (winBtn) {
     winBtn.disabled = false;
-    winBtn.title = winOk ? 'Windows container render' : 'No Windows 2.0 render yet - click to queue it';
+    winBtn.title = winOk ? 'Windows container render' : 'No Windows render yet - click to queue it';
   }
   const linBtn = wrap.querySelector('button[data-plat2="linux"]');
   if (linBtn) linBtn.disabled = false;
@@ -1056,8 +1017,6 @@ function hideVb2PlatToggle() {
 }
 
 function showNeedsToken(htmlUrl, title) {
-  // 2.0 empty state: this VI has no frames JSON yet (no render exists, run in
-  // progress, or the run failed). The 2.0 controller below reflects the real state.
   frameRequestId++;
   const canvas = document.getElementById('vi-canvas');
   if (canvas) canvas.style.display = 'none';
@@ -1077,7 +1036,6 @@ function showNeedsToken(htmlUrl, title) {
   try { window.__lvciVB2Context = { platform: vb2Plat, sha: (document.getElementById('commit-select') || {}).value || '', vi: openViRel || '' }; } catch (e) {}
   syncVb2PlatToggle();
   setViewerLoading(false);
-  // Let the 2.0 controller pick the right panel (no render yet / running /
   // no-frames / failed). It owns the repo + run-status + dispatch logic.
   try { if (window.__lvciVB2 && window.__lvciVB2.resolve) window.__lvciVB2.resolve(title, window.__lvciVB2Context); } catch (e) {}
 }
@@ -1107,16 +1065,10 @@ function showInFrame(url, title) {
   const frame = document.getElementById('vi-frame');
   setViewerLoading(true);
   fetch(url, { method: 'HEAD', cache: 'no-store' })
-    .then(r => { if (!r.ok) throw new Error(String(r.status)); return r; })
+    .then(response => { if (!response.ok) throw new Error(String(response.status)); })
     .then(() => {
       if (requestId !== frameRequestId) return;
-      // The snapshot is same-origin (gh-pages), so we can restyle its DOM on load to
-      // make images fit/zoom and turn a Case/Event structure's frames into a stepper.
-      frame.onload = () => {
-        try { enhanceSnapshot(frame.contentDocument); }
-        catch (e) { /* cross-origin or unexpected DOM: fall back to the raw snapshot */ }
-        setViewerLoading(false);
-      };
+      frame.onload = () => setViewerLoading(false);
       frame.src = url;
     })
     .catch(() => { if (requestId === frameRequestId) showMissingDocument(url, title); });
@@ -1140,324 +1092,15 @@ function showMissingDocument(url, title) {
   const tokp = document.getElementById('nt-tokp'); if (tokp) tokp.style.display = 'none';
   const state = document.getElementById('nt-state'); if (state) state.style.display = 'block';
   const icon = document.getElementById('nt-state-icon'); if (icon) icon.textContent = '!';
-  const stTitle = document.getElementById('nt-state-title'); if (stTitle) stTitle.textContent = 'Snapshot document not found';
+  const stTitle = document.getElementById('nt-state-title'); if (stTitle) stTitle.textContent = 'Report document not found';
   const msg = document.getElementById('nt-state-msg');
-  if (msg) msg.innerHTML = 'This revision lists <strong>' + escapeHtml(title) + '</strong>, but its snapshot HTML has not been published yet. Populate history to generate missing VI Browser documents for older revisions.';
+  if (msg) msg.innerHTML = 'This revision lists <strong>' + escapeHtml(title) + '</strong>, but its report HTML has not been published yet. Populate history to generate missing VI Browser documents for older revisions.';
   const actions = document.getElementById('nt-state-actions');
   if (actions) actions.innerHTML = '<a href="' + escapeHtml(populateHistoryUrl()) + '" style="padding:9px 18px;border-radius:8px;background:#2da44e;color:#fff;font-weight:600;text-decoration:none">Populate history</a><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" style="color:var(--link);font-weight:600">Open raw URL</a>';
   const status = document.getElementById('nt-state-status'); if (status) status.textContent = '';
   setViewerLoading(false);
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Snapshot viewer enhancements (run inside the same-origin snapshot iframe):
-//   • every diagram image scales to fit the viewer width
-//   • Connector Pane / Front Panel / Block Diagram / Hierarchy images become
-//     zoomable & pannable (toolbar, double-click, Ctrl/⌘+wheel, drag)
-//   • the top-level block diagram stays visible at the top, and each Case/Event/
-//     Sequence structure's extra cases (the consecutive Block Diagram images
-//     LabVIEW emits) are grouped into their own scrollable window so the user
-//     can page through one structure's cases in place, LabVIEW-style, instead of
-//     a single flat stack that mixes the diagram with every case
-// ───────────────────────────────────────────────────────────────────────────
-const ENHANCE_CSS = `
-*{box-sizing:border-box}
-html,body{margin:0}
-body{padding:18px 20px 64px;font:14px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1f2328;background:#fff;max-width:1180px;margin:0 auto}
-h1,h2{font-size:1.2em;margin:.2em 0 .45em}
-h3{font-size:1.02em;margin:1.5em 0 .55em;padding-bottom:.3em;border-bottom:1px solid #d0d7de}
-hr{border:none;border-top:1px solid #eaeef2;margin:1.3em 0}
-img{max-width:100%;height:auto}
-table{border-collapse:collapse;max-width:100%}
-.vi-fig{position:relative;margin:.6em 0;border:1px solid #d0d7de;border-radius:10px;background:#fbfcfd;overflow:hidden}
-.vi-fig__view{overflow:hidden;max-height:none;text-align:center}
-.vi-fig__view.zoomed{cursor:grab;text-align:left}
-.vi-fig__view.grabbing{cursor:grabbing}
-.vi-img{display:block;max-width:100%;height:auto;margin:0 auto;-webkit-user-drag:none;user-select:none}
-.vi-fig__view.zoomed .vi-img{margin:0}
-.vi-fig__bar{position:absolute;top:8px;right:8px;display:flex;gap:1px;background:rgba(255,255,255,.93);border:1px solid #d0d7de;border-radius:7px;padding:2px;box-shadow:0 1px 4px rgba(31,35,40,.16);opacity:0;transition:opacity .15s}
-.vi-fig:hover .vi-fig__bar,.vi-fig__view.zoomed~.vi-fig__bar{opacity:1}
-.vi-fig__bar button{border:none;background:none;font:600 13px/1 system-ui,sans-serif;color:#1f2328;cursor:pointer;padding:5px 9px;border-radius:5px;min-width:34px}
-.vi-fig__bar button:hover{background:#eaeef2}
-.vi-stepper{margin:.6em 0}
-.vi-stepper__bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:.55em;padding:7px 11px;background:#f6f8fa;border:1px solid #d0d7de;border-radius:9px;font-size:.9em}
-.vi-step-btn{border:1px solid #d0d7de;background:#fff;color:#1f2328;cursor:pointer;padding:4px 11px;border-radius:6px;font:600 .92em system-ui,sans-serif}
-.vi-step-btn:hover:not(:disabled){background:#eaeef2}
-.vi-step-btn:disabled{opacity:.4;cursor:default}
-.vi-step-label{font-weight:700;min-width:96px;text-align:center}
-.vi-step-hint{color:#8b949e;font-size:.82em;text-transform:uppercase;letter-spacing:.04em}
-.vi-step-range{flex:1 1 150px;max-width:340px;accent-color:#0969da}
-.vi-stepper{margin:0}
-.vi-stepper__stage .vi-frame{margin:0}
-.vi-bd{margin:.4em 0}
-.vi-cap{font-weight:700;color:#57606a;font-size:.82em;margin:.2em 0 .25em;text-transform:uppercase;letter-spacing:.04em}
-.vi-bd-intro{margin:1.2em 0 .6em;color:#57606a;font-size:.9em}
-.vi-structs{display:flex;flex-direction:column;gap:14px}
-.vi-struct{border:1px solid #d0d7de;border-radius:10px;background:#f6f8fa;padding:10px 12px}
-.vi-struct__title{display:flex;align-items:baseline;gap:10px;margin-bottom:.55em}
-.vi-struct__name{font-weight:700;color:#1f2328}
-.vi-struct__meta{color:#8b949e;font-size:.82em}
-.vi-struct .vi-fig{background:#fff}
-`;
-
-function enhanceSnapshot(doc) {
-  if (!doc || !doc.documentElement) return;
-  if (doc.documentElement.dataset.viEnhanced) return;   // each navigation loads a fresh doc
-  doc.documentElement.dataset.viEnhanced = '1';
-
-  // Only fully restyle/restructure genuine LabVIEW "Print to HTML" snapshots.
-  // Anything else (e.g. a VIDiff side-by-side report) just gets an image-fit rule
-  // so its images never overflow, leaving its own layout otherwise intact.
-  const isSnapshot = [...doc.querySelectorAll('meta')]
-    .some(m => /G Development Environment/i.test(m.getAttribute('content') || ''));
-
-  const style = doc.createElement('style');
-  style.textContent = isSnapshot ? ENHANCE_CSS : 'img{max-width:100%;height:auto}';
-  (doc.head || doc.documentElement).appendChild(style);
-
-  if (!isSnapshot) return;
-
-  const SINGLE = new Set(['connector pane', 'front panel', 'position in hierarchy']);
-  for (const h3 of [...doc.querySelectorAll('h3')]) {
-    const title  = (h3.textContent || '').trim().toLowerCase();
-    const frames = collectFrames(h3);
-    if (title === 'block diagram') {
-      if (frames.length > 1)        buildBlockDiagram(doc, h3, frames);
-      else if (frames.length === 1) frames[0].p.replaceWith(makeFigure(doc, frames[0].img));
-    } else if (SINGLE.has(title)) {
-      for (const fr of frames) fr.p.replaceWith(makeFigure(doc, fr.img));
-    }
-  }
-
-  // Arrow keys page through the active (or only) Block Diagram stepper.
-  doc.addEventListener('keydown', e => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    const st = doc.__activeStepper || doc.querySelector('.vi-stepper');
-    if (!st || !st.__step) return;
-    st.__step(e.key === 'ArrowRight' ? 1 : -1);
-    e.preventDefault();
-  });
-}
-
-// Consecutive <P><IMG></P> siblings under a section heading, up to the next <HR>/<H3>.
-function collectFrames(h3) {
-  const out = [];
-  let n = h3.nextElementSibling;
-  while (n && n.tagName !== 'H3' && n.tagName !== 'HR') {
-    if (n.tagName === 'P') {
-      const img = n.querySelector('img');
-      if (img && n.children.length === 1) out.push({ p: n, img });
-    }
-    n = n.nextElementSibling;
-  }
-  return out;
-}
-
-// Wrap one diagram image in a zoom/pan figure with a small toolbar.
-function makeFigure(doc, img) {
-  const fig  = doc.createElement('div'); fig.className  = 'vi-fig';
-  const view = doc.createElement('div'); view.className = 'vi-fig__view';
-  img.classList.add('vi-img');
-  img.removeAttribute('width'); img.removeAttribute('height');
-  img.setAttribute('draggable', 'false');
-  view.appendChild(img);
-  const bar  = doc.createElement('div'); bar.className = 'vi-fig__bar';
-  const bOut = mkBtn(doc, '−', 'Zoom out');
-  const bFit = mkBtn(doc, 'Fit', 'Fit to width');
-  const bIn  = mkBtn(doc, '+', 'Zoom in');
-  bar.append(bOut, bFit, bIn);
-  fig.append(view, bar);
-  wireZoom(view, img, { bOut, bFit, bIn });
-  return fig;
-}
-
-function mkBtn(doc, label, title) {
-  const b = doc.createElement('button');
-  b.type = 'button'; b.textContent = label; b.title = title;
-  return b;
-}
-
-// Zoom by widening the image inside an overflow:auto viewport; pan = scroll.
-// At fit (zoom 1) the viewport grows to the image's height so the page scrolls
-// normally; once zoomed it becomes a bounded, pannable window.
-function wireZoom(view, img, btn) {
-  let zoom = 1, dragging = false, sx = 0, sy = 0, ssl = 0, sst = 0;
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  function fitWidth() {
-    const prev = img.style.width; img.style.width = '';
-    const w = img.offsetWidth; img.style.width = prev; return w;
-  }
-  function setMode() {
-    if (zoom > 1) {
-      view.style.maxHeight = '78vh'; view.style.overflow = 'auto'; view.classList.add('zoomed');
-    } else {
-      view.style.maxHeight = 'none'; view.style.overflow = 'hidden'; view.classList.remove('zoomed');
-      view.scrollLeft = 0; view.scrollTop = 0;
-    }
-  }
-  function relabel() { btn.bFit.textContent = zoom > 1 ? Math.round(zoom * 100) + '%' : 'Fit'; }
-  function apply(nz, ax, ay) {
-    nz = clamp(nz, 1, 8);
-    const vr = view.getBoundingClientRect();
-    if (ax == null) { ax = vr.left + vr.width / 2; ay = vr.top + vr.height / 2; }
-    const preW = img.offsetWidth || 1, preH = img.offsetHeight || 1;
-    const fx = (view.scrollLeft + (ax - vr.left)) / preW;
-    const fy = (view.scrollTop  + (ay - vr.top))  / preH;
-    zoom = nz;
-    if (zoom <= 1) img.style.width = '';
-    else           img.style.width = (zoom * fitWidth()) + 'px';
-    setMode();
-    if (zoom > 1) {
-      const postW = img.offsetWidth, postH = img.offsetHeight;
-      view.scrollLeft = fx * postW - (ax - vr.left);
-      view.scrollTop  = fy * postH - (ay - vr.top);
-    }
-    relabel();
-  }
-  btn.bIn.addEventListener('click',  () => apply(zoom * 1.4));
-  btn.bOut.addEventListener('click', () => apply(zoom / 1.4));
-  btn.bFit.addEventListener('click', () => apply(1));
-  view.addEventListener('dblclick', e => apply(zoom > 1 ? 1 : 2.5, e.clientX, e.clientY));
-  view.addEventListener('wheel', e => {
-    if (!(e.ctrlKey || e.metaKey)) return;          // plain wheel still scrolls the page
-    e.preventDefault();
-    apply(zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY);
-  }, { passive: false });
-  view.addEventListener('pointerdown', e => {
-    if (zoom <= 1) return;
-    dragging = true; sx = e.clientX; sy = e.clientY; ssl = view.scrollLeft; sst = view.scrollTop;
-    view.classList.add('grabbing');
-    try { view.setPointerCapture(e.pointerId); } catch (_) {}
-  });
-  view.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    view.scrollLeft = ssl - (e.clientX - sx);
-    view.scrollTop  = sst - (e.clientY - sy);
-  });
-  const end = () => { dragging = false; view.classList.remove('grabbing'); };
-  view.addEventListener('pointerup', end);
-  view.addEventListener('pointercancel', end);
-  setMode(); relabel();
-}
-
-// Read a PNG's pixel size straight from its data-URI (IHDR width/height). LabVIEW
-// renders every case of one structure at that structure's fixed border size, so
-// equal sizes reliably identify cases that belong to the same structure — and the
-// snapshot HTML carries no other grouping/coordinate data to go on.
-function pngSize(img) {
-  const src = img.getAttribute('src') || '';
-  const k = src.indexOf('base64,');
-  if (k < 0) return null;
-  let b;
-  try { b = atob(src.slice(k + 7, k + 7 + 48)); } catch (_) { return null; }
-  if (b.length < 24 || b.charCodeAt(0) !== 0x89) return null;
-  const u32 = o => b.charCodeAt(o) * 16777216 + b.charCodeAt(o + 1) * 65536 +
-                   b.charCodeAt(o + 2) * 256 + b.charCodeAt(o + 3);
-  return u32(16) + 'x' + u32(20);   // IHDR: width x height
-}
-
-// A self-contained Prev/Next/slider stepper over a set of frames. Returns the
-// element; the caller places it. `unit` labels the counter ("Case" / "Frame").
-function makeStepper(doc, frames, unit) {
-  const N    = frames.length;
-  const wrap = doc.createElement('div'); wrap.className = 'vi-stepper';
-  const bar  = doc.createElement('div'); bar.className  = 'vi-stepper__bar';
-  const prev = doc.createElement('button'); prev.type = 'button'; prev.className = 'vi-step-btn'; prev.textContent = '◀ Prev';
-  const next = doc.createElement('button'); next.type = 'button'; next.className = 'vi-step-btn'; next.textContent = 'Next ▶';
-  const label = doc.createElement('span'); label.className = 'vi-step-label';
-  const hint  = doc.createElement('span'); hint.className  = 'vi-step-hint'; hint.textContent = (unit || 'Frame') + 's';
-  let slider = null;
-  if (N > 2) {
-    slider = doc.createElement('input');
-    slider.type = 'range'; slider.min = '1'; slider.max = String(N); slider.value = '1';
-    slider.className = 'vi-step-range'; slider.title = 'Scroll through ' + (unit || 'frame').toLowerCase() + 's';
-  }
-  const stage = doc.createElement('div'); stage.className = 'vi-stepper__stage';
-  const figs = frames.map(fr => {
-    const f = makeFigure(doc, fr.img); f.classList.add('vi-frame');
-    stage.appendChild(f); return f;
-  });
-  let idx = 0;
-  function show(i) {
-    idx = Math.max(0, Math.min(N - 1, i));
-    figs.forEach((f, k) => { f.style.display = k === idx ? 'block' : 'none'; });
-    label.textContent = `${unit || 'Frame'} ${idx + 1} / ${N}`;
-    if (slider) slider.value = String(idx + 1);
-    prev.disabled = idx === 0; next.disabled = idx === N - 1;
-  }
-  prev.addEventListener('click', () => show(idx - 1));
-  next.addEventListener('click', () => show(idx + 1));
-  if (slider) slider.addEventListener('input', () => show(parseInt(slider.value, 10) - 1));
-  wrap.addEventListener('pointerdown', () => { doc.__activeStepper = wrap; });
-  wrap.__step = d => show(idx + d);
-  bar.append(prev, label, next);
-  if (slider) bar.append(slider);
-  bar.append(hint);
-  wrap.append(bar, stage);
-  doc.__activeStepper = doc.__activeStepper || wrap;
-  show(0);
-  return wrap;
-}
-
-// Lay out a multi-image Block Diagram the way a user reads a VI: the top-level
-// diagram stays pinned and visible, and every Case/Event/Sequence structure's
-// extra cases get their own scrollable window (grouped by rendered size, since
-// that's the only signal the snapshot exposes — see pngSize). This replaces the
-// single flat stepper that forced a choice between the diagram and the cases.
-function buildBlockDiagram(doc, h3, frames) {
-  const container = doc.createElement('div'); container.className = 'vi-bd';
-
-  // First emitted image == the whole top-level diagram. Always shown, zoomable.
-  const topCap = doc.createElement('div'); topCap.className = 'vi-cap'; topCap.textContent = 'Top-level diagram';
-  const topFig = makeFigure(doc, frames[0].img); topFig.classList.add('vi-bd-top');
-  container.append(topCap, topFig);
-
-  // Remaining images are additional structure cases. Group by exact pixel size:
-  // all cases of one structure share its fixed border size, so equal sizes group
-  // together even when LabVIEW interleaves nested structures between them.
-  const rest = frames.slice(1);
-  if (rest.length) {
-    const groups = [];
-    const byKey  = new Map();
-    rest.forEach((fr, i) => {
-      const key = pngSize(fr.img) || ('u' + i);   // unknown size -> its own group
-      let g = byKey.get(key);
-      if (!g) { g = []; byKey.set(key, g); groups.push(g); }
-      g.push(fr);
-    });
-
-    const intro = doc.createElement('div'); intro.className = 'vi-bd-intro';
-    intro.textContent = groups.length === 1
-      ? 'One case / event structure — scroll its cases in the window below.'
-      : `${groups.length} case / event structures — scroll each one's cases in its window below.`;
-    container.appendChild(intro);
-
-    const structs = doc.createElement('div'); structs.className = 'vi-structs';
-    groups.forEach((g, i) => {
-      const panel = doc.createElement('div'); panel.className = 'vi-struct';
-      const title = doc.createElement('div'); title.className = 'vi-struct__title';
-      const name  = doc.createElement('span'); name.className = 'vi-struct__name'; name.textContent = `Structure ${i + 1}`;
-      const meta  = doc.createElement('span'); meta.className = 'vi-struct__meta';
-      meta.textContent = g.length === 1 ? '1 case' : `${g.length} cases`;
-      title.append(name, meta);
-      panel.appendChild(title);
-      if (g.length > 1) {
-        panel.appendChild(makeStepper(doc, g, 'Case'));
-      } else {
-        const f = makeFigure(doc, g[0].img); f.classList.add('vi-frame');
-        panel.appendChild(f);
-      }
-      structs.appendChild(panel);
-    });
-    container.appendChild(structs);
-  }
-
-  frames.forEach(fr => fr.p.remove());
-  h3.after(container);
-}
-
-// Configure the toolbar "View diff report" link. Shown only when a true side-by-side
-// VIDiff report exists for this VI (on the selected or the other platform).
 function setDiffLink(viRel) {
   const chg = changeMap[viRel];
   const diffLink = document.getElementById('diff-link');
@@ -1506,7 +1149,6 @@ function openVI(row) {
   currentSnapshot = { html: `${BASE}${row.dataset.html}`, title: row.dataset.name };
   openSnapshot(currentSnapshot.html, currentSnapshot.title);
   syncUrl();
-  syncViewerToggle();                    // reflect 1.0/2.0 active + enable/disable the Diff segment
 }
 
 // Open a changed VI's side-by-side diff report (from the selected container), or
@@ -1547,12 +1189,11 @@ function openDiff(viRel, type, row) {
 //
 // A changed VI shows a "diff" badge whether or not its side-by-side report has
 // been generated. When it hasn't, openDiff() shows the panel below instead of the
-// flat snapshot: it explains the report hasn't been run and offers to run VIDiff
+// snapshot: it explains the report hasn't been run and offers to run VIDiff
 // for just this VI or for every VI the revision changed. When a report IS shown, a
 // "Regenerate diff" link appears in the toolbar and opens the same panel.
 //
 // The run is a GitHub Actions workflow_dispatch (LabVIEW can't run in a browser),
-// reusing the same Actions:write token the 2.0 wizard stores in this origin's
 // localStorage. When the run finishes and the dashboard redeploys, reloading shows
 // the new report. base = the previous revision in the dropdown, so the generated
 // report matches the change set the browser computed.
@@ -1648,7 +1289,8 @@ function showDiffRun(viRel, type, mode) {
   const snap = document.getElementById('dr-snap');
   const chg = changeMap[viRel];
   if (snap) {
-    if (chg && chg.url) { snap.style.display = ''; snap.onclick = (e) => { e.preventDefault(); showInFrame(chg.url, `${viRel} \u2014 snapshot`); }; }
+    const snapshotRow = findRowByName(viRel);
+    if (snapshotRow) { snap.style.display = ''; snap.onclick = (e) => { e.preventDefault(); openVI(snapshotRow); }; }
     else snap.style.display = 'none';
   }
   const panel = document.getElementById('vi-diffrun'); if (panel) panel.style.display = 'block';
@@ -1749,7 +1391,6 @@ function buildShareUrl() {
     p.set('vi', openViRel);
     if (openView === 'diff') p.set('view', 'diff');
   }
-  if (viewerMode === '2') p.set('viewer', '2');
   if (vb2Pane === 'bd') p.set('pane', 'bd');
   if (vb2Plat === 'windows') p.set('plat2', 'windows');
   if (diffPlatform === 'linux') p.set('plat', 'linux');
@@ -1957,11 +1598,8 @@ document.querySelectorAll('#plat-toggle button').forEach(btn => {
 });
 
 // VI Browser viewer toggle: a single tri-state control for the open VI's three
-// faces — 1.0 (classic flat gallery), 2.0 (in-place renderer), and Diff (the
-// side-by-side VIDiff report). 1.0/2.0 pick the snapshot sub-mode and persist via
 // ?viewer=; Diff is offered only when the open VI changed in this revision, and is
 // grayed out with an explanatory tip strip otherwise. The active segment always
-// mirrors the live view (openView 'diff' -> Diff, else the 1.0/2.0 mode).
 function setViewerModeNote(msg) {
   const note = document.getElementById('viewer-mode-note');
   if (!note) return;
@@ -1970,7 +1608,6 @@ function setViewerModeNote(msg) {
 }
 function syncViewerToggle() {
   // The active segment mirrors what's on screen: the Diff view when one is open,
-  // otherwise the 1.0/2.0 snapshot sub-mode.
   const active = (openView === 'diff') ? 'diff' : viewerMode;
   document.querySelectorAll('#viewer-toggle button').forEach(b => {
     b.classList.toggle('active', b.dataset.viewer === active);
@@ -2009,11 +1646,8 @@ document.querySelectorAll('#viewer-toggle button').forEach(btn => {
       openDiff(openViRel, chg.type, currentDiffRow || findRowByName(openViRel));
       return;
     }
-    // 1.0 / 2.0 — a snapshot sub-mode.
     const leavingDiff = (openView === 'diff');
-    if (v === viewerMode && !leavingDiff) return;
-    vb2LsSet(VB2_VIEWER_KEY, v);
-    viewerMode = v;
+    if (!leavingDiff) return;
     if (leavingDiff && openViRel) {
       // Leaving the diff view: re-open this VI's snapshot in the chosen mode.
       const row = currentDiffRow || findRowByName(openViRel);
@@ -2028,7 +1662,6 @@ document.querySelectorAll('#viewer-toggle button').forEach(btn => {
 });
 syncViewerToggle();
 
-// Front Panel / Block Diagram sub-toggle (2.0 in-place view). Re-renders the
 // already-loaded frames at the chosen root; the choice sticks across VIs.
 document.querySelectorAll('#pane-toggle button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -2040,7 +1673,6 @@ document.querySelectorAll('#pane-toggle button').forEach(btn => {
   });
 });
 
-// Linux / Windows 2.0 platform sub-toggle: switch the render source and re-open the
 // current VI in the chosen platform. The choice sticks across VIs; a VI with no
 // Windows render quietly stays on Linux (the switch only shows when one exists).
 document.querySelectorAll('#vb2-plat-toggle button').forEach(btn => {
@@ -2048,6 +1680,7 @@ document.querySelectorAll('#vb2-plat-toggle button').forEach(btn => {
     if (btn.dataset.plat2 === vb2Plat) return;
     vb2LsSet(VB2_PLAT_KEY, btn.dataset.plat2);
     vb2Plat = btn.dataset.plat2;
+    snapshotPlatformChosen = true;
     syncUrl();
     if (currentSnapshot && !currentDiffVi) openSnapshot(currentSnapshot.html, currentSnapshot.title);
   });
@@ -2058,7 +1691,6 @@ loadCommits().catch(err => {
     `<div style="padding:16px;color:var(--error);font-size:.8em">Error loading gallery:<br>${err.message}</div>`;
 });
 
-// Light up the "2.0" availability glyphs and keep them current as renders publish.
 loadJson2Index();
 startJson2Poll();
 
@@ -2100,15 +1732,6 @@ if (window.lvciHeaderReady) lvciPlaceRevInContextBar();
 else document.addEventListener('lvci:ready', lvciPlaceRevInContextBar);
 </script>
 <script>
-/* VI Browser 2.0 empty-state controller. Self-contained.
-   2.0 renders from this repository's OWN image - built by the "Build VI Browser
-   2.0 render image" workflow and pulled with the built-in token, so there is no
-   render token or private image to set up. When 2.0 is selected but a VI has no
-   frames JSON yet, this reflects the latest snapshot-to-JSON run (no render yet /
-   in progress / finished-no-frames / failed) and offers a one-click run via the
-   dispatch token (Actions: write) the integrate/dashboard pages keep in this
-   origin's localStorage. A browser cannot test a registry pull (no CORS), so the
-   real proof is the dispatched workflow run. */
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
@@ -2166,8 +1789,6 @@ else document.addEventListener('lvci:ready', lvciPlaceRevInContextBar);
     return gh("/repos/" + repo, token).then(ghJson).then(function (d) { return (d && d.default_branch) || "main"; }).catch(function () { return "main"; });
   }
 
-  // ---- VI Browser 2.0 viewer state ----------------------------------------
-  // The viewer calls vb2Resolve() when 2.0 is selected but a VI has no frames JSON.
   // Reflect the real state in #nt-state: no render yet (run prompt) / run in
   // progress / run finished but no frames for this VI / run failed. The run button
   // dispatches the snapshot-to-JSON workflow with the dispatch token (Actions:write).
@@ -2184,14 +1805,13 @@ else document.addEventListener('lvci:ready', lvciPlaceRevInContextBar);
     var s = $("nt-state-status"); if (s) s.innerHTML = "";
     p.style.display = "";
   }
-  // No 2.0 render exists yet for this repo/VI: explain that 2.0 builds from this
   // repo's own image and offer a one-click run of the snapshot-to-JSON workflow.
   function vb2ShowRunPrompt() {
     vb2Cancel();
     var wf = vb2Workflow(_vb2Ctx.platform), plat = platformLabel(_vb2Ctx.platform);
-    var run = "<button id='nt-state-rerun' type='button' style='padding:7px 15px;border:0;border-radius:7px;background:#2da44e;color:#fff;font-weight:600;cursor:pointer'>\u26a1 Run the " + esc(plat) + " 2.0 snapshot</button>";
-    vb2State("\uD83C\uDFA8", "No " + esc(plat) + " VI Browser 2.0 render yet",
-      "Queue <code>" + esc(wf) + "</code> for the current revision to start the " + esc(plat) + " container and generate the 2.0 frames for <strong>" + esc(_vb2Title) + "</strong>. Linux renders use this repository\u2019s 2.0 image; if it has not been built yet, run <a href='" + buildWfUrl() + "' target='_blank' rel='noopener' style='color:var(--link);font-weight:600'>Build VI Browser 2.0 render image \u2197</a> first.",
+    var run = "<button id='nt-state-rerun' type='button' style='padding:7px 15px;border:0;border-radius:7px;background:#2da44e;color:#fff;font-weight:600;cursor:pointer'>\u26a1 Run the " + esc(plat) + " snapshot</button>";
+    vb2State("\uD83C\uDFA8", "No " + esc(plat) + " VI Snapshots render yet",
+      "Queue <code>" + esc(wf) + "</code> for the current revision to start the " + esc(plat) + " container and generate the frames for <strong>" + esc(_vb2Title) + "</strong>. Linux renders use this repository\u2019s image; if it has not been built yet, run <a href='" + buildWfUrl() + "' target='_blank' rel='noopener' style='color:var(--link);font-weight:600'>Build LabVIEW CI Image — Linux \u2197</a> first.",
       run);
   }
   function vb2Resolve(title, ctx) {
@@ -2204,20 +1824,20 @@ else document.addEventListener('lvci:ready', lvciPlaceRevInContextBar);
     if (!repo || !dt) { vb2ShowRunPrompt(); return; }
     var spin = "<span class='spinner'></span>";
     var wf = vb2Workflow(_vb2Ctx.platform), plat = platformLabel(_vb2Ctx.platform);
-    vb2State(spin, "Checking the " + esc(plat) + " 2.0 render\u2026", "Looking up the latest <code>" + esc(wf) + "</code> run\u2026", "");
+    vb2State(spin, "Checking the " + esc(plat) + " render\u2026", "Looking up the latest <code>" + esc(wf) + "</code> run\u2026", "");
     gh("/repos/" + repo + "/actions/workflows/" + encodeURIComponent(wf) + "/runs?per_page=1", dt).then(ghJson)
       .then(function (d) {
         var run = (d && d.workflow_runs || [])[0];
         if (!run) { vb2ShowRunPrompt(); return; }
         _vb2ViewLink = "<a href='" + esc(run.html_url) + "' target='_blank' rel='noopener' style='color:var(--link);font-weight:600'>View run \u2197</a>";
-        var rerun = "<button id='nt-state-rerun' type='button' style='padding:7px 15px;border:0;border-radius:7px;background:#2da44e;color:#fff;font-weight:600;cursor:pointer'>\u26a1 Re-run the " + esc(plat) + " 2.0 snapshot</button>";
+        var rerun = "<button id='nt-state-rerun' type='button' style='padding:7px 15px;border:0;border-radius:7px;background:#2da44e;color:#fff;font-weight:600;cursor:pointer'>\u26a1 Re-run the " + esc(plat) + " snapshot</button>";
         if (run.status !== "completed") {
-          vb2State(spin, "Rendering the " + esc(plat) + " 2.0 snapshot\u2026", "The <code>" + esc(wf) + "</code> run is <strong>" + esc(run.status) + "</strong>. When it finishes, reload this page to load the new frames.", _vb2ViewLink);
+          vb2State(spin, "Rendering the " + esc(plat) + " snapshot\u2026", "The <code>" + esc(wf) + "</code> run is <strong>" + esc(run.status) + "</strong>. When it finishes, reload this page to load the new frames.", _vb2ViewLink);
           vb2Timer = setTimeout(function () { vb2Resolve(_vb2Title, _vb2Ctx); }, 12000);
         } else if (run.conclusion === "success") {
-          vb2State("\u26a0\uFE0F", "No " + esc(plat) + " 2.0 render for " + esc(_vb2Title), "The last run finished, but produced no position-aware frames for this item. A VI appears in 2.0 only when the render image emits frames for it \u2014 controls (<code>.ctl</code>) and VIs without a block diagram are skipped, and a VI the renderer cannot open is skipped too. If you expected a render here, open the run to check the logs.", _vb2ViewLink + " " + rerun);
+          vb2State("\u26a0\uFE0F", "No " + esc(plat) + " render for " + esc(_vb2Title), "The last run finished, but produced no position-aware frames for this item. A snapshot is available only when the render image emits frames for it \u2014 controls (<code>.ctl</code>) and VIs without a block diagram are skipped, and a VI the renderer cannot open is skipped too. If you expected a render here, open the run to check the logs.", _vb2ViewLink + " " + rerun);
         } else {
-          vb2State("\u274C", "The " + esc(plat) + " 2.0 snapshot run did not succeed", "The last <code>" + esc(wf) + "</code> run ended with <strong>" + esc(run.conclusion || "no result") + "</strong>, so no frames were produced. Open the run to see why, then re-run.", _vb2ViewLink + " " + rerun);
+          vb2State("\u274C", "The " + esc(plat) + " snapshot run did not succeed", "The last <code>" + esc(wf) + "</code> run ended with <strong>" + esc(run.conclusion || "no result") + "</strong>, so no frames were produced. Open the run to see why, then re-run.", _vb2ViewLink + " " + rerun);
         }
       })
       .catch(function () { vb2ShowRunPrompt(); });
@@ -2228,11 +1848,11 @@ else document.addEventListener('lvci:ready', lvciPlaceRevInContextBar);
     var b = $("nt-state-rerun"); if (b) b.disabled = true;
     var wf = vb2Workflow(_vb2Ctx.platform), plat = platformLabel(_vb2Ctx.platform), targetSha = _vb2Ctx.sha || "";
     var inputs = _vb2Ctx.platform === "windows" ? { vi: _vb2Ctx.vi || "", target_sha: targetSha } : { mode: "head", target_sha: targetSha };
-    setStatus(sEl, "Queuing the " + esc(plat) + " 2.0 snapshot run\u2026", null);
+    setStatus(sEl, "Queuing the " + esc(plat) + " snapshot run\u2026", null);
     defaultBranch(dt).then(function (ref) { return gh("/repos/" + repo + "/actions/workflows/" + encodeURIComponent(wf) + "/dispatches", dt, { method: "POST", body: { ref: ref, inputs: inputs } }); })
       .then(function (r) {
         if (b) b.disabled = false;
-        if (r.status === 204) { vb2State("<span class='spinner'></span>", "Rendering the " + esc(plat) + " 2.0 snapshot\u2026", "Queued the current revision. When it finishes, reload this page to load the new frames.", _vb2ViewLink); vb2Timer = setTimeout(function () { vb2Resolve(_vb2Title, _vb2Ctx); }, 12000); return; }
+        if (r.status === 204) { vb2State("<span class='spinner'></span>", "Rendering the " + esc(plat) + " snapshot\u2026", "Queued the current revision. When it finishes, reload this page to load the new frames.", _vb2ViewLink); vb2Timer = setTimeout(function () { vb2Resolve(_vb2Title, _vb2Ctx); }, 12000); return; }
         if (r.status === 401 || r.status === 403) { try { localStorage.removeItem(DISPATCH_KEY); } catch (ig) {} setStatus(sEl, "Dispatch token " + (r.status === 401 ? "rejected (401)" : "lacks Actions: write") + " \u2014 click Re-run to enter a new one.", "err"); return; }
         return r.json().catch(function () { return {}; }).then(function (j) { setStatus(sEl, r.status === 404 ? "Token cannot see <code>" + esc(repo) + "</code>, or the workflow is not on the default branch." : "Dispatch failed (HTTP " + r.status + "): " + esc(j.message || "GitHub rejected the dispatch."), "err"); });
       })
@@ -2253,7 +1873,6 @@ else document.addEventListener('lvci:ready', lvciPlaceRevInContextBar);
     var sa = $("nt-state-actions"); if (sa) sa.addEventListener("click", function (e) { var t = e.target; if (t && t.id === "nt-state-rerun") { e.preventDefault(); vb2Rerun(); } });
   }
   window.__lvciVB2 = { resolve: vb2Resolve, cancel: vb2Cancel };
-
   // Resizable sidebar divider
   const divider = document.getElementById('divider');
   const sidebar = document.getElementById('sidebar');
@@ -2262,20 +1881,20 @@ else document.addEventListener('lvci:ready', lvciPlaceRevInContextBar);
       const startX = event.clientX;
       const startWidth = sidebar.offsetWidth;
       document.body.classList.add('resizing');
-      
+
       function onMove(e) {
         const delta = e.clientX - startX;
         const newWidth = Math.max(220, Math.min(startWidth + delta, window.innerWidth * 0.6));
         sidebar.style.width = newWidth + 'px';
       }
-      
+
       function onEnd() {
         document.body.classList.remove('resizing');
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup', onEnd);
         document.removeEventListener('pointercancel', onEnd);
       }
-      
+
       document.addEventListener('pointermove', onMove);
       document.addEventListener('pointerup', onEnd);
       document.addEventListener('pointercancel', onEnd);

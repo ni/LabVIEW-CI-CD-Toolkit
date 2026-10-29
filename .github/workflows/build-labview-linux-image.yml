@@ -308,7 +308,7 @@ jobs:
                 pathlib.Path('.github/labview/vipm/install-vipc-linux.sh'),
             ]
             files += sorted(pathlib.Path('.github/labview/vipm').glob('*.vipc'), key=lambda p: p.name.lower())
-            # The VI Browser 2.0 render engine (lvctl + runner) is baked into this
+            # The VI Browser render engine (lvctl + runner) is baked into this
             # worker, so its source must factor into the version -- an engine change
             # must yield a new worker image so clients pick it up on the next copy.
             toimages = pathlib.Path('.github/labview/toimages')

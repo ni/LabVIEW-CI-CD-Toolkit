@@ -69,9 +69,6 @@ param(
     [string]$OpsDir            = '',
     # Directory holding the VI Browser page assets (vi-browser.html, vi-interactive.html).
     [string]$PagesDir          = '',
-    # VI Browser 2.0 (position-aware frames JSON) emission: 'true' (default) emits
-    # the frames JSON next to each HTML when the PrintToImagesJson op is present;
-    # 'false' renders HTML only (VI Browser config: positionAware excludes Windows).
     [string]$EmitFramesJson    = 'true'
 )
 
@@ -131,8 +128,16 @@ function Get-VimapForSha([string]$Sha) {
 $Rendered = New-Object System.Collections.Generic.HashSet[string]
 foreach ($dir in @($ExistingByBlobDir, $ByBlobDir)) {
     if ($dir -and (Test-Path $dir)) {
-        Get-ChildItem $dir -Recurse -Filter '*.html' -ErrorAction SilentlyContinue |
-            ForEach-Object { [void]$Rendered.Add($_.BaseName) }
+        Get-ChildItem $dir -Recurse -Filter '*.windows.json' -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                $blob = $_.Name -replace '\.windows\.json$', ''
+                if ($blob -notmatch '^[0-9a-f]{40}$') { return }
+                $destination = Join-Path $ByBlobDir $blob.Substring(0, 2)
+                New-Item -ItemType Directory -Force -Path $destination | Out-Null
+                $framePath = Join-Path $destination $_.Name
+                if ($_.FullName -ne $framePath) { Copy-Item -LiteralPath $_.FullName -Destination $framePath -Force }
+                [void]$Rendered.Add($blob)
+            }
     }
 }
 Write-Host "Seeded $($Rendered.Count) already-rendered blob(s)."
@@ -161,11 +166,38 @@ else {
 }
 Write-Host "Mode=$Mode - processing $($Commits.Count) commit(s)."
 
+$RenderBinHost = Join-Path $TempRoot ($ContainerName + '-bin')
+New-Item -ItemType Directory -Force -Path $RenderBinHost | Out-Null
+if ($EmitFramesJson -ne 'false') {
+    $visDir = Join-Path $OpsHost 'toimages\_ni\labview\lvctl\vis'
+    Push-Location $visDir
+    try {
+        Remove-Item 'toimages.zip' -Force -ErrorAction SilentlyContinue
+        & 7z a -tzip 'toimages.zip' 'toimages' | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Could not package snapshot rendering VIs.' }
+    } finally { Pop-Location }
+    $previousCgo = $env:CGO_ENABLED
+    $env:CGO_ENABLED = '0'
+    try {
+        foreach ($build in @(
+            @{ Source = 'toimages\_ni\labview\lvctl'; Binary = 'lvctl.exe' },
+            @{ Source = 'toimages'; Binary = 'runner.exe' }
+        )) {
+            Push-Location (Join-Path $OpsHost $build.Source)
+            try {
+                & go build -trimpath -o (Join-Path $RenderBinHost $build.Binary) .
+                if ($LASTEXITCODE -ne 0) { throw "Could not build $($build.Binary)." }
+            } finally { Pop-Location }
+        }
+    } finally { $env:CGO_ENABLED = $previousCgo }
+}
+
 # ── Start the long-lived container ───────────────────────────────────────────
 & docker pull $Image | Out-Null
 Write-Host "Starting container $ContainerName ..."
 & docker run -d --name $ContainerName `
     -v "${OpsHost}:C:\ops" `
+    -v "${RenderBinHost}:C:\renderbin" `
     -v "${WorkTreesHost}:C:\wt" `
     -v "${OutDir}:C:\out" `
     $Image powershell -NoProfile -Command "while (`$true) { Start-Sleep -Seconds 3600 }" | Out-Null
@@ -216,7 +248,7 @@ try {
             [System.IO.File]::WriteAllLines($vimapFile,    @($vimap    | ForEach-Object { "$($_.Blob)`t$($_.Rel)" }), $utf8NoBom)
             [System.IO.File]::WriteAllLines($worklistFile, @($worklist | ForEach-Object { "$($_.Blob)`t$($_.Rel)" }), $utf8NoBom)
 
-            if ($worklist.Count -gt 0) {
+            if ($worklist.Count -gt 0 -and $EmitFramesJson -ne 'false') {
                 Write-Host "[$($sha.Substring(0,7))] rendering $($worklist.Count) new VI(s) of $($vimap.Count)..."
                 & docker exec $ContainerName powershell -NoProfile -ExecutionPolicy Bypass `
                     -File 'C:\ops\render-snapshots.ps1' `
@@ -226,8 +258,10 @@ try {
                     -WorkListPath  "C:\out\worklist-$sha.tsv" `
                     -EmitFramesJson $EmitFramesJson
                 if ($LASTEXITCODE -ne 0) { Write-Warning "render exec returned $LASTEXITCODE for $sha (continuing)." }
-                foreach ($e in $worklist) { [void]$Rendered.Add($e.Blob) }
-                $totalRendered += $worklist.Count
+                foreach ($entry in $worklist) {
+                    $framePath = Join-Path $ByBlobDir ($entry.Blob.Substring(0, 2) + '\' + $entry.Blob + '.windows.json')
+                    if (Test-Path $framePath) { [void]$Rendered.Add($entry.Blob); $totalRendered++ }
+                }
             }
             else {
                 Write-Host "[$($sha.Substring(0,7))] all $($vimap.Count) VI(s) already rendered - manifest only."
@@ -258,6 +292,7 @@ try {
 finally {
     & docker rm -f $ContainerName 2>$null | Out-Null
     & git -C $WorkspaceRoot worktree prune 2>$null | Out-Null
+    Remove-Item $RenderBinHost -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # ── Publish the browser pages alongside the gallery data ─────────────────────
@@ -272,9 +307,9 @@ if (Test-Path $ViRenderSrc) { Copy-Item $ViRenderSrc (Join-Path $OutDir 'vi-rend
 # The dashboard reads this single file to know which of each revision's VIs have
 # a snapshot (snapshots are keyed by git blob SHA), so the Snapshots column and
 # the per-revision glyph reflect the real gallery without crawling by-blob/. The
-# set is every blob that now has a by-blob HTML (already-deployed seed + rendered
+# set is every blob that now has a frames JSON (already-deployed seed + rendered
 # this run); it deploys alongside commits.json under vi-snapshots/.
-$BlobsIndex = Join-Path $OutDir 'blobs.json'
+$BlobsIndex = Join-Path $OutDir 'json-blobs.windows.json'
 try {
     $sortedBlobs = @($Rendered) | Sort-Object
     if ($sortedBlobs.Count -eq 0) {
@@ -285,9 +320,9 @@ try {
         $blobsJson = '[' + (($sortedBlobs | ForEach-Object { '"' + $_ + '"' }) -join ',') + ']'
     }
     [System.IO.File]::WriteAllText($BlobsIndex, $blobsJson, (New-Object System.Text.UTF8Encoding($false)))
-    Write-Host "Wrote blobs.json with $($sortedBlobs.Count) rendered blob(s)."
+    Write-Host "Wrote json-blobs.windows.json with $($sortedBlobs.Count) rendered blob(s)."
 } catch {
-    Write-Warning "Could not write blobs.json: $_"
+    Write-Warning "Could not write json-blobs.windows.json: $_"
 }
 
 Write-Host ""

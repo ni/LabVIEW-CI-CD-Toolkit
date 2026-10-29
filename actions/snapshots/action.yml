@@ -9,7 +9,7 @@
 #   build-snapshots.ps1, render-snapshots.ps1, build-gallery.py,
 #   vi-browser.html, vi-interactive.html
 name: 'LabVIEW VI Snapshots'
-description: 'Render the VI block-diagram gallery (VI Browser) for a repository, inside a container.'
+description: 'Render interactive VI snapshots for the VI Browser inside a container.'
 author: 'labview-ci'
 
 inputs:
@@ -58,6 +58,11 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Set up the snapshot render toolchain
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: ${{ github.action_path }}/../../.github/labview/toimages/go.mod
+
     - name: Build VI snapshots (incremental, content-addressed)
       id: snapshots
       shell: powershell
@@ -71,7 +76,7 @@ runs:
           -Shas              "$Env:SNAPSHOT_SHAS" `
           -OutDir            "${{ github.workspace }}\${{ inputs.out-dir }}" `
           -ExistingByBlobDir '${{ inputs.existing-by-blob-dir }}' `
-          -OpsDir            "${{ github.action_path }}" `
+          -OpsDir            "${{ github.action_path }}\..\..\.github\labview" `
           -PagesDir          "${{ github.action_path }}" `
           -Image             "${{ inputs.image }}" `
           -MaxCommits        ${{ inputs.max-commits }} `

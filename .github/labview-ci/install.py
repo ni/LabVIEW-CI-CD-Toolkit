@@ -216,7 +216,7 @@ def resolve_activities(catalog: dict, activities: list[str]) -> list[str]:
     """Expand hard capability dependencies, preserving the requested order."""
     by_id = {c["id"]: c for c in catalog.get("capabilities", [])}
     selected: list[str] = []
-    stack = list(activities)
+    stack = ['snapshots' if activity == 'snapshots-2' else activity for activity in activities]
     while stack:
         cid = stack.pop(0)
         if cid in selected:
@@ -336,7 +336,7 @@ def copy_entry(entry: str, source_root: Path, target_root: Path,
         # REMOVED so a vendored directory matches the source exactly. Without this,
         # a file the tooling deletes (e.g. an obsolete Go source) lingers on the
         # consumer and can break the build - duplicate Go declarations broke the
-        # Windows VI Browser 2.0 render after viserver_windows.go was removed. Only
+        # Windows VI Browser render after viserver_windows.go was removed. Only
         # prune real orphans (never a file still in source) and never the consumer's
         # own preserved config files.
         if update:

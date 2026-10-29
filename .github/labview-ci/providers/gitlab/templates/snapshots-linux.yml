@@ -1,4 +1,4 @@
-lvci:snapshots-2-linux:
+lvci:snapshots-linux:
   extends: .lvci:linux-docker
   stage: verify
   needs:
@@ -24,7 +24,7 @@ lvci:snapshots-2-linux:
     - |
       set +e
       previous=".lvci-previous-pages"
-      output="ci-out/vi-snapshots-2-linux"
+      output="ci-out/vi-snapshots-linux"
       rm -rf "$output"
       mkdir -p "$output"
       python3 .gitlab/labview-ci/scripts/restore-pages.py --out "$previous"
@@ -33,10 +33,10 @@ lvci:snapshots-2-linux:
       elif [ "${LVCI_USE_CUSTOM_IMAGE:-false}" = "true" ]; then
         image="${CI_REGISTRY_IMAGE}/labview:linux-latest"
       else
-        printf '%s\n' 'VI Snapshots 2.0 on Linux needs a custom Linux worker image. Enable custom-image or set LVCI_LINUX_IMAGE.' > "$output/render.log"
+        printf '%s\n' 'VI Snapshots on Linux needs a custom Linux worker image. Enable custom-image or set LVCI_LINUX_IMAGE.' > "$output/render.log"
         python3 .gitlab/labview-ci/scripts/stage-tree.py \
           --source "$output" \
-          --destination "ci-out/gitlab-pages/snapshots-2-linux/vi-snapshots"
+          --destination "ci-out/gitlab-pages/snapshots-linux/vi-snapshots"
         exit 0
       fi
       if [[ "$image" == "${CI_REGISTRY_IMAGE}"/* ]]; then
@@ -61,11 +61,11 @@ lvci:snapshots-2-linux:
       fi
       python3 .gitlab/labview-ci/scripts/stage-tree.py \
         --source "$output" \
-        --destination "ci-out/gitlab-pages/snapshots-2-linux/vi-snapshots"
+        --destination "ci-out/gitlab-pages/snapshots-linux/vi-snapshots"
       exit "$render_exit"
   artifacts:
     when: always
     expire_in: 30 days
     paths:
-      - ci-out/vi-snapshots-2-linux/
-      - ci-out/gitlab-pages/snapshots-2-linux/
+      - ci-out/vi-snapshots-linux/
+      - ci-out/gitlab-pages/snapshots-linux/

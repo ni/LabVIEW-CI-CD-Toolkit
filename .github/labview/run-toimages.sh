@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # run-toimages.sh - orchestrate position-aware <blob>.json rendering for the
-# in-place VI Browser (2.0) across one or more commits.
+# in-place VI Browser across one or more commits.
 #
 # PUBLIC scaffolding: contains NO LabVIEW/NI code. The actual rendering is done by
 # a separate PRIVATE image (see .github/workflows/vi-snapshots-json.yml). This
@@ -19,7 +19,7 @@
 #
 # INCREMENTAL PUBLISH: after each commit that produced JSON, the new files (plus a
 # flat json-blobs.json index) are pushed to gh-pages best-effort, so the VI
-# Browser's 2.0 glyphs light up progressively during a long backfill instead of
+# Browser's snapshot glyphs light up progressively during a long backfill instead of
 # only at the very end. The workflow's final deploy step remains authoritative, so
 # a failed incremental push never loses data.
 #
@@ -48,6 +48,7 @@ FORCE=${FORCE:-false}
 MAX_COMMITS=${MAX_COMMITS:-0}
 TIME_BUDGET_MIN=${TIME_BUDGET_MIN:-110}
 WORKLIST_SH=${WORKLIST_SH:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/build-json-worklist.sh"}
+METADATA_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/build-snapshot-metadata.py"
 
 BYBLOB="$OUT/by-blob"
 mkdir -p "$BYBLOB"
@@ -60,9 +61,7 @@ esac
 EMPTY_EXISTING="$OUT/.force-empty-existing"
 if [ "$FORCE_RENDER" = "1" ]; then rm -rf "$EMPTY_EXISTING" && mkdir -p "$EMPTY_EXISTING"; fi
 
-# ── Seed staging with already-rendered JSON (only .json - the .html belong to the
-#    1.0 pipeline) so done blobs are skipped instantly and dedup works across the
-#    commits within this run. ──
+# ── Seed staging with already-rendered Linux frames ──
 if [ -n "$GHP" ] && [ -d "$GHP/vi-snapshots/by-blob" ]; then
   while IFS= read -r -d '' f; do
     rel=${f#"$GHP/vi-snapshots/by-blob/"}
@@ -96,7 +95,7 @@ publish() {
   git -C "$GHP" add vi-snapshots/by-blob vi-snapshots/json-blobs.json >/dev/null 2>&1 || true
   git -C "$GHP" diff --cached --quiet && return 0
   git -C "$GHP" -c user.email=actions@github.com -c user.name='lvci-toimages' \
-      commit -q -m "vi-snapshots(2.0): incremental JSON render" || return 0
+      commit -q -m "vi-snapshots: incremental JSON render" || return 0
   local i
   for i in 1 2 3 4 5; do
     if git -C "$GHP" push -q origin HEAD:gh-pages 2>/dev/null; then return 0; fi
@@ -128,6 +127,7 @@ deadline=$(( $(date +%s) + TIME_BUDGET_MIN * 60 ))
 
 for sha in "${COMMITS[@]}"; do
   short=${sha:0:7}
+  python3 "$METADATA_SCRIPT" --workspace "$WS" --out "$OUT" --sha "$sha" --existing "$GHP/vi-snapshots"
   wl="$OUT/worklist.tsv"
   # Enumerate this commit's not-yet-rendered .vi blobs (reuses the worklist builder;
   # it skips any blob that already has a .json under $BYBLOB).

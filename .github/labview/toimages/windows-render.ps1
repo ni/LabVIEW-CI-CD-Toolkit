@@ -1,5 +1,5 @@
 <#
-  windows-render.ps1 - in-container entrypoint for VI Browser 2.0 rendering on
+  windows-render.ps1 - in-container entrypoint for VI Browser rendering on
   Windows. This is the Windows counterpart of docker-entrypoint.sh (Linux): it
     prepares the stock NI LabVIEW Windows container, then runs the SAME portable
     batch runner (runner.exe, built from .github/labview/toimages/main.go) which
@@ -122,7 +122,7 @@ function Start-LabVIEWVIServer([string]$ExePath, [int]$Port, [int]$WaitSeconds) 
     return $false
 }
 
-Write-Host "=== VI Browser 2.0 Windows render ==="
+Write-Host "=== VI Browser Windows render ==="
 $lvExe = Resolve-LabVIEWPath $LabVIEWPath
 Write-Host "  LabVIEW.exe : $lvExe"
 Write-Host "  Workspace   : $Workspace"

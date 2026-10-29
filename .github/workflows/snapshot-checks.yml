@@ -1,0 +1,55 @@
+name: Snapshot Checks
+
+on:
+  pull_request:
+    paths:
+      - 'actions/snapshots/**'
+      - 'actions/dashboard/**'
+      - '.github/pages/**'
+      - '.github/labview/*snapshot*'
+      - '.github/labview/run-toimages.sh'
+      - '.github/labview-ci/**'
+      - '.github/workflows/*snapshots*'
+      - '.github/workflows/reconfigure.yml'
+      - '.github/workflows/snapshot-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'actions/snapshots/**'
+      - 'actions/dashboard/**'
+      - '.github/pages/**'
+      - '.github/labview/*snapshot*'
+      - '.github/labview/run-toimages.sh'
+      - '.github/labview-ci/**'
+      - '.github/workflows/*snapshots*'
+      - '.github/workflows/reconfigure.yml'
+      - '.github/workflows/snapshot-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check installer, configuration, and preview contracts
+        run: python .github/labview/test-snapshots.py
+      - name: Check interactive viewer behavior
+        run: node --test .github/labview/test-snapshots.mjs
+      - name: Parse Windows snapshot scripts
+        shell: powershell
+        run: |
+          foreach ($script in @('.github/labview/build-snapshots.ps1', '.github/labview/render-snapshots.ps1', 'actions/snapshots/build-snapshots.ps1', 'actions/snapshots/render-snapshots.ps1')) {
+            $parseErrors = $null
+            $tokens = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $script), [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+          }

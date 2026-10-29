@@ -285,10 +285,6 @@
     let dragonFoundCount = 0;                // how many .dragon files discovery found in the repo
     const actionContainer = new Map();       // activity id -> container tag override (absent = inherit `use`)
     const triggerSel = new Map();            // activity id -> Set of submission sources that run it
-    // VI Browser render matrix: which render generations run on each OS on a new
-    // revision. classic (1.0 HTML) is Windows-only; positionAware (2.0 frames) can
-    // run on Windows and/or Linux. See the VI Browser tab.
-    const viBrowser = { classic: new Set(["windows"]), positionAware: new Set(["windows"]) };
 
     // VI Analyzer: which .viancfg test configuration runs on which code.
     //   viaDefault  = "builtin" (full default suite), "none" (don't test unmatched
@@ -382,7 +378,7 @@
         if (/^\s*dependencyPolicy:\s*$/.test(line)) { inDepPolicy = true; inActionOs = false; inActs = false; inContainer = false; inVipc = false; inActions = false; inTriggers = false; inViBrowser = false; continue; }
         if (inActs) {
           const m = line.match(/^\s*-\s*(\S+)/);
-          if (m) { out.activities.push(m[1]); continue; }
+          if (m) { out.activities.push(m[1] === "snapshots-2" ? "snapshots" : m[1]); continue; }
           inActs = false;
         }
         if (inTriggers) {
@@ -391,7 +387,7 @@
           if (/^\s{0,3}\S/.test(line)) inTriggers = false;
         }
         if (inViBrowser) {
-          const mv = line.match(/^\s{4}(classic|positionAware):\s*(\S+)/);
+          const mv = line.match(/^\s{4}(classic|positionAware|platforms):\s*(\S+)/);
           if (mv) { out.viBrowser[mv[1]] = mv[2]; continue; }
           if (/^\s{0,3}\S/.test(line)) inViBrowser = false;
         }
@@ -892,74 +888,17 @@
 
     // ---- VI Browser render matrix ------------------------------------------
     // Which render generations run on each OS when a new revision is submitted.
-    // classic (1.0) = flat-HTML snapshots (the Windows snapshots run); only Windows
-    // has an HTML renderer. positionAware (2.0) = in-place block-diagram frames:
-    // Windows emits them from the same snapshots run (PrintToImagesJson), Linux from
-    // the render engine baked into the Linux worker image. Both the Windows and Linux 2.0 render paths are
-    // released (core) capabilities.
-    const VB_ROWS = [
-      { key: "classic", label: "Classic gallery", sub: "1.0 \u2014 flat HTML snapshots" },
-      { key: "positionAware", label: "Position-aware", sub: "2.0 \u2014 in-place block-diagram renders" }
-    ];
-    const VB_OS = [{ key: "windows", label: "Windows" }, { key: "linux", label: "Linux" }];
-    // No Linux HTML renderer exists, so 1.0 runs on Windows only.
-    function vbAvailable(rowKey, osKey) { return !(rowKey === "classic" && osKey === "linux"); }
-    function vbList(set) { return VB_OS.map(o => o.key).filter(k => set.has(k)); }
-    function renderViBrowser() {
-      const host = $("vbMatrix"); if (!host || !catalog) return; host.innerHTML = "";
-      const on = actSel.has("snapshots");
-      const table = document.createElement("table"); table.className = "trigtable";
-      const thead = document.createElement("thead"); const hr = document.createElement("tr");
-      const h0 = document.createElement("th"); h0.textContent = "Render"; hr.appendChild(h0);
-      VB_OS.forEach(o => { const th = document.createElement("th"); th.textContent = o.label; hr.appendChild(th); });
-      thead.appendChild(hr); table.appendChild(thead);
-      const tbody = document.createElement("tbody");
-      VB_ROWS.forEach(row => {
-        const tr = document.createElement("tr"); if (!on) tr.className = "off";
-        const td0 = document.createElement("td");
-        const nm = document.createElement("span"); nm.className = "actname"; nm.textContent = row.label; td0.appendChild(nm);
-        if (!on) { const pill = document.createElement("span"); pill.className = "pill"; pill.textContent = "snapshots off"; td0.appendChild(pill); }
-        const sub = document.createElement("span"); sub.className = "vbsub"; sub.textContent = row.sub; td0.appendChild(sub);
-        tr.appendChild(td0);
-        VB_OS.forEach(o => {
-          const td = document.createElement("td");
-          if (!vbAvailable(row.key, o.key)) {
-            const dash = document.createElement("span"); dash.className = "vbna"; dash.textContent = "\u2014";
-            dash.title = "No Linux HTML renderer \u2014 the classic gallery runs on Windows.";
-            td.appendChild(dash);
-          } else {
-            // 1.0 on Windows is the gallery foundation (and the base for 2.0 on
-            // Windows, which rides the same render loop), so it is always on when
-            // VI Snapshots is enabled \u2014 shown locked rather than a no-op toggle.
-            const forced = (row.key === "classic" && o.key === "windows");
-            const cb = document.createElement("input"); cb.type = "checkbox";
-            cb.checked = forced ? true : viBrowser[row.key].has(o.key);
-            cb.disabled = !on || forced;
-            if (forced) cb.title = "1.0 on Windows is the snapshot gallery and the base for 2.0 on Windows; it runs whenever VI Snapshots is enabled.";
-            cb.setAttribute("aria-label", row.label + " on " + o.label);
-            cb.addEventListener("change", () => {
-              cb.checked ? viBrowser[row.key].add(o.key) : viBrowser[row.key].delete(o.key);
-              update();
-            });
-            td.appendChild(cb);
-          }
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody); host.appendChild(table);
+    function snapshotPlatforms() {
+      const platforms = actionOs.get("snapshots") || new Set(["windows"]);
+      return ["windows", "linux"].filter(platform => platforms.has(platform));
     }
     function viBrowserYamlLines() {
       if (!actSel.has("snapshots")) return [];
-      const c = vbList(viBrowser.classic), p = vbList(viBrowser.positionAware);
-      return ["  viBrowser:",
-        "    classic: " + (c.length ? c.join("+") : "none"),
-        "    positionAware: " + (p.length ? p.join("+") : "none")];
+      return ["  viBrowser:", "    platforms: " + snapshotPlatforms().join("+")];
     }
     function viBrowserInputEnc() {
       if (!actSel.has("snapshots")) return "";
-      const c = vbList(viBrowser.classic), p = vbList(viBrowser.positionAware);
-      return "classic::" + (c.length ? c.join("+") : "none") + ";positionAware::" + (p.length ? p.join("+") : "none");
+      return "platforms::" + snapshotPlatforms().join("+");
     }
 
     // ---- VI Analyzer configuration -----------------------------------------
@@ -1425,16 +1364,13 @@
           const v = String(m.triggers[id]).trim();
           triggerSel.set(id, new Set(v === "none" || v === "" ? [] : v.split("+").map(s => s.trim()).filter(Boolean)));
         });
-        // VI Browser render matrix: reset to defaults, then apply any saved selection.
-        viBrowser.classic = new Set(["windows"]);
-        viBrowser.positionAware = new Set(["windows"]);
-        ["classic", "positionAware"].forEach(k => {
-          if (m.viBrowser && m.viBrowser[k] != null) {
-            const v = String(m.viBrowser[k]).trim();
-            viBrowser[k] = new Set(v === "none" || v === "" ? [] : v.split("+").map(s => s.trim()).filter(Boolean));
-          }
-        });
-        viBrowser.classic.add("windows"); // 1.0 on Windows is the gallery foundation (always on)
+        const savedPlatforms = m.viBrowser && (m.viBrowser.platforms || m.viBrowser.positionAware);
+        if (savedPlatforms && savedPlatforms !== "none") {
+          const platforms = new Set(String(savedPlatforms).split("+").filter(platform => ["windows", "linux"].includes(platform)));
+          if (platforms.size) actionOs.set("snapshots", platforms);
+        }
+        recomputeOsSel();
+        renderActivities();
         // VI Analyzer: load the saved default + rules (discovery fills in available
         // configs / suggestions afterwards). viaDefault left "" when unsaved so
         // discovery can auto-pick the first .viancfg.

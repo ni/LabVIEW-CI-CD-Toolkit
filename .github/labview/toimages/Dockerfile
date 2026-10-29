@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# toimages render image for the in-place VI Browser (2.0).
+# toimages render image for the in-place VI Browser.
 #
 # Public LabVIEW base + Xvfb + the lvctl `toimages` render engine (native VI
 # Server TCP client + Go-side PNG encoding) + a one-shot batch runner. Each repo
-# builds its OWN image from this directory via the "Build VI Browser 2.0 render
+# builds its OWN image from this directory via the "Build VI Browser render
 # image" workflow and publishes it to that repo's GHCR with the built-in
 # GITHUB_TOKEN; the render workflow then pulls it with the same token.
 # =============================================================================

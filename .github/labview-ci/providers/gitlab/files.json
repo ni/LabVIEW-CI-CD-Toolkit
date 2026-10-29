@@ -1,7 +1,9 @@
 {
   "schemaVersion": 1,
   "targetRoot": ".gitlab/labview-ci",
-  "builtInCapabilities": ["dashboard"],
+  "builtInCapabilities": [
+    "dashboard"
+  ],
   "files": [
     "files.json",
     "README.md",
@@ -12,8 +14,7 @@
     "templates/masscompile-windows.yml",
     "templates/pages.yml",
     "templates/sbom-windows.yml",
-    "templates/snapshots-2-linux.yml",
-    "templates/snapshots-2-windows.yml",
+    "templates/snapshots-linux.yml",
     "templates/snapshots-windows.yml",
     "templates/unit-tests-windows.yml",
     "templates/vi-analyzer-linux.yml",
@@ -61,11 +62,8 @@
       "linux": "templates/vidiff-linux.yml"
     },
     "snapshots": {
-      "windows": "templates/snapshots-windows.yml"
-    },
-    "snapshots-2": {
-      "windows": "templates/snapshots-2-windows.yml",
-      "linux": "templates/snapshots-2-linux.yml"
+      "windows": "templates/snapshots-windows.yml",
+      "linux": "templates/snapshots-linux.yml"
     }
   }
 }

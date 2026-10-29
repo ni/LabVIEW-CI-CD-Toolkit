@@ -1,7 +1,7 @@
-name: VI Browser 2.0 render (Windows container)
-run-name: VI Browser 2.0 Windows ${{ github.event.inputs.target_sha || github.event.workflow_run.head_sha || github.sha }}${{ github.event.inputs.vi && ' single VI' || '' }}${{ github.event.inputs.force == 'true' && ' force' || '' }}
+name: VI Snapshots render (Windows container)
+run-name: VI Snapshots Windows ${{ github.event.inputs.target_sha || github.event.workflow_run.head_sha || github.sha }}${{ github.event.inputs.vi && ' single VI' || '' }}${{ github.event.inputs.force == 'true' && ' force' || '' }}
 
-# Generates the position-aware VI Browser 2.0 "frames" JSON on WINDOWS, using the
+# Generates the position-aware VI Snapshots "frames" JSON on WINDOWS, using the
 # stock NI LabVIEW Windows container and the SAME cross-platform render engine the
 # Linux workflow already uses (.github/labview/toimages: the `lvctl` engine + the
 # `runner` batch driver). The only difference from Linux is the transport the
@@ -33,7 +33,7 @@ on:
         required: false
         default: ""
       force:
-        description: "Re-render Windows VI Browser 2.0 JSON even when outputs already exist"
+        description: "Re-render Windows VI Snapshots JSON even when outputs already exist"
         required: false
         default: "false"
       render_timeout:
@@ -45,7 +45,7 @@ on:
   # VIs this revision CHANGED - the content-addressed worklist skips every VI whose
   # blob already has a <blob>.windows.json (unchanged VIs reuse their existing
   # render) and queues only the new/changed blobs. Gated by the VI Browser config
-  # (see the gate job): position-aware 2.0 defaults to Windows.
+  # (see the gate job): snapshot rendering defaults to Windows.
   workflow_run:
     workflows: ["VI Snapshots and VI Browser"]
     types: [completed]
@@ -64,8 +64,8 @@ concurrency:
 
 jobs:
   # Auto-runs (workflow_run) honour the VI Browser config, exactly like the Linux
-  # path: the position-aware 2.0 render defaults to Windows (the configurator's
-  # default), so it runs automatically only when config.viBrowser.positionAware
+  # path: the position-aware snapshot render defaults to Windows (the configurator's
+  # default), so it runs automatically only when config.viBrowser.platforms
   # includes "windows" - or when no config / no viBrowser block is present (the
   # default = run). A manual dispatch always runs. The VI Browser tab on Configure
   # writes this setting. An auto-run is skipped when the triggering snapshot run did
@@ -87,11 +87,14 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
               run=false
-              echo "Triggering snapshot run concluded '${{ github.event.workflow_run.conclusion }}', not success; skipping the Windows 2.0 render."
+              echo "Triggering snapshot run concluded '${{ github.event.workflow_run.conclusion }}', not success; skipping the Windows render."
             else
               cfg=.github/labview-ci.yml
               if [ -f "$cfg" ]; then
-                pa=$(sed -n 's/^[[:space:]]*positionAware:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+                pa=$(sed -n 's/^[[:space:]]*platforms:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+                [ -n "$pa" ] || pa=$(sed -n 's/^[[:space:]]*positionAware:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+                [ "$pa" != "none" ] || pa=""
+                [ -n "$pa" ] || pa=$(sed -n 's/^[[:space:]]*os:[[:space:]]*\[\([^]]*\)\].*/\1/p' "$cfg" | head -1 | tr -d '[:space:]' | tr \, +)
                 if [ -n "$pa" ]; then
                   if printf '%s' "$pa" | tr '+' '\n' | grep -qx 'windows'; then run=true; else run=false; fi
                 fi
@@ -99,7 +102,7 @@ jobs:
             fi
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
-          echo "VI Browser 2.0 on Windows auto-run: $run (event=${{ github.event_name }})"
+          echo "VI Snapshots on Windows auto-run: $run (event=${{ github.event_name }})"
 
   render:
     needs: gate
@@ -286,14 +289,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Render VI Browser 2.0 frames in the LabVIEW Windows container
+      - name: Render VI Snapshots frames in the LabVIEW Windows container
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $repo  = "${{ github.workspace }}"
           $image = $Env:LABVIEW_CONTAINER_IMAGE
           if (-not (Test-Path "$repo\_winout\worklist.tsv") -or (Get-Content "$repo\_winout\worklist.tsv" | Where-Object { $_.Trim() -ne '' }).Count -eq 0) {
-            Write-Host 'No Windows 2.0 renders are missing for this selection.'
+            Write-Host 'No Windows renders are missing for this selection.'
             exit 0
           }
           Write-Host "Pulling $image ..."
@@ -340,7 +343,7 @@ jobs:
             $hostCount = @(Get-ChildItem -Path "$repo\_winout\by-blob" -Recurse -Filter '*.json' -ErrorAction SilentlyContinue).Count
             Write-Host "Host _winout\by-blob now holds $hostCount frame JSON file(s)"
 
-            if ($renderExit -ne 0) { throw "Windows VI Browser 2.0 render failed with exit code $renderExit" }
+            if ($renderExit -ne 0) { throw "Windows VI Snapshots render failed with exit code $renderExit" }
           }
           finally {
             docker rm -f $name | Out-Null
@@ -360,7 +363,7 @@ jobs:
           fi
           echo "renamed $n render(s) to .windows.json"
           {
-            echo "### VI Browser 2.0 - Windows render"
+            echo "### VI Snapshots - Windows render"
             echo ""
             echo "Rendered **$n** new VI(s) to \`<blob>.windows.json\` in the stock NI LabVIEW Windows container."
             echo "The deploy step publishes these frames beside the existing snapshot HTML and Linux \`<blob>.json\` frames."
@@ -388,6 +391,7 @@ jobs:
           mkdir -p _winpublish
           cp _winout/json-blobs.windows.json _winpublish/json-blobs.windows.json
           if [ -d _winout/by-blob ]; then cp -R _winout/by-blob _winpublish/by-blob; fi
+          python3 .github/labview/build-snapshot-metadata.py --out _winpublish --sha "${{ github.event.inputs.target_sha || github.event.workflow_run.head_sha || github.sha }}" --existing _ghp/vi-snapshots
 
       - name: Deploy Windows JSON to GitHub Pages (race-safe)
         if: steps.index.outputs.count != '0'
@@ -401,6 +405,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: vi-snapshots-2.0-windows
+          name: vi-snapshots-windows
           path: _winout/by-blob/
           if-no-files-found: warn

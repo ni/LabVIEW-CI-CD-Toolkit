@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # build-json-worklist.sh - enumerate which VIs still need a position-aware
-# <blob>.json for the in-place VI Browser (2.0).
+# <blob>.json for the in-place VI Browser.
 #
 # PUBLIC scaffolding: contains NO LabVIEW/NI code. It only lists work by mirroring
 # the exact content-addressing the Windows HTML pipeline uses (the git blob SHA
@@ -16,7 +16,7 @@
 #                            (may be missing/empty - then everything is queued)
 #     <out-tsv>              worklist output: lines of "<blob>\t<relpath>"
 #     [json-suffix]          output suffix to consider rendered (default .json;
-#                            Windows 2.0 uses .windows.json beside Linux .json)
+#                            Windows uses .windows.json beside Linux .json)
 #
 # Mirrors Get-VimapForSha in build-snapshots.ps1: same `git ls-tree -r` source,
 # same blob field, same path filter. Restricted to *.vi (toimages renders block

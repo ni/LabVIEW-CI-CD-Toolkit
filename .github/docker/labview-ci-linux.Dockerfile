@@ -3,7 +3,7 @@
 # LabVIEW CI Linux image
 # =============================================================================
 # Extends the official NI LabVIEW Linux container with native VIPM, applies repo
-# VIPC dependency files, AND bakes in the VI Browser 2.0 render engine (lvctl +
+# VIPC dependency files, AND bakes in the VI Browser render engine (lvctl +
 # the batch runner) so position-aware 2.0 screenshots render inside this worker
 # with no separate image to build -- a client just copies this worker.
 # =============================================================================
@@ -11,7 +11,7 @@
 ARG VIPM_DEB_URL=https://traffic.libsyn.com/secure/jkinc/vipm_26.3.0-3954_amd64.deb
 ARG LV_CONTAINER_TAG=2026q1patch2-linux
 
-# ---- build stage: compile the VI Browser 2.0 render engine (lvctl + runner) ---
+# ---- build stage: compile the VI Browser render engine (lvctl + runner) ---
 # Mirrors .github/labview/toimages/Dockerfile so the engine is byte-for-byte the
 # same as the standalone render image used to be -- just baked into the worker.
 FROM golang:1.26.3-alpine AS toimages-builder
@@ -68,7 +68,7 @@ RUN --mount=type=secret,id=vipm_serial,required=false \
       export LABVIEW_VERSION="${LABVIEW_VERSION}"; \
       /opt/lvci/vipm/install-vipc-linux.sh
 
-# VI Browser 2.0 render engine, baked in so 2.0 screenshots render inside this
+# VI Browser render engine, baked in so 2.0 screenshots render inside this
 # worker with no separate image. The render workflow invokes it explicitly with
 # --entrypoint /usr/local/bin/toimages-entrypoint.sh, so the worker's DEFAULT
 # behavior (used by every other CI activity) is unchanged. xvfb is installed

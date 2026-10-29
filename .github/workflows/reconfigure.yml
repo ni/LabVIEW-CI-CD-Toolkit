@@ -52,7 +52,7 @@ on:
         required: false
         default: ''
       vi_browser:
-        description: 'VI Browser render matrix as classic::<oses>;positionAware::<oses> (oses joined by +, e.g. positionAware::windows+linux; "none" to disable a generation; blank = keep current)'
+        description: 'Snapshot render platforms, e.g. platforms::windows+linux (blank = keep current)'
         required: false
         default: ''
       action_os:
@@ -185,7 +185,7 @@ jobs:
                       if m: prev['triggers'][m.group(1)] = m.group(2); continue
                       if re.match(r'^\s{0,3}\S', line): in_triggers = False
                   if in_vibrowser:
-                      m = re.match(r'^\s{4}(classic|positionAware):\s*(\S+)', line)
+                      m = re.match(r'^\s{4}(classic|positionAware|platforms):\s*(\S+)', line)
                       if m: prev['viBrowser'][m.group(1)] = m.group(2); continue
                       if re.match(r'^\s{0,3}\S', line): in_vibrowser = False
                   if in_action_os:
@@ -340,6 +340,9 @@ jobs:
                   if k and v: out[k] = v
               return out
           vi_browser = _parse_vibrowser(vi_browser_in) if vi_browser_in else prev['viBrowser']
+          snapshot_platforms = vi_browser.get('platforms', vi_browser.get('positionAware', 'windows'))
+          if snapshot_platforms in ('none', ''): snapshot_platforms = 'windows'
+          vi_browser = {'platforms': snapshot_platforms}
 
           # Per-action platforms (config.actionOs): same id::oses;.. shape as the
           # VI Browser matrix. Explicit input wins; blank keeps the manifest's.
@@ -488,7 +491,7 @@ jobs:
                   lines.append(f'      {_id}: {container_actions[_id]}')
           if vi_browser:
               lines.append('  viBrowser:')
-              for _k in ('classic', 'positionAware'):
+              for _k in ('platforms',):
                   if _k in vi_browser:
                       lines.append(f'    {_k}: {vi_browser[_k]}')
           if via_default and (via_default != 'builtin' or via_rules):

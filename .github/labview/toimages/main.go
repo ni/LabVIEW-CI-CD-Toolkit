@@ -1,5 +1,5 @@
 // Command lvci-toimages-runner renders position-aware "frames" JSON for the
-// in-place VI Browser (2.0). It is a ONE-SHOT batch tool: it renders every VI in
+// in-place VI Browser. It is a ONE-SHOT batch tool: it renders every VI in
 // a worklist by shelling out to `lvctl toimages`, writes <blob>.json into the
 // by-blob store, then exits.
 //
