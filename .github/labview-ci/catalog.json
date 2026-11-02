@@ -4498,6 +4498,7 @@
       ".github/labview-ci/providers/gitlab/",
       ".github/labview/wait-for-worker-image.sh",
       ".github/labview/ensure-docker.ps1",
+      ".github/labview/dragon_deps.py",
       ".github/labview/lvpm/worker.py",
       ".github/labview/lvpm/adapter.py",
       ".github/actions/publish-gh-pages/action.yml"

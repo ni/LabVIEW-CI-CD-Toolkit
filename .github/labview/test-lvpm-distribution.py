@@ -21,6 +21,7 @@ SPEC = importlib.util.spec_from_file_location("lvpm_installer", ROOT / ".github/
 INSTALLER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(INSTALLER)
 HELPERS = {".github/labview/lvpm/worker.py", ".github/labview/lvpm/adapter.py"}
+SHARED_HELPERS = HELPERS | {".github/labview/dragon_deps.py"}
 CANDIDATE_FILES = {
     ".github/workflows/build-labview-lvpm-image.yml",
     ".github/docker/labview-ci-lvpm.Dockerfile",
@@ -52,14 +53,14 @@ class DistributionTests(unittest.TestCase):
             for activities in ((), ("dashboard",), *[(activity,) for activity in LINUX_ACTIVITIES]):
                 with self.subTest(platforms=platforms, activities=activities):
                     entries = self.resolve(activities, platforms)
-                    self.assertTrue(HELPERS.issubset(entries))
+                    self.assertTrue(SHARED_HELPERS.issubset(entries))
                     self.assertNotIn(".github/workflows/build-labview-lvpm-image.yml", entries)
 
     def test_linux_custom_image_resolves_complete_candidate_payload(self):
         for platforms in PLATFORMS[:2]:
             for activities in (("custom-image",), ("dashboard", "custom-image")):
                 with self.subTest(platforms=platforms, activities=activities):
-                    self.assertTrue((HELPERS | CANDIDATE_FILES).issubset(self.resolve(activities, platforms)))
+                    self.assertTrue((SHARED_HELPERS | CANDIDATE_FILES).issubset(self.resolve(activities, platforms)))
 
     def test_candidate_files_registered_only_for_linux(self):
         capability = next(entry for entry in self.catalog["capabilities"] if entry["id"] == "custom-image")
@@ -70,17 +71,17 @@ class DistributionTests(unittest.TestCase):
 
     def test_windows_keeps_existing_payload_without_candidate_build(self):
         previous = copy.deepcopy(self.catalog)
-        previous["base"]["files"] = [entry for entry in previous["base"]["files"] if entry not in HELPERS]
+        previous["base"]["files"] = [entry for entry in previous["base"]["files"] if entry not in SHARED_HELPERS]
         for activities in (("custom-image",), ("dashboard", "custom-image", *LINUX_ACTIVITIES)):
             with self.subTest(activities=activities), patch.object(INSTALLER, "warn"):
                 expected = INSTALLER.resolve_file_list(previous, list(activities), ["windows"])
                 actual = self.resolve(activities, ["windows"])
-                self.assertEqual([entry for entry in actual if entry not in HELPERS], expected)
+                self.assertEqual([entry for entry in actual if entry not in SHARED_HELPERS], expected)
                 self.assertNotIn(".github/workflows/build-labview-lvpm-image.yml", actual)
                 self.assertNotIn(".github/docker/labview-ci-lvpm.Dockerfile", actual)
 
     def test_helper_registration_excludes_recursive_cache_or_test_payloads(self):
-        self.assertTrue(HELPERS.issubset(self.catalog["base"]["files"]))
+        self.assertTrue(SHARED_HELPERS.issubset(self.catalog["base"]["files"]))
         entries = self.resolve(("dashboard", "custom-image", *LINUX_ACTIVITIES), ["windows", "linux"])
         self.assertEqual({entry for entry in entries if entry.startswith(".github/labview/lvpm/")}, HELPERS)
         self.assertNotIn(".github/workflows/lvpm-checks.yml", entries)
@@ -91,7 +92,7 @@ class DistributionTests(unittest.TestCase):
             with self.subTest(platforms=platforms), tempfile.TemporaryDirectory() as temporary:
                 target = Path(temporary)
                 self.stage(target, ("custom-image",), platforms)
-                for relative in HELPERS | CANDIDATE_FILES | {".github/actions/publish-gh-pages/action.yml"}:
+                for relative in SHARED_HELPERS | CANDIDATE_FILES | {".github/actions/publish-gh-pages/action.yml"}:
                     self.assertTrue((target / relative).exists(), relative)
                 dockerfile = target / ".github/docker/labview-ci-lvpm.Dockerfile"
                 for line in dockerfile.read_text().replace("\\\n", " ").splitlines():
@@ -123,8 +124,24 @@ class DistributionTests(unittest.TestCase):
                 target = Path(temporary)
                 self.stage(target, ("dashboard",), platforms)
                 self.assertTrue((target / ".github/workflows/reconfigure.yml").is_file())
-                self.assertTrue(all((target / relative).is_file() for relative in HELPERS))
+                self.assertTrue(all((target / relative).is_file() for relative in SHARED_HELPERS))
                 self.assertFalse((target / ".github/workflows/build-labview-lvpm-image.yml").exists())
+
+    def test_installed_dragon_parser_reads_real_declarations_without_source_imports(self):
+        for platforms in PLATFORMS:
+            with self.subTest(platforms=platforms), tempfile.TemporaryDirectory() as temporary:
+                target = Path(temporary)
+                self.stage(target, ("dashboard",), platforms)
+                declaration = target / "project.dragon"
+                declaration.write_text('[vipm.dependencies]\noglib_file = "6.0.2.28"\n')
+                spec = importlib.util.spec_from_file_location("installed_dragon", target / ".github/labview/dragon_deps.py")
+                parser = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(parser)
+                self.assertTrue(parser.toml_available())
+                inventory = parser.build_inventory(str(target))
+                self.assertEqual(len(inventory["files"]), 1)
+                self.assertEqual(inventory["install_set"][0]["package_id"], "oglib_file")
+                self.assertEqual(inventory["install_set"][0]["declared_version"], "6.0.2.28")
 
     def test_base_catalog_preserves_qualified_container_metadata_without_release_workflows(self):
         for platforms in PLATFORMS:
