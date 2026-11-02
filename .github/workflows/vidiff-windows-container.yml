@@ -246,7 +246,7 @@ jobs:
           JSON
 
       - name: Upload VIDiff report artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: vidiff-windows-${{ steps.shas.outputs.head }}
           path: |
