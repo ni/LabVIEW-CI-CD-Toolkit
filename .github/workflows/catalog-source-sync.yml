@@ -9,6 +9,7 @@ run-name: Catalog/source sync - ${{ github.event_name == 'workflow_dispatch' && 
 # main (Settings > Branches) so the guard actually blocks a merge.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
     branches: [main]
   workflow_dispatch:
@@ -30,6 +31,8 @@ jobs:
           fetch-depth: 0
       - name: Validate catalog/source sync
         run: python3 .github/labview/validate-catalog-source-sync.py
+      - name: Reject process-only pull request titles
+        run: python3 .github/labview/release-catalog-pr.py check-title
       - name: Test protected-branch release routing
         run: python3 .github/labview/test-release-catalog-pr.py
       - name: Test snapshot revision scope

@@ -183,6 +183,45 @@ jobs:
                           value_node.flow_style = True
                   return node
 
+          def reconfigure_pr_title(before, after):
+              def value(document, path):
+                  for key in path:
+                      if not isinstance(document, dict):
+                          return None
+                      document = document.get(key)
+                  return document
+
+              linux_path = ('config', 'container', 'linuxUse')
+              linux_changed = value(before, linux_path) != value(after, linux_path)
+              fields = [
+                  (('config', 'labviewVersion'), 'LabVIEW version'),
+                  (('config', 'os'), 'operating systems'),
+                  (('config', 'concurrency'), 'runner concurrency'),
+                  (('config', 'container', 'use'), 'default worker selection'),
+                  (('config', 'container', 'vipc'), 'VIPC dependency monitoring'),
+                  (('config', 'container', 'dragon'), 'Dragon dependency monitoring'),
+                  (('config', 'container', 'actions'), 'per-activity workers'),
+                  (('config', 'dependencyPolicy'), 'dependency policies'),
+                  (('config', 'viAnalyzer'), 'VI Analyzer rules'),
+                  (('config', 'builds'), 'build specifications'),
+                  (('config', 'viBrowser'), 'VI snapshot platforms'),
+                  (('config', 'triggers'), 'activity triggers'),
+                  (('config', 'actionOs'), 'activity platforms'),
+                  (('unitTests',), 'unit-test settings'),
+                  (('activities',), 'enabled activities'),
+              ]
+              changes = [label for path, label in fields if value(before, path) != value(after, path)]
+              if linux_changed:
+                  title = ('Activate digest-pinned Linux LVPM worker' if value(after, linux_path)
+                           else 'Reset Linux worker to the existing default selection')
+                  if changes:
+                      title += '; update ' + ', '.join(changes[:2])
+              else:
+                  title = 'Update ' + ', '.join(changes[:3]) if changes else 'Update committed VIPC package selections'
+              if len(changes) > (2 if linux_changed else 3):
+                  title += ' and other settings'
+              return title
+
           ver_in  = os.environ['IN_VERSION'].strip()
           oss     = os.environ['IN_OS'].strip()
           antidoc_in = os.environ['IN_ANTIDOC'].strip().lower()
@@ -725,6 +764,7 @@ jobs:
           if os.environ.get('GITHUB_ENV'):
               with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as _f:
                   _f.write(f'RESOLVED_LV={ver}\n')
+                  _f.write('RECONFIGURE_PR_TITLE=' + reconfigure_pr_title(original or {}, yaml.safe_load(rendered)) + '\n')
 
           # Antidoc dependencies are now owned by committed
           # .github/labview/antidoc/antidoc.vipc (VIPC-first). Keep this input
@@ -770,11 +810,23 @@ jobs:
           git push -u origin "$BRANCH"
 
           gh pr create \
-            --title "Reconfigure LabVIEW CI" \
+            --title "$RECONFIGURE_PR_TITLE" \
             --base "$RECONFIGURE_BASE" \
             --head "$BRANCH" \
             --body "$(cat <<'BODY'
-          Automated settings change via the **Reconfigure** workflow.
+          ## Features and fixes
+
+          Updates the client settings named in the pull request title. The table below lists requested inputs;
+          blank or keep values preserve existing settings. Review the actual configuration diff.
+
+          ## Release impact
+
+          Client configuration only: **no toolkit release from this PR; containing version unassigned**.
+          This does not install a new tooling version or deliver additional toolkit fixes.
+          Settings take effect after merge where supported; dependency/version changes may require an
+          explicit image build. No release-channel promotion or automatic LVPM build is requested.
+
+          ## Requested settings
 
           | Setting | Value |
           |---|---|
