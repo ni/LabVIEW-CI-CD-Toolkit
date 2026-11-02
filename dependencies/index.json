@@ -1,8 +1,170 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "8f7cb5b94bdc57baf05d8ed822db5f3f297a0cea",
+  "sha": "2db092f8fd6056e9ea57528cde64a262f11f8391",
   "revisions": [
+    {
+      "sha": "2db092f8fd6056e9ea57528cde64a262f11f8391",
+      "short": "2db092f",
+      "message": "Merge pull request #108 from ni/lvci-release/release-4.19.4",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:44:09Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "18b6244c61bc5df93f95387aff118a59caeea421",
+      "short": "18b6244",
+      "message": "Prepare release 4.19.4",
+      "author": "github-actions[bot]",
+      "date": "2026-11-02T21:41:02Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "5f82ec3b57520705573848f4b7e37330fbd12d14",
+      "short": "5f82ec3",
+      "message": "Merge pull request #104 from ni/dependabot/github_actions/actions/upload-artifact-7",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:40:47Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "c29c27a084f4c699724c96ecc3d06247a8f6a6d7",
+      "short": "c29c27a",
+      "message": "Merge branch 'main' into dependabot/github_actions/actions/upload-artifact-7",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:36:36Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "703f00124725d43e2970db44c53c650e0077dd29",
+      "short": "703f001",
+      "message": "Merge pull request #107 from ni/lvci-release/release-4.19.3",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:36:15Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "d2908784eaf4f5f22733b39d077b2648502f64c2",
+      "short": "d290878",
+      "message": "Merge branch 'main' into dependabot/github_actions/actions/upload-artifact-7",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:34:51Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "ed9a936e7d993b9db396a8138f0999d3bbbbf8b6",
+      "short": "ed9a936",
+      "message": "Prepare release 4.19.3",
+      "author": "github-actions[bot]",
+      "date": "2026-11-02T21:33:31Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "2b31d8ea0e20ba1ac914d493937cea14f4279920",
+      "short": "2b31d8e",
+      "message": "Merge pull request #102 from ni/dependabot/github_actions/actions/setup-python-7",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:33:16Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "e62fdb05b14699ff0a57a56015ff11a46a9d4467",
+      "short": "e62fdb0",
+      "message": "Merge branch 'main' into dependabot/github_actions/actions/setup-python-7",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:30:21Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "500b57137001fde56fea1c1e90c4e4c529ab6dc8",
+      "short": "500b571",
+      "message": "Merge pull request #100 from ni/lvci-release/release-4.19.2",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:20:19Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "603a409880c469b0e51d90a3fd52fc1537774fc3",
+      "short": "603a409",
+      "message": "Bump actions/upload-artifact from 6 to 7",
+      "author": "dependabot[bot]",
+      "date": "2026-11-02T21:19:15Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "1b9a60f75123303d1a947c51ef051f5a7a5cc23c",
+      "short": "1b9a60f",
+      "message": "Bump actions/setup-python from 5 to 7",
+      "author": "dependabot[bot]",
+      "date": "2026-11-02T21:19:04Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "72379a9edff7f71e366b4d6fb2a904f4ba44ad16",
+      "short": "72379a9",
+      "message": "Prepare release 4.19.2",
+      "author": "github-actions[bot]",
+      "date": "2026-11-02T21:18:09Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "a7b29a949e075d5c10a6139dbb6886af12027df3",
+      "short": "a7b29a9",
+      "message": "Merge pull request #72 from ni/MIpetrov-NI-enable-dependabot",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:17:54Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "661d497942c8cd75c09e9dabb48c1200e333b73a",
+      "short": "661d497",
+      "message": "Merge branch 'main' into MIpetrov-NI-enable-dependabot",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:16:04Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "7c9213101969af1970e150ecc0d97162ebba523d",
+      "short": "7c92131",
+      "message": "Merge pull request #99 from ni/lvci-release/release-4.19.1",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:15:06Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "3e23a50d36e030c0dd1c146aa70936cf22c2f666",
+      "short": "3e23a50",
+      "message": "Merge branch 'main' into MIpetrov-NI-enable-dependabot",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:14:46Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "025f3ef3a54d38b34429a77e9b876bb88e327c71",
+      "short": "025f3ef",
+      "message": "Prepare release 4.19.1",
+      "author": "github-actions[bot]",
+      "date": "2026-11-02T20:56:58Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "8f7cb5b94bdc57baf05d8ed822db5f3f297a0cea",
       "short": "8f7cb5b",
@@ -436,6 +598,15 @@
       "dep_only": false
     },
     {
+      "sha": "64ae1a13255b3b648dc4b642532d5c418627b366",
+      "short": "64ae1a1",
+      "message": "Configure Dependabot for multiple ecosystems",
+      "author": "Milena",
+      "date": "2026-10-01T21:40:13Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "46c8590034008d7e11f1bd72d83074fd3cc6baa2",
       "short": "46c8590",
       "message": "Release 4.18.4 [skip release]",
@@ -729,177 +900,6 @@
       "message": "Release channel: stable=4.16.0 (catalog 4.16.1) [skip release]",
       "author": "github-actions[bot]",
       "date": "2026-08-21T19:16:55Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "4fe05eb4a94f74c5c2e195129e8837928a5476e6",
-      "short": "4fe05eb",
-      "message": "Release 4.16.0 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-21T19:16:20Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "687c6c1211f0969ef24fc9e408c2719d62a0adae",
-      "short": "687c6c1",
-      "message": "Merge pull request #57 from elijah286/feat/container-q3-compat",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T19:16:08Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "8367198a1f39ed18f248012ca1d65b82596b23b5",
-      "short": "8367198",
-      "message": "Qualify LabVIEW 2026 Q3 and add the release-note fragment",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T19:15:57Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "8bf2645e73907b1537d563f9c1b44264f8392a9e",
-      "short": "8bf2645",
-      "message": "Correct the outage narrative across comments and docs",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T17:58:10Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "6bc6092154597de68810b80a836715fd53da6857",
-      "short": "6bc6092",
-      "message": "Clear LV_RTE_HEADLESS around the VIPM stack in the bake and probe",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T17:32:25Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "6b7ae1c1d8923b21cacd71623738fe0abd872b5f",
-      "short": "6b7ae1c",
-      "message": "Probe: allow overriding LV_RTE_HEADLESS to isolate the baked env var",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T17:31:09Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "6422bc85ce7a3420b29ccd5dcb333f74f4aa449b",
-      "short": "6422bc8",
-      "message": "Document container release qualification and the build-memory failure mode",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T17:05:42Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "666b899f7e5162d78fa7583396416dafc59015f2",
-      "short": "666b899",
-      "message": "Point containers.default at 2026q3 for end-to-end bake validation",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T17:04:31Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "6cec08b05539e1e4206f923da6e3561be5faa261",
-      "short": "6cec08b",
-      "message": "Fix the Windows bake VIPM wedge: raise docker build memory to 8GB",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T17:04:00Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "cfde7a0ddac045a575ab162ceb7aa3cdea5d73d4",
-      "short": "cfde7a0",
-      "message": "Catalog-driven NI container release selection with qualification gating",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T16:55:37Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5a8ef633e271eb5b7d310022494931471d5f75d9",
-      "short": "5a8ef63",
-      "message": "Add container compatibility probe for VIPM startup qualification [skip release]",
-      "author": "Elijah Kerry",
-      "date": "2026-08-21T16:43:11Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "f4602aff4de345ac24c1001d420761c60b003129",
-      "short": "f4602af",
-      "message": "Release 4.15.5 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-19T19:10:51Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "c22487324fa9357161a17297f2fdb5a6bc38d57e",
-      "short": "c224873",
-      "message": "fix: keep source Pages bundle current",
-      "author": "Elijah Kerry",
-      "date": "2026-08-19T19:10:30Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "82fcdf2c88a259d67a2066b0c55170007cd413bc",
-      "short": "82fcdf2",
-      "message": "Release 4.15.4 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-19T18:52:30Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "91579855c144547f021265c77a293861e929d9de",
-      "short": "9157985",
-      "message": "fix: fail fast on wedged VIPM Desktop",
-      "author": "Elijah Kerry",
-      "date": "2026-08-19T18:52:07Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "6f20e2c0b0941dc1aae3ff764c0429953f94ec5e",
-      "short": "6f20e2c",
-      "message": "Release 4.15.3 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-18T13:56:46Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "70084c8abbd64687f59c4f82b2d7f1e615148bf2",
-      "short": "70084c8",
-      "message": "Merge pull request #50 from elijah286/via-debug",
-      "author": "Daniel Coons",
-      "date": "2026-08-18T13:56:34Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "1132f0d8a6321055976815d55ac15803af092367",
-      "short": "1132f0d",
-      "message": "Release channel: stable=4.15.1 (catalog 4.15.2) [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-18T00:09:21Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "bdfef9ed2d3db19c1db5c2c5878f3d03b4aa0b49",
-      "short": "bdfef9e",
-      "message": "put in a debug line",
-      "author": "daniel-coons",
-      "date": "2026-08-17T23:50:26Z",
       "project": false,
       "dep_only": false
     },
