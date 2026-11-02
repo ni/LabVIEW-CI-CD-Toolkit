@@ -1,6 +1,7 @@
 import ast
 import copy
 from contextlib import contextmanager
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
@@ -46,6 +47,35 @@ def dashboard_functions(*names):
                  '__file__': str(ROOT / 'actions/dashboard/dashboard.py')}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), 'dashboard.py', 'exec'), namespace)
     return namespace
+
+
+class DependenciesPlatformMarkupTests(unittest.TestCase):
+    def test_platform_tabs_have_valid_accessible_panel_targets(self):
+        elements = []
+
+        class ElementParser(HTMLParser):
+            def handle_starttag(self, tag, attributes):
+                elements.append((tag, dict(attributes)))
+
+        ElementParser().feed((ROOT / '.github/pages/dependencies.html').read_text())
+        tabs = [attributes for _, attributes in elements if 'data-platform' in attributes]
+        self.assertEqual([tab['data-platform'] for tab in tabs], ['windows', 'linux'])
+        self.assertEqual([tab['role'] for tab in tabs], ['tab', 'tab'])
+        panel = next(attributes for _, attributes in elements
+                     if attributes.get('id') == 'platform-panel')
+        self.assertEqual(panel['role'], 'tabpanel')
+        self.assertEqual(panel['aria-labelledby'], tabs[0]['id'])
+        self.assertEqual([tab['aria-controls'] for tab in tabs], [panel['id']] * 2)
+        self.assertEqual([tab['tabindex'] for tab in tabs], ['0', '-1'])
+        summary = next(attributes for _, attributes in elements
+                       if attributes.get('id') == 'platformSummary')
+        self.assertEqual(summary['aria-live'], 'polite')
+
+    def test_dependency_and_header_assets_are_identical(self):
+        for name in ('dependencies.html', 'lvci-header.js'):
+            with self.subTest(asset=name):
+                self.assertEqual((ROOT / '.github/pages' / name).read_bytes(),
+                                 (ROOT / 'actions/dashboard' / name).read_bytes())
 
 
 class ReconfigureLvpmTests(unittest.TestCase):

@@ -22,12 +22,15 @@ let responseCandidate = candidate;
 let activeConfig = 'config:\n  container:\n    linuxUse: "' + tag + '@' + digest + '"\n';
 let failMetadata = false;
 let workflowResponse = 'available';
+let postBarrier = null;
+let dispatchStatus = 204;
 const context = vm.createContext({
   window:{ LVCI:{ repo:'owner/project' } },
-  location:{ hostname:'owner.github.io', pathname:'/project/dependencies.html' },
+  location:{ hostname:'owner.github.io', pathname:'/project/dependencies.html', href:'https://owner.github.io/project/dependencies.html?sha=' + revision },
+  history:{ replaceState(_state, _title, url){ context.location.href = String(url); } },
   document:{ getElementById:id => elements.get(id) || null },
   localStorage:{ getItem:() => 'test-token' },
-  URL, URLSearchParams, console,
+  URL, URLSearchParams, console, setInterval:() => 0, clearInterval:() => {},
   fetch:async (url, options = {}) => {
     requests.push({ url, options });
     if (url === 'https://api.github.com/repos/owner/project') {
@@ -48,7 +51,10 @@ const context = vm.createContext({
     if (url.includes('latest.json')) return { ok:true, json:async () => ({ tag, manifest_path:candidate.manifest_path, image_digest:digest }) };
     if (url.includes('manifest.json')) return { ok:true, json:async () => responseCandidate };
     if (new URL(url).hostname === 'raw.githubusercontent.com') return { ok:true, text:async () => activeConfig };
-    if (options.method === 'POST') return { status:204 };
+    if (options.method === 'POST') {
+      if (postBarrier) await postBarrier;
+      return { status:dispatchStatus };
+    }
     throw new Error('Unexpected request: ' + url);
   }
 });
@@ -56,9 +62,18 @@ vm.runInContext(source.replace('    init();', `
     globalThis.hooks = { parseManifestYaml, resolveColumn, packagesInManifest, pkgCellState,
       candidateSelection, loadLinuxBuildAvailability, linuxWorkflowPayload, dispatchLinuxWorker, dispatchContainerUpdate, loadManifestFor, updTargets, renderLinuxInstaller, nipmCell, enrichPlatformState,
       lvpmFreshness, localFreshnessText, loadPlatformStates, renderGenerated, renderContainers,
-      dragonFileState, updMissingList, renderDragonFiles,
+      dragonFileState, updMissingList, renderDragonFiles, platformCoverage, visibleColumns, selectPlatform,
+      renderUpdatePanel, renderVipc, encodeMonitorList, setFileMonitor, syncPlatformTabs, initPlatformTabs,
+      monitorCounts, monitorInputs, dispatchMonitor, openUpdateApprovalDialog,
+      pendingAction:() => pendingTokenAction,
+      setModal:modal => { updModal = modal; },
       getColumnStates: () => currentColStates,
       setState: state => {
+        activePlatform = state.platform || "linux";
+        linuxToolingView = state.tooling || "vipm";
+        if (state.vipcs) currentVipcs = state.vipcs;
+        if (state.dragons) currentDragons = state.dragons;
+        if (state.columns) currentColStates = state.columns;
         selectedRevision = state.revision || "${revision}";
         generatedInventory = state.inventory || null;
         lvpmCandidate = state.candidate;
@@ -141,7 +156,7 @@ const manifestStart = requests.length;
 assert.equal((await hooks.loadManifestFor(tag + '@' + digest, 'linux')).image_digest, digest);
 assert.ok(requests.slice(manifestStart).every(request => !request.url.includes('latest.json')));
 await assert.rejects(hooks.loadManifestFor(tag, 'linux'), /digest-pinned/);
-elements.set('updatePanel', { querySelectorAll:() => [{ checked:true, value:'linux' }] });
+elements.set('updatePanel', { classList:{remove(){}}, querySelectorAll:() => [{ checked:true, value:'linux' }] });
 elements.set('updStatus', {});
 hooks.setState({ candidate, config:{ linuxUse:tag + '@' + digest } });
 assert.deepEqual(plain(hooks.updTargets()), []);
@@ -183,6 +198,7 @@ function installerView(){
   };
   elements.set('linuxInstaller', host);
   elements.set('lvpmReview', review);
+  elements.set('linuxVipmView', { hidden:false });
   for (const id of ['lvpmBuild', 'lvpmActivate', 'lvpmReset']) elements.set(id, { addEventListener(){} });
   return { host, review, inputs };
 }
@@ -206,6 +222,29 @@ assert.match(selectedView.host.innerHTML, /<strong>LVPM Experimental<\/strong>/)
 selectedView.inputs.find(input => input.value === 'lvpm').listener();
 assert.equal(selectedView.review.hidden, false);
 assert.equal(requests.length, beforeViewSwitch);
+for (const retainedDefault of ['base', 'ghcr.io/owner/custom-linux:reviewed@' + digest]) {
+  const resetConfig = { linuxUse:selection, use:retainedDefault, actions:{masscompile:'custom-action-worker'} };
+  const originalConfig = JSON.stringify(resetConfig);
+  hooks.setState({ candidate, config:resetConfig });
+  const resetView = installerView();
+  await hooks.renderLinuxInstaller();
+  assert.match(resetView.host.innerHTML, />Reset Linux to existing default selection via PR<\/button>/);
+  assert.match(resetView.host.innerHTML, /To return to the existing default selection/);
+  assert.match(resetView.host.innerHTML, /Reset removes only <code>linuxUse<\/code>/);
+  assert.ok(resetView.host.innerHTML.includes('existing default selection remains <code>' + retainedDefault + '</code>'));
+  assert.match(resetView.host.innerHTML, /per-action overrides are retained/);
+  assert.match(resetView.host.innerHTML, /Reset does not guarantee VIPM/);
+  assert.doesNotMatch(resetView.host.innerHTML, /Reset Linux default to VIPM|return to the existing VIPM selection/);
+  const beforeReset = requests.length;
+  await hooks.dispatchLinuxWorker('reset');
+  const resetRequests = requests.slice(beforeReset).filter(request => request.options.method === 'POST');
+  assert.equal(resetRequests.length, 1);
+  assert.ok(resetRequests[0].url.endsWith('/reconfigure.yml/dispatches'));
+  assert.deepEqual(JSON.parse(resetRequests[0].options.body), {
+    ref:'trunk', inputs:{linux_worker:'reset'}
+  });
+  assert.equal(JSON.stringify(resetConfig), originalConfig);
+}
 hooks.setState({ candidate, config:{ use:'vipm-selected-default' }, liveConfig:{ linuxUse:tag + '@' + digest } });
 const vipmView = installerView();
 await hooks.renderLinuxInstaller();
@@ -236,7 +275,7 @@ await hooks.renderLinuxInstaller();
 assert.match(missingView.review.innerHTML, /id="lvpmBuild" disabled/);
 assert.match(missingView.review.innerHTML, /Install the Linux custom-image capability on the default branch/);
 assert.match(missingView.review.innerHTML, /id="lvpmActivate">/);
-assert.match(missingView.review.innerHTML, /id="lvpmReset">/);
+assert.doesNotMatch(missingView.host.innerHTML, /id="lvpmReset"/);
 assert.equal((await hooks.linuxWorkflowPayload('activate')).file, 'reconfigure.yml');
 assert.equal((await hooks.linuxWorkflowPayload('reset')).body.inputs.linux_worker, 'reset');
 for (const failure of [401, 403, 404, 500, 'network', 'malformed']) {
@@ -248,7 +287,7 @@ for (const failure of [401, 403, 404, 500, 'network', 'malformed']) {
   assert.match(unavailableView.review.innerHTML, /Candidate build availability is unknown/);
   assert.doesNotMatch(unavailableView.review.innerHTML, /Install the Linux custom-image capability/);
   assert.match(unavailableView.review.innerHTML, /id="lvpmActivate">/);
-  assert.match(unavailableView.review.innerHTML, /id="lvpmReset">/);
+  assert.doesNotMatch(unavailableView.host.innerHTML, /id="lvpmReset"/);
   const beforeBlockedBuild = requests.length;
   await hooks.dispatchLinuxWorker('build');
   assert.ok(requests.slice(beforeBlockedBuild).every(request => request.options.method !== 'POST'));
@@ -265,7 +304,7 @@ workflowResponse = 'available';
 hooks.setState({ revision:'historical', candidate });
 const historicalView = installerView();
 await hooks.renderLinuxInstaller();
-for (const control of ['lvpmBuild', 'lvpmActivate', 'lvpmReset']) {
+for (const control of ['lvpmBuild', 'lvpmActivate']) {
   assert.ok(historicalView.review.innerHTML.includes('id="' + control + '" disabled'));
 }
 hooks.setState({ candidate });
@@ -355,7 +394,7 @@ function dragonInventory(file, available = true){
   return { sha:revision, dragon:{ available, files:[{ source_file:dragonPath, ...file }] } };
 }
 const parsedDragon = { inspection:{ status:'parsed', reason:'Trusted declarations parsed.' },
-  dependencies:[{ package_id:'actual', status:'installed' }] };
+  dependencies:[{ package_id:'actual', status:'installed', platform_status:{windows:{status:'installed'},linux:{status:'installed'}} }] };
 hooks.setState({ candidate, inventory:dragonInventory(parsedDragon) });
 assert.match(hooks.dragonFileState(monitoredDragon), />installed</);
 for (const testCase of [
@@ -375,7 +414,7 @@ for (const testCase of [
 }
 for (const status of ['missing', 'wrong_version', 'conflict']) {
   hooks.setState({ candidate, inventory:dragonInventory({ ...parsedDragon, dependencies:[{ status }] }) });
-  assert.match(hooks.dragonFileState(monitoredDragon), />missing</);
+  assert.match(hooks.dragonFileState({...monitoredDragon, monitorOn:['windows']}), />missing</);
 }
 for (const testCase of [
   { name:'missing parser', inventory:dragonInventory({}, false) },
@@ -411,4 +450,275 @@ const unknownPendingHtml = hooks.updMissingList({ dragon:[{ name:dragonPath, sta
 assert.match(unknownPendingHtml, /Unresolved .dragon dependencies/);
 assert.match(unknownPendingHtml, /unknown/);
 assert.doesNotMatch(unknownPendingHtml, /<parser unavailable>/);
-console.log('LVPM UX dispatch, inventory, historical-revision, no-fallback, tooling-view, build-availability, revision-bound freshness, and trusted Dragon inspection tests passed.');
+function uiElement(){
+  const classes = new Set();
+  return { innerHTML:'', hidden:false, style:{},
+    classList:{ add:value => classes.add(value), remove:value => classes.delete(value), contains:value => classes.has(value) },
+    addEventListener(){}, setAttribute(){}, querySelector:() => null, querySelectorAll:() => []
+  };
+}
+for (const id of ['updatePanel', 'platformSummary', 'containers', 'vipcWrap', 'nipmWrap', 'systemWrap', 'dragonWrap', 'monitorStatus', 'saveMonitor', 'tokPanel', 'updStatus']) {
+  elements.set(id, uiElement());
+}
+const projectVipc = { path:'project.vipc', packages:['actual-1.2'], role:'project', monitored:true, configured:true, monitorOn:['windows', 'linux'] };
+function platformFixture(platform, windowsPackages, linuxPackages){
+  hooks.setState({ candidate, platform, vipcs:[{ ...projectVipc }], dragons:[],
+    columns:{
+      windows:{ key:'windows', tag:'win-existing', ready:true, packages:new Set(windowsPackages) },
+      linux:{ key:'linux', tag:'linux-existing', ready:true, packages:new Set(linuxPackages) }
+    } });
+}
+for (const testCase of [
+  { platform:'windows', windows:['actual-1.2'], linux:[], pending:false },
+  { platform:'linux', windows:['actual-1.2'], linux:[], pending:true },
+  { platform:'windows', windows:[], linux:['actual-1.2'], pending:true },
+  { platform:'linux', windows:[], linux:['actual-1.2'], pending:false }
+]) {
+  platformFixture(testCase.platform, testCase.windows, testCase.linux);
+  assert.equal(hooks.platformCoverage(testCase.platform).pending, testCase.pending);
+  await hooks.renderUpdatePanel();
+  const label = testCase.platform === 'linux' ? 'Linux' : 'Windows';
+  const other = testCase.platform === 'linux' ? 'Windows' : 'Linux';
+  assert.match(elements.get('platformSummary').innerHTML,
+    new RegExp(label + (testCase.pending ? ' dependencies need attention' : ' monitored project dependencies are satisfied')));
+  assert.doesNotMatch(elements.get('platformSummary').innerHTML, new RegExp(other + ' dependencies need attention'));
+  hooks.renderVipc([{ ...projectVipc }], hooks.getColumnStates());
+  assert.match(elements.get('vipcWrap').innerHTML, new RegExp('data-monitor-plat="' + testCase.platform + '"'));
+  assert.doesNotMatch(elements.get('vipcWrap').innerHTML, new RegExp('data-monitor-plat="' + other.toLowerCase() + '"'));
+  assert.deepEqual(plain(hooks.updTargets()).map(item => item.key), [testCase.platform]);
+}
+for (const platform of ['windows', 'linux']) {
+  const oldConfig = activeConfig;
+  activeConfig = 'config:\n  container:\n    use: vipm-default\n';
+  hooks.setState({ candidate, platform, vipcs:[], dragons:[], config:{linuxUse:selection} });
+  if (platform === 'linux') hooks.setState({ candidate, platform, vipcs:[], dragons:[] });
+  const start = requests.length;
+  await hooks.dispatchContainerUpdate();
+  const sent = requests.slice(start).filter(request => request.options.method === 'POST');
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].url.endsWith(platform === 'windows' ? '/build-labview-image.yml/dispatches' : '/build-labview-linux-image.yml/dispatches'));
+  assert.equal(JSON.parse(sent[0].options.body).inputs.update_mode, 'replace');
+  if (platform === 'windows') assert.ok(requests.slice(start).every(request => new URL(request.url).hostname !== 'raw.githubusercontent.com'));
+  activeConfig = oldConfig;
+}
+let releasePost;
+postBarrier = new Promise(resolve => { releasePost = resolve; });
+hooks.setState({ candidate, platform:'windows', vipcs:[], dragons:[] });
+const inFlightUpdate = hooks.dispatchContainerUpdate();
+hooks.setState({ candidate, platform:'linux', vipcs:[], dragons:[] });
+elements.get('updStatus').innerHTML = 'Linux status unchanged';
+releasePost();
+await inFlightUpdate;
+assert.equal(elements.get('updStatus').innerHTML, 'Linux status unchanged');
+postBarrier = null;
+for (const action of ['build', 'activate', 'reset']) {
+  for (const change of [{platform:'windows'}, {revision:'historical'}, {dirty:true}]) {
+    for (const responseStatus of [204, 500]) {
+      hooks.setState({ candidate, vipcs:[], dragons:[] });
+      elements.set('lvpmStatus', uiElement());
+      postBarrier = new Promise(resolve => { releasePost = resolve; });
+      dispatchStatus = responseStatus;
+      const start = requests.length;
+      const pending = hooks.dispatchLinuxWorker(action);
+      for (let attempt = 0; attempt < 30 && !requests.slice(start).some(request => request.options.method === 'POST'); attempt++) {
+        await Promise.resolve();
+      }
+      assert.equal(requests.slice(start).filter(request => request.options.method === 'POST').length, 1);
+      hooks.setState({ candidate, vipcs:[], dragons:[], ...change });
+      elements.get('tokPanel').hidden = false;
+      elements.get('lvpmStatus').textContent = 'Current view unchanged';
+      releasePost();
+      await pending;
+      assert.equal(elements.get('tokPanel').hidden, false, action + JSON.stringify(change));
+      assert.equal(elements.get('lvpmStatus').textContent, 'Current view unchanged');
+      postBarrier = null;
+    }
+  }
+}
+dispatchStatus = 204;
+platformFixture('windows', ['actual-1.2'], []);
+const beforeWindowsRender = requests.length;
+hooks.renderContainers(hooks.getColumnStates());
+assert.match(elements.get('containers').innerHTML, /Windows uses VIPM/);
+assert.doesNotMatch(elements.get('containers').innerHTML, /id="linuxInstaller"|name="linuxInstaller"|LVPM Experimental/);
+await hooks.dispatchLinuxWorker('build');
+assert.equal(requests.length, beforeWindowsRender);
+const splitDragon = dragonInventory({ ...parsedDragon, dependencies:[{
+  package_id:'actual', status:'unknown',
+  platform_status:{windows:{status:'installed'},linux:{status:'unknown',message:'No current Linux package evidence'}}
+}] });
+hooks.setState({candidate, vipcs:[], dragons:[], inventory:dragonInventory({...parsedDragon, dependencies:[{status:'installed'}]})});
+assert.match(hooks.dragonFileState(monitoredDragon), />unknown</);
+assert.match(hooks.dragonFileState({...monitoredDragon, monitorOn:['windows']}), />installed</);
+for (const platform of ['windows', 'linux']) {
+  hooks.setState({candidate, platform, vipcs:[], dragons:[{...monitoredDragon, monitorOn:['windows','linux']}], inventory:splitDragon, columns:{}});
+  assert.equal(hooks.platformCoverage(platform).pending, platform === 'linux');
+  hooks.renderDragonFiles([{...monitoredDragon, monitorOn:['windows','linux']}]);
+  assert.match(elements.get('dragonWrap').innerHTML, platform === 'windows' ? />installed</ : />unknown</);
+}
+for (const evidence of [
+  { vipcs:[{ ...projectVipc, error:'Malformed VIPC' }], columns:{windows:{ready:true, packages:new Set(['actual-1.2'])}} },
+  { vipcs:[projectVipc], columns:{windows:{ready:false, packages:new Set(['actual-1.2'])}} },
+  { vipcs:[projectVipc], columns:{windows:{ready:true, unsupported:true, packages:new Set(['actual-1.2'])}} },
+  { vipcs:[], dragons:[{ ...monitoredDragon, monitorOn:['windows'] }], inventory:dragonInventory({}, false) },
+  { vipcs:[], dragons:[{ ...monitoredDragon, monitorOn:['windows'] }], inventory:dragonInventory({error:'Malformed Dragon'}) },
+  { vipcs:[], dragons:[{ ...monitoredDragon, monitorOn:['windows'] }], inventory:dragonInventory({inspection:{status:'parsed'}, dependencies:{}}) },
+  { vipcs:[], dragons:[{ ...monitoredDragon, monitorOn:['windows'] }], inventory:{sha:revision, dragon:{available:true, files:{}}} }
+]) {
+  hooks.setState({ candidate, platform:'windows', dragons:[], ...evidence });
+  assert.equal(hooks.platformCoverage('windows').pending, true);
+  await hooks.renderUpdatePanel();
+  assert.doesNotMatch(elements.get('platformSummary').innerHTML, /are satisfied/);
+}
+for (const status of ['stale', 'unknown']) {
+  hooks.setState({ candidate, vipcs:[projectVipc], dragons:[], config:{linuxUse:selection},
+    inventory:inventoryFor({...currentFreshness, status}), columns:{linux:state} });
+  await hooks.renderUpdatePanel();
+  assert.match(elements.get('platformSummary').innerHTML, /Linux dependencies need attention/);
+  assert.doesNotMatch(elements.get('updatePanel').innerHTML, /id="updRun"/);
+  assert.match(elements.get('updatePanel').innerHTML, /active image is never rebuilt/);
+}
+hooks.setState({ candidate, vipcs:[{ ...projectVipc, monitored:false, monitorOn:[] }], dragons:[], columns:{} });
+await hooks.renderUpdatePanel();
+assert.match(elements.get('platformSummary').innerHTML, /No project dependency files are monitored/);
+assert.doesNotMatch(elements.get('platformSummary').innerHTML, /are satisfied/);
+hooks.setState({ candidate, vipcs:[{ ...projectVipc, monitorOn:['windows'] }], dragons:[], columns:{} });
+assert.equal(hooks.monitorCounts().monitored, 0);
+hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
+assert.equal(hooks.monitorInputs().container_vipc, 'project.vipc::windows+linux');
+hooks.setFileMonitor('vipc', 'project.vipc', 'linux', false);
+assert.equal(hooks.monitorInputs().container_vipc, 'project.vipc::windows');
+assert.equal(hooks.monitorCounts().monitored, 0);
+await hooks.dispatchMonitor();
+await hooks.renderUpdatePanel();
+assert.match(elements.get('monitorStatus').innerHTML, /Review and merge its pull request/);
+assert.match(elements.get('updatePanel').innerHTML, /id="updRun" disabled/);
+for (const staleState of [{ revision:'historical' }, { dirty:true }]) {
+  hooks.setState({ candidate, vipcs:[], dragons:[], ...staleState });
+  await hooks.renderUpdatePanel();
+  assert.match(elements.get('updatePanel').innerHTML, /id="updRun" disabled/);
+  const start = requests.length;
+  await hooks.dispatchContainerUpdate();
+  for (const action of ['build', 'activate', 'reset']) await hooks.dispatchLinuxWorker(action);
+  assert.ok(requests.slice(start).every(request => request.options.method !== 'POST'));
+}
+hooks.setState({ candidate, vipcs:[], dragons:[], tooling:'lvpm' });
+await hooks.renderUpdatePanel();
+assert.match(elements.get('updatePanel').innerHTML, /You are exploring LVPM/);
+assert.doesNotMatch(elements.get('updatePanel').innerHTML, /id="updRun"/);
+const postStart = requests.length;
+const explorationView = installerView();
+await hooks.renderLinuxInstaller();
+for (const input of explorationView.inputs) input.listener();
+assert.ok(requests.slice(postStart).every(request => request.options.method !== 'POST'));
+for (const operation of ['vipm', 'lvpm']) {
+  for (const change of [{platform:'windows'}, {revision:'historical'}, {dirty:true}]) {
+    hooks.setState({ candidate, vipcs:[], dragons:[] });
+    const start = requests.length;
+    const pending = operation === 'vipm' ? hooks.dispatchContainerUpdate() : hooks.dispatchLinuxWorker('activate');
+    hooks.setState({ candidate, vipcs:[], dragons:[], ...change });
+    await pending;
+    assert.ok(requests.slice(start).every(request => request.options.method !== 'POST'), operation + JSON.stringify(change));
+  }
+}
+const modalFields = new Map(['#updConfirmSub', '#updConfirmBody', '#updConfirmApprove'].map(key => [key, uiElement()]));
+const modal = uiElement();
+modal.querySelector = selector => modalFields.get(selector);
+hooks.setModal(modal);
+platformFixture('windows', ['actual-1.2'], []);
+hooks.openUpdateApprovalDialog();
+assert.match(modalFields.get('#updConfirmBody').innerHTML, /Windows preview/);
+assert.doesNotMatch(modalFields.get('#updConfirmBody').innerHTML, /Linux preview/);
+const approvedBeforeSwitch = modalFields.get('#updConfirmApprove').onclick;
+hooks.selectPlatform('linux');
+const beforeObsoleteApproval = requests.length;
+approvedBeforeSwitch();
+assert.equal(requests.length, beforeObsoleteApproval);
+assert.equal(modal.classList.contains('hidden'), true);
+hooks.setModal(null);
+const savedStorage = context.localStorage;
+context.localStorage = { getItem:() => '' };
+hooks.setState({ candidate, vipcs:[], dragons:[] });
+await hooks.dispatchLinuxWorker('activate');
+assert.equal(typeof hooks.pendingAction(), 'function');
+hooks.selectPlatform('windows');
+assert.equal(hooks.pendingAction(), null);
+assert.equal(elements.get('tokPanel').hidden, true);
+context.localStorage = savedStorage;
+const platformTabs = ['windows', 'linux'].map(platform => ({
+  platform, attributes:{}, listeners:{}, tabIndex:0,
+  getAttribute(){ return platform; },
+  setAttribute(name, value){ this.attributes[name] = value; },
+  addEventListener(event, listener){ this.listeners[event] = listener; },
+  focus(){ this.focused = true; }
+}));
+context.document.querySelectorAll = selector => selector === '[data-platform]' ? platformTabs : [];
+hooks.setState({ candidate, platform:'windows', vipcs:[], dragons:[] });
+hooks.initPlatformTabs();
+assert.equal(platformTabs[0].attributes['aria-selected'], 'true');
+platformTabs[0].listeners.keydown({key:'ArrowRight', preventDefault(){}});
+assert.equal(platformTabs[1].attributes['aria-selected'], 'true');
+assert.equal(platformTabs[1].tabIndex, 0);
+assert.equal(platformTabs[1].focused, true);
+assert.equal(new URL(context.location.href).searchParams.get('platform'), 'linux');
+assert.equal(new URL(context.location.href).searchParams.get('sha'), revision);
+platformTabs[1].listeners.keydown({key:'Home', preventDefault(){}});
+assert.equal(platformTabs[0].attributes['aria-selected'], 'true');
+const header = fs.readFileSync(new URL('pages/lvci-header.js', root), 'utf8');
+const bannerSource = header.slice(header.indexOf("    try {\n      fetch(base + '/deps-pending.json'"), header.indexOf('    // VI Browser owns #commit-select'));
+assert.ok(bannerSource.includes('platform not identified'));
+function bannerElement(tagName){
+  const element = uiElement();
+  element.tagName = tagName;
+  element.children = [];
+  let content = '';
+  Object.defineProperty(element, 'innerHTML', {
+    get(){ throw new Error('Banner tests must inspect DOM nodes, not HTML'); },
+    set(){ throw new Error('Dependency banner must not parse HTML'); }
+  });
+  Object.defineProperty(element, 'textContent', {
+    get(){ return content + element.children.map(child => child.textContent).join(''); },
+    set(value){ content = String(value); element.children = []; }
+  });
+  element.appendChild = child => { element.children.push(child); return child; };
+  return element;
+}
+function bannerLinks(element){
+  return element.children.flatMap(child => child.tagName === 'a' ? [child] : bannerLinks(child));
+}
+for (const testCase of [
+  { path:'/project/dependencies.html', containers:['linux'], show:false },
+  { path:'/project/dashboard.html', containers:['linux'], show:true, labels:['Linux'], other:'Windows' },
+  { path:'/project/vi-browser.html', containers:['windows-beta'], show:true, labels:['Windows'], other:'Linux' },
+  { path:'/project/configure.html', containers:['windows','linux'], show:true, labels:['Windows','Linux'] },
+  { path:'/project/dashboard.html', containers:[], show:true, labels:[] },
+  { path:'/project/dashboard.html', containers:['linux', '<img src=x onerror=alert(1)>'], show:true, labels:['Linux'], other:'Windows', navBase:'https://owner.github.io/project/"/><img src=x onerror=alert(1)>' },
+  { path:'/project/dashboard.html', containers:['linux'], show:false, navBase:'javascript:alert(1)' },
+  { path:'/project/dashboard.html', containers:['linux'], show:false, navBase:'data:text/html,<script>alert(1)</script>' }
+]) {
+  const banner = bannerElement('div');
+  vm.runInNewContext(bannerSource, {
+    base:'/project', navBase:testCase.navBase || '/project', location:{pathname:testCase.path, href:'https://owner.github.io' + testCase.path}, pendbar:banner,
+    URL,
+    document:{ createElement:bannerElement, createTextNode:value => {
+      const text = bannerElement('#text'); text.textContent = value; return text;
+    } },
+    fetch:async () => ({ok:true, json:async () => ({pending:true, containers:testCase.containers, packages:['a'],dragon:[]})})
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(banner.classList.contains('show'), testCase.show);
+  if (!testCase.show) continue;
+  assert.match(banner.textContent, /aggregate, not per-platform/);
+  const links = bannerLinks(banner);
+  assert.equal(links.length, Math.max(1, testCase.labels.length));
+  for (const label of testCase.labels) {
+    const link = links.find(item => item.textContent === 'Review ' + label + ' dependencies ↗');
+    assert.ok(link);
+    assert.equal(new URL(link.href).searchParams.get('platform'), label.toLowerCase());
+  }
+  if (testCase.other) assert.doesNotMatch(banner.textContent, new RegExp('Review ' + testCase.other + ' dependencies'));
+  assert.ok(links.every(link => new URL(link.href).protocol === 'https:'));
+  assert.deepEqual(banner.children[0].children.map(child => child.tagName),
+    testCase.labels.length === 2 ? ['strong', 'span', 'a', '#text', 'a'] : ['strong', 'span', 'a']);
+}
+console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon checks plus OS-isolated status, monitoring preservation, tab keyboard/deep links, preview-only tooling, stale/historical blocking, cross-tab/revision/dirty dispatch races, obsolete approval/token cancellation, and shared-banner scope passed.');
