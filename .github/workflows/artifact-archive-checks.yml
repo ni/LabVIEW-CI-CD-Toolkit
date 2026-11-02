@@ -21,7 +21,7 @@ jobs:
         os: [ubuntu-latest, windows-2022]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - name: Create representative VIDiff report
