@@ -12,6 +12,7 @@ env:
   PAGES_URL: ${{ vars.PAGES_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
 
 permissions:
+  actions: read
   contents: write
   pull-requests: write
   pages: write

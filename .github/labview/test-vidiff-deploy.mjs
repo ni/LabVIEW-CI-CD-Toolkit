@@ -701,6 +701,10 @@ test('workflow gates merge and Pages deploy behind trusted publication policy', 
   );
 });
 
+test('workflow declares actions:read permission for artifact REST access', () => {
+  assert.match(workflowText, /permissions:\n\s+actions: read/);
+});
+
 test('comment script updates existing bot comment for the same platform', async () => {
   const updates = [];
   const creations = [];
