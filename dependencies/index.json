@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "9736176b4c54ac8845a13c39b03023049a0b4b19",
+  "sha": "8e66f4b5ebdde7ed0708418895a130b03e585d6c",
   "revisions": [
+    {
+      "sha": "8e66f4b5ebdde7ed0708418895a130b03e585d6c",
+      "short": "8e66f4b",
+      "message": "Merge pull request #110 from ni/lvci-release/release-4.19.5",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T22:19:37Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "5cbe7b7c6e97f5cb650fabfbf226068618fe882a",
+      "short": "5cbe7b7",
+      "message": "Prepare release 4.19.5",
+      "author": "github-actions[bot]",
+      "date": "2026-11-02T22:17:47Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "9736176b4c54ac8845a13c39b03023049a0b4b19",
       "short": "9736176",
@@ -882,24 +900,6 @@
       "message": "Merge pull request #61 from elijah286/fix/dashboard-dead-run-visibility",
       "author": "Elijah Kerry",
       "date": "2026-08-22T16:46:41Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "643405a4654ea88ae4a1604aeb632c324062ba06",
-      "short": "643405a",
-      "message": "Dashboard: keep dead CI runs visible instead of silently resetting cells",
-      "author": "Elijah Kerry",
-      "date": "2026-08-22T16:45:57Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "35f457ed7da0303428bb337e10d983d990e6c81b",
-      "short": "35f457e",
-      "message": "Fork-safe first run: auto-build the missing worker image",
-      "author": "Elijah Kerry",
-      "date": "2026-08-22T01:11:28Z",
       "project": false,
       "dep_only": false
     },
