@@ -125,6 +125,40 @@ class ReconfigurePreservationTests(unittest.TestCase):
             text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_reversed_analyzer_rules_remain_readable_after_settings_change(self):
+        original = self.preservation_fixture()
+        original['config']['viAnalyzer']['rules'] = [{'paths': 'src/**|test/**', 'config': 'custom.viancfg'}]
+        result, text = self.apply_settings(initial=yaml.safe_dump(original, sort_keys=False), IN_RUNNERS='3')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expected = copy.deepcopy(original)
+        expected['config']['concurrency'] = {'maxParallel': 3}
+        self.assert_preserved(yaml.safe_load(text), expected)
+        tree = ast.parse(SCRIPT)
+        parser = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                      and node.name == '_parse_via_block')
+        namespace = {'re': re}
+        exec(compile(ast.Module(body=[parser], type_ignores=[]), 'reconfigure.yml', 'exec'), namespace)
+        self.assertEqual(namespace['_parse_via_block'](text)['rules'],
+                         [{'config': 'custom.viancfg', 'paths': ['src/**', 'test/**']}])
+        node_script = r'''
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const vm = require('node:vm');
+          const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+          for (const file of input.files) {
+            const source = fs.readFileSync(file, 'utf8');
+            const match = source.match(/    function parseViAnalyzerBlock\(text\)\s*\{[\s\S]*?\n    \}/);
+            assert.ok(match, file);
+            const parser = vm.runInNewContext(match[0] + '; parseViAnalyzerBlock');
+            const config = JSON.parse(JSON.stringify(parser(input.text)));
+            assert.deepEqual(config.rules, [{config: 'custom.viancfg', paths: ['src/**', 'test/**']}], file);
+          }
+        '''
+        result = subprocess.run(['node', '-e', node_script], input=json.dumps({'text': text, 'files': [
+            str(ROOT / '.github/pages/configure.html'), str(ROOT / 'actions/dashboard/configure.html')]}),
+            text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_explicit_none_retains_configured_empty_dependency_lists(self):
         original = self.preservation_fixture()
         expected = copy.deepcopy(original)
