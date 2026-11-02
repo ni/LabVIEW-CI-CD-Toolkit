@@ -1,8 +1,35 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "c5d89fe8896fe878cb3e1c98a9d050643b3ecb16",
+  "sha": "97733445462f2c49cdea2c4dcf5eb4564a01e324",
   "revisions": [
+    {
+      "sha": "97733445462f2c49cdea2c4dcf5eb4564a01e324",
+      "short": "9773344",
+      "message": "Merge pull request #92 from ni/fix/preserve-reconfigure-settings-20261101",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T13:16:59Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "e971ab84399015a557b0922600e4a25b80f92925",
+      "short": "e971ab8",
+      "message": "Keep platform defaults unchanged for scoped Reconfigure requests",
+      "author": "elijah286",
+      "date": "2026-11-02T00:14:29Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "1b3383f45e9090acc9104de5e50c0693147bf3c0",
+      "short": "1b3383f",
+      "message": "Preserve unrelated client settings during Reconfigure",
+      "author": "elijah286",
+      "date": "2026-11-02T00:12:14Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "c5d89fe8896fe878cb3e1c98a9d050643b3ecb16",
       "short": "c5d89fe",
@@ -873,33 +900,6 @@
       "message": "Skip Pages publishing for fork pull requests",
       "author": "elijah286",
       "date": "2026-08-12T16:27:18Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "8f935e6e3379c89c9e08a86d8514fb05b8daee43",
-      "short": "8f935e6",
-      "message": "indentation fixes for report error",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-11T16:43:36Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5f102c241f6b32338e705a02513d701d3ef2d0f1",
-      "short": "5f102c2",
-      "message": "Correct CycloneDX SBOM componnet supplier data in the generated report.",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-11T15:52:58Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "38a335472926c8d0337c9daa1cfcd63d16ab2a1d",
-      "short": "38a3354",
-      "message": "pass --allow-missing-files to override",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-10T21:14:41Z",
       "project": false,
       "dep_only": false
     },
