@@ -56,7 +56,7 @@ jobs:
       - id: ref
         shell: bash
         run: |
-          python3 -S - <<'PY'
+          python3 -I -S - <<'PY'
           import os
           from pathlib import Path
           import re

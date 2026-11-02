@@ -8,3 +8,5 @@ source mappings produce a clear error. Explicit immutable pins fetch the exact
 release, including newer published releases outside stable. The config reader
 independently follows v4; publication alone does not promote stable or advance
 v4 to the new release.
+The ref resolver isolates Python imports from client-root modules, PYTHONPATH,
+and site packages so those modules cannot execute or forge the tooling ref.

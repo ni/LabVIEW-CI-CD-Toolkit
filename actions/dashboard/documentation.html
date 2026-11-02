@@ -987,6 +987,8 @@ mass-compile:
         publication alone does not promote stable or advance <code>v4</code> to the new release
         (see <a href="#versioning">§18</a>).</p>
       <p>The ref resolver uses Python's standard library and Git, with no runtime YAML package dependency.
+        Python runs with <code>-I -S</code> so client-root modules, <code>PYTHONPATH</code>, and site packages
+        cannot supply imports to the resolver or forge its selected ref.
         It accepts manifests with plain top-level keys and a block <code>source</code> mapping whose
         <code>ref</code> is a single-line Git ref, optionally single- or double-quoted and followed by a comment.
         Empty refs use the default. Refs under <code>config</code> or <code>source.distribution</code> are ignored

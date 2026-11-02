@@ -16,7 +16,7 @@ SOURCE_REPO = 'ni/LabVIEW-CI-CD-Toolkit'
 
 
 class ReusableWorkflowTests(unittest.TestCase):
-    def resolve(self, manifest):
+    def resolve(self, manifest, shadow_module=None, via_pythonpath=False):
         resolver = next(step for step in CONFIG['steps'] if step.get('id') == 'ref')
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
@@ -24,12 +24,35 @@ class ReusableWorkflowTests(unittest.TestCase):
                 (workspace / '.github').mkdir()
                 (workspace / '.github/labview-ci.yml').write_text(manifest)
             output = workspace / 'output'
+            environment = {**os.environ, 'GITHUB_OUTPUT': str(output)}
+            if shadow_module:
+                module_dir = workspace / 'injected' if via_pythonpath else workspace
+                module_dir.mkdir(exist_ok=True)
+                (module_dir / f'{shadow_module}.py').write_text(
+                    'import os\n'
+                    'open("shadow-executed", "w").write("client module executed")\n'
+                    'with open(os.environ["GITHUB_OUTPUT"], "a") as output:\n'
+                    '    output.write("ref=attacker-selected\\n")\n'
+                    'raise SystemExit(0)\n'
+                )
+                if via_pythonpath:
+                    environment['PYTHONPATH'] = str(module_dir)
             result = subprocess.run(
                 ['bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', resolver['run']],
-                cwd=workspace, env={**os.environ, 'GITHUB_OUTPUT': str(output)},
+                cwd=workspace, env=environment,
                 capture_output=True, text=True, timeout=10,
             )
+            self.assertFalse((workspace / 'shadow-executed').exists(), result.stdout + result.stderr)
             return result, output.read_text() if output.exists() else ''
+
+    def test_client_modules_and_pythonpath_cannot_execute_or_forge_ref(self):
+        for module in ('pathlib', 're', 'subprocess'):
+            for via_pythonpath in (False, True):
+                with self.subTest(module=module, via_pythonpath=via_pythonpath):
+                    result, output = self.resolve('source:\n  ref: "v4.19.1"\n', module, via_pythonpath)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertEqual(output, 'ref=v4.19.1\n')
+                    self.assertIn('Capability version (source.ref) this repo opted into: v4.19.1', result.stdout)
 
     def test_config_reader_uses_current_major_from_canonical_source(self):
         reader = next(step for step in CONFIG['steps'] if step.get('id') == 'cfg')
