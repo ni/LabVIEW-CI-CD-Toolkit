@@ -66,6 +66,7 @@ class ReconfigurePreservationTests(unittest.TestCase):
     def test_changed_output_remains_readable_by_existing_config_readers(self):
         original = self.preservation_fixture()
         original['config']['os'] = ['linux']
+        original['config']['container']['vipc'][0]['path'] = 'client folder with spaces/' * 6 + 'project.vipc'
         result, text = self.apply_settings(initial=yaml.safe_dump(original), IN_RUNNERS='3')
         self.assertEqual(result.returncode, 0, result.stderr)
         tree = ast.parse((ROOT / 'actions/dashboard/dashboard.py').read_text())
@@ -79,7 +80,7 @@ class ReconfigurePreservationTests(unittest.TestCase):
             parsed = namespace['_parse_container_config'](str(path))
         self.assertTrue(parsed['vipc'], parsed)
         self.assertTrue(parsed['dragon'], parsed)
-        self.assertEqual(parsed['vipc'][0]['path'], 'project.vipc')
+        self.assertEqual(parsed['vipc'][0]['path'], original['config']['container']['vipc'][0]['path'])
         self.assertEqual(parsed['vipc'][0]['monitorOn'], ['linux'])
         self.assertEqual(parsed['dragon'][0]['path'], 'project.dragon')
         self.assertEqual(parsed['dragon'][0]['monitorOn'], ['linux'])
@@ -100,7 +101,7 @@ class ReconfigurePreservationTests(unittest.TestCase):
             const parser = vm.runInNewContext(match[0] + '; ' + match[1], {parseViAnalyzerBlock:()=>({})});
             const config = JSON.parse(JSON.stringify(parser(input.text)));
             assert.equal(config.containerUse || config.use, 'win-existing', file);
-            assert.equal(config.vipc[0].path, 'project.vipc', file);
+            assert.equal(config.vipc[0].path, input.vipcPath, file);
             assert.equal(config.dragon[0].path, 'project.dragon', file);
             assert.equal(config.vipc[0].monitor, true, file);
             assert.equal(config.dragon[0].monitor, true, file);
@@ -109,13 +110,41 @@ class ReconfigurePreservationTests(unittest.TestCase):
               assert.equal(config.version, '2026', file);
               assert.deepEqual(config.os, ['linux'], file);
             }
+            const empty = JSON.parse(JSON.stringify(parser('config:\n  container:\n    use: base\n    vipc: []\n    dragon: []\n    actions: {}\n')));
+            assert.deepEqual(empty.vipc, [], file);
+            assert.deepEqual(empty.dragon, [], file);
+            if ('hasVipcList' in empty) {
+              assert.equal(empty.hasVipcList, true, file);
+              assert.equal(empty.hasDragonList, true, file);
+            }
           }
         '''
-        result = subprocess.run(['node', '-e', node_script], input=json.dumps({'text': text, 'files': [
+        result = subprocess.run(['node', '-e', node_script], input=json.dumps({'text': text, 'vipcPath': original['config']['container']['vipc'][0]['path'], 'files': [
             str(ROOT / '.github/pages/configure.html'), str(ROOT / '.github/pages/dependencies.html'),
             str(ROOT / 'actions/dashboard/configure.html'), str(ROOT / 'actions/dashboard/dependencies.html')]}),
             text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_explicit_none_retains_configured_empty_dependency_lists(self):
+        original = self.preservation_fixture()
+        expected = copy.deepcopy(original)
+        expected['config']['container']['vipc'] = []
+        expected['config']['container']['dragon'] = []
+        result, text = self.apply_settings(initial=yaml.safe_dump(original), IN_CONTAINER_VIPC='none', IN_CONTAINER_DRAGON='none')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_preserved(yaml.safe_load(text), expected)
+        tree = ast.parse((ROOT / 'actions/dashboard/dashboard.py').read_text())
+        parser = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == '_parse_container_config')
+        namespace = {'os': os, 're': re}
+        exec(compile(ast.Module(body=[parser], type_ignores=[]), 'dashboard.py', 'exec'), namespace)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'config.yml'
+            path.write_text(text)
+            parsed = namespace['_parse_container_config'](str(path))
+        self.assertEqual(parsed['vipc'], [])
+        self.assertEqual(parsed['dragon'], [])
+        self.assertTrue(parsed['hasVipcList'])
+        self.assertTrue(parsed['hasDragonList'])
 
     def test_updating_an_aliased_mapping_preserves_other_paths(self):
         shared = {'use': 'latest', 'customSetting': True}

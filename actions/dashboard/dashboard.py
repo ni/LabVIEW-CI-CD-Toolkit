@@ -4305,6 +4305,14 @@ def _parse_container_config(path='.github/labview-ci.yml'):
           if selected:
             cfg['linuxUse'] = selected.group(1)
             section = 'container'; current = None
+          header = re.match(r'^\s{4}(vipc|dragon|actions):\s*(\[\]|\{\})?\s*$', line)
+          if header:
+            name, empty = header.groups()
+            if name == 'vipc': cfg['hasVipcList'] = True
+            if name == 'dragon': cfg['hasDragonList'] = True
+            section = 'container' if empty else name
+            current = None
+            continue
         if section == 'container':
           m = re.match(r'^\s{4}use:\s*"?([^"#]+)"?', line)
           if m:
