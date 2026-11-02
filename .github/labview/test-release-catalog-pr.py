@@ -1,7 +1,10 @@
 import copy
 import importlib.util
 import json
+import os
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -22,6 +25,12 @@ class ReleaseCatalogPrTests(unittest.TestCase):
             'base': {'ref': 'main'},
         }
         self.files = ['.github/labview-ci/catalog.json', '.github/labview-ci/notes/fix.md']
+        self.metadata = {'title': 'Preserve configured test runners — v4.18.5',
+                         'body': '## Features and fixes\n\nPreserve configured test runners.',
+                         'label': 'release:patch'}
+        metadata_patch = patch.object(RELEASE_PR, 'catalog_pr_metadata', return_value=self.metadata)
+        metadata_patch.start()
+        self.addCleanup(metadata_patch.stop)
 
     def prepared(self, pull=None, files=None):
         return RELEASE_PR.prepared_pr(pull or self.pull, files or self.files,
@@ -82,6 +91,10 @@ class ReleaseCatalogPrTests(unittest.TestCase):
                 RELEASE_PR.push('ni/LabVIEW-CI-CD-Toolkit', 'main', '4.18.5', 'promotion')
         self.assertEqual(command.call_args_list[1].args,
                          ('git', 'push', 'origin', 'HEAD:refs/heads/lvci-release/promotion-4.18.5'))
+        created = command.call_args_list[-1].args
+        self.assertEqual(created[created.index('--title') + 1], self.metadata['title'])
+        self.assertEqual(created[created.index('--body') + 1], self.metadata['body'])
+        self.assertEqual(created[created.index('--label') + 1], self.metadata['label'])
         output.assert_any_call('published', 'false')
         output.assert_any_call('pr_url', 'https://github.com/ni/LabVIEW-CI-CD-Toolkit/pull/123')
 
@@ -90,11 +103,16 @@ class ReleaseCatalogPrTests(unittest.TestCase):
             subprocess.CompletedProcess([], 1, '', 'GH013: Changes must be made through a pull request'),
             subprocess.CompletedProcess([], 0, '', ''),
             subprocess.CompletedProcess([], 0, '[{"url":"existing-pr"}]', ''),
+            subprocess.CompletedProcess([], 0, '', ''),
         ]
         with patch.object(RELEASE_PR, 'run', side_effect=results) as command:
             with patch.object(RELEASE_PR, 'output') as output:
                 RELEASE_PR.push('ni/LabVIEW-CI-CD-Toolkit', 'main', '4.18.5', 'release')
-        self.assertEqual(command.call_count, 3)
+        self.assertEqual(command.call_count, 4)
+        self.assertEqual(command.call_args_list[-1].args,
+                         ('gh', 'pr', 'edit', 'existing-pr', '--repo', 'ni/LabVIEW-CI-CD-Toolkit',
+                          '--title', self.metadata['title'], '--body', self.metadata['body'],
+                          '--add-label', self.metadata['label']))
         output.assert_any_call('pr_url', 'existing-pr')
 
     def test_stale_preparation_branch_gets_a_commit_scoped_review_branch(self):
@@ -160,13 +178,14 @@ class ReleaseCatalogPrTests(unittest.TestCase):
             subprocess.CompletedProcess([], 0, commit + '\n', ''),
             subprocess.CompletedProcess([], 0, '', ''),
             subprocess.CompletedProcess([], 0, '[{"url":"existing-promotion-pr"}]', ''),
+            subprocess.CompletedProcess([], 0, '', ''),
         ]
         with patch.object(RELEASE_PR, 'run', side_effect=results) as command:
             with patch.object(RELEASE_PR, 'output') as output:
                 RELEASE_PR.push('ni/LabVIEW-CI-CD-Toolkit', 'main', '4.18.5', 'promotion')
         self.assertEqual(command.call_args_list[3].args,
                          ('git', 'push', 'origin', f'HEAD:refs/heads/{branch}'))
-        self.assertEqual(command.call_count, 5)
+        self.assertEqual(command.call_count, 6)
         output.assert_any_call('pr_url', 'existing-promotion-pr')
 
     def test_pr_creation_failure_does_not_claim_publication(self):
@@ -209,6 +228,89 @@ class ReleaseCatalogPrTests(unittest.TestCase):
             with patch.object(RELEASE_PR, 'output') as output:
                 RELEASE_PR.resume('ni/LabVIEW-CI-CD-Toolkit', 'main', 'ordinary-sha')
         output.assert_called_once_with('prepared', 'false')
+
+
+class PrMetadataTests(unittest.TestCase):
+    def catalog(self, version='4.19.0'):
+        return {'version': version, 'history': {'releases': [
+            {'version': version, 'notes': 'Add digest-pinned Linux LVPM dependency candidates. Preserve Reconfigure settings.'},
+            {'version': '4.18.7', 'notes': 'Earlier published fixes.'},
+        ]}}
+
+    def test_release_title_describes_features_before_version(self):
+        result = RELEASE_PR.build_pr_metadata(self.catalog(), '4.19.0', 'release', 'owner/toolkit')
+        self.assertEqual(result['title'], 'Add digest-pinned Linux LVPM dependency candidates — v4.19.0')
+        self.assertEqual(result['label'], 'release:minor')
+        self.assertTrue(result['body'].startswith('## Features and fixes'))
+        for expected in ('## Release impact', 'Minor', 'prepared / not published',
+                         'releases/tag/v4.18.7', 'already merged', 'runtime checks'):
+            self.assertIn(expected, result['body'])
+        self.assertLess(result['body'].index('## Features'), result['body'].index('## Release impact'))
+
+    def test_semver_classification(self):
+        for version, label in [('5.0.0', 'release:major'), ('4.19.0', 'release:minor'), ('4.18.8', 'release:patch')]:
+            with self.subTest(version=version):
+                result = RELEASE_PR.build_pr_metadata(self.catalog(version), version, 'release', 'owner/toolkit')
+                self.assertEqual(result['label'], label)
+
+    def test_promotion_names_existing_target_and_channel_not_new_features(self):
+        catalog = self.catalog('4.18.8')
+        catalog['history']['releases'][0]['notes'] = 'Marked v4.18.7 as the stable release. Default installs target it.'
+        result = RELEASE_PR.build_pr_metadata(catalog, '4.18.8', 'promotion', 'owner/toolkit')
+        self.assertIn('v4.18.7 as the stable', result['title'])
+        self.assertIn('metadata version is distinct', result['body'])
+        self.assertIn('does not introduce new implementation', result['body'])
+
+    def test_meaningful_summary_can_supply_title_with_full_notes_retained(self):
+        catalog = self.catalog()
+        catalog['history']['releases'][0]['summary'] = '**Linux LVPM dependencies** and [readable settings](https://example.com)'
+        result = RELEASE_PR.build_pr_metadata(catalog, '4.19.0', 'release', 'owner/toolkit')
+        self.assertEqual(result['title'], 'Linux LVPM dependencies and readable settings — v4.19.0')
+        self.assertIn('Preserve Reconfigure settings.', result['body'])
+
+    def test_long_multiline_title_is_bounded_without_truncating_release_body(self):
+        catalog = self.catalog()
+        notes = 'Improve dependency inspection\n' + 'and retain exact package versions ' * 12
+        catalog['history']['releases'][0]['notes'] = notes
+        result = RELEASE_PR.build_pr_metadata(catalog, '4.19.0', 'release', 'owner/toolkit')
+        self.assertLessEqual(len(result['title']), 125)
+        self.assertNotIn('\n', result['title'])
+        self.assertIn(notes.strip(), result['body'])
+
+    def test_missing_or_generic_notes_cannot_create_placeholder(self):
+        for notes in ('', 'Prepare LabVIEW CI release v4.19.0', 'Reconfigure LabVIEW CI'):
+            with self.subTest(notes=notes):
+                catalog = self.catalog()
+                catalog['history']['releases'][0]['notes'] = notes
+                with self.assertRaises(ValueError):
+                    RELEASE_PR.build_pr_metadata(catalog, '4.19.0', 'release', 'owner/toolkit')
+
+    def test_mismatched_prepared_version_is_rejected(self):
+        with self.assertRaises(ValueError):
+            RELEASE_PR.build_pr_metadata(self.catalog(), '4.18.8', 'release', 'owner/toolkit')
+
+    def test_generic_titles_rejected_and_descriptive_titles_allowed(self):
+        for title in ('Prepare LabVIEW CI release v4.19.0', 'prepare labview ci promotion v4.18.8',
+                      'Reconfigure LabVIEW CI', 'Release v4.19.0', 'v4.19.0', ''):
+            with self.subTest(title=title), self.assertRaises(ValueError):
+                RELEASE_PR.validate_title(title)
+        for title in ('Fix Linux VIDiff native HTML crashes', 'Update VIPC dependency monitoring',
+                      'Document release publication safeguards', 'Linux LVPM candidates — v4.19.0'):
+            self.assertEqual(RELEASE_PR.validate_title(title), title)
+
+    def test_actual_event_gate_checks_titles_without_repository_api_or_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            event = Path(directory) / 'event.json'
+            environment = {'PATH': os.environ['PATH'], 'GITHUB_EVENT_PATH': str(event)}
+            for title, expected in [('Prepare LabVIEW CI release v4.19.0', 1), ('Fix Linux dependency inspection', 0)]:
+                event.write_text(json.dumps({'pull_request': {'title': title}}))
+                result = subprocess.run([sys.executable, str(SPEC.origin), 'check-title'],
+                                        env=environment, capture_output=True, text=True)
+                self.assertEqual(result.returncode, expected, result.stderr)
+            event.write_text('{}')
+            result = subprocess.run([sys.executable, str(SPEC.origin), 'check-title'],
+                                    env=environment, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == '__main__':

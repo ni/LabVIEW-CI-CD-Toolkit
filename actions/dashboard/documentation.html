@@ -2143,6 +2143,12 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         or reuses the PR for that exact retry branch, and reports other push failures with their Git output.
         Close superseded catalog PRs after checking that the new proposal includes the current release notes;
         merge only the current proposal. Release-routing regressions run in the Catalog Source Sync PR gate.</p>
+      <p>Generated catalog PR titles describe release-note content first, with the version as secondary context, and
+        bodies identify the update type, baseline, unpublished status, and exact client update guidance.
+        Existing bot PR metadata is refreshed when reused; meaningful missing notes stop generation rather
+        than producing a version-only placeholder. Catalog Source Sync rejects known generic titles on
+        creation and edits. Reconfigure titles name actual changed settings or explicit LVPM activation/reset.
+        Metadata-only release PRs describe already-merged capabilities without claiming to implement them again.</p>
       <p>After merging a prepared catalog PR, Release verifies that it was created by
         <code>github-actions[bot]</code> in this repository and changes only the catalog and release-note fragments.
         It publishes the prepared version without generating another bump. If the merge does not trigger Release,

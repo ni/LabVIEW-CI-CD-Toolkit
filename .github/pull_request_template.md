@@ -2,7 +2,10 @@
 
 <!-- Explain what users can do now, or what failed before and works now.
 Lead with capabilities and benefits, not agent roles or release mechanics.
-Use an outcome-focused title; use "Document" for documentation-only features. -->
+Use an outcome-focused title; use "Document" for documentation-only features.
+Bot release/promotion/configuration PRs are not exempt. Avoid "Prepare LabVIEW CI
+release vX.Y.Z" and "Reconfigure LabVIEW CI"; name the actual capabilities,
+fixes, or changed settings, with a release version only as secondary context. -->
 
 ## Release impact
 
@@ -35,6 +38,7 @@ failed, pending, skipped, or environment-limited checks; do not imply they passe
 ## Author checklist
 
 - [ ] Title and opening summary explain concrete changes and user benefits.
+- [ ] Automated PR metadata follows the same policy; recurring generic titles are fixed in the generator and tests.
 - [ ] Claims match the base-to-head diff; already-landed work is labeled separately.
 - [ ] Release impact names the target version, update type/label, baseline, availability, and client update guidance.
 - [ ] Compatibility limits and verification gaps are explicit; PR references link directly.

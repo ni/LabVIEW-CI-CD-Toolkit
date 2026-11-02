@@ -58,6 +58,26 @@ be able to identify the user benefit, the exact scope, and any verification gaps
 without reading agent handoffs or commit history. Apply the same user-outcome
 standard to release-note fragments.
 
+### Automated PRs are not exempt
+
+Release, promotion, and Reconfigure generators must apply this policy in code,
+not rely on someone renaming every bot PR afterward. Reject version-only or
+generic titles such as "Prepare LabVIEW CI release v4.19.0" and "Reconfigure
+LabVIEW CI". Use the actual prepared release notes or changed configuration
+fields to describe the content. For example, "Linux LVPM dependency candidates
+and readable Reconfigure settings — v4.19.0" or "Update VIPC dependency
+monitoring and runner concurrency". Put the version after the feature summary,
+not in place of it; promotion titles identify the actual target and channel.
+
+Generated bodies start with features/fixes, followed by Release impact. Catalog
+PRs must distinguish preparing metadata for already-merged work from introducing
+new implementation. A reused bot PR must refresh its title and body as well.
+Missing meaningful release notes must stop PR generation rather than produce a
+generic placeholder. Add regression tests for new and reused bot PR metadata.
+Catalog Source Sync rejects known generic titles on PR creation and title edits;
+reviewers must still check semantic accuracy against the actual diff. Do not
+approve generic titles, stale projections, or superseded release proposals.
+
 ## Every PR identifies its release version and update type
 
 Every PR, including documentation, maintenance, and bot-generated PRs, must have
