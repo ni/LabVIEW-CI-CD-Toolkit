@@ -258,6 +258,15 @@
         if (/^\s*container:\s*$/.test(line)) { sec = "container"; cur = null; return; }
         if (/^\s*viBrowser:\s*$/.test(line)) { sec = "viBrowser"; cur = null; return; }
         if (/^\S/.test(line)) { sec = ""; cur = null; }
+        if (["container", "vipc", "dragon", "actions"].includes(sec)) {
+          const header = line.match(/^\s{4}(vipc|dragon|actions):\s*$/);
+          if (header) {
+            sec = header[1]; cur = null;
+            if (sec === "vipc") out.hasVipcList = true;
+            if (sec === "dragon") out.hasDragonList = true;
+            return;
+          }
+        }
         if (sec === "container") {
           let m = line.match(/^\s{4}use:\s*"?([^"#]+)"?/); if (m) out.use = m[1].trim();
           if (/^\s{4}vipc:\s*$/.test(line)) { sec = "vipc"; out.hasVipcList = true; cur = null; return; }
