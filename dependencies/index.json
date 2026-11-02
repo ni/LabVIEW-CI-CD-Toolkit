@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "2db092f8fd6056e9ea57528cde64a262f11f8391",
+  "sha": "9736176b4c54ac8845a13c39b03023049a0b4b19",
   "revisions": [
+    {
+      "sha": "9736176b4c54ac8845a13c39b03023049a0b4b19",
+      "short": "9736176",
+      "message": "Merge pull request #98 from ni/fix/dependencies-platform-ux-20261102",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T22:17:30Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "5121c60c11bda66eda7ab9220f32d05afbfde1a5",
+      "short": "5121c60",
+      "message": "Merge branch 'main' into fix/dependencies-platform-ux-20261102",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:45:17Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "2db092f8fd6056e9ea57528cde64a262f11f8391",
       "short": "2db092f",
@@ -85,6 +103,15 @@
       "dep_only": false
     },
     {
+      "sha": "185962f24acd4f48e662e3ab00738ae9decc05d7",
+      "short": "185962f",
+      "message": "Merge branch 'main' into fix/dependencies-platform-ux-20261102",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:20:25Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "500b57137001fde56fea1c1e90c4e4c529ab6dc8",
       "short": "500b571",
       "message": "Merge pull request #100 from ni/lvci-release/release-4.19.2",
@@ -130,6 +157,24 @@
       "dep_only": false
     },
     {
+      "sha": "370cde7b58b01e549c5b60d42097a80664b36609",
+      "short": "370cde7",
+      "message": "Preserve active dependency prompts after late Linux dispatches",
+      "author": "elijah286",
+      "date": "2026-11-02T21:17:42Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "95d551890ad235b8b25f9f8901686b09f8509626",
+      "short": "95d5518",
+      "message": "Merge branch 'main' into fix/dependencies-platform-ux-20261102",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:16:06Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "661d497942c8cd75c09e9dabb48c1200e333b73a",
       "short": "661d497",
       "message": "Merge branch 'main' into MIpetrov-NI-enable-dependabot",
@@ -144,6 +189,15 @@
       "message": "Merge pull request #99 from ni/lvci-release/release-4.19.1",
       "author": "Elijah Kerry",
       "date": "2026-11-02T21:15:06Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "72784afae73c1505d8814d8fe603d8ef94fb7965",
+      "short": "72784af",
+      "message": "Merge branch 'main' into fix/dependencies-platform-ux-20261102",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T21:14:48Z",
       "project": false,
       "dep_only": false
     },
@@ -171,6 +225,24 @@
       "message": "Merge pull request #97 from ni/fix/descriptive-generated-prs-20261102",
       "author": "Elijah Kerry",
       "date": "2026-11-02T20:56:42Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "69175eca5c4146893620ff8d31d9bfd0ffa6e598",
+      "short": "69175ec",
+      "message": "Render dependency notices without interpreting text as HTML",
+      "author": "elijah286",
+      "date": "2026-11-02T20:48:58Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "bf169ad2cce5421f023728ceecf094bead893a9f",
+      "short": "bf169ad",
+      "message": "Separate Windows and Linux dependency management views",
+      "author": "elijah286",
+      "date": "2026-11-02T18:34:19Z",
       "project": false,
       "dep_only": false
     },
@@ -828,78 +900,6 @@
       "message": "Fork-safe first run: auto-build the missing worker image",
       "author": "Elijah Kerry",
       "date": "2026-08-22T01:11:28Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b43ab7c99f648911e1aa65de6e0913b7c620cf3e",
-      "short": "b43ab7c",
-      "message": "Release channel: stable=4.16.3 (catalog 4.16.4) [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-22T01:03:36Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "4fc1643686149046ebc63299448afc830a6e57ff",
-      "short": "4fc1643",
-      "message": "Release 4.16.3 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-22T01:03:02Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "6a145cda14510b093e20cbd2b8308f78a8c04420",
-      "short": "6a145cd",
-      "message": "Merge pull request #59 from elijah286/fix/vipm-liveliness-timeout",
-      "author": "Elijah Kerry",
-      "date": "2026-08-22T01:02:49Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "374ebb9401f9c4557165c807e94e075b792a4451",
-      "short": "374ebb9",
-      "message": "Raise VIPM Desktop liveliness tolerance to the operation timeout",
-      "author": "Elijah Kerry",
-      "date": "2026-08-22T01:02:39Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "747a1572e5d4849ceccc524c4c5a644d415c8859",
-      "short": "747a157",
-      "message": "Release 4.16.2 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-22T00:59:04Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "73946831d9fd53eef3e7205b9b4b63e8f2a8c64a",
-      "short": "7394683",
-      "message": "Merge pull request #58 from elijah286/fix/copy-seed-push-trigger",
-      "author": "Elijah Kerry",
-      "date": "2026-08-22T00:58:53Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "def4a12ad35e545c00e7da1d8b866ac7ffd9046c",
-      "short": "def4a12",
-      "message": "Copy-seed workflows self-trigger on install/update pushes (fork self-heal)",
-      "author": "Elijah Kerry",
-      "date": "2026-08-22T00:58:41Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "f8e064477db737bf900c09de5ddae9a3040d31ee",
-      "short": "f8e0644",
-      "message": "Release channel: stable=4.16.0 (catalog 4.16.1) [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-21T19:16:55Z",
       "project": false,
       "dep_only": false
     },
