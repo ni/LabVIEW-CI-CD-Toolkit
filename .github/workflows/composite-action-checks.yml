@@ -1,0 +1,50 @@
+name: Composite Action Checks
+
+on:
+  pull_request:
+    paths:
+      - 'actions/unit-tests/**'
+      - 'actions/worker-image/**'
+      - '.github/labview/run-unit-tests.ps1'
+      - '.github/labview/build-unittest-report.py'
+      - '.github/labview/ensure-docker.ps1'
+      - '.github/labview/vipm/**'
+      - '.github/labview/test-composite-actions.py'
+      - '.github/pages/documentation.html'
+      - 'actions/dashboard/documentation.html'
+      - '.github/workflows/composite-action-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'actions/unit-tests/**'
+      - 'actions/worker-image/**'
+      - '.github/labview/run-unit-tests.ps1'
+      - '.github/labview/build-unittest-report.py'
+      - '.github/labview/ensure-docker.ps1'
+      - '.github/labview/vipm/**'
+      - '.github/labview/test-composite-actions.py'
+      - '.github/pages/documentation.html'
+      - 'actions/dashboard/documentation.html'
+      - '.github/workflows/composite-action-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python -m pip install PyYAML==6.0.3
+      - name: Check composite contracts and explicit framework runner
+        run: python .github/labview/test-composite-actions.py
+      - name: Check existing runner and report behavior
+        if: runner.os == 'Windows'
+        run: python .github/labview/test-unit-tests.py

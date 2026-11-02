@@ -341,6 +341,11 @@ flowchart LR
 
       <!-- 4 ───────────────────────────────────────────────────────────────── -->
       <h2 id="architecture">4. The big picture <a class="anchor" href="#architecture">#</a></h2>
+      <p>Existing GitHub workflows can also call <code>actions/worker-image</code> and
+        <code>actions/unit-tests</code> directly, without installing client configuration or vendoring scripts.
+        Both composites use the current source scripts from their pinned action revision. They require a
+        Windows container runner such as <code>windows-2022</code>; see
+        <a href="#composite-actions">the composite example and contracts</a>.</p>
       <p>A push (or pull request) triggers the reusable workflow, which gates a set of per-capability container
         jobs on your configuration. Each job pulls a worker image, runs LabVIEW headless inside a throwaway
         container, writes a report, deploys it to the <code>gh-pages</code> branch, and posts a commit status. A
@@ -1032,6 +1037,21 @@ mass-compile:
 
       <!-- 13 ──────────────────────────────────────────────────────────────── -->
       <h2 id="images">13. Worker container images <a class="anchor" href="#images">#</a></h2>
+      <p>The standalone <code>actions/worker-image</code> composite builds only a client worker layer.
+        Callers explicitly supply a readable, qualified Windows <code>base-image</code> and matching LabVIEW year;
+        the action never builds or promotes the shared base. It resolves that reference to a digest and uses
+        the same digest for hashing, Docker <code>FROM</code>, and dependency-free registry copies. It verifies
+        that the resolved base provides <code>windows/amd64</code> before building or copying.
+        A fresh isolated context contains the current source VIPM installer, optional source
+        <code>ci-tooling.vipc</code>, and the caller's dependency files at the source worker's
+        <code>.github/labview/vipm/</code> path. Its Dockerfile adds explicit LabVIEW/public-repository build
+        arguments, an 8 GB build memory limit, and required Dragon error handling.</p>
+      <p>Worker tags hash every staged filename and byte, the build arguments, base digest, and orchestration
+        code. An existing exact content tag is reused; only an explicit registry
+        <code>MANIFEST_UNKNOWN</code> or <code>NAME_UNKNOWN</code> response permits a build. Permission, authentication, rate-limit, and
+        transport errors fail the action. Publishing verifies a manifest digest before moving the year tag
+        and optional <code>latest</code> tag. These are client worker aliases, separate from toolkit release
+        channels. Concurrent writers to the same worker package should be serialized by the caller.</p>
       <p>The worker image is where LabVIEW and your baked-in dependencies live. The <strong>source/template repo
         (LCWC)</strong> owns and publishes one shared base image from
         <code>.github/docker/labview-ci-base.Dockerfile</code> &mdash; LabVIEW with VI Analyzer support, optional UTF
@@ -1578,6 +1598,76 @@ docker run --rm `
 
       <!-- 16 ──────────────────────────────────────────────────────────────── -->
       <h2 id="capabilities">16. Capabilities in depth <a class="anchor" href="#capabilities">#</a></h2>
+      <h3 id="composite-actions">Standalone Windows worker and unit-test actions</h3>
+      <p>For an existing workflow, grant <code>contents: read</code> and <code>packages: write</code>, check out
+        the project, and call these actions on <code>windows-2022</code>. Pin both actions to the same reviewed
+        immutable toolkit tag or commit. Replace <code>REVIEWED_REF</code> below after publication; this
+        example does not imply the actions exist in an earlier release.</p>
+      <pre><code>permissions:
+  contents: read
+  packages: write
+jobs:
+  tests:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ni/LabVIEW-CI-CD-Toolkit/actions/worker-image@REVIEWED_REF
+        id: worker
+        with:
+          base-image: ${{ vars.LCWC_BASE_IMAGE }}
+          labview-version: '2026'
+          # Optional flat directory containing project VIPCs/Dragon files and referenced VIPs:
+          # deps-dir: dependencies
+      - uses: ni/LabVIEW-CI-CD-Toolkit/actions/unit-tests@REVIEWED_REF
+        id: tests
+        with:
+          image: ${{ steps.worker.outputs.image }}@${{ steps.worker.outputs.digest }}
+          framework: lunit
+          test-dir: tests
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: unit-tests-report
+          path: ci-out/unit-tests/
+          if-no-files-found: warn</code></pre>
+      <p>The worker's <code>image</code> input is an unqualified GHCR package name; the default is
+        <code>&lt;repo&gt;-labview</code>. Outputs are <code>image</code>, <code>tag</code> (a
+        <code>win-</code> content hash), verified <code>digest</code>, and <code>built</code> (also true for
+        a dependency-free registry copy). <code>deps-dir</code> must exist inside the workspace and contain
+        files directly: nested dependency files, links, duplicate names and reserved <code>ci-tooling*</code>
+        names fail rather than being silently skipped or overwritten. Exact <code>.vip</code> extensions are
+        hashed separately from <code>.vipc</code>. Loose VIPs are used only when a VIPC references them;
+        a VIP-only directory without a VIPC fails. Project VIPCs are required; bundled optional framework
+        packages retain the source installer's best-effort behavior. Verify the framework in the finished
+        image before relying on it. <code>include-ci-tooling: 'false'</code> omits the tooling VIPC and disables
+        default UTF/JUnit/early framework packages. Dragon files require a base with a working
+        <code>dragon</code> CLI supporting <code>dragon apply</code>; a missing CLI or failed apply fails the
+        build. The standard VIPM base alone does not provide that additional runtime.</p>
+      <p>The unit-test composite requires <code>image</code> and <code>framework</code> (Caraya,
+        <code>vi-tester</code>, <code>utf</code>, or <code>lunit</code>). Its optional <code>command</code>
+        is an intentionally executable, trusted <code>cmd.exe</code> template with <code>{ver}</code>,
+        <code>{dir}</code>, <code>{out}</code>, <code>{lv}</code>, and <code>{cli}</code> tokens
+        (<code>{proj}</code> replaces <code>{dir}</code> for UTF projects); custom
+        framework identifiers require it. A command overrides even the native UTF/LUnit runner.
+        <code>test-dir</code> accepts a workspace-relative directory, glob, or UTF project; empty means the
+        whole project. Inputs reach the container through a UTF-8 environment file, preserving empty values
+        and quotes without inserting input text into a shell script. Newlines are rejected.</p>
+      <p>The optional source-runner parameters <code>-Framework</code>, <code>-TestDir</code>, and
+        <code>-Command</code> (or <code>LVCI_FRAMEWORK</code>, <code>LVCI_TEST_DIR</code>, and
+        <code>LVCI_COMMAND</code>) select exactly one framework. Without a framework, existing config and
+        autodetection behavior remain intact. Installed LabVIEW/CLI path detection is preserved.</p>
+      <p><code>report-dir</code> defaults to <code>ci-out/unit-tests</code> and must be a dedicated directory
+        inside the workspace. The action owns its results directory and removes old results and summaries
+        before running. Outputs are <code>report-exists</code>, <code>tests</code>, <code>passed</code>, and
+        <code>failed</code> (including errors). Docker pull/run errors, report-generation errors, absent XML,
+        empty tests, all-skipped tests, and runner errors fail the action. Reports are rendered after a
+        nonzero runner exit when Docker returns normally, so diagnostics remain available for artifact upload.
+        <code>fail-on-test-failure: 'false'</code> permits assertion failures only. The optional
+        <code>pages-url</code> controls navigation links; the caller owns artifact upload, Pages deployment,
+        and commit statuses. Python and the worker action's Go/crane runtime are installed explicitly.
+        <code>Composite Action Checks</code> runs portable regressions on Linux and Windows plus real Windows
+        PowerShell runner tests without LabVIEW; an actual Windows container bake/test remains a separate
+        acceptance check.</p>
       <p class="lead-in">Every capability is built to the same template, so once you understand one you understand them
         all. <a href="#cap-unittests">§16.4 (Unit Tests)</a> is documented end-to-end as the fully worked example you can
         copy from.</p>
