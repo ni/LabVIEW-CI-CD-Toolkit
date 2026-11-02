@@ -71,6 +71,9 @@ a PR. Lead with concrete features/fixes and their user benefit, not captain
 roles, fleet handoffs, or release mechanics. Check the actual base-to-head diff
 and explicitly distinguish new implementation from already-landed release
 context. Keep validation limits visible and always link PR references.
+Bot-generated release, promotion and Reconfigure PRs follow the same rule.
+Fix the generating code and tests when a generic title recurs; renaming one PR
+is not a complete prevention measure. Never approve a process/version-only title.
 
 Every PR must also follow the
 [release-impact policy](.github/CONTRIBUTING.md#every-pr-identifies-its-release-version-and-update-type):

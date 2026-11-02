@@ -25,6 +25,37 @@ MANIFEST = ('schemaVersion: 1\nconfig:\n  labviewVersion: "2026"\n'
 
 
 class ReconfigurePreservationTests(unittest.TestCase):
+    def pr_title(self, before, after):
+        tree = ast.parse(SCRIPT)
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                        and node.name == 'reconfigure_pr_title')
+        namespace = {}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), 'reconfigure.yml', 'exec'), namespace)
+        return namespace['reconfigure_pr_title'](before, after)
+
+    def test_pr_title_names_actual_changed_settings(self):
+        before = self.preservation_fixture()
+        after = copy.deepcopy(before)
+        after['config']['concurrency'] = {'maxParallel': 3}
+        after['config']['container']['vipc'] = []
+        self.assertEqual(self.pr_title(before, after), 'Update runner concurrency, VIPC dependency monitoring')
+
+    def test_pr_title_distinguishes_linux_activation_and_reset(self):
+        before = self.preservation_fixture()
+        after = copy.deepcopy(before)
+        after['config']['container']['linuxUse'] = 'linux-lvpm-fixture@sha256:fixture'
+        self.assertEqual(self.pr_title(before, after), 'Activate digest-pinned Linux LVPM worker')
+        self.assertEqual(self.pr_title(after, before), 'Reset Linux worker to the existing default selection')
+
+    def test_pr_title_ignores_timestamp_and_commit_only_vipc_changes_are_specific(self):
+        before = self.preservation_fixture()
+        after = copy.deepcopy(before)
+        after['configuredAt'] = 'later'
+        self.assertEqual(self.pr_title(before, after), 'Update committed VIPC package selections')
+        step = next(step for step in WORKFLOW['jobs']['reconfigure']['steps'] if step['name'] == 'Open pull request')
+        self.assertIn('--title "$RECONFIGURE_PR_TITLE"', step['run'])
+        self.assertNotIn('--title "Reconfigure LabVIEW CI"', step['run'])
+
     def preservation_fixture(self):
         document = yaml.safe_load(MANIFEST)
         document.update({'provider': 'github', 'installedVersion': 'unreleased-fixture',

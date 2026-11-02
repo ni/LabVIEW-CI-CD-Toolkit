@@ -1,11 +1,74 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
 
 CATALOG = Path('.github/labview-ci/catalog.json')
+
+
+def validate_title(title):
+    title = ' '.join(title.split()).strip()
+    if not title or re.fullmatch(
+            r'(?:Prepare LabVIEW CI (?:release|promotion)(?: v\d+\.\d+\.\d+)?|'
+            r'Reconfigure LabVIEW CI|Release(?: v\d+\.\d+\.\d+)?|v\d+\.\d+\.\d+)',
+            title, re.IGNORECASE):
+        raise ValueError('PR title must describe concrete features, fixes, or settings; version/process-only titles are not allowed')
+    return title
+
+
+def build_pr_metadata(catalog, version, kind, repo):
+    releases = catalog.get('history', {}).get('releases', [])
+    if catalog.get('version') != version or not releases or releases[0].get('version') != version:
+        raise ValueError('Prepared PR version must match the newest catalog release')
+    release = releases[0]
+    notes = str(release.get('notes') or '').strip()
+    summary = str(release.get('summary') or notes).strip()
+    summary = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', summary)
+    summary = ' '.join(re.sub(r'[`*#]', '', summary).split())
+    summary = re.split(r'(?<=[.!?])\s+', summary, maxsplit=1)[0].rstrip('.!?')
+    validate_title(summary)
+    if len(summary) > 110:
+        summary = summary[:107].rsplit(' ', 1)[0] + '…'
+    title = validate_title(f'{summary} — v{version}')
+    baseline = str(releases[1]['version']) if len(releases) > 1 else None
+    target_parts = tuple(int(part) for part in version.split('.'))
+    previous_parts = tuple(int(part) for part in baseline.split('.')) if baseline else None
+    bump = ('major' if target_parts[0] > previous_parts[0] else
+            'minor' if target_parts[1] > previous_parts[1] else 'patch') if previous_parts else 'patch'
+    update_type = {'major': 'Major', 'minor': 'Minor', 'patch': 'Incremental (patch)'}[bump]
+    release_url = f'https://github.com/{repo}/releases/tag/v{version}'
+    baseline_text = (f'[v{baseline}](https://github.com/{repo}/releases/tag/v{baseline})'
+                     if baseline else 'No earlier catalog release recorded; verify published tags before merge')
+    scope = ('This PR prepares release metadata and consumes release-note fragments for implementation already '
+             'merged on the base branch. It does not introduce that implementation a second time.')
+    guidance = (f'After publication and containment verification, select the exact immutable tooling version '
+                f'`v{version}` and confirm the installed version. Publication alone does not promote beta or stable.')
+    if kind == 'promotion':
+        scope = ('This PR records the channel change described above for an already-published release. '
+                 'It does not introduce new implementation; the metadata version is distinct from the promoted version.')
+        guidance = ('Verify the already-published target and channel described above separately from this metadata '
+                    'release. Do not treat the metadata version as the promoted software version.')
+    body = (f'## Features and fixes\n\n{notes or summary}\n\n'
+            f'## Release impact\n\n'
+            f'- **Target version:** `v{version}` — prepared / not published; [immutable release]({release_url}) becomes usable only after verified publication.\n'
+            f'- **Update type:** {update_type}; `release:{bump}`, derived from the prepared version and baseline.\n'
+            f'- **Published baseline:** {baseline_text}; reconcile against published tags before merge.\n'
+            f'- **Client update:** {guidance}\n\n'
+            f'## Scope and compatibility\n\n{scope}\n\n'
+            f'## Validation and publication\n\n'
+            f'Review the actual catalog diff, release notes, and required checks; this proposal is not evidence that '
+            f'runtime checks passed. Merge only the current proposal through normal review. If merging does not '
+            f'trigger Release, run it manually on the default branch immediately afterward. The workflow recognizes '
+            f'the merged bot catalog PR and publishes the prepared version without another bump. '
+            f'Do not include unrelated changes or bypass protection.\n')
+    return {'title': title, 'body': body, 'label': f'release:{bump}'}
+
+
+def catalog_pr_metadata(repo, version, kind):
+    return build_pr_metadata(json.loads(CATALOG.read_text(encoding='utf-8')), version, kind, repo)
 
 
 def run(*args, check=True):
@@ -73,17 +136,17 @@ def push(repo, base, version, kind):
                 print(prepared.stdout + prepared.stderr)
             if prepared.returncode != 0:
                 raise RuntimeError(f'Prepared catalog branch push failed:\n{prepared.stdout}{prepared.stderr}')
+            metadata = catalog_pr_metadata(repo, version, kind)
             existing = json.loads(run('gh', 'pr', 'list', '--repo', repo, '--head', branch,
                                       '--base', base, '--json', 'url').stdout)
             if existing:
                 url = existing[0]['url']
+                run('gh', 'pr', 'edit', url, '--repo', repo,
+                    '--title', metadata['title'], '--body', metadata['body'], '--add-label', metadata['label'])
             else:
                 url = run('gh', 'pr', 'create', '--repo', repo, '--base', base, '--head', branch,
-                          '--title', f'Prepare LabVIEW CI {kind} v{version}',
-                          '--body', 'Prepared by the release workflow because the default branch requires a pull request. '
-                          'Review the catalog and merge this PR. Then run Release manually on the default branch '
-                          'if GitHub did not trigger it: it recognizes this merged bot PR and publishes the prepared '
-                          'version without another bump. Do not squash unrelated changes into this PR.').stdout.strip()
+                          '--title', metadata['title'], '--body', metadata['body'],
+                          '--label', metadata['label']).stdout.strip()
             output('published', 'false')
             output('pr_url', url)
             if os.environ.get('GITHUB_STEP_SUMMARY'):
@@ -100,10 +163,20 @@ def push(repo, base, version, kind):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=('resume', 'push'))
+    parser.add_argument('command', choices=('resume', 'push', 'check-title'))
+    parser.add_argument('--title')
     parser.add_argument('--version')
     parser.add_argument('--kind', choices=('release', 'promotion'), default='release')
     args = parser.parse_args()
+    if args.command == 'check-title':
+        title = args.title
+        if title is None:
+            event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text(encoding='utf-8'))
+            if 'pull_request' not in event:
+                return
+            title = event['pull_request']['title']
+        validate_title(title)
+        return
     repo = os.environ['GITHUB_REPOSITORY']
     base = os.environ['GITHUB_REF_NAME']
     default_branch = run('gh', 'api', f'repos/{repo}', '--jq', '.default_branch').stdout.strip()
