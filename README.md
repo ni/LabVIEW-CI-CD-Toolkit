@@ -44,7 +44,7 @@ LabVIEW CI closes that gap. It is **portable** (drops into any LabVIEW repositor
 | **VI Analyzer** | Runs NI's static-analysis suite for correctness, performance, style, and documentation, as a friendly, navigable report. |
 | **VIDiff** | Visual, side-by-side front-panel + block-diagram diffs of the VIs each commit changed — code review you can actually see. |
 | **VI Snapshots / Browser** | Interactive front panels and block diagrams across commit history: pan, zoom, and navigate cases directly on the code. |
-| **Unit Tests** | Runs Caraya / VI Tester / NI Unit Test Framework headlessly and merges the results into one report. |
+| **Unit Tests** | Runs Caraya / LUnit / VI Tester / NI Unit Test Framework on Windows and LUnit on Linux, with per-platform reports. |
 | **Antidoc** | Generates project documentation from the VI hierarchy on every commit. |
 | **Status Dashboard** | Aggregates every capability's result for every commit into one live GitHub Pages or GitLab Pages dashboard. |
 

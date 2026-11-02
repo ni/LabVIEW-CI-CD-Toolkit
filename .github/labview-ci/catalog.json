@@ -4728,7 +4728,8 @@
       "status": "stable",
       "recommended": false,
       "supportsOs": [
-        "windows"
+        "windows",
+        "linux"
       ],
       "requires": [],
       "recommends": [
@@ -4744,9 +4745,12 @@
           ".github/workflows/unit-tests-windows-container.yml",
           ".github/labview/run-unit-tests.ps1"
         ],
-        "linux": []
+        "linux": [
+          ".github/workflows/unit-tests-linux-container.yml",
+          ".github/labview/run-unit-tests.sh"
+        ]
       },
-      "notes": "Runs the configured LabVIEW unit-test frameworks headlessly in the Windows worker, normalises their JUnit output into one report, and links each failing test to the VI under test in the VI Browser. Supports Caraya, LUnit, JKI VI Tester, and the NI Unit Test Framework. Windows-only because the frameworks ship as VIPM packages; choose which tools run and where their tests live on the Unit Testing page."
+      "notes": "Runs configured unit-test frameworks on Windows and LUnit on Linux, normalises JUnit into a report, and links failures to the VI Browser. Linux reports explain unsupported frameworks; configure tools on the Unit Testing page."
     },
     {
       "id": "antidoc",

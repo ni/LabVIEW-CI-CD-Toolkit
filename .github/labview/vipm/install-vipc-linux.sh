@@ -78,7 +78,9 @@ vipc_package_specs() {
 package_install_spec() {
   local package_name="$1"
   if [[ "$package_name" =~ ^(.+)-([0-9]+(\.[0-9]+)+)(-[0-9]+)?$ ]]; then
-    printf '%s@%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    # Keep a package revision suffix (e.g. jki_rsc_toolkits_palette-1.1-1 ->
+    # @1.1-1): VIPM only knows the full version and rejects the bare 1.1.
+    printf '%s@%s%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]}"
   else
     printf '%s\n' "$package_name"
   fi

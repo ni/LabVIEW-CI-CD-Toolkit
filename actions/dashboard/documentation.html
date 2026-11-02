@@ -399,7 +399,7 @@ flowchart TD
           <tr><td><strong>Mass Compile</strong></td><td>Compiles every VI/CTL and flags broken VIs and missing dependencies.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
           <tr><td><strong>VI Analyzer</strong></td><td>Runs NI's static-analysis test suite for correctness, performance, style and documentation.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
           <tr><td><strong>VIDiff</strong></td><td>Generates visual, side-by-side front-panel + block-diagram diffs of changed VIs between commits.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
-          <tr><td><strong>Unit Tests</strong></td><td>Runs Caraya / LUnit / VI Tester / NI Unit Test Framework headlessly and merges JUnit output into one report.</td><td><span class="pill win">Win</span></td></tr>
+          <tr><td><strong>Unit Tests</strong></td><td>Runs Caraya / LUnit / VI Tester / NI Unit Test Framework headlessly and merges JUnit output into one report. LUnit also runs on Linux.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
           <tr><td><strong>Antidoc</strong></td><td>Generates project documentation from the VI hierarchy using Wovalab's Antidoc CLI.</td><td><span class="pill win">Win</span></td></tr>
           <tr><td><strong>VI Snapshots</strong></td><td>Position-aware, in-place VI Browser frames (JSON) rendered by the cross-platform toimages engine.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
           <tr><td><strong>Dashboard</strong></td><td>Aggregates everything above into a single status page on GitHub Pages.</td><td>runner host</td></tr>
@@ -897,9 +897,10 @@ flowchart TD
         LabVIEW containers. If you changed a runner label, set it back to <code>windows-2022</code>.</p>
 
       <h3>Unit Tests / Antidoc &ldquo;missing&rdquo; on Linux</h3>
-      <p><strong>Not a bug.</strong> Unit Tests and Antidoc are Windows-only today (they depend on
-        baked VIPM tooling). They are not offered for Linux in Configure or Populate history. VI Analyzer, by
-        contrast, now runs on Linux too &mdash; enable it per platform on the Configure page.</p>
+      <p>LUnit runs on Windows and Linux when the worker includes LUnit CLI 1.7.1.32 or newer.
+        Caraya, VI Tester and NI UTF have Windows runners; Linux reports list them as unsupported.
+        Antidoc remains Windows-only. Linux unit tests support per-revision Run; history backfill
+        remains available only on Windows.</p>
 
       <h3>A new install does not appear on the Clients page</h3>
       <p><strong>Not a bug.</strong> Discovery is a daily pull-based scan plus GitHub's own search-index lag, so a
@@ -1816,12 +1817,12 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       <h4>At a glance</h4>
       <table>
         <tbody>
-          <tr><th>In-container driver</th><td><code>.github/labview/run-unit-tests.ps1</code> &mdash; runs each enabled framework headless, writes one JUnit XML per tool.</td></tr>
+          <tr><th>In-container driver</th><td><code>.github/labview/run-unit-tests.ps1</code> (Windows) and <code>.github/labview/run-unit-tests.sh</code> (Linux) &mdash; run each enabled framework headless, write one JUnit XML per tool.</td></tr>
           <tr><th>Host report builder</th><td><code>.github/labview/build-unittest-report.py</code> &mdash; merges the JUnit XML into <code>results.json</code> + the navigable HTML report.</td></tr>
-          <tr><th>Per-commit workflow</th><td><code>unit-tests-windows-container.yml</code> on <span class="pill win">windows-2022</span>.</td></tr>
+          <tr><th>Per-commit workflow</th><td><code>unit-tests-windows-container.yml</code> on <span class="pill win">windows-2022</span>; <code>unit-tests-linux-container.yml</code> on <span class="pill lin">ubuntu-latest</span>.</td></tr>
           <tr><th>History backfill</th><td><code>unit-tests-backfill-windows.yml</code> + <code>unit-tests-backfill.ps1</code> &mdash; one warm container across many revisions.</td></tr>
-          <tr><th>Output &amp; status</th><td>Report deploys to <code>unit-tests/&lt;sha&gt;/</code> on <code>gh-pages</code>; commit-status context is <code>CI / Unit Tests</code>.</td></tr>
-          <tr><th>Platform</th><td>Windows only &mdash; every framework depends on baked VIPM/UTF tooling (<a href="#vipm">§15</a>).</td></tr>
+          <tr><th>Output &amp; status</th><td>Report deploys to <code>unit-tests/&lt;sha&gt;/</code> on <code>gh-pages</code> with commit-status context <code>CI / Unit Tests</code>; the Linux run deploys to <code>unit-tests/&lt;sha&gt;/linux/</code> with <code>CI / Unit Tests (Linux)</code>.</td></tr>
+          <tr><th>Platform</th><td>Windows; LUnit also runs on Linux. Every framework depends on baked VIPM/UTF tooling (<a href="#vipm">§15</a>).</td></tr>
         </tbody>
       </table>
 
@@ -1838,6 +1839,14 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
           <tr><td><strong>NI UTF</strong></td><td><code>.lvtest</code> items inside a <code>.lvproj</code></td><td>native <code>LabVIEWCLI</code></td><td><code>"{cli}" -LogToConsole TRUE -OperationName RunUnitTests -ProjectPath "{proj}" -JUnitReportPath "{out}" -LabVIEWPath "{lv}" -Headless</code></td></tr>
         </tbody>
       </table>
+      <p>On Linux, LUnit runs with the same default command and tokens (<code>{lv}</code> is
+        <code>labviewprofull</code>, <code>{cli}</code> is <code>LabVIEWCLI</code>), so one <code>command:</code> line
+        can work on both platforms when the executable and flags are portable. The Linux runner requires Python 3
+        (already installed in the worker). It splits a command into arguments before substituting tokens, so spaces,
+        quotes and shell metacharacters in paths remain literal; shell operators in overrides are not evaluated.
+        Invoke a project-owned script explicitly for more complex commands. Keep <code>-Headless</code> as the <strong>last</strong> argument of any override: on
+        Linux, <code>LabVIEWCLI</code> swallows whatever follows it, and the Linux driver warns when an override doesn&rsquo;t
+        end with it.</p>
       <p>Tokens the driver substitutes: <code>{ver}</code> = LabVIEW year, <code>{dir}</code> = a resolved test-root
         directory, <code>{proj}</code> = a resolved <code>.lvproj</code>, <code>{out}</code> = the JUnit output path,
         <code>{lv}</code> = <code>LabVIEW.exe</code>, <code>{cli}</code> = <code>LabVIEWCLI.exe</code>.</p>
@@ -1943,6 +1952,41 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         <li><strong>Runs each command via <code>cmd.exe /c</code></strong>, capturing exit code and output; on a failed UTF/LUnit run it echoes the LabVIEW CLI <em>session log</em> (the console error is generic) and records a tooling finding.</li>
       </ul>
 
+      <h4>The Linux run</h4>
+      <p><code>unit-tests-linux-container.yml</code> follows the same step order on <span class="pill lin">ubuntu-latest</span>,
+        with the Linux image selection used by the other Linux activities (<code>config.container.actions.unit-tests</code>
+        &rarr; <code>config.container.use</code> &rarr; the shared Linux worker <code>:linux-latest</code>;
+        <code>base</code>/<code>none</code> selects <code>nationalinstruments/labview:latest-linux</code>). It runs the
+        driver in a fresh container:</p>
+      <pre><code>docker run --rm -v "$GITHUB_WORKSPACE:/workspace" "$LABVIEW_CONTAINER_IMAGE" \
+  bash /workspace/.github/labview/run-unit-tests.sh /workspace /workspace/ci-out/unit-tests/results</code></pre>
+      <ul>
+        <li><strong>LUnit.</strong> The driver runs enabled LUnit locations and records other enabled frameworks as
+          <code>unsupported-on-linux</code> in <code>_tooling.json</code>. Reports show this as information,
+          separately from missing tooling, and update the notice when switching platforms.</li>
+        <li><strong>Fail closed.</strong> The driver clears stale XML, logs and tooling markers, and writes a runner-error
+          JUnit case for missing CLI/executable, unresolved locations, a nonzero command exit, or absent output.
+          Runner failures exit nonzero even when a partial XML file exists. GitHub and GitLab also fail empty,
+          malformed and all-skipped reports; assertion failures come from JUnit. Unsupported tools do not fabricate
+          test cases: a run containing only unsupported tools has zero tests and fails.</li>
+        <li><strong>Autodetection.</strong> With no <code>unitTests:</code> block, the Linux runner uses the same framework
+          signatures and tooling/build exclusions as Windows. Any explicit block, including all tools disabled,
+          suppresses autodetection. Both <code>config.unitTests</code> and the legacy top-level block are read.</li>
+        <li><strong>Worker selection.</strong> The workflow uses the current LVPM resolver and verifies immutable
+          candidate evidence before selecting an LVPM image. A selected candidate skips waiting for a VIPM build.</li>
+        <li><strong>History backfill</strong> has no Linux workflow yet; use the per-revision Run button.</li>
+      </ul>
+      <p>The GitLab provider installs <code>templates/unit-tests-linux.yml</code> for Linux clients. The unit-test
+        catalog capability now advertises Linux support; the installer selects the OS-specific runner
+        and workflow without changing existing client configuration. Windows-only installations omit the Linux runner.
+        The dashboard Run button dispatches the Linux workflow with <code>commit_sha</code>; historical dispatches
+        restore current driver/report/publishing scripts from the default branch before execution.</p>
+      <p>The bundled VIPC upgrades only LUnit CLI from 1.6.1.23 to 1.7.1.32. Rebuild the shared Linux worker before
+        clients use it, then rebuild client workers that copy that base. Existing consumer package pins remain owned
+        by the consumer and must be updated explicitly if older than this minimum. Linux VIPM installation preserves
+        package revision suffixes, for example <code>jki_rsc_toolkits_palette-1.1-1</code> becomes
+        <code>jki_rsc_toolkits_palette@1.1-1</code>; dropping the revision makes VIPM reject the pinned package.</p>
+
       <h4>The output contract</h4>
       <p>The container emits raw JUnit XML; the host builder normalises it. Two files matter:</p>
       <ul>
@@ -1966,7 +2010,11 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         Runner/report errors contribute to <code>summary.errored</code>; assertion results remain separate cases.
         The workflow fails the job as well as the commit status, and test-script/inventory edits under
         <code>tests/</code> trigger a run. Regression checks run without LabVIEW in the Windows
-        <code>Unit Test Runner Checks</code> workflow; locally run <code>python .github/labview/test-unit-tests.py</code>.</p>
+        <code>Unit Test Runner Checks</code> workflow. Linux offline checks run in its Ubuntu job and cover
+        autodetection, disabled configs, missing tooling, stale results, safe argument substitution, installation
+        selection and VIPM revision suffixes. Locally run <code>python .github/labview/test-unit-tests.py</code>
+        and <code>python .github/labview/test-linux-unit-tests.py</code>. Real LabVIEW and container execution
+        still require worker validation.</p>
       <p>The dashboard colours the Unit Tests badge from the <code>passedPercent</code> thresholds above (green at or
         above 100%, yellow at or above 80%, red below 80%). When Linux results are present the cell shows the same
         two-number Windows/Linux pill as Mass Compile.</p>
@@ -1987,8 +2035,8 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         A framework whose CLI add-on is not baked into the image fails to load: UTF/LUnit surface LabVIEW CLI error
         <code>-350053</code> (&ldquo;missing or bad files in the operation folder&rdquo;). The driver records this in
         <code>_tooling.json</code> and the report renders an explicit &ldquo;the selected container is missing this
-        dependency&rdquo; banner instead of a bare &ldquo;no tests found.&rdquo; The UTF JUnit reporter in particular is
-        mandatory &mdash; see <a href="#vipm">§15</a>.</div>
+        dependency&rdquo; banner instead of a bare &ldquo;no tests found.&rdquo; On Linux the same banner appears when
+        LUnit CLI is missing (<code>-350053</code> or <code>-350006</code>). The UTF JUnit reporter in particular is mandatory &mdash; see <a href="#vipm">§15</a>.</div>
 
       <h3 id="cap-antidoc">16.5 Antidoc <a class="anchor" href="#cap-antidoc">#</a></h3>
 
@@ -2121,6 +2169,7 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
           <tr><td><code>vi-analyzer/&lt;sha&gt;/linux/summary.json</code></td><td>VI Analyzer report builder (Linux)</td><td>Dashboard cell (Windows / Linux split)</td></tr>
           <tr><td><code>vidiff/&lt;segment&gt;/&lt;platform&gt;/vidiff/changes.json</code></td><td>VIDiff</td><td>Dashboard + VIDiff report</td></tr>
           <tr><td><code>unit-tests/&lt;sha&gt;/results.json</code></td><td>Unit-test report builder</td><td>Dashboard + report</td></tr>
+          <tr><td><code>unit-tests/&lt;sha&gt;/linux/results.json</code></td><td>Unit-test report builder (Linux)</td><td>Dashboard cell (Windows / Linux split) + report</td></tr>
           <tr><td><code>builds/&lt;sha&gt;/summary.json</code></td><td>Builds report builder</td><td>Dashboard cell (succeeded/failed split) + report</td></tr>
           <tr><td><code>sbom/&lt;sha&gt;/results.json</code></td><td>SBOM report builder</td><td>Dashboard report availability + HTML report</td></tr>
           <tr><td><code>sbom/&lt;sha&gt;/results/sbom.json</code></td><td>VIPM CLI</td><td>Native CycloneDX download</td></tr>
@@ -2388,7 +2437,8 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       <ul>
         <li><strong>Concurrency is per account, not per repo.</strong> GitHub's job-concurrency limit is shared
           across all your repositories, which is why the per-repo runner cap defaults conservatively.</li>
-        <li><strong>Unit Tests &amp; Antidoc are Windows-only</strong> today (they depend on baked VIPM tooling).</li>
+        <li><strong>Unit Tests:</strong> LUnit supports Windows and Linux; Caraya, VI Tester and UTF have Windows
+          runners. <strong>Antidoc</strong> remains Windows-only. Workers must include the corresponding tooling.</li>
         <li><strong>SBOM now fails fast on VIPM errors.</strong> The SBOM driver treats a non-zero
           <code>vipm sbom</code> exit (or missing output file) as fatal, and the workflow no longer uses
           <code>continue-on-error</code> on that step, so failed scans do not publish replacement output artifacts. The generated SBOM JSON is preserved in its native CycloneDX form, and the HTML report now renders the component supplier/vendor field from that source data instead of rewriting it to a generic label. VIPM still auto-detects and explicitly targets the container's installed LabVIEW version (via <code>--labview-version</code>) to prevent auto-detection from project metadata; this avoids errors when a project targets a different year than the container provides.</li>
@@ -2526,7 +2576,8 @@ flowchart TD
           <tr><td>Run VI Analyzer — Linux Container</td><td><span class="pill lin">ubuntu-latest</span></td><td>same as above</td><td>Linux counterpart; deploys under <code>vi-analyzer/&lt;sha&gt;/linux/</code>.</td></tr>
           <tr><td>VIDiff Report — Windows Container</td><td><span class="pill win">windows-2022</span></td><td>PR / push <code>**.vi/.ctl</code>, dispatch</td><td>Diffs changed VIs; runs on the bare NI image (no custom worker).</td></tr>
           <tr><td>VIDiff Report — Linux Container</td><td><span class="pill lin">ubuntu-latest</span></td><td>PR / push <code>**.vi/.ctl</code>, dispatch</td><td>Linux counterpart.</td></tr>
-          <tr><td>Run Unit Tests — Windows Container</td><td><span class="pill win">windows-2022</span></td><td>PR / push (VIs, <code>**.lvtest</code>), dispatch</td><td>Windows-only (depends on baked VIPM/UTF tooling).</td></tr>
+          <tr><td>Run Unit Tests — Windows Container</td><td><span class="pill win">windows-2022</span></td><td>PR / push (VIs, <code>**.lvtest</code>), dispatch</td><td>Windows frameworks depend on baked VIPM/UTF tooling.</td></tr>
+          <tr><td>Run Unit Tests — Linux Container</td><td><span class="pill lin">ubuntu-latest</span></td><td>PR / push (LabVIEW source, test scripts), dispatch</td><td>LUnit CLI 1.7.1.32+; report under <code>unit-tests/&lt;sha&gt;/linux/</code>.</td></tr>
           <tr><td>Run Antidoc — Windows Container</td><td><span class="pill win">windows-2022</span></td><td>push to default branch, dispatch (no PR)</td><td>Windows-only; heavier doc render, so no per-PR run.</td></tr>
           <tr><td>VI Snapshots and VI Browser</td><td><span class="pill win">windows-2022</span></td><td>push VI source (excl. <code>.github/</code>), dispatch (head / backfill)</td><td>Builds revision metadata and queues interactive snapshot rendering.</td></tr>
           <tr><td>VI Snapshots JSON (VI Browser, Linux)</td><td><span class="pill lin">ubuntu-latest</span></td><td><code>workflow_run</code> after snapshots, dispatch</td><td>Gate job decides; auto-runs only when <code>positionAware</code> includes <code>linux</code>.</td></tr>
