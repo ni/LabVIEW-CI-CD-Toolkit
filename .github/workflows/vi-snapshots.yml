@@ -68,7 +68,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0   # full history: backfill + per-commit worktrees
 
@@ -76,7 +76,7 @@ jobs:
       # whose content (git blob) has already been captured. Sparse-checkout keeps
       # this cheap — we only need the by-blob file listing.
       - name: Checkout deployed gallery (gh-pages) for incremental seeding
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         continue-on-error: true
         with:
           ref: gh-pages

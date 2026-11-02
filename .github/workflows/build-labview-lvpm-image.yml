@@ -24,7 +24,7 @@ jobs:
         run: test "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH"
 
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Install planning dependencies
         run: python3 -m pip install PyYAML==6.0.3 tomli==2.4.0

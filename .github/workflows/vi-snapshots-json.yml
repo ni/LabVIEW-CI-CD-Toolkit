@@ -71,7 +71,7 @@ jobs:
       run: ${{ steps.decide.outputs.run }}
     steps:
       - name: Check out the config only
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           sparse-checkout: |
             .github/labview-ci.yml
@@ -106,7 +106,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Checkout repository for verified worker selection
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -191,7 +191,7 @@ jobs:
 
       - name: Checkout deployed gallery (gh-pages) for incremental seed + live publish
         if: steps.pull.outputs.ok == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         continue-on-error: true
         with:
           ref: gh-pages

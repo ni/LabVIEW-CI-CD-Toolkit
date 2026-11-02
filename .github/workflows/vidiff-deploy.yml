@@ -39,7 +39,7 @@ jobs:
       # is on disk. Without a checkout the deploy step fails with "Can't find
       # 'action.yml' … under '.github/actions/publish-gh-pages'".
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Download VIDiff artifact
         uses: actions/github-script@v8

@@ -81,14 +81,14 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"VIDiff in progress\",\"context\":\"CI / VIDiff (windows)\"}"
 
       - name: Checkout head commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.shas.outputs.head }}
           fetch-depth: 0
           path: head
 
       - name: Checkout base commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.shas.outputs.base }}
           path: base

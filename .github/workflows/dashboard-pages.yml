@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       - name: Resolve tooling ref
         id: cfg
         shell: bash
@@ -66,7 +66,7 @@ jobs:
           fi
           echo "ref=${REF:-v4.11.10}" >> "$GITHUB_OUTPUT"
       - name: Check out tooling (opted-in version)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ steps.cfg.outputs.ref }}

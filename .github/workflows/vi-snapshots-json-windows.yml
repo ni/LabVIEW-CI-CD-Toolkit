@@ -76,7 +76,7 @@ jobs:
       run: ${{ steps.decide.outputs.run }}
     steps:
       - name: Check out the config only
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           sparse-checkout: .github/labview-ci.yml
           sparse-checkout-cone-mode: false
@@ -113,7 +113,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: Checkout repository (full history for content-addressed blobs)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -183,7 +183,7 @@ jobs:
           bash .github/labview/wait-for-worker-image.sh "${{ github.event.inputs.target_sha || github.event.workflow_run.head_sha || github.sha }}" "${{ github.event.before }}"
 
       - name: Checkout deployed gallery (gh-pages) for incremental seed + live publish
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         continue-on-error: true
         with:
           ref: gh-pages
