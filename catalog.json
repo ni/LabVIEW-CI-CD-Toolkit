@@ -4498,6 +4498,9 @@
       ".github/labview-ci/providers/gitlab/",
       ".github/labview/wait-for-worker-image.sh",
       ".github/labview/ensure-docker.ps1",
+      ".github/labview/dragon_deps.py",
+      ".github/labview/lvpm/worker.py",
+      ".github/labview/lvpm/adapter.py",
       ".github/actions/publish-gh-pages/action.yml"
     ]
   },
@@ -4699,8 +4702,11 @@
         "linux": [
           ".github/workflows/build-labview-linux-image.yml",
           ".github/workflows/copy-labview-linux-image.yml",
+          ".github/workflows/build-labview-lvpm-image.yml",
           ".github/docker/labview-ci-linux.Dockerfile",
+          ".github/docker/labview-ci-lvpm.Dockerfile",
           ".github/labview/vipm/install-vipc-linux.sh",
+          ".github/labview/vipm/ci-tooling.vipc",
           ".github/labview/toimages/"
         ]
       },
