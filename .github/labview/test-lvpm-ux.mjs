@@ -4,7 +4,7 @@ import vm from 'node:vm';
 
 const root = new URL('../', import.meta.url);
 const html = fs.readFileSync(new URL('pages/dependencies.html', root), 'utf8');
-const source = html.match(/<script>\s*\(\(\) => \{[\s\S]*?<\/script>/)[0].replace(/^<script>|<\/script>$/g, '');
+const source = html.match(/<script>\s*\(\(\) => \{[\s\S]*?<\/script>/i)[0].replace(/^<script>|<\/script>$/gi, '');
 const tag = 'linux-lvpm-' + 'a'.repeat(64);
 const digest = 'sha256:' + 'b'.repeat(64);
 const revision = 'd'.repeat(40);
@@ -47,7 +47,7 @@ const context = vm.createContext({
     }
     if (url.includes('latest.json')) return { ok:true, json:async () => ({ tag, manifest_path:candidate.manifest_path, image_digest:digest }) };
     if (url.includes('manifest.json')) return { ok:true, json:async () => responseCandidate };
-    if (url.includes('raw.githubusercontent.com')) return { ok:true, text:async () => activeConfig };
+    if (new URL(url).hostname === 'raw.githubusercontent.com') return { ok:true, text:async () => activeConfig };
     if (options.method === 'POST') return { status:204 };
     throw new Error('Unexpected request: ' + url);
   }
