@@ -1,0 +1,40 @@
+name: VIDiff Deploy Checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/vidiff-deploy.yml'
+      - '.github/workflows/vidiff-deploy-checks.yml'
+      - '.github/labview/extract-vidiff-artifact.py'
+      - '.github/labview/validate-vidiff-deploy-metadata.py'
+      - '.github/labview/test-vidiff-deploy.py'
+      - '.github/labview/test-vidiff-deploy.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/vidiff-deploy.yml'
+      - '.github/workflows/vidiff-deploy-checks.yml'
+      - '.github/labview/extract-vidiff-artifact.py'
+      - '.github/labview/validate-vidiff-deploy-metadata.py'
+      - '.github/labview/test-vidiff-deploy.py'
+      - '.github/labview/test-vidiff-deploy.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-security-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Validate workflow metadata guardrails and provenance checks
+        run: |
+          python .github/labview/test-vidiff-deploy.py
+          node --test .github/labview/test-vidiff-deploy.mjs

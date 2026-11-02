@@ -1,0 +1,1 @@
+VIDiff deploy now validates artifact metadata against trusted workflow_run lineage, resolves missing pull-request association from the commit-to-PR API, preserves workflow_dispatch historical target SHAs, and extracts report ZIPs with path-safe checks that reject absolute paths, parent traversal, and symlink entries before deploy/status/comment updates.

@@ -1761,7 +1761,15 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       <ul>
         <li>Reports land at <code>vidiff/&lt;pr-N|push-sha&gt;/&lt;platform&gt;/vidiff/</code> with a
           <code>changes.json</code> manifest (<code>{modified, added, deleted}</code>). <code>vidiff-deploy.yml</code>
-          deploys them to Pages and comments the diff on the PR (it runs even on failure).</li>
+          deploys them to Pages and comments the diff on the PR (it runs even on failure). The deploy workflow
+          derives SHA/PR lineage and platform from the trusted <code>workflow_run</code> event, then fail-closes if
+          <code>vidiff-meta.json</code> disagrees or falls outside strict SHA/PR/platform/outcome validation.
+          Artifact extraction is path-safe and rejects ZIP entries with absolute paths, parent traversal, or symlink
+          members before writing to disk.
+          For pull-request events where <code>workflow_run.pull_requests</code> is empty, it resolves PR association
+          from the commit-to-PR API and requires exactly one trusted match. For manually dispatched historical
+          diffs, it keeps the artifact&rsquo;s validated target SHA (instead of silently retargeting to
+          <code>workflow_run.head_sha</code>).</li>
         <li>The <strong>backfill</strong> variant walks <code>git log --reverse -- '*.vi' '*.ctl'</code>, creates
           detached worktrees per commit, renders through a warm container, and is resumable via a skip-list.</li>
         <li>The dashboard <strong>VIDiff</strong> column summarises each revision as a three-number diff stat &mdash;

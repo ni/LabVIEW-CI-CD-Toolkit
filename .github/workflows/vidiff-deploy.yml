@@ -46,19 +46,114 @@ jobs:
         id: artifact
         with:
           script: |
-            const run_id = context.payload.workflow_run.id;
+            const workflowRun = context.payload.workflow_run;
+            if (!workflowRun || typeof workflowRun.id !== 'number') {
+              throw new Error('workflow_run payload is missing or invalid.');
+            }
+            const run_id = workflowRun.id;
+            const platformByWorkflow = {
+              'VIDiff Report — Windows Container': 'windows',
+              'VIDiff Report — Linux Container': 'linux',
+            };
+            const expectedPathByPlatform = {
+              windows: '.github/workflows/vidiff-windows-container.yml',
+              linux: '.github/workflows/vidiff-linux-container.yml',
+            };
+            const platform = platformByWorkflow[workflowRun.name];
+            if (!platform) {
+              throw new Error(`Untrusted workflow_run.name: ${String(workflowRun.name)}`);
+            }
+            const expectedWorkflowPath = expectedPathByPlatform[platform];
+            const workflowPath = String(workflowRun.path || '');
+            if (!workflowPath.startsWith(expectedWorkflowPath)) {
+              throw new Error(`Unexpected workflow_run.path: ${workflowPath}`);
+            }
+            const expectedRepo = `${context.repo.owner}/${context.repo.repo}`;
+            const sourceRepo = workflowRun.repository && workflowRun.repository.full_name;
+            if (sourceRepo !== expectedRepo) {
+              throw new Error(`Unexpected workflow_run.repository.full_name: ${String(sourceRepo)}`);
+            }
+            const sourceEvent = String(workflowRun.event || '');
+            if (!['push', 'pull_request', 'workflow_dispatch'].includes(sourceEvent)) {
+              throw new Error(`Unsupported workflow_run.event: ${sourceEvent}`);
+            }
+            const runHeadSha = String(workflowRun.head_sha || '').toLowerCase();
+            if (!/^[0-9a-f]{40}$/.test(runHeadSha)) {
+              throw new Error(`Invalid workflow_run.head_sha: ${runHeadSha}`);
+            }
+            const prs = Array.isArray(workflowRun.pull_requests) ? workflowRun.pull_requests : [];
+            let prNumbers = [...new Set(prs.map(pr => Number(pr && pr.number)).filter(Number.isInteger))];
+            if (prNumbers.some(number => number <= 0)) {
+              throw new Error('workflow_run.pull_requests contains a non-positive PR number.');
+            }
+            if (sourceEvent === 'pull_request' && prNumbers.length === 0) {
+              const associated = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: runHeadSha,
+              });
+              const trustedAssociatedNumbers = [...new Set((associated.data || [])
+                .filter(pr =>
+                  pr &&
+                  Number.isInteger(pr.number) &&
+                  pr.number > 0 &&
+                  pr.base &&
+                  pr.base.repo &&
+                  pr.base.repo.full_name === expectedRepo &&
+                  String(pr.head && pr.head.sha || '').toLowerCase() === runHeadSha
+                )
+                .map(pr => pr.number))];
+              prNumbers = trustedAssociatedNumbers;
+            }
+            if (prNumbers.length > 1) {
+              throw new Error(`pull_request lineage is ambiguous: ${prNumbers.join(',')}`);
+            }
+            if (sourceEvent === 'pull_request' && prNumbers.length !== 1) {
+              throw new Error('pull_request workflow_run is missing a trusted PR association.');
+            }
+            const pr_number = prNumbers.length === 1 ? String(prNumbers[0]) : '';
+            const runConclusion = String(workflowRun.conclusion || '').toLowerCase();
             const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
               repo:  context.repo.repo,
               run_id,
             });
-            // Accept both windows and linux artifact names
-            const art = artifacts.data.artifacts.find(a =>
-              a.name.startsWith('vidiff-windows-') || a.name.startsWith('vidiff-linux-')
-            );
+            const pattern = new RegExp(`^vidiff-${platform}-([0-9a-f]{40})$`);
+            const candidates = (artifacts.data.artifacts || [])
+              .filter(artifact => artifact && typeof artifact.name === 'string')
+              .map(artifact => {
+                const match = artifact.name.match(pattern);
+                return match ? { artifact, headSha: match[1] } : null;
+              })
+              .filter(Boolean);
+            let trustedHeadSha = '';
+            let art = null;
+            if (sourceEvent === 'workflow_dispatch') {
+              if (candidates.length === 0) {
+                core.warning(`No ${platform} VIDiff artifact found for workflow_dispatch run.`);
+                core.setOutput('found', 'false');
+                return null;
+              }
+              if (candidates.length > 1) {
+                throw new Error(
+                  `workflow_dispatch run produced multiple ${platform} artifacts; cannot infer trusted head SHA safely.`
+                );
+              }
+              ({ artifact: art, headSha: trustedHeadSha } = candidates[0]);
+            } else {
+              const expectedArtifactName = `vidiff-${platform}-${runHeadSha}`;
+              const exact = candidates.find(entry => entry.artifact.name === expectedArtifactName);
+              if (exact) {
+                ({ artifact: art, headSha: trustedHeadSha } = exact);
+              }
+            }
             if (!art) {
               core.warning('No VIDiff artifact found — skipping deploy.');
+              core.setOutput('found', 'false');
               return null;
+            }
+            if (typeof art.id !== 'number' || art.id <= 0) {
+              throw new Error(`Invalid artifact id for ${art.name}`);
             }
             const dl = await github.rest.actions.downloadArtifact({
               owner: context.repo.owner,
@@ -68,23 +163,31 @@ jobs:
             });
             const fs = require('fs');
             fs.writeFileSync('/tmp/vidiff-artifact.zip', Buffer.from(dl.data));
+            core.setOutput('found', 'true');
+            core.setOutput('platform', platform);
+            core.setOutput('head_sha', trustedHeadSha);
+            core.setOutput('pr_number', pr_number);
+            core.setOutput('run_conclusion', runConclusion);
+            core.setOutput('segment', pr_number ? `pr-${pr_number}` : `push-${trustedHeadSha}`);
+            core.setOutput('artifact_name', art.name);
             return art.name;
 
       - name: Extract artifact
-        if: steps.artifact.outputs.result != 'null'
+        if: steps.artifact.outputs.found == 'true'
         run: |
-          mkdir -p /tmp/vidiff-report
-          unzip -q /tmp/vidiff-artifact.zip -d /tmp/vidiff-report
+          python3 -I -S .github/labview/extract-vidiff-artifact.py /tmp/vidiff-artifact.zip /tmp/vidiff-report
 
-      - name: Read metadata
-        if: steps.artifact.outputs.result != 'null'
+      - name: Validate artifact metadata provenance
+        if: steps.artifact.outputs.found == 'true'
         id: meta
+        env:
+          TRUSTED_ARTIFACT_NAME: ${{ steps.artifact.outputs.artifact_name }}
+          TRUSTED_HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
+          TRUSTED_PLATFORM: ${{ steps.artifact.outputs.platform }}
+          TRUSTED_PR_NUMBER: ${{ steps.artifact.outputs.pr_number }}
+          TRUSTED_RUN_CONCLUSION: ${{ steps.artifact.outputs.run_conclusion }}
         run: |
-          META=$(cat /tmp/vidiff-report/vidiff-meta.json 2>/dev/null || echo '{}')
-          echo "head_sha=$(echo $META | python3 -c "import sys,json; print(json.load(sys.stdin).get('head_sha',''))")" >> "$GITHUB_OUTPUT"
-          echo "pr_number=$(echo $META | python3 -c "import sys,json; print(json.load(sys.stdin).get('pr_number',''))")" >> "$GITHUB_OUTPUT"
-          echo "platform=$(echo $META | python3 -c "import sys,json; print(json.load(sys.stdin).get('platform','windows'))")" >> "$GITHUB_OUTPUT"
-          echo "outcome=$(echo $META | python3 -c "import sys,json; print(json.load(sys.stdin).get('outcome','unknown'))")" >> "$GITHUB_OUTPUT"
+          python3 -I -S .github/labview/validate-vidiff-deploy-metadata.py /tmp/vidiff-report/vidiff-meta.json
 
       # A targeted (single-VI) VIDiff run produces a changes.json listing only the
       # VIs it diffed. The Pages deploy uses keep_files, so that file would REPLACE
@@ -92,16 +195,14 @@ jobs:
       # Merge the new entries into the already-deployed index (new entries win) so a
       # single-VI run is additive and never regresses a fuller report.
       - name: Merge with existing report index (keep prior diff entries)
-        if: steps.artifact.outputs.result != 'null'
+        if: steps.artifact.outputs.found == 'true'
         env:
-          PLATFORM: ${{ steps.meta.outputs.platform }}
-          HEAD_SHA: ${{ steps.meta.outputs.head_sha }}
-          PR_NUMBER: ${{ steps.meta.outputs.pr_number }}
+          PLATFORM: ${{ steps.artifact.outputs.platform }}
+          SEGMENT: ${{ steps.artifact.outputs.segment }}
         run: |
           NEWCH=/tmp/vidiff-report/vidiff/changes.json
           if [ ! -f "$NEWCH" ]; then echo "no changes.json in artifact; nothing to merge"; exit 0; fi
-          if [ -n "$PR_NUMBER" ]; then SEG="pr-${PR_NUMBER}"; else SEG="push-${HEAD_SHA}"; fi
-          EXIST_URL="${PAGES_URL}/vidiff/${SEG}/${PLATFORM}/vidiff/changes.json"
+          EXIST_URL="${PAGES_URL}/vidiff/${SEGMENT}/${PLATFORM}/vidiff/changes.json"
           curl -fsSL "$EXIST_URL" -o /tmp/existing-changes.json 2>/dev/null || echo '{}' > /tmp/existing-changes.json
           python3 - "$NEWCH" /tmp/existing-changes.json <<'PY'
           import json, sys
@@ -128,61 +229,99 @@ jobs:
           PY
 
       - name: Deploy VIDiff report to GitHub Pages
-        if: steps.artifact.outputs.result != 'null'
+        if: steps.artifact.outputs.found == 'true'
         uses: ./.github/actions/publish-gh-pages
         with:
           publish_dir: /tmp/vidiff-report
           # push-SHORT_SHA/windows or pr-NUMBER/linux
-          destination_dir: >-
-            vidiff/${{
-              steps.meta.outputs.pr_number != '' &&
-              format('pr-{0}', steps.meta.outputs.pr_number) ||
-              format('push-{0}', steps.meta.outputs.head_sha)
-            }}/${{ steps.meta.outputs.platform }}
+          destination_dir: vidiff/${{ steps.artifact.outputs.segment }}/${{ steps.artifact.outputs.platform }}
 
       - name: Build report URL
-        if: steps.artifact.outputs.result != 'null'
+        if: steps.artifact.outputs.found == 'true'
         id: url
+        env:
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
+          PLATFORM: ${{ steps.artifact.outputs.platform }}
+          PR_NUMBER: ${{ steps.artifact.outputs.pr_number }}
+          SEGMENT: ${{ steps.artifact.outputs.segment }}
         run: |
-          SHA="${{ steps.meta.outputs.head_sha }}"
-          PR="${{ steps.meta.outputs.pr_number }}"
-          PLATFORM="${{ steps.meta.outputs.platform }}"
-          if [ -n "$PR" ]; then
+          if [ -n "$PR_NUMBER" ]; then
             # PR head snapshots aren't published to the VI Browser, so link the
             # standalone diff report table for PRs.
-            echo "url=${{ env.PAGES_URL }}/vidiff/pr-${PR}/${PLATFORM}/vidiff/index.html" >> "$GITHUB_OUTPUT"
+            echo "url=${PAGES_URL}/vidiff/${SEGMENT}/${PLATFORM}/vidiff/index.html" >> "$GITHUB_OUTPUT"
           else
             # For pushes (what the dashboard shows), open the unified VI Browser
             # filtered to this commit's changed VIs; each links to its diff report.
-            echo "url=${{ env.PAGES_URL }}/vi-snapshots/index.html?sha=${SHA}&changed=1" >> "$GITHUB_OUTPUT"
+            echo "url=${PAGES_URL}/vi-snapshots/index.html?sha=${HEAD_SHA}&changed=1" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Post commit status
-        if: steps.artifact.outputs.result != 'null'
+        if: steps.artifact.outputs.found == 'true'
+        uses: actions/github-script@v8
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          SHA="${{ steps.meta.outputs.head_sha }}"
-          STATE="${{ steps.meta.outputs.outcome == 'success' && 'success' || 'failure' }}"
-          PLATFORM="${{ steps.meta.outputs.platform }}"
-          curl -s -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/statuses/${SHA}" \
-            -d "{\"state\":\"$STATE\",\"target_url\":\"${{ steps.url.outputs.url }}\",\"description\":\"VIDiff ($PLATFORM) $STATE\",\"context\":\"CI / VIDiff (${PLATFORM})\"}"
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
+          OUTCOME: ${{ steps.meta.outputs.outcome }}
+          PLATFORM: ${{ steps.artifact.outputs.platform }}
+          REPORT_URL: ${{ steps.url.outputs.url }}
+        with:
+          script: |
+            const headSha = String(process.env.HEAD_SHA || '').toLowerCase();
+            if (!/^[0-9a-f]{40}$/.test(headSha)) {
+              throw new Error(`Invalid HEAD_SHA: ${headSha}`);
+            }
+            const platform = String(process.env.PLATFORM || '');
+            if (!['windows', 'linux'].includes(platform)) {
+              throw new Error(`Invalid PLATFORM: ${platform}`);
+            }
+            const outcome = String(process.env.OUTCOME || '');
+            if (!['success', 'failure'].includes(outcome)) {
+              throw new Error(`Invalid OUTCOME: ${outcome}`);
+            }
+            const reportUrl = String(process.env.REPORT_URL || '');
+            const parsed = new URL(reportUrl);
+            if (parsed.protocol !== 'https:') {
+              throw new Error(`Invalid REPORT_URL protocol: ${parsed.protocol}`);
+            }
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: headSha,
+              state: outcome,
+              target_url: reportUrl,
+              description: `VIDiff (${platform}) ${outcome}`,
+              context: `CI / VIDiff (${platform})`,
+            });
 
       # ── Post PR comment with diff table ────────────────────────────────────
       - name: Post PR comment
         if: >
-          steps.artifact.outputs.result != 'null' &&
-          steps.meta.outputs.pr_number != ''
+          steps.artifact.outputs.found == 'true' &&
+          steps.artifact.outputs.pr_number != ''
         uses: actions/github-script@v8
+        env:
+          PLATFORM: ${{ steps.artifact.outputs.platform }}
+          OUTCOME: ${{ steps.meta.outputs.outcome }}
+          PR_NUMBER: ${{ steps.artifact.outputs.pr_number }}
+          REPORT_URL: ${{ steps.url.outputs.url }}
         with:
           script: |
-            const prNumber  = parseInt('${{ steps.meta.outputs.pr_number }}');
-            const reportUrl = '${{ steps.url.outputs.url }}';
-            const platform  = '${{ steps.meta.outputs.platform }}';
-            const outcome   = '${{ steps.meta.outputs.outcome }}';
+            const prNumber = Number(process.env.PR_NUMBER);
+            if (!Number.isInteger(prNumber) || prNumber <= 0) {
+              throw new Error(`Invalid PR_NUMBER: ${String(process.env.PR_NUMBER || '')}`);
+            }
+            const reportUrl = String(process.env.REPORT_URL || '');
+            const reportUri = new URL(reportUrl);
+            if (reportUri.protocol !== 'https:') {
+              throw new Error(`Invalid REPORT_URL protocol: ${reportUri.protocol}`);
+            }
+            const platform = String(process.env.PLATFORM || '');
+            if (!['windows', 'linux'].includes(platform)) {
+              throw new Error(`Invalid PLATFORM: ${platform}`);
+            }
+            const outcome = String(process.env.OUTCOME || '');
+            if (!['success', 'failure'].includes(outcome)) {
+              throw new Error(`Invalid OUTCOME: ${outcome}`);
+            }
             const status    = outcome === 'success' ? '✅ Passed' : '❌ Failed';
 
             const body = [
