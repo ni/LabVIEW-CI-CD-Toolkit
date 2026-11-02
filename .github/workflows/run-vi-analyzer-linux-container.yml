@@ -217,7 +217,7 @@ jobs:
 
       - name: Upload report artifact
         if: steps.report.outputs.exists == 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: vi-analyzer-linux-report-${{ steps.sha.outputs.sha }}
           path: ${{ github.workspace }}/ci-out/vi-analyzer/
