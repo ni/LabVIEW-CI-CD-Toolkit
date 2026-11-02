@@ -2054,13 +2054,19 @@
       fetch(base + '/deps-pending.json', { cache: 'no-cache' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-          if (!d || !d.pending) return;
+          if (!d || !d.pending || /(?:^|\/)dependencies\.html$/.test(location.pathname)) return;
           var total = (d.packages || []).length + (d.dragon || []).length;
-          if (total) {
-            var sub = pendbar.querySelector('.lvci-dep-sub');
-            if (sub) sub.textContent = 'Your project declares ' + total + ' dependency item' + (total === 1 ? '' : 's') +
-              ' (in VIPC or .dragon files) not yet baked into the worker container(s); container CI may error or show broken code until you update them. ';
-          }
+          var platforms = ['windows', 'linux'].filter(function (platform) {
+            return (d.containers || []).indexOf(platform) !== -1
+              || (platform === 'windows' && (d.containers || []).indexOf('windows-beta') !== -1);
+          });
+          var labels = platforms.map(function (platform) { return platform === 'windows' ? 'Windows' : 'Linux'; });
+          pendbar.innerHTML = '<span class="lvci-dep-txt"><strong>Dependency attention: ' + (labels.join(' + ') || 'platform not identified') + '. </strong>'
+            + '<span class="lvci-dep-sub">' + (total ? total + ' unresolved dependency items across affected workers (aggregate, not per-platform). ' : 'Some dependency evidence is missing or unknown. ')
+            + 'Review each affected platform; this does not imply both workers need an update. </span>'
+            + (platforms.length ? platforms.map(function (platform) {
+              return '<a href="' + navBase + '/dependencies.html?platform=' + platform + '">Review ' + (platform === 'windows' ? 'Windows' : 'Linux') + ' dependencies &#8599;</a>';
+            }).join(' &middot; ') : '<a href="' + navBase + '/dependencies.html">Review dependency evidence &#8599;</a>') + '</span>';
           pendbar.classList.add('show');
         })
         .catch(function () {});

@@ -1416,11 +1416,40 @@ docker run --rm `
         The Docker hook propagates a failed installer exit rather than silently publishing an incomplete worker.
         Override the required set with <code>VIPM_REQUIRED_PACKAGES</code>. A seed-only registry copy does not
         apply these dependencies: rebuild the project worker before relying on Caraya being present.</div>
+      <h3 id="dependencies-platforms">Manage dependencies one platform at a time</h3>
+      <p>The Dependencies page has separate <strong>Windows</strong> and <strong>Linux</strong> tabs.
+        Windows keeps its VIPM workflow and never offers an LVPM installer choice. Linux offers VIPM or
+        experimental LVPM. Links can select a tab with <code>?platform=windows</code> or
+        <code>?platform=linux</code>; switching tabs preserves the inspected revision. Keyboard users can move
+        between platform tabs with the arrow, Home, and End keys.</p>
+      <p>Each tab shows only that platform&rsquo;s default worker, package coverage, monitoring checkboxes,
+        and update approval. The summary uses existing platform-specific inventory and declaration evidence,
+        not aggregate missing-package counts. Missing packages and unavailable, malformed, or stale evidence
+        require attention only on the affected platform. An empty monitored project list is neutral, not proof
+        of installation; satisfied package inventory is not runtime verification. Legacy Windows-only Dragon
+        status cannot establish Linux satisfaction. Explicit per-action overrides may select a different worker
+        from the default shown here.</p>
+      <p>For VIPM, choose <strong>Review Windows VIPM update</strong> or
+        <strong>Review Linux VIPM update</strong>, inspect the selected platform&rsquo;s package changes, then
+        approve the build. Advanced update options are collapsed by default. Saving monitoring choices preserves
+        the other platform&rsquo;s selections and opens a configuration pull request; merge it and refresh before
+        building committed dependencies. Tab or revision changes cancel outstanding approval/token prompts, and
+        in-flight reads cannot retarget a dispatch. Switching away after a build is already queued does not cancel it.</p>
+      <p>Package rows, unresolved declaration details, native inventory, and candidate provenance are available on
+        demand rather than shown as one large checklist. The aggregate dependency banner is replaced by the
+        platform summary on Dependencies. Other dashboard pages name the affected platform(s), link to their
+        tabs, and label combined unresolved counts as aggregate rather than attributing them to both workers.</p>
       <h3 id="linux-lvpm">Optional Linux LVPM environments (experimental)</h3>
-      <p>The Dependencies page offers <strong>VIPM</strong> (the existing default) and <strong>LVPM</strong>
+      <p>The Dependencies page&rsquo;s <strong>Linux</strong> tab offers <strong>VIPM</strong> (the existing default) and <strong>LVPM</strong>
         as alternative installers for Linux. Windows behavior is unchanged. Switching tooling views in the page
         is exploratory, not a pipeline change: review the declarations, build a candidate, inspect its verification,
-        and explicitly request activation through a Reconfigure pull request. Never apply the client installer to
+        and explicitly request activation through a Reconfigure pull request. While exploring LVPM, the current
+        VIPM update controls are hidden; returning to the VIPM view does not change the active worker. If LVPM
+        is already selected, returning to the existing default selection requires the explicit reset PR under the
+        collapsed configured-image, overrides and rollback section. Reset removes only <code>linuxUse</code>,
+        retaining <code>container.use</code> and per-action overrides; a base or custom image may be selected,
+        so reset does not guarantee VIPM. The retained default ref is shown before requesting reset.
+        Never apply the client installer to
         this tooling source repository or a fork to test this feature; use a separate scratch client repository.</p>
       <ol>
         <li><strong>Review.</strong> The candidate uses the locked CI-tooling VIPC and project VIPC/Dragon files
@@ -1465,7 +1494,8 @@ docker run --rm `
           release-note or version bookkeeping alone does not invalidate a candidate.
           Explicit existing per-action container overrides continue to win, then <code>linuxUse</code>, then the
           previous fallback. Windows never reads this Linux-only selection. Unrelated reconfiguration preserves it;
-          resetting to VIPM removes only <code>linuxUse</code>, preserving existing overrides. Reconfigure applies
+          resetting to the existing default selection removes only <code>linuxUse</code>, preserving
+          <code>container.use</code> and existing overrides without assuming the fallback uses VIPM. Reconfigure applies
           only explicitly requested settings to the parsed existing manifest: activation/reset preserves separate
           VIPC and Dragon lists, explicit dependency-policy values, platform settings, provenance, and unknown
           client fields. A no-op keeps the file byte-identical; an actual update may normalize YAML formatting.</li>
