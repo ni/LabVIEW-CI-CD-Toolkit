@@ -245,6 +245,35 @@ test('download script rejects untrusted workflow provenance', async () => {
   assert.equal(outputs.size, 0);
 });
 
+test('download script rejects workflow path prefix spoof with same workflow name', async () => {
+  const outputs = new Map();
+  const context = {
+    repo: { owner: 'owner', repo: 'repo' },
+    payload: {
+      workflow_run: workflowRun({
+        path: '.github/workflows/vidiff-windows-container.yml.evil.yml@refs/heads/main',
+      }),
+    },
+  };
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({ data: { artifacts: [] } }),
+      },
+    },
+  };
+  const core = {
+    setOutput: (name, value) => outputs.set(name, String(value)),
+    warning: () => {},
+  };
+
+  await assert.rejects(
+    () => runGithubScript(downloadScript, { context, github, core }),
+    /Unexpected workflow_run.path/
+  );
+  assert.equal(outputs.size, 0);
+});
+
 test('workflow uses isolated Python for metadata validation helper', () => {
   assert.match(
     workflowText,

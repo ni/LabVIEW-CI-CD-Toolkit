@@ -65,7 +65,8 @@ jobs:
             }
             const expectedWorkflowPath = expectedPathByPlatform[platform];
             const workflowPath = String(workflowRun.path || '');
-            if (!workflowPath.startsWith(expectedWorkflowPath)) {
+            const workflowPathCanonical = workflowPath.split('@', 1)[0];
+            if (workflowPathCanonical !== expectedWorkflowPath) {
               throw new Error(`Unexpected workflow_run.path: ${workflowPath}`);
             }
             const expectedRepo = `${context.repo.owner}/${context.repo.repo}`;
