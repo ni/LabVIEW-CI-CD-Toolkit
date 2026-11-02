@@ -719,10 +719,14 @@
         const response = await fetch(api("/actions/workflows/" + payload.file + "/dispatches"), {
           method:"POST", headers:Object.assign({}, updHeaders(), { "Content-Type":"application/json" }), body:JSON.stringify(payload.body)
         });
+        if (platform !== activePlatform || revision !== selectedRevision || monitorDirty) return;
         if (response.status !== 204) throw new Error("Workflow dispatch failed (" + response.status + "); no fallback was attempted.");
         hideTokenPanel();
         if (status) status.textContent = action === "build" ? "Candidate build queued on the default branch. Active configuration is unchanged. Refresh after it finishes to review and activate." : "Reconfigure queued. Review and merge its pull request to apply; explicit per-action overrides and Windows remain unchanged.";
-      } catch (error) { if (status) status.textContent = error.message; }
+      } catch (error) {
+        if (platform !== activePlatform || revision !== selectedRevision || monitorDirty) return;
+        if (status) status.textContent = error.message;
+      }
     }
     async function renderLinuxInstaller(){
       const host = $("linuxInstaller"); if (!host) return;

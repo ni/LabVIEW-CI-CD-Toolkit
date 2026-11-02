@@ -1434,7 +1434,9 @@ docker run --rm `
         approve the build. Advanced update options are collapsed by default. Saving monitoring choices preserves
         the other platform&rsquo;s selections and opens a configuration pull request; merge it and refresh before
         building committed dependencies. Tab or revision changes cancel outstanding approval/token prompts, and
-        in-flight reads cannot retarget a dispatch. Switching away after a build is already queued does not cancel it.</p>
+        in-flight reads cannot retarget a dispatch. Late Linux responses do not dismiss a new token prompt or
+        update status after the platform, revision, or monitoring selection changes. Switching away after a
+        build is already queued does not cancel it.</p>
       <p>Package rows, unresolved declaration details, native inventory, and candidate provenance are available on
         demand rather than shown as one large checklist. The aggregate dependency banner is replaced by the
         platform summary on Dependencies. Other dashboard pages name the affected platform(s), link to their

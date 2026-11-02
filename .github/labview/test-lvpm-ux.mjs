@@ -23,6 +23,7 @@ let activeConfig = 'config:\n  container:\n    linuxUse: "' + tag + '@' + digest
 let failMetadata = false;
 let workflowResponse = 'available';
 let postBarrier = null;
+let dispatchStatus = 204;
 const context = vm.createContext({
   window:{ LVCI:{ repo:'owner/project' } },
   location:{ hostname:'owner.github.io', pathname:'/project/dependencies.html', href:'https://owner.github.io/project/dependencies.html?sha=' + revision },
@@ -52,7 +53,7 @@ const context = vm.createContext({
     if (new URL(url).hostname === 'raw.githubusercontent.com') return { ok:true, text:async () => activeConfig };
     if (options.method === 'POST') {
       if (postBarrier) await postBarrier;
-      return { status:204 };
+      return { status:dispatchStatus };
     }
     throw new Error('Unexpected request: ' + url);
   }
@@ -510,6 +511,31 @@ releasePost();
 await inFlightUpdate;
 assert.equal(elements.get('updStatus').innerHTML, 'Linux status unchanged');
 postBarrier = null;
+for (const action of ['build', 'activate', 'reset']) {
+  for (const change of [{platform:'windows'}, {revision:'historical'}, {dirty:true}]) {
+    for (const responseStatus of [204, 500]) {
+      hooks.setState({ candidate, vipcs:[], dragons:[] });
+      elements.set('lvpmStatus', uiElement());
+      postBarrier = new Promise(resolve => { releasePost = resolve; });
+      dispatchStatus = responseStatus;
+      const start = requests.length;
+      const pending = hooks.dispatchLinuxWorker(action);
+      for (let attempt = 0; attempt < 30 && !requests.slice(start).some(request => request.options.method === 'POST'); attempt++) {
+        await Promise.resolve();
+      }
+      assert.equal(requests.slice(start).filter(request => request.options.method === 'POST').length, 1);
+      hooks.setState({ candidate, vipcs:[], dragons:[], ...change });
+      elements.get('tokPanel').hidden = false;
+      elements.get('lvpmStatus').textContent = 'Current view unchanged';
+      releasePost();
+      await pending;
+      assert.equal(elements.get('tokPanel').hidden, false, action + JSON.stringify(change));
+      assert.equal(elements.get('lvpmStatus').textContent, 'Current view unchanged');
+      postBarrier = null;
+    }
+  }
+}
+dispatchStatus = 204;
 platformFixture('windows', ['actual-1.2'], []);
 const beforeWindowsRender = requests.length;
 hooks.renderContainers(hooks.getColumnStates());

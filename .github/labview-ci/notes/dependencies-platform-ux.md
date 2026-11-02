@@ -7,3 +7,5 @@ demand. Other dashboard pages identify affected platforms instead of implying
 that both workers need a dependency update. Dependency banners use text-safe DOM
 rendering and HTTP(S)-only review links rather than interpreting navigation text
 as HTML.
+Late Linux build, activation and reset responses no longer dismiss a token prompt
+or change status after switching platforms, revisions or monitoring selections.
