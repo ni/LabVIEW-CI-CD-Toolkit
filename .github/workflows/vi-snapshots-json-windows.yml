@@ -403,7 +403,7 @@ jobs:
 
       - name: Upload rendered frames JSON
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: vi-snapshots-windows
           path: _winout/by-blob/
