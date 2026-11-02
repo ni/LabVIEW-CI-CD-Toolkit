@@ -1,14 +1,122 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "e2b457e311196c645da1be563e690b48a3ad2e24",
+  "sha": "c4165551094fae6d3d705a22b3c6ede4a2f48822",
   "revisions": [
+    {
+      "sha": "c4165551094fae6d3d705a22b3c6ede4a2f48822",
+      "short": "c416555",
+      "message": "Merge pull request #93 from ni/feat/linux-lvpm-candidates-20261101",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T14:59:02Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "c54dec7b42840f6f05be1410b8c695092e339fb8",
+      "short": "c54dec7",
+      "message": "Merge remote-tracking branch 'origin/fix/reconfigure-yaml-reader-compatibility' into feat/linux-lvpm-candidates-20261101",
+      "author": "elijah286",
+      "date": "2026-11-02T14:06:30Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "b0233c113f722e8c1d090f0430db3752f0517093",
+      "short": "b0233c1",
+      "message": "Preserve VI Analyzer rule visibility after Reconfigure updates",
+      "author": "elijah286",
+      "date": "2026-11-02T14:06:15Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "836bda00ddc0e9b87c3b1abd312601aa51e9902b",
+      "short": "836bda0",
+      "message": "Preserve empty dependency selections across LVPM configuration tools",
+      "author": "elijah286",
+      "date": "2026-11-02T13:54:58Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "e6088530eed4c0bfa1d90fabaf3873de4598d049",
+      "short": "e608853",
+      "message": "Preserve explicit empty dependency choices and long YAML scalars",
+      "author": "elijah286",
+      "date": "2026-11-02T13:53:36Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "b7a1a7aa07dfec5dabd151f580adfc837e2110a9",
+      "short": "b7a1a7a",
+      "message": "Tighten script extraction and URL matching in dependency UX tests",
+      "author": "elijah286",
+      "date": "2026-11-02T13:51:07Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "9fbcd3a77562839bfe3a134c68e6ac15c44e6fa5",
+      "short": "9fbcd3a",
+      "message": "Integrate settings-reader compatibility into LVPM validation",
+      "author": "elijah286",
+      "date": "2026-11-02T13:48:19Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "631f142b4878d8ba38b4be34e2da2fdeeaa85dcc",
+      "short": "631f142",
+      "message": "Use trusted per-platform Dragon dependency evidence",
+      "author": "elijah286",
+      "date": "2026-11-02T13:47:39Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "4ee584e9b2e1c6b68f9f985b019da761b782857a",
+      "short": "4ee584e",
+      "message": "Keep Reconfigure output readable by existing settings tools",
+      "author": "elijah286",
+      "date": "2026-11-02T13:47:03Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "8e8f736f207114d2e77b67c19d3e94e06ad70a9c",
+      "short": "8e8f736",
+      "message": "Distribute the Dragon dependency parser with shared client tooling",
+      "author": "elijah286",
+      "date": "2026-11-02T13:32:20Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "de4dd4d2314ecf672549bac2d7f8894ca7e96ab7",
+      "short": "de4dd4d",
+      "message": "Merge remote-tracking branch 'origin/main' into feat/linux-lvpm-candidates-20261101",
+      "author": "elijah286",
+      "date": "2026-11-02T13:26:08Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "e2b457e311196c645da1be563e690b48a3ad2e24",
       "short": "e2b457e",
       "message": "Merge pull request #94 from ni/lvci-release/release-4.18.7-7d5ee618b305a2736c2b9bc1369503c540202f2a",
       "author": "Elijah Kerry",
       "date": "2026-11-02T13:23:35Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "7f53aabb3a44c5e32fdcbf62a433c3fe34f0a091",
+      "short": "7f53aab",
+      "message": "Merge remote-tracking branch 'origin/main' into feat/linux-lvpm-candidates-20261101",
+      "author": "elijah286",
+      "date": "2026-11-02T13:19:10Z",
       "project": false,
       "dep_only": false
     },
@@ -31,11 +139,38 @@
       "dep_only": false
     },
     {
+      "sha": "895416b96c86bc0134a51bf3b12f9a69527f0d2e",
+      "short": "895416b",
+      "message": "Merge branch 'fix/preserve-reconfigure-settings-20261101' into feat/linux-lvpm-candidates-20261101",
+      "author": "elijah286",
+      "date": "2026-11-02T00:14:54Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "e971ab84399015a557b0922600e4a25b80f92925",
       "short": "e971ab8",
       "message": "Keep platform defaults unchanged for scoped Reconfigure requests",
       "author": "elijah286",
       "date": "2026-11-02T00:14:29Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "7783b7f1dd4525c58a76002f959f21729e831afe",
+      "short": "7783b7f",
+      "message": "Integrate the standalone Reconfigure preservation patch",
+      "author": "elijah286",
+      "date": "2026-11-02T00:13:29Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "2c9f159b74651d1875123de1a20f8578923978eb",
+      "short": "2c9f159",
+      "message": "Add opt-in digest-pinned Linux LVPM dependency candidates",
+      "author": "elijah286",
+      "date": "2026-11-02T00:12:58Z",
       "project": false,
       "dep_only": false
     },
@@ -769,123 +904,6 @@
       "dep_only": false
     },
     {
-      "sha": "fefb4465569789dddad7f8b90a45e4b43c6650af",
-      "short": "fefb446",
-      "message": "Release 4.15.0 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-17T20:47:33Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "69d7fadcbd19ddb678343f0aacbbcf972dfdf36a",
-      "short": "69d7fad",
-      "message": "Merge pull request #53 from elijah286/feat/alias-tracks-stable",
-      "author": "Elijah Kerry",
-      "date": "2026-08-17T20:47:20Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "1c68413e56e2b0f30634d8b1a675d4098769505d",
-      "short": "1c68413",
-      "message": "@v<major> tracks the stable channel instead of the development tip",
-      "author": "elijah286",
-      "date": "2026-08-17T20:46:50Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "cf05db2f53226c91666ade04fcfa2a908229d147",
-      "short": "cf05db2",
-      "message": "Correct the 4.14.1 release note [skip release]",
-      "author": "elijah286",
-      "date": "2026-08-17T20:02:15Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "770d7cf1147df06cf2eb399eb8385d532a106cc8",
-      "short": "770d7cf",
-      "message": "Release 4.14.1 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-17T20:01:27Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "c958a71e4e1ff47ab72e48895d532fcf88377c64",
-      "short": "c958a71",
-      "message": "release: don't abort when no note fragments are pending",
-      "author": "elijah286",
-      "date": "2026-08-17T19:58:12Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "f099373d821d7f028ef115e820cdc755b0227e93",
-      "short": "f099373",
-      "message": "Release 4.14.0 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-17T19:50:07Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "bddc57510ad151b51ffae12181e70496991db053",
-      "short": "bddc575",
-      "message": "Merge pull request #52 from elijah286/feat/auto-version",
-      "author": "Elijah Kerry",
-      "date": "2026-08-17T19:49:56Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "da49fb94312fac7d3694d0705d9100f4b1471992",
-      "short": "da49fb9",
-      "message": "Let CI own the version: derive it from tags, publish every merge",
-      "author": "elijah286",
-      "date": "2026-08-17T19:48:49Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "2e982904f1648f701cd569b4b2c7823679e4669e",
-      "short": "2e98290",
-      "message": "Merge pull request #51 from elijah286/fix/restore-catalog-version",
-      "author": "Elijah Kerry",
-      "date": "2026-08-17T19:40:52Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "19bf1e378d889caf2804304ef8cf4145cc3fd7eb",
-      "short": "19bf1e3",
-      "message": "Restore the version of record to 4.13.0 and guard against another downgrade",
-      "author": "elijah286",
-      "date": "2026-08-17T18:19:48Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "6f6b07773d2029cf6cfd6af82e4b0672c89f50e1",
-      "short": "6f6b077",
-      "message": "Set VI Analyzer default to 'builtin'",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-13T21:50:46Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "26b8330acf023225984b98cef5ce7df7a25af1fc",
-      "short": "26b8330",
-      "message": "merge branch 'main' into via-debug",
-      "author": "MIpetrov-NI",
-      "date": "2026-08-13T20:34:53Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
       "sha": "d0e080c128589707c82a13a45d842952fb3a5fc8",
       "short": "d0e080c",
       "message": "Merge remote-tracking branch 'origin/main' into via-debug",
@@ -1113,6 +1131,7 @@
   ],
   "config": {
     "use": "",
+    "linuxUse": "",
     "actions": {},
     "vipc": [],
     "dragon": [],
@@ -1301,8 +1320,8 @@
   "dragon": {
     "available": true,
     "column": "windows",
-    "ready": true,
-    "health": "",
+    "ready": false,
+    "health": "unknown",
     "manifest_version": "win-982773c5fc86",
     "files": [
       {
@@ -1316,9 +1335,22 @@
             "declared_version": "6.0.1.20",
             "feed_name": null,
             "source_file": "example/Example.dragon",
-            "status": "installed",
-            "installed_version": "6.0.1.20",
-            "message": "inferred from Windows worker VIPM package inventory"
+            "platform_status": {
+              "windows": {
+                "status": "installed",
+                "installed_version": "6.0.1.20",
+                "message": "inferred from Windows worker VIPM package inventory"
+              },
+              "linux": {
+                "status": "unknown",
+                "installed_version": "",
+                "scope": "package-files",
+                "message": "Current digest-bound Linux LVPM package-file evidence is unavailable. Rebuild, reverify, and explicitly re-activate the candidate."
+              }
+            },
+            "status": "unknown",
+            "installed_version": "",
+            "message": "Aggregate monitored package evidence: installed, unknown."
           },
           {
             "manager": "vipm",
@@ -1326,12 +1358,33 @@
             "declared_version": "6.0.0.9",
             "feed_name": null,
             "source_file": "example/Example.dragon",
+            "platform_status": {
+              "windows": {
+                "status": "missing",
+                "installed_version": "",
+                "message": "package not found in Windows worker VIPM package inventory"
+              },
+              "linux": {
+                "status": "unknown",
+                "installed_version": "",
+                "scope": "package-files",
+                "message": "Current digest-bound Linux LVPM package-file evidence is unavailable. Rebuild, reverify, and explicitly re-activate the candidate."
+              }
+            },
             "status": "missing",
             "installed_version": "",
-            "message": "package not found in Windows worker VIPM package inventory"
+            "message": "Aggregate monitored package evidence: missing, unknown."
           }
         ],
-        "monitored": true
+        "monitored": true,
+        "monitorOn": [
+          "windows",
+          "linux"
+        ],
+        "inspection": {
+          "status": "parsed",
+          "reason": "Declarations parsed by trusted tooling."
+        }
       }
     ],
     "install_set": [
@@ -1347,9 +1400,22 @@
           "example/Example.dragon"
         ],
         "conflict": false,
-        "status": "installed",
-        "installed_version": "6.0.1.20",
-        "message": "inferred from Windows worker VIPM package inventory"
+        "platform_status": {
+          "linux": {
+            "status": "unknown",
+            "installed_version": "",
+            "scope": "package-files",
+            "message": "Current digest-bound Linux LVPM package-file evidence is unavailable. Rebuild, reverify, and explicitly re-activate the candidate."
+          },
+          "windows": {
+            "status": "installed",
+            "installed_version": "6.0.1.20",
+            "message": "inferred from Windows worker VIPM package inventory"
+          }
+        },
+        "status": "unknown",
+        "installed_version": "",
+        "message": "Aggregate monitored package evidence: unknown, installed."
       },
       {
         "manager": "vipm",
@@ -1363,9 +1429,22 @@
           "example/Example.dragon"
         ],
         "conflict": false,
+        "platform_status": {
+          "linux": {
+            "status": "unknown",
+            "installed_version": "",
+            "scope": "package-files",
+            "message": "Current digest-bound Linux LVPM package-file evidence is unavailable. Rebuild, reverify, and explicitly re-activate the candidate."
+          },
+          "windows": {
+            "status": "missing",
+            "installed_version": "",
+            "message": "package not found in Windows worker VIPM package inventory"
+          }
+        },
         "status": "missing",
         "installed_version": "",
-        "message": "package not found in Windows worker VIPM package inventory"
+        "message": "Aggregate monitored package evidence: unknown, missing."
       }
     ],
     "conflicts": []
@@ -1412,6 +1491,8 @@
       "defaultTag": "latest",
       "tag": "latest",
       "ready": true,
+      "installer": "vipm",
+      "verification": {},
       "packages": [
         "astemes_lib_lunit-2.0.13.6",
         "astemes_lib_lunit_cli-1.6.1.23",
@@ -1454,6 +1535,8 @@
       "defaultTag": "latest",
       "tag": "latest",
       "ready": true,
+      "installer": "vipm",
+      "verification": {},
       "packages": [],
       "failed_packages": [],
       "nipkg_ready": true,
@@ -1461,5 +1544,6 @@
       "labview_version": "2026",
       "version": "linux-4ce478ba9bb6"
     }
-  ]
+  ],
+  "linux_lvpm_candidate": null
 }
