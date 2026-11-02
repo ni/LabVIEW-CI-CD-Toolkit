@@ -279,6 +279,7 @@
     let autoInstallDeps = false;             // config.dependencyPolicy.autoInstall — install missing deps + rebuild first
     let winLatest = null;                    // workers/windows/latest.json (current build)
     let containerUse = "latest";             // config.container.use (default tag activities pull)
+    let linuxUse = "";
     let vipcList = [];                       // [{ path, include, monitor }] repo VIPC files; only `include` ones are baked
     let dragonList = [];                     // [{ path, include, monitor }] repo .dragon files; only `include` ones are baked
     let vipcFoundCount = 0;                  // how many .vipc files discovery found in the repo
@@ -402,6 +403,7 @@
           if (/^\s{0,3}\S/.test(line)) inDepPolicy = false;
         }
         if (inContainer) {
+          const linux = line.match(/^\s{4}linuxUse:\s*["']?([^"'\s]+)/); if (linux) out.linuxUse = linux[1];
           let mc;
           if ((mc = line.match(/^\s{4}use:\s*"?([^"\s]+)"?/))) { out.containerUse = mc[1]; inVipc = false; inDragon = false; inActions = false; continue; }
           if (/^\s{4}vipc:\s*$/.test(line)) { inVipc = true; inDragon = false; inActions = false; continue; }
@@ -1021,6 +1023,7 @@
     }
     function containerYamlLines() {
       const lines = ["  container:", "    use: " + (containerUseValue() || "latest")];
+      if (linuxUse) lines.push("    linuxUse: " + JSON.stringify(linuxUse));
       const baked = vipcList.filter(v => v.include === true);
       if (baked.length) {
         lines.push("    vipc:");
@@ -1353,6 +1356,7 @@
         renderActivities();
         if (m.runners) $("runners").value = m.runners;
         containerUse = m.containerUse || "latest";
+        linuxUse = m.linuxUse || "";
         vipcList = (m.vipc || []).map(v => ({ path: v.path, monitor: v.monitor === true, include: true }));
         dragonList = (m.dragon || []).map(v => ({ path: v.path, monitor: v.monitor === true, include: true }));
         actionContainer.clear();

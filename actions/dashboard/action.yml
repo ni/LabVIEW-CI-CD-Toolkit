@@ -35,6 +35,24 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Prepare optional local LVPM freshness checks
+      id: lvpm_freshness
+      shell: bash
+      run: |
+        if python3 -I - <<'PY'
+        import pathlib, re, sys
+        config = pathlib.Path('.github/labview-ci.yml')
+        text = config.read_text() if config.is_file() else ''
+        sys.exit(0 if re.search(r'''^\s{4}(?:linuxUse|use):\s*["']?linux-lvpm-''', text, re.MULTILINE) else 1)
+        PY
+        then
+          if environment=$(mktemp -d "${RUNNER_TEMP:-/tmp}/lvci-lvpm-freshness.XXXXXX") && python3 -I -m venv "$environment" && "$environment/bin/python" -I -m pip install --quiet PyYAML==6.0.3 tomli==2.4.0; then
+            echo "python=$environment/bin/python" >> "$GITHUB_OUTPUT"
+          else
+            echo '::warning::Optional LVPM freshness prerequisites unavailable; the dashboard will report freshness unknown.'
+          fi
+        fi
+
     - name: Build dashboard
       shell: bash
       env:
@@ -45,9 +63,11 @@ runs:
         # consumer's own catalog.json; it falls back to .github/labview-ci.yml.
         PAGES_SRC: ${{ github.action_path }}
         CATALOG_PATH: .github/labview-ci/catalog.json
+        LVCI_LVPM_PYTHON: ${{ steps.lvpm_freshness.outputs.python }}
+        LVCI_LVPM_HELPER: ${{ github.action_path }}/../../.github/labview/lvpm/worker.py
       run: |
         if [ -z "${PAGES_URL}" ]; then
           owner="${GITHUB_REPOSITORY_OWNER}"; name="${REPO#*/}"
           export PAGES_URL="https://${owner}.github.io/${name}"
         fi
-        python3 "${{ github.action_path }}/dashboard.py"
+        python3 -I "${{ github.action_path }}/dashboard.py"

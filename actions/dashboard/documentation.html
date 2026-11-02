@@ -1138,11 +1138,15 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         declare the bare form (<code>0.5.0.1</code>), the comparison normalizes that <code>v</code> prefix &mdash; without
         it, correctly-baked packages would be reported as missing and the &ldquo;dependencies need to be installed&rdquo;
         banner would never clear.</p>
-      <p>Dragon dependencies are reconciled against the current <strong>Windows worker</strong> manifest (the worker
+      <p>Dragon dependencies honor each file&rsquo;s <code>monitorOn</code> platforms. Windows declarations are
+        reconciled against the current <strong>Windows worker</strong> manifest (the worker
         rebuilt by <code>build-labview-image.yml</code>). If a manifest has not yet published a dedicated
         <code>dragon.items</code> status block, the dashboard falls back to the installed-package inventories
         (<code>vipm_packages</code> / <code>nipkg_packages</code>) so already-baked dependencies are marked installed
-        instead of staying stuck at <code>not_attempted</code>.</p>
+        instead of staying stuck at <code>not_attempted</code>. Linux declarations require the selected
+        digest-pinned LVPM inventory and locally current freshness, with exact VIPM name/version matches.
+        Unsupported native/NIPM dependencies and stale or unavailable Linux evidence remain unknown/pending.
+        Files monitored on both platforms are satisfied only when both platforms are satisfied.</p>
 
       <h3>When images rebuild</h3>
       <p>A worker rebuild is a heavy, opt-in operation. It runs when you apply a dependency update from the dashboard's
@@ -1412,7 +1416,108 @@ docker run --rm `
         The Docker hook propagates a failed installer exit rather than silently publishing an incomplete worker.
         Override the required set with <code>VIPM_REQUIRED_PACKAGES</code>. A seed-only registry copy does not
         apply these dependencies: rebuild the project worker before relying on Caraya being present.</div>
-      <div class="note"><span class="lbl">Public-index fallback</span>
+      <h3 id="linux-lvpm">Optional Linux LVPM environments (experimental)</h3>
+      <p>The Dependencies page offers <strong>VIPM</strong> (the existing default) and <strong>LVPM</strong>
+        as alternative installers for Linux. Windows behavior is unchanged. Switching tooling views in the page
+        is exploratory, not a pipeline change: review the declarations, build a candidate, inspect its verification,
+        and explicitly request activation through a Reconfigure pull request. Never apply the client installer to
+        this tooling source repository or a fork to test this feature; use a separate scratch client repository.</p>
+      <ol>
+        <li><strong>Review.</strong> The candidate uses the locked CI-tooling VIPC and project VIPC/Dragon files
+          selected for Linux. One installer owns the environment; no per-package mixing of VIPM and LVPM occurs.
+          Conflicting exact pins (including conflicts between tooling and project declarations), missing files,
+          unsupported declaration settings, and Dragon NIPM requirements fail rather than being silently dropped.</li>
+        <li><strong>Build.</strong> <code>build-labview-lvpm-image.yml</code> is manually dispatched. The Linux
+          custom-image capability must be installed first. The page checks workflow availability on the default
+          branch before enabling Build and again before dispatch; unknown availability blocks dispatch rather than
+          pretending the workflow is missing. It builds upstream
+          <a href="https://github.com/Flydroid/lvpm">Flydroid/lvpm</a> at commit
+          <code>8e8bd7e390b7d4a77558af12cfa52f79079df409</code> with its Cargo lockfile, as an external dependency;
+          the toolkit does not vendor or fork its implementation. Candidates use separate
+          <code>linux-lvpm-*</code> image tags and <code>workers/linux-lvpm/</code> manifests. They never replace
+          the existing Linux VIPM, Windows, seed, or default worker tags.</li>
+        <li><strong>Verify.</strong> The adapter first asks LVPM for read-only package discovery, then expands
+          explicitly declared embedded VIP subpackages into the checked dependency closure. It preserves original
+          archives and their SHA-256 values, and records separate hashes for normalized installation archives.
+          Legacy non-UTF-8 specs use ZIP's CP437 filename encoding; normalized specs and archive names use UTF-8
+          without replacing unknown characters or changing payload bytes. File groups explicitly restricted to
+          other LabVIEW versions are excluded with recorded evidence; package-level incompatibilities, unsupported
+          OS restrictions, unknown conditions, conflicts, and missing transitive dependencies remain errors.
+          Exact root pins are fetched separately with dependency traversal disabled, so upstream's
+          transitive-first resolution cannot silently upgrade a declared version. Transitive discovery cannot
+          replace those roots. Once every dependency constraint has been checked, both the local recheck and
+          actual install disable further dependency resolution and use only the frozen closure.
+          A final, local-only dry run must resolve the complete exact closure without unresolved dependencies or
+          missing archive entries before any real installation. No initial discovery warning counts as verification.
+          The checked closure is frozen to exact local package archives before the actual
+          install with hooks and relinking. Installation rejects non-Linux or non-x86-64 hosts before changing
+          packages. The exact digest-pinned image is inspected and must agree with the installed inventory on
+          <code>linux/amd64</code>. Final verification requires exact installed versions, recorded files on
+          disk, no skipped applicable groups/hooks, and completed relinking. Declared system-package paths are
+          preserved: file verification alone does not prove a Windows-shaped CLI operation works on Linux.
+          SHA-256 values record the acquired package bytes;
+          they are not publisher signatures. The initial indexes are requested over HTTPS.</li>
+        <li><strong>Activate.</strong> Activation proposes a digest-pinned <code>config.container.linuxUse</code>
+          selection through the existing reviewable Reconfigure PR flow. Server-side checks require the canonical
+          candidate manifest, explicit <code>architecture: amd64</code>, successful build provenance, matching registry
+          digest, and current dependency fingerprint. Older manifests lacking architecture evidence require a rebuild.
+          Freshness includes the consumed catalog default, qualification, LabVIEW year, and Linux base tag;
+          release-note or version bookkeeping alone does not invalidate a candidate.
+          Explicit existing per-action container overrides continue to win, then <code>linuxUse</code>, then the
+          previous fallback. Windows never reads this Linux-only selection. Unrelated reconfiguration preserves it;
+          resetting to VIPM removes only <code>linuxUse</code>, preserving existing overrides. Reconfigure applies
+          only explicitly requested settings to the parsed existing manifest: activation/reset preserves separate
+          VIPC and Dragon lists, explicit dependency-policy values, platform settings, provenance, and unknown
+          client fields. A no-op keeps the file byte-identical; an actual update may normalize YAML formatting.</li>
+      </ol>
+      <div class="note"><span class="lbl">Verification is deliberately scoped</span>
+        <strong>Package files verified does not mean CI activities passed.</strong> The first release records
+        <code>verification.scope: package-files</code> and <code>activity_checks: not_run</code>. Upstream LVPM
+        cannot yet observe a hook VI's internal <code>error out</code>; explicit hook failures are rejected, but a
+        completed hook is not proof of functional correctness. Validate the candidate against the project's actual
+        compile, test, build, and rendering activities before depending on it. Conditional file groups the adapter
+        cannot safely validate are rejected conservatively. Private package feeds, embedded Dragon VIPC references,
+        and NIPM installation are not supported by this initial LVPM adapter.</div>
+      <p>These are <strong>global installs inside isolated containers</strong>, not developer virtual environments.
+        Snapshots retain their existing <code>TOIMAGES_IMAGE</code> or repository Linux-latest selection when
+        <code>linuxUse</code> is absent. After opting in, explicit snapshot action overrides precede
+        <code>linuxUse</code>; a verified LVPM pull failure never falls back to another worker.
+        Existing LabVIEW launchers therefore see the installed dependencies without venv activation or preference-file
+        changes. LVPM candidates are immutable selections: monitored dependency changes do not silently rebuild or
+        switch them. Only verified immutable LVPM workers skip the VIPM image wait; existing VIPM waiting and
+        NI-base behavior are unchanged. Linux execution checks the current requirements fingerprint and blocks stale selections until
+        a fresh candidate is built, verified, and explicitly activated. A failed candidate leaves the previous image
+        available but does not make stale requirements current. The selected environment drives Linux inventory;
+        an unused candidate does not create missing-dependency warnings for the active pipeline. LVPM inventories
+        VIP packages, not native NI packages: unmeasured native package coverage is unknown, not evidence of absence.</p>
+      <p>The dashboard separately reports <strong>local freshness</strong> for the exact inspected revision and
+        digest-pinned selection. It uses trusted action-distributed helper code, treating the client checkout only as
+        input data. Optional pinned Python prerequisites are installed in an isolated temporary environment only when
+        LVPM is selected; failure leaves the rest of the dashboard running and reports freshness as unknown.
+        Python startup is isolated so checkout modules and inherited import paths cannot replace trusted imports.
+        Changed declaration bytes invalidate freshness even when package pins are unchanged. Stale or unknown
+        freshness marks Linux dependencies pending and cannot produce green satisfaction. A local
+        <code>current</code> result does not verify registry access, build provenance, or runtime activities;
+        activation and execution still perform their server-side checks. Historical views cannot reuse another
+        revision's current result.</p>
+      <p>Dragon declaration inspection loads only the parser from the trusted action repository, resolved relative
+        to the dashboard generator itself; Python helpers in the inspected client checkout are never imported.
+        The parser requires Python 3.11+ with <code>tomllib</code>, or an available <code>tomli</code> backend.
+        Missing tooling/backend, missing monitored files, and malformed declarations produce per-file
+        <code>inspection.status: unknown</code> evidence instead of an empty installed inventory. Monitored unknowns
+        keep the dependency banner pending for their monitored platforms; unmonitored files do not create pending
+        work. The Dependencies page requires matching-revision declaration evidence and measured installed package
+        statuses before displaying installed. Update the trusted tooling or repair the declaration and regenerate
+        the dashboard; rebuilding a worker alone does not repair parser evidence. Per-dependency
+        <code>platform_status</code> records honor the file&rsquo;s <code>monitorOn</code> list; the existing
+        <code>status</code>, <code>installed_version</code>, and <code>message</code> fields aggregate only applicable
+        monitored platforms. Installed requires all applicable platforms installed; conflict, missing, wrong
+        version, unknown, pending, and not attempted take precedence in that order. Windows-only files retain
+        measured Windows inference. Linux-only VIPM declarations can be satisfied by exact name/version in the
+        selected canonical LVPM inventory, only with locally current revision/selection-bound freshness.
+        Linux <code>scope: package-files</code> is not runtime verification; native/NIPM declarations remain unknown.
+        Pending package records include per-platform evidence and target only unresolved monitored platforms.</p>
+      <div class="note"><span class="lbl">Public-index fallback (existing VIPM path)</span>
         The resolver-bypass fallback covers packages in the built-in NI LabVIEW Tools Network and VIPM Community
         repositories, including old OpenG <code>sf://opengtoolkit</code> URLs and the legacy
         <code>jki_vi_tester</code> alias. Private/custom VIPM repositories still require either a populated VIPM
@@ -1990,7 +2095,13 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
           <tr><td><code>sbom/&lt;sha&gt;/results/sbom.json</code></td><td>VIPM CLI</td><td>Native CycloneDX download</td></tr>
           <tr><td><code>vi-snapshots/&lt;sha&gt;/manifest.json</code></td><td>Snapshot gallery builder</td><td>VI Browser</td></tr>
           <tr><td><code>dependencies/index.json</code></td><td>Dashboard publisher</td><td>Dependencies page install-time inventory</td></tr>
+          <tr><td><code>columns[].freshness</code> in <code>dependencies/index.json</code></td><td>Trusted dashboard LVPM helper</td><td>Local status, reason, inspected revision, and exact selection; stale/unknown block satisfaction</td></tr>
+          <tr><td><code>dependencies/index.json: dragon.files[].inspection</code></td><td>Trusted Dragon parser in the action repository</td><td>Parsed or unknown declaration evidence with a reason; monitored parse/tooling failures cannot report installed</td></tr>
+          <tr><td><code>dragon.files[].dependencies[].platform_status</code> / <code>dragon.install_set[].platform_status</code></td><td>Monitored Windows inventory and selected, locally current Linux LVPM inventory</td><td>Per-platform status, installed_version and message; Linux scope is package-files. Aggregate status cannot be installed when an applicable platform is missing or unknown.</td></tr>
+          <tr><td><code>deps-pending.json</code></td><td>Dashboard publisher</td><td>Persistent pending banner, including local LVPM freshness under <code>linux_lvpm</code> and monitored Dragon inspection failures as <code>dragon[].status: unknown</code></td></tr>
           <tr><td><code>workers/&lt;platform&gt;/&lt;version&gt;/manifest.json</code></td><td>Worker image workflows</td><td>Dependencies page installed-package status</td></tr>
+          <tr><td><code>workers/linux-lvpm/&lt;tag&gt;/manifest.json</code></td><td>LVPM candidate build</td><td>Digest-bound candidate inventory, activation and Linux runtime freshness checks</td></tr>
+          <tr><td><code>workers/linux-lvpm/latest.json</code></td><td>LVPM candidate build</td><td>Alternative candidate discovery only; never selects an active worker</td></tr>
           <tr><td><code>catalog.json</code> (root)</td><td>Installer / integrate-deploy</td><td>Version badge, What's New</td></tr>
         </tbody>
       </table>
@@ -2098,6 +2209,15 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         operating systems, provenance, and unknown client fields are preserved. Blank or unchanged requests keep
         the file byte-identical, including comments; actual updates may normalize YAML formatting. Invalid YAML
         or a non-mapping configuration path is rejected before the manifest is written.</p>
+      <p>Changed manifests use the layout expected by existing tooling readers: indented dependency lists,
+        path-first dependency records, config-first VI Analyzer rules, double-quoted numeric strings, and inline OS lists. Dependencies also
+        recognizes adjacent VIPC, Dragon, and action sections without dropping a header. Scalar values are not
+        line-wrapped, and explicit <code>none</code> dependency selections remain configured empty lists rather
+        than falling back to automatic discovery. Scoped updates detach
+        shared YAML mappings before editing so aliases cannot change unrelated client settings. A no-op remains
+        byte-identical. If a prior update left an older dashboard unable to read the formatting, the saved values
+        are still present: update tooling, then make an intentional settings change through the GitHub Reconfigure
+        workflow to regenerate compatible formatting. Do not rely on a misread UI to overwrite monitored lists.</p>
       <p>Upgrade preservation covers the complete existing project configuration, not just runner concurrency.
         <code>Unit Test Runner Checks</code> exercises manifest upgrades alongside execution and report regressions,
         and is triggered by installer changes as well as unit-test runtime changes.</p>

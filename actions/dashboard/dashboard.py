@@ -4287,7 +4287,7 @@ def _parse_vipc_packages(vipc_path):
   return sorted(set(names)), ''
 
 def _parse_container_config(path='.github/labview-ci.yml'):
-  cfg = {'use': '', 'actions': {}, 'vipc': [], 'dragon': [], 'hasVipcList': False, 'hasDragonList': False}
+  cfg = {'use': '', 'linuxUse': '', 'actions': {}, 'vipc': [], 'dragon': [], 'hasVipcList': False, 'hasDragonList': False}
   if not os.path.isfile(path):
     return cfg
   section = ''
@@ -4300,6 +4300,19 @@ def _parse_container_config(path='.github/labview-ci.yml'):
           section = 'container'; current = None; continue
         if re.match(r'^\S', line):
           section = ''; current = None
+        if section in ('container', 'vipc', 'dragon', 'actions'):
+          selected = re.match(r'^\s{4}linuxUse:\s*["\']?([^"\'\s]+)', line)
+          if selected:
+            cfg['linuxUse'] = selected.group(1)
+            section = 'container'; current = None
+          header = re.match(r'^\s{4}(vipc|dragon|actions):\s*(\[\]|\{\})?\s*$', line)
+          if header:
+            name, empty = header.groups()
+            if name == 'vipc': cfg['hasVipcList'] = True
+            if name == 'dragon': cfg['hasDragonList'] = True
+            section = 'container' if empty else name
+            current = None
+            continue
         if section == 'container':
           m = re.match(r'^\s{4}use:\s*"?([^"#]+)"?', line)
           if m:
@@ -4371,6 +4384,14 @@ def _repo_dragons():
 def _worker_manifest(platform, tag):
   if not tag or tag in ('base', 'none'):
     return None
+  if platform == 'linux' and tag.startswith('linux-lvpm-'):
+    selected = re.fullmatch(r'(linux-lvpm-[a-f0-9]{64})@(sha256:[a-f0-9]{64})', tag)
+    if not selected:
+      return None
+    man = http_json(f"{pages_url}/workers/linux-lvpm/{selected.group(1)}/manifest.json")
+    if not isinstance(man, dict) or man.get('installer') != 'lvpm' or man.get('tag') != selected.group(1) or man.get('image_digest') != selected.group(2) or man.get('manifest_path') != f'workers/linux-lvpm/{selected.group(1)}/manifest.json':
+      return None
+    return man
   resolved = tag
   if tag == 'latest':
     latest = http_json(f"{pages_url}/workers/{platform}/latest.json")
@@ -4381,6 +4402,17 @@ def _worker_manifest(platform, tag):
 
 def _manifest_packages(man):
   packages = set()
+  if isinstance(man, dict) and man.get('installer') == 'lvpm':
+    for package in man.get('packages') or []:
+      if not isinstance(package, dict):
+        continue
+      name = str(package.get('name') or '').strip()
+      version = str(package.get('version') or '').strip()
+      if name:
+        packages.add(name)
+        if version:
+          packages.add(f'{name}-{version.lstrip("vV")}')
+    return sorted(packages, key=str.lower)
   if isinstance(man, dict):
     for pkg in man.get('vipm_packages') or []:
       if isinstance(pkg, dict):
@@ -4536,15 +4568,12 @@ def _known_nipm_dependencies():
 _DRAGON_MOD = None
 
 def _load_dragon_module():
-  """Import the shared .dragon TOML parser (.github/labview/dragon_deps.py).
-
-  Returns the module, or False when it (or a TOML backend) is unavailable so the
-  dashboard still builds. A repo without the parser simply shows no Dragon
-  items."""
+  """Load only the parser shipped beside this action in the trusted tooling repo."""
   global _DRAGON_MOD
   if _DRAGON_MOD is not None:
     return _DRAGON_MOD
-  path = '.github/labview/dragon_deps.py'
+  from pathlib import Path
+  path = Path(__file__).resolve().parents[2] / '.github/labview/dragon_deps.py'
   if not os.path.isfile(path):
     _DRAGON_MOD = False
     return _DRAGON_MOD
@@ -4565,15 +4594,17 @@ def _dragon_inventory():
   Returns {'available', 'files', 'install_set', 'conflicts'}. Degrades to an empty
   inventory (available False) when the parser or a TOML backend is missing."""
   mod = _load_dragon_module()
-  if not mod or not mod.toml_available():
-    return {'available': False, 'files': [], 'install_set': [], 'conflicts': []}
   try:
+    if not mod or not mod.toml_available():
+      reason = 'Trusted Dragon parser unavailable.' if not mod else 'Dragon TOML backend unavailable.'
+      return {'available': False, 'error': reason, 'files': [], 'install_set': [], 'conflicts': []}
     inv = mod.build_inventory('.')
     inv['available'] = True
     return inv
   except Exception as exc:
     print(f"WARN: could not build dragon inventory: {exc}", file=sys.stderr)
-    return {'available': False, 'files': [], 'install_set': [], 'conflicts': []}
+    return {'available': False, 'error': 'Dragon declarations could not be inspected: ' + str(exc),
+            'files': [], 'install_set': [], 'conflicts': []}
 
 def _dragon_status_index(man):
   """Map (manager, package_id_lower) -> the worker manifest's Dragon status item."""
@@ -4710,8 +4741,48 @@ def _annotate_dragon_status(dep, status_index, have_manifest, baked_packages, vi
       dep.setdefault('installed_version', '')
       dep.setdefault('message', '')
 
+def _linux_dragon_status(dep, selection, manifest, freshness):
+  unknown = {'status': 'unknown', 'installed_version': '', 'scope': 'package-files',
+             'message': 'Current digest-bound Linux LVPM package-file evidence is unavailable. Rebuild, reverify, and explicitly re-activate the candidate.'}
+  if str(dep.get('manager') or 'vipm').lower() != 'vipm':
+    return {**unknown, 'message': 'Native/NIPM dependencies are not inventoried by this LVPM worker.'}
+  if (not re.fullmatch(r'linux-lvpm-[a-f0-9]{64}@sha256:[a-f0-9]{64}', selection or '')
+      or not isinstance(manifest, dict) or manifest.get('installer') != 'lvpm'
+      or manifest.get('platform') != 'linux' or manifest.get('architecture') != 'amd64'
+      or freshness.get('status') != 'current' or freshness.get('selection') != selection
+      or not os.environ.get('GITHUB_SHA') or freshness.get('revision') != os.environ.get('GITHUB_SHA')):
+    return unknown
+  name = str(dep.get('package_id') or '').lower()
+  declared = str(dep.get('declared_version') or '')
+  if not name or not declared:
+    return {**unknown, 'message': 'An exact VIPM name/version declaration is required.'}
+  versions = sorted({str(package.get('version') or '') for package in manifest.get('packages') or []
+                     if isinstance(package, dict) and str(package.get('name') or '').lower() == name})
+  if declared in versions:
+    return {'status': 'installed', 'installed_version': declared, 'scope': 'package-files',
+            'message': 'Exact version in a locally current Linux LVPM inventory; runtime activities are not verified.'}
+  return {'status': 'wrong_version' if versions else 'missing',
+          'installed_version': versions[0] if versions else '', 'scope': 'package-files',
+          'message': 'The exact declared version is absent from the Linux LVPM package-file inventory.'}
+
+
+def _aggregate_dragon_status(evidence):
+  if not evidence:
+    return {'status': 'unknown', 'installed_version': '', 'message': 'No monitored package evidence is available.'}
+  if len(evidence) == 1:
+    return dict(evidence[0])
+  statuses = [item.get('status') or 'unknown' for item in evidence]
+  status = next((value for value in ('conflict', 'missing', 'wrong_version', 'unknown', 'pending', 'not_attempted')
+                 if value in statuses), 'installed' if all(value == 'installed' for value in statuses) else 'unknown')
+  versions = {item.get('installed_version') or '' for item in evidence}
+  scopes = {item.get('scope') for item in evidence}
+  return {'status': status, 'installed_version': next(iter(versions)) if len(versions) == 1 else '',
+          'message': 'Aggregate monitored package evidence: ' + ', '.join(statuses) + '.',
+          **({'scope': next(iter(scopes))} if len(scopes) == 1 and None not in scopes else {})}
+
+
 def _build_dragon_section(config=None):
-  """Build the Dragon dependency block for the Dependencies index (Windows).
+  """Build monitored Dragon declaration and per-platform package-file evidence.
 
   Declared dependencies come from repository .dragon files. Each file carries its
   monitor flag so the Dependencies page can suppress warnings and auto-update
@@ -4733,6 +4804,14 @@ def _build_dragon_section(config=None):
   for f in files:
     entry = configured.get(f.get('source_file') or '')
     f['monitored'] = bool(entry and entry.get('monitor') is True) if has_config_list else True
+    f['monitorOn'] = _monitor_on(entry, has_config_list, False)
+    error = f.get('error') or inv.get('error') or ''
+    if not os.path.isfile(f.get('source_file') or ''):
+      error = 'Declared Dragon file is missing.'
+    if not inv.get('available') and not error:
+      error = 'Dragon declarations could not be inspected.'
+    f['inspection'] = {'status': 'unknown' if error else 'parsed',
+                       'reason': str(error) if error else 'Declarations parsed by trusted tooling.'}
   if not files:
     # No .dragon files in this revision: skip the worker-manifest fetch.
     return {
@@ -4745,23 +4824,55 @@ def _build_dragon_section(config=None):
       'install_set': [],
       'conflicts': inv.get('conflicts') or [],
     }
-  win_man = _worker_manifest('windows', 'latest')
+  platforms = sorted({platform for file in files if file['monitored'] for platform in file['monitorOn']})
+  win_man = _worker_manifest('windows', 'latest') if 'windows' in platforms else None
   have_manifest = isinstance(win_man, dict)
   status_index = _dragon_status_index(win_man)
   win_dragon = win_man.get('dragon') if have_manifest else None
   baked_packages = {str(p).lower() for p in _manifest_packages(win_man)} if have_manifest else set()
   vipm_index = _vipm_version_index(win_man) if have_manifest else {}
   nipkg_index = _nipkg_version_index(win_man) if have_manifest else {}
-  for item in inv.get('install_set') or []:
-    _annotate_dragon_status(item, status_index, have_manifest, baked_packages, vipm_index, nipkg_index)
+  selection = config.get('linuxUse') or config.get('use') or ''
+  canonical = re.fullmatch(r'linux-lvpm-[a-f0-9]{64}@sha256:[a-f0-9]{64}', selection)
+  linux_man = _worker_manifest('linux', selection) if 'linux' in platforms and canonical else None
+  freshness = _lvpm_local_freshness(selection, linux_man) if isinstance(linux_man, dict) else {}
   for f in files:
     for dep in f.get('dependencies') or []:
-      _annotate_dragon_status(dep, status_index, have_manifest, baked_packages, vipm_index, nipkg_index)
+      evidence = {}
+      if 'windows' in f['monitorOn']:
+        measured = dict(dep)
+        _annotate_dragon_status(measured, status_index, have_manifest, baked_packages, vipm_index, nipkg_index)
+        evidence['windows'] = {key: measured[key] for key in ('status', 'installed_version', 'message')}
+      if 'linux' in f['monitorOn']:
+        evidence['linux'] = _linux_dragon_status(dep, selection, linux_man, freshness)
+      dep['platform_status'] = evidence
+      dep.update(_aggregate_dragon_status(list(evidence.values())))
+  for item in inv.get('install_set') or []:
+    key = (item['manager'], item['package_id'].lower())
+    records = [dep for file in files if file['monitored'] for dep in file.get('dependencies') or []
+               if (dep['manager'], dep['package_id'].lower()) == key]
+    evidence = {platform: _aggregate_dragon_status([dep['platform_status'][platform] for dep in records
+                if platform in dep['platform_status']]) for platform in platforms}
+    evidence = {platform: record for platform, record in evidence.items()
+                if any(platform in dep['platform_status'] for dep in records)}
+    for platform, record in evidence.items():
+      versions = {dep.get('declared_version') for dep in records if platform in dep['platform_status']}
+      if len(versions) > 1:
+        record.update({'status': 'conflict', 'message': 'Declared with different versions across monitored files.'})
+    item['platform_status'] = evidence
+    item.update(_aggregate_dragon_status(list(evidence.values())))
+  inspected = all(not f['monitored'] or f['inspection']['status'] == 'parsed' for f in files)
+  health = win_dragon.get('health', '') if isinstance(win_dragon, dict) else ''
+  measured = ('windows' not in platforms or have_manifest) and (
+      'linux' not in platforms or (isinstance(linux_man, dict) and linux_man.get('installer') == 'lvpm'
+      and linux_man.get('platform') == 'linux' and linux_man.get('architecture') == 'amd64'
+      and freshness.get('status') == 'current' and freshness.get('selection') == selection
+      and bool(os.environ.get('GITHUB_SHA')) and freshness.get('revision') == os.environ.get('GITHUB_SHA')))
   return {
-    'available': inv.get('available', False) or bool(files),
+    'available': inv.get('available', False),
     'column': 'windows',
-    'ready': have_manifest,
-    'health': (win_dragon or {}).get('health', '') if isinstance(win_dragon, dict) else '',
+    'ready': measured and inspected,
+    'health': health if inspected and measured else 'unknown',
     'manifest_version': win_man.get('version', '') if have_manifest else '',
     'files': files,
     'install_set': inv.get('install_set') or [],
@@ -4797,6 +4908,33 @@ def _system_dependencies():
     },
   ]
 
+def _lvpm_local_freshness(selection, manifest):
+  import subprocess
+  unknown = {'status': 'unknown', 'revision': os.environ.get('GITHUB_SHA', ''), 'selection': selection,
+             'reason': 'Local LVPM freshness is unavailable. Rebuild, reverify, and explicitly re-activate the candidate.'}
+  try:
+    revision = subprocess.check_output(['git', 'rev-parse', '--verify', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
+    unknown['revision'] = revision
+    if not re.fullmatch(r'[0-9a-f]{40}', revision) or revision != os.environ.get('GITHUB_SHA', ''):
+      return unknown
+    interpreter = os.environ.get('LVCI_LVPM_PYTHON', '')
+    helper = os.environ.get('LVCI_LVPM_HELPER', '')
+    if not interpreter or not helper or not os.path.isfile(interpreter) or not os.path.isfile(helper) or not isinstance(manifest, dict):
+      return unknown
+    result = subprocess.run([interpreter, '-I', helper, 'freshness', '--repo', os.getcwd(),
+                             '--candidate', selection, '--revision', revision],
+                            input=json.dumps(manifest), capture_output=True, text=True, timeout=120)
+    if result.returncode:
+      return unknown
+    freshness = json.loads(result.stdout)
+    if (not isinstance(freshness, dict) or freshness.get('status') not in ('current', 'stale', 'unknown')
+        or freshness.get('revision') != revision or freshness.get('selection') != selection):
+      return unknown
+    return freshness
+  except Exception:
+    return unknown
+
+
 def _compute_deps_pending(data):
   """Decide whether the repo declares project dependencies that are NOT yet baked
   into its current worker container(s). This drives the persistent dashboard
@@ -4816,7 +4954,7 @@ def _compute_deps_pending(data):
   def baked(key):
     c = cols.get(key) or {}
     pkgs = c.get('packages') or []
-    return {str(p).lower() for p in pkgs}, {_pkg_base(p) for p in pkgs}
+    return {str(p).lower() for p in pkgs}, (set() if c.get('installer') == 'lvpm' else {_pkg_base(p) for p in pkgs})
 
   def _missing(pkgs, baked_pair):
     exact, bases = baked_pair
@@ -4829,6 +4967,10 @@ def _compute_deps_pending(data):
   # Otherwise (Linux unused / base image) there is no worker to bake into and we do
   # not surface a spurious Linux update prompt.
   lin_col = cols.get('linux') or {}
+  freshness = lin_col.get('freshness') or {}
+  lvpm_pending = lin_col.get('installer') == 'lvpm' and (
+    freshness.get('status') != 'current' or freshness.get('revision') != data.get('sha')
+    or freshness.get('selection') != lin_col.get('tag'))
   lin_active = bool(lin_col.get('ready')) and str(lin_col.get('tag') or 'base') not in ('base', 'none')
   lin_baked = baked('linux') if lin_active else set()
   pending_pkgs = set()
@@ -4858,26 +5000,37 @@ def _compute_deps_pending(data):
       if lin_missing_pkgs:
         lin_pending_files.append(v.get('path'))
         pending_pkgs.update(lin_missing_pkgs)
-  lin_missing = bool(lin_pending_files)
+  lin_missing = bool(lin_pending_files) or lvpm_pending
 
   dragon = data.get('dragon') or {}
   monitored_dragon_keys = set()
+  dragon_pending = []
+  dragon_unknown_platforms = set()
   for f in dragon.get('files') or []:
-    if f.get('monitored') is False:
+    if f.get('monitored') is False or f.get('monitorOn') == []:
       continue
+    inspection = f.get('inspection') or {}
+    if inspection.get('status') == 'unknown' or f.get('error') or dragon.get('available') is False:
+      source = f.get('source_file') or ''
+      dragon_pending.append({'name': source, 'source_file': source, 'status': 'unknown',
+                             'message': inspection.get('reason') or f.get('error') or 'Dragon inspection unavailable.'})
+      dragon_unknown_platforms.update(f.get('monitorOn') or ['windows', 'linux'])
     for dep in f.get('dependencies') or []:
       if dep.get('package_id'):
         monitored_dragon_keys.add((str(dep.get('manager') or 'vipm'), str(dep.get('package_id')).lower()))
-  dragon_pending = []
   for item in dragon.get('install_set') or []:
     key = (str(item.get('manager') or 'vipm'), str(item.get('package_id') or '').lower())
     if key not in monitored_dragon_keys:
       continue
     st = str(item.get('status') or '')
-    if st in ('pending', 'not_attempted', 'missing', 'wrong_version', 'conflict'):
-      dragon_pending.append({'name': item.get('name') or item.get('package_id') or '', 'status': st})
+    if st in ('unknown', 'pending', 'not_attempted', 'missing', 'wrong_version', 'conflict'):
+      evidence = item.get('platform_status') or {}
+      dragon_pending.append({'name': item.get('name') or item.get('package_id') or '', 'status': st,
+                             'message': item.get('message') or '', 'platform_status': evidence})
+      dragon_unknown_platforms.update(platform for platform, record in evidence.items()
+                                     if record.get('status') != 'installed')
 
-  containers = []
+  containers = list(dragon_unknown_platforms)
   if pending_files:
     containers.append('windows')
   if lin_missing:
@@ -4893,6 +5046,7 @@ def _compute_deps_pending(data):
     'vipcs': all_files,
     'dragon': dragon_pending,
     'containers': sorted(set(containers)),
+    **({'linux_lvpm': freshness} if lin_col.get('installer') == 'lvpm' else {}),
     'generated': __import__('datetime').datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
   }
 
@@ -4940,7 +5094,8 @@ def _build_dependencies_index():
   manifest_cache = {}
   for col in columns:
     action_tag = config.get('actions', {}).get(col.get('action')) if col.get('action') else ''
-    tag = col.get('tag') or action_tag or config.get('use') or col.get('defaultTag') or 'base'
+    linux_tag = config.get('linuxUse') if col['platform'] == 'linux' else ''
+    tag = col.get('tag') or action_tag or linux_tag or config.get('use') or col.get('defaultTag') or 'base'
     col['tag'] = tag
     if tag not in ('base', 'none'):
       cache_key = f"{col['platform']}:{tag}"
@@ -4948,12 +5103,17 @@ def _build_dependencies_index():
         manifest_cache[cache_key] = _worker_manifest(col['platform'], tag)
       man = manifest_cache[cache_key]
       col['ready'] = isinstance(man, dict)
+      col['installer'] = man.get('installer', 'vipm') if isinstance(man, dict) else ('lvpm' if tag.startswith('linux-lvpm-') else 'vipm')
+      col['verification'] = man.get('verification', {}) if isinstance(man, dict) else {}
+      if col['installer'] == 'lvpm':
+        col['freshness'] = _lvpm_local_freshness(tag, man)
+        col['ready'] = col['ready'] and col['freshness'].get('status') == 'current'
       col['packages'] = _manifest_packages(man)
       col['failed_packages'] = _manifest_failed_packages(man)
-      col['nipkg_ready'] = isinstance(man, dict)
+      col['nipkg_ready'] = isinstance(man, dict) and isinstance(man.get('nipkg_packages'), list)
       col['nipkg_packages'] = _manifest_nipkg_packages(man)
       col['labview_version'] = man.get('labview_version', '') if isinstance(man, dict) else ''
-      col['version'] = man.get('version', tag) if isinstance(man, dict) else tag
+      col['version'] = (man.get('tag') or man.get('version', tag)) if isinstance(man, dict) else tag
     else:
       col['ready'] = True
       col['packages'] = []
@@ -4962,6 +5122,10 @@ def _build_dependencies_index():
       col['nipkg_packages'] = []
       col['labview_version'] = ''
       col['version'] = tag
+  candidate_pointer = http_json(f'{pages_url}/workers/linux-lvpm/latest.json')
+  candidate_tag = candidate_pointer.get('tag', '') if isinstance(candidate_pointer, dict) else ''
+  candidate_path = f'workers/linux-lvpm/{candidate_tag}/manifest.json'
+  candidate = http_json(f'{pages_url}/{candidate_path}') if re.fullmatch(r'linux-lvpm-[a-f0-9]{64}', candidate_tag) and candidate_pointer.get('manifest_path') == candidate_path else None
   data = {
     'schema': 1,
     'repo': repo,
@@ -4981,6 +5145,7 @@ def _build_dependencies_index():
     'dragon': _build_dragon_section(config),
     'system': _system_dependencies(),
     'columns': columns,
+    'linux_lvpm_candidate': candidate,
   }
   with open('ci-out/dashboard/dependencies/index.json', 'w', encoding='utf-8') as fh:
     json.dump(data, fh, indent=2, ensure_ascii=True)
