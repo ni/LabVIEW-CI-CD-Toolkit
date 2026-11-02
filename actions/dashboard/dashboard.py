@@ -536,9 +536,6 @@ RUN_TARGETS = {
       'snapshots2': {'label': 'VI Snapshots', 'platforms': {
         'windows': {'wf': 'vi-snapshots-json-windows.yml', 'inputs': {'target_sha': '{sha}'}},
         'linux':   {'wf': 'vi-snapshots-json.yml',         'inputs': {'mode': 'head', 'target_sha': '{sha}'}}}},
-    # Unit tests: every framework runs in the Windows worker; LUnit also runs in
-    # the Linux worker. Each runner emits JUnit that
-    # build-unittest-report.py normalises into one report per platform.
     'unit-tests': {'label': 'Unit Tests', 'platforms': {
         'windows': {'wf': 'unit-tests-windows-container.yml', 'inputs': {'commit_sha': '{sha}'},
                     'batch': {'wf': 'unit-tests-backfill-windows.yml', 'shas_input': 'shas'}},

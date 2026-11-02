@@ -1,17 +1,7 @@
 name: Run Unit Tests — Linux Container
 run-name: Unit Tests Linux container - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit_sha || github.event.pull_request.head.sha || github.sha }}
 
-# Linux counterpart of unit-tests-windows-container.yml. Runs the configured
-# LabVIEW unit-test frameworks that have a Linux runner (LUnit) inside the Linux
-# worker image, builds the same
-# friendly report (build-unittest-report.py --platform linux), deploys it under
-# unit-tests/<sha>/linux/ so the report's platform toggle and the dashboard's
-# Windows/Linux pill have data on both sides, and posts "CI / Unit Tests (Linux)".
-# Frameworks without a Linux runner are listed in the report as not run on Linux.
-
 on:
-  # Auto-runs only on real LabVIEW source changes, never on the tooling files an
-  # install/deploy adds (same filters as the Windows unit-test workflow).
   pull_request:
     paths:
       - '**.vi'
@@ -49,12 +39,8 @@ permissions:
   pages: write
   statuses: write
   packages: read
-  actions: write  # wait-for-worker-image.sh reads worker-image build runs and starts the first build on a fresh fork
+  actions: write
 
-# Each activity+revision gets its own group: re-dispatching the same revision
-# queues behind the in-flight run instead of cancelling it. The report deploys to
-# a disjoint path (unit-tests/<sha>/linux/) through the retry-safe
-# publish-gh-pages action.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.inputs.commit_sha || github.sha }}
   cancel-in-progress: false
@@ -155,8 +141,6 @@ jobs:
         run: docker pull "$LABVIEW_CONTAINER_IMAGE"
         continue-on-error: true
 
-      # One fresh container per run: LabVIEWCLI fails to reach VI Server (-350000)
-      # in a container where VIPM's headless LabVIEW already ran.
       - name: Run unit tests inside Linux container
         if: steps.pull.outcome == 'success'
         id: run
@@ -194,7 +178,7 @@ jobs:
           if [ -f "$OUT/index.html" ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
 
       - name: Upload report artifact
-        if: steps.report.outputs.exists == 'true'
+        if: steps.report.outcome == 'success' && steps.report.outputs.exists == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: unit-tests-linux-report-${{ steps.sha.outputs.sha }}
@@ -202,7 +186,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Deploy report to GitHub Pages
-        if: steps.report.outputs.exists == 'true'
+        if: steps.report.outcome == 'success' && steps.report.outputs.exists == 'true'
         uses: ./.github/actions/publish-gh-pages
         with:
           publish_dir: ${{ github.workspace }}/ci-out/unit-tests
@@ -215,10 +199,8 @@ jobs:
         run: |
           OUT="${{ github.workspace }}/ci-out/unit-tests"
           STATE="failure"; DESC="Unit tests (Linux) did not run"
-          if [ "${{ steps.report.outputs.exists }}" = "true" ] && [ -f "$OUT/results.json" ]; then
+          if [ "${{ steps.report.outcome }}" = "success" ] && [ "${{ steps.report.outputs.exists }}" = "true" ] && [ -f "$OUT/results.json" ]; then
             REPORT_URL="${{ env.PAGES_URL }}/unit-tests/${{ steps.sha.outputs.sha }}/linux/index.html"
-            # Derive pass/fail from the report's own summary (results.json) so the
-            # status matches exactly what the report shows.
             tests=$(jq -r '.summary.tests // 0'   "$OUT/results.json")
             passed=$(jq -r '.summary.passed // 0' "$OUT/results.json")
             failed=$(jq -r '((.summary.failed // 0) + (.summary.errored // 0))' "$OUT/results.json")
@@ -231,16 +213,17 @@ jobs:
             else
               STATE="failure"; DESC="${failed} failed, ${passed} passed"
             fi
-          elif [ "${{ steps.report.outputs.exists }}" = "true" ]; then
+          elif [ "${{ steps.report.outcome }}" = "success" ] && [ "${{ steps.report.outputs.exists }}" = "true" ]; then
             REPORT_URL="${{ env.PAGES_URL }}/unit-tests/${{ steps.sha.outputs.sha }}/linux/index.html"
           else
             REPORT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           fi
-          # A pull failure means the tests never ran; make the status say so.
           if [ "${{ steps.pull.outcome }}" != "success" ]; then
             STATE="failure"; DESC="Worker image unavailable - build it via Configure Workers"
           elif [ "${{ steps.run.outcome }}" != "success" ]; then
             STATE="failure"; DESC="Unit test runner failed or did not run"
+          elif [ "${{ steps.report.outcome }}" != "success" ]; then
+            STATE="failure"; DESC="Unit test report failed or did not run"
           fi
           curl -s -X POST \
             -H "Authorization: token $GH_TOKEN" \

@@ -338,10 +338,6 @@ def build_data(args) -> dict:
         platforms = [{"id": "windows", "url": "../results.json"}, {"id": "linux", "url": None}]
         snap_depth = "../../../"
 
-    # Optional marker written by run-unit-tests.ps1/.sh when a configured tool could
-    # not run because the selected container lacks the required tooling (drives the
-    # shared "missing container tooling" banner, see tooling_banner_html) or has no
-    # runner on this platform yet (see unsupported_note_html).
     tooling = {}
     res_dir = Path(args.results) if args.results else None
     if res_dir and (res_dir / "_tooling.json").exists():

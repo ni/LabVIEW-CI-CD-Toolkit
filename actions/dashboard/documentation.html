@@ -2059,6 +2059,9 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
           Runner failures exit nonzero even when a partial XML file exists. GitHub and GitLab also fail empty,
           malformed and all-skipped reports; assertion failures come from JUnit. Unsupported tools do not fabricate
           test cases: a run containing only unsupported tools has zero tests and fails.</li>
+        <li><strong>Report generation.</strong> A failed, skipped or cancelled report step fails the final status even
+          if passing JSON or a partial HTML file exists. Only successful report generation permits artifact upload
+          or Pages deployment; report failures link to the workflow run for diagnostics.</li>
         <li><strong>Autodetection.</strong> With no <code>unitTests:</code> block, the Linux runner uses the same framework
           signatures and tooling/build exclusions as Windows. Any explicit block, including all tools disabled,
           suppresses autodetection. Both <code>config.unitTests</code> and the legacy top-level block are read.</li>

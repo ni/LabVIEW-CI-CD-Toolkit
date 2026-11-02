@@ -37,7 +37,6 @@ lvci:unit-tests-linux:
       pull_exit=$?
       run_exit=1
       if [ "$pull_exit" -eq 0 ]; then
-        # Runner errors fail the job; assertion failures are checked below.
         docker run --rm \
           -e "GITHUB_REPOSITORY=$CI_PROJECT_PATH" \
           -e "GITHUB_SHA=$CI_COMMIT_SHA" \

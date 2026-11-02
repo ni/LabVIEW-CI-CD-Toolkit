@@ -229,7 +229,6 @@ class LinuxIntegrationTests(unittest.TestCase):
 
     @unittest.skipIf(os.name == 'nt', 'Bash revision parser')
     def test_vipm_revision_suffix_preserved(self):
-        # Execute the real production function, without invoking VIPM or starting LabVIEW.
         text = (ROOT / 'vipm/install-vipc-linux.sh').read_text()
         function = text.split('package_install_spec() {', 1)[1].split('\n}\n', 1)[0]
         shell = 'package_install_spec() {' + function + '\n}\n'
@@ -322,24 +321,32 @@ CUR='windows'; renderTooling(); assert.equal(host.innerHTML, SELF_TOOLING_HTML);
             curl = bin_dir / 'curl'
             curl.write_text('#!/usr/bin/env python3\nimport pathlib,sys\npathlib.Path("status.json").write_text(sys.argv[-1])\n')
             curl.chmod(0o755)
-            for name, summary, pull, runner, expected in [
-                ('passing', {'tests': 1, 'passed': 1}, 'success', 'success', 'success'),
-                ('empty', {'tests': 0, 'passed': 0}, 'success', 'success', 'failure'),
-                ('skipped', {'tests': 1, 'passed': 0, 'skipped': 1}, 'success', 'success', 'failure'),
-                ('assertion', {'tests': 1, 'failed': 1}, 'success', 'success', 'failure'),
-                ('runner', {'tests': 1, 'passed': 1}, 'success', 'failure', 'failure'),
-                ('pull', {'tests': 1, 'passed': 1}, 'failure', 'skipped', 'failure'),
+            for name, summary, pull, runner, report, expected in [
+                ('passing', {'tests': 1, 'passed': 1}, 'success', 'success', 'success', 'success'),
+                ('empty', {'tests': 0, 'passed': 0}, 'success', 'success', 'success', 'failure'),
+                ('skipped', {'tests': 1, 'passed': 0, 'skipped': 1}, 'success', 'success', 'success', 'failure'),
+                ('assertion', {'tests': 1, 'failed': 1}, 'success', 'success', 'success', 'failure'),
+                ('runner', {'tests': 1, 'passed': 1}, 'success', 'failure', 'success', 'failure'),
+                ('pull', {'tests': 1, 'passed': 1}, 'failure', 'skipped', 'skipped', 'failure'),
+                ('report-failed', {'tests': 1, 'passed': 1}, 'success', 'success', 'failure', 'failure'),
+                ('report-skipped', {'tests': 1, 'passed': 1}, 'success', 'success', 'skipped', 'failure'),
+                ('report-cancelled', {'tests': 1, 'passed': 1}, 'success', 'success', 'cancelled', 'failure'),
             ]:
                 with self.subTest(name=name):
                     (report_dir / 'results.json').write_text(json.dumps({'summary': summary}))
+                    (report_dir / 'index.html').write_text('<html>partial report')
                     values = {'github.workspace': str(workspace), 'steps.report.outputs.exists': 'true',
-                              'steps.pull.outcome': pull, 'steps.run.outcome': runner}
+                              'steps.pull.outcome': pull, 'steps.run.outcome': runner, 'steps.report.outcome': report}
                     executable = re.sub(r'\$\{\{\s*(.*?)\s*\}\}', lambda m: values.get(m[1], 'test'), script)
                     result = subprocess.run(['bash', '-e', '-c', executable], cwd=workspace,
                                             env=dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ['PATH'], GH_TOKEN='fake'),
                                             capture_output=True, text=True)
-                    self.assertEqual(json.loads((workspace / 'status.json').read_text())['state'], expected)
+                    status = json.loads((workspace / 'status.json').read_text())
+                    self.assertEqual(status['state'], expected)
                     self.assertEqual(result.returncode == 0, expected == 'success', result.stderr)
+                    if name.startswith('report-'):
+                        self.assertEqual(status['description'], 'Unit test report failed or did not run')
+                        self.assertIn('/actions/runs/', status['target_url'])
 
 
 if __name__ == '__main__':

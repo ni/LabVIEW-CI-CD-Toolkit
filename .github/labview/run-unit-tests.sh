@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Linux unit-test driver. Python's standard library keeps config parsing, argv
-# substitution, JUnit failures and autodetection independent of shell expansion.
 set -euo pipefail
 exec python3 - "$@" <<'PY'
 import glob
@@ -52,8 +50,6 @@ def scalar(value):
 
 
 def read_tools():
-    # The same shallow configuration contract as the Windows runner, accepting
-    # both config.unitTests and the preserved legacy top-level unitTests block.
     tools = []
     block_indent = None
     tools_indent = None
@@ -180,8 +176,6 @@ try:
                 issues.append(dict(tool=id, name=name, kind='missing-tooling', detail=detail))
                 failure(id, number, detail)
                 continue
-            # Split the configured command BEFORE replacing tokens. Paths and
-            # metacharacters stay literal arguments, including in custom commands.
             tokens = {'cli': cli, 'lv': labview, 'ver': version, 'dir': str(root), 'out': str(out)}
             argv = [re.sub(r'\{(cli|lv|ver|dir|out)\}', lambda m: tokens[m[1]], arg)
                     for arg in shlex.split(tool['command'] or default)]
@@ -189,8 +183,6 @@ try:
                 print('WARNING: Linux LabVIEWCLI commands should end with -Headless.', flush=True)
             log = out.with_suffix('.log')
             print('Running: ' + shlex.join(argv), flush=True)
-            # File redirection avoids waiting for EOF from a LabVIEW child that
-            # inherits stdout and continues after the CLI has returned.
             try:
                 with log.open('wb') as stream:
                     code = subprocess.run(argv, cwd=workspace, stdout=stream, stderr=subprocess.STDOUT).returncode
