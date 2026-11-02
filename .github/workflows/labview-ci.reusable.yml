@@ -52,7 +52,7 @@ jobs:
         # Full repo path (not ./actions/...): inside a reusable workflow a ./ path
         # resolves against the CALLER's checked-out workspace, which doesn't contain
         # this repo's actions. Pin to the same major alias consumers use (@v1).
-        uses: elijah286/LabVIEW-CI-with-Containers/actions/load-config@v1
+        uses: elijah286/LabVIEW-CI-with-Containers/actions/load-config@v4
       - id: ref
         shell: bash
         run: |
