@@ -1,5 +1,8 @@
+import ast
 import copy
+import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -59,6 +62,69 @@ class ReconfigurePreservationTests(unittest.TestCase):
                                                    IN_REQUIRE_DEPS='keep', IN_AUTO_INSTALL_DEPS='keep')
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(text, initial)
+
+    def test_changed_output_remains_readable_by_existing_config_readers(self):
+        original = self.preservation_fixture()
+        original['config']['os'] = ['linux']
+        result, text = self.apply_settings(initial=yaml.safe_dump(original), IN_RUNNERS='3')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        tree = ast.parse((ROOT / 'actions/dashboard/dashboard.py').read_text())
+        parser = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                      and node.name == '_parse_container_config')
+        namespace = {'os': os, 're': re}
+        exec(compile(ast.Module(body=[parser], type_ignores=[]), 'dashboard.py', 'exec'), namespace)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'config.yml'
+            path.write_text(text)
+            parsed = namespace['_parse_container_config'](str(path))
+        self.assertTrue(parsed['vipc'], parsed)
+        self.assertTrue(parsed['dragon'], parsed)
+        self.assertEqual(parsed['vipc'][0]['path'], 'project.vipc')
+        self.assertEqual(parsed['vipc'][0]['monitorOn'], ['linux'])
+        self.assertEqual(parsed['dragon'][0]['path'], 'project.dragon')
+        self.assertEqual(parsed['dragon'][0]['monitorOn'], ['linux'])
+        year = re.search(r'^\s*labviewVersion:\s*"?([^"\s]+)"?', text, re.MULTILINE)
+        self.assertEqual(year[1], '2026')
+        platforms = re.search(r'^\s*os:\s*\[([^\]]*)\]', text, re.MULTILINE)
+        self.assertIsNotNone(platforms)
+        self.assertEqual(platforms[1].strip(), 'linux')
+        node_script = r'''
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const vm = require('node:vm');
+          const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+          for (const file of input.files) {
+            const source = fs.readFileSync(file, 'utf8');
+            const match = source.match(/    function (parseManifest(?:Yaml)?)\(text\)\s*\{[\s\S]*?\n    \}/);
+            assert.ok(match, file);
+            const parser = vm.runInNewContext(match[0] + '; ' + match[1], {parseViAnalyzerBlock:()=>({})});
+            const config = JSON.parse(JSON.stringify(parser(input.text)));
+            assert.equal(config.containerUse || config.use, 'win-existing', file);
+            assert.equal(config.vipc[0].path, 'project.vipc', file);
+            assert.equal(config.dragon[0].path, 'project.dragon', file);
+            assert.equal(config.vipc[0].monitor, true, file);
+            assert.equal(config.dragon[0].monitor, true, file);
+            assert.equal(config.actions.masscompile, 'base', file);
+            if ('version' in config) {
+              assert.equal(config.version, '2026', file);
+              assert.deepEqual(config.os, ['linux'], file);
+            }
+          }
+        '''
+        result = subprocess.run(['node', '-e', node_script], input=json.dumps({'text': text, 'files': [
+            str(ROOT / '.github/pages/configure.html'), str(ROOT / '.github/pages/dependencies.html'),
+            str(ROOT / 'actions/dashboard/configure.html'), str(ROOT / 'actions/dashboard/dependencies.html')]}),
+            text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_updating_an_aliased_mapping_preserves_other_paths(self):
+        shared = {'use': 'latest', 'customSetting': True}
+        original = {'config': {'container': shared}, 'clientExtension': shared}
+        expected = copy.deepcopy(original)
+        expected['config']['container'] = {**shared, 'use': 'base'}
+        result, text = self.apply_settings(initial=yaml.safe_dump(original), IN_CONTAINER_USE='base')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_preserved(yaml.safe_load(text), expected)
 
     def test_explicit_setting_changes_do_not_rewrite_other_fields(self):
         original = self.preservation_fixture()

@@ -279,6 +279,13 @@
         if (/^\S/.test(line)) { sec = ""; cur = null; }
         if (["container", "vipc", "dragon", "actions"].includes(sec)) {
           const linux = line.match(/^\s{4}linuxUse:\s*["']?([^"'\s]+)/); if (linux) { out.linuxUse = linux[1]; sec = "container"; cur = null; }
+          const header = line.match(/^\s{4}(vipc|dragon|actions):\s*$/);
+          if (header) {
+            sec = header[1]; cur = null;
+            if (sec === "vipc") out.hasVipcList = true;
+            if (sec === "dragon") out.hasDragonList = true;
+            return;
+          }
         }
         if (sec === "container") {
           let m = line.match(/^\s{4}use:\s*"?([^"#]+)"?/); if (m) out.use = m[1].trim();

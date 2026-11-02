@@ -2209,6 +2209,13 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         operating systems, provenance, and unknown client fields are preserved. Blank or unchanged requests keep
         the file byte-identical, including comments; actual updates may normalize YAML formatting. Invalid YAML
         or a non-mapping configuration path is rejected before the manifest is written.</p>
+      <p>Changed manifests use the layout expected by existing tooling readers: indented dependency lists,
+        path-first dependency records, double-quoted numeric strings, and inline OS lists. Dependencies also
+        recognizes adjacent VIPC, Dragon, and action sections without dropping a header. Scoped updates detach
+        shared YAML mappings before editing so aliases cannot change unrelated client settings. A no-op remains
+        byte-identical. If a prior update left an older dashboard unable to read the formatting, the saved values
+        are still present: update tooling, then make an intentional settings change through the GitHub Reconfigure
+        workflow to regenerate compatible formatting. Do not rely on a misread UI to overwrite monitored lists.</p>
       <p>Upgrade preservation covers the complete existing project configuration, not just runner concurrency.
         <code>Unit Test Runner Checks</code> exercises manifest upgrades alongside execution and report regressions,
         and is triggered by installer changes as well as unit-test runtime changes.</p>

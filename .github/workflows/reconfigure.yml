@@ -155,6 +155,32 @@ jobs:
           python3 - <<'PY'
           import copy, os, re, json, datetime, pathlib, yaml
 
+          class ManifestDumper(yaml.SafeDumper):
+              def increase_indent(self, flow=False, indentless=False):
+                  return super().increase_indent(flow, False)
+
+              def choose_scalar_style(self):
+                  style = super().choose_scalar_style()
+                  return '"' if style == "'" else style
+
+              def represent_mapping(self, tag, mapping, flow_style=None):
+                  order = ()
+                  if isinstance(mapping, dict):
+                      if 'path' in mapping:
+                          order = ('path', 'monitor', 'monitorOn')
+                      elif any(key in mapping for key in ('use', 'linuxUse', 'vipc', 'dragon', 'actions')):
+                          order = ('use', 'linuxUse', 'vipc', 'dragon', 'actions')
+                      elif 'container' in mapping or 'labviewVersion' in mapping:
+                          order = ('labviewVersion', 'os', 'concurrency', 'container')
+                  if order:
+                      mapping = {**{key: mapping[key] for key in order if key in mapping},
+                                 **{key: value for key, value in mapping.items() if key not in order}}
+                  node = super().represent_mapping(tag, mapping, flow_style)
+                  for key_node, value_node in node.value:
+                      if key_node.value == 'os' and isinstance(value_node, yaml.SequenceNode):
+                          value_node.flow_style = True
+                  return node
+
           ver_in  = os.environ['IN_VERSION'].strip()
           oss     = os.environ['IN_OS'].strip()
           antidoc_in = os.environ['IN_ANTIDOC'].strip().lower()
@@ -647,6 +673,7 @@ jobs:
                           target[key] = {}
                       if not isinstance(target[key], dict):
                           raise ValueError('.'.join(path[:-1]) + ' must be a mapping')
+                      target[key] = copy.deepcopy(target[key])
                       target = target[key]
                   if value is missing:
                       target.pop(path[-1], None)
@@ -680,7 +707,7 @@ jobs:
                       update_path(('config', 'dependencyPolicy', key), value)
               if updated != original:
                   updated['configuredAt'] = now
-                  rendered = yaml.safe_dump(updated, sort_keys=False, allow_unicode=True)
+                  rendered = yaml.dump(updated, Dumper=ManifestDumper, sort_keys=False, allow_unicode=True)
               else:
                   rendered = original_text
           mpath.parent.mkdir(parents=True, exist_ok=True)
