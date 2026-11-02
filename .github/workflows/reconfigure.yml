@@ -655,7 +655,7 @@ jobs:
 
               fields = [
                   (ver_in, ('config', 'labviewVersion')),
-                  (oss, ('config', 'os')),
+                  (oss if oss != 'keep' else '', ('config', 'os')),
                   (runners, ('config', 'concurrency', 'maxParallel')),
                   (acts_in, ('activities',)),
                   (container_use_in, ('config', 'container', 'use')),

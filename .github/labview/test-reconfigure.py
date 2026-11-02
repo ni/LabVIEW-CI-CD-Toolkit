@@ -46,6 +46,20 @@ class ReconfigurePreservationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(text, initial)
 
+    def test_keep_defaults_preserve_missing_or_block_platforms(self):
+        for platforms in (None, ['linux'], ['windows']):
+            with self.subTest(platforms=platforms):
+                original = self.preservation_fixture()
+                if platforms is None:
+                    original['config'].pop('os')
+                else:
+                    original['config']['os'] = platforms
+                initial = yaml.safe_dump(original)
+                result, text = self.apply_settings(initial=initial, IN_OS='keep', IN_ANTIDOC='keep',
+                                                   IN_REQUIRE_DEPS='keep', IN_AUTO_INSTALL_DEPS='keep')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(text, initial)
+
     def test_explicit_setting_changes_do_not_rewrite_other_fields(self):
         original = self.preservation_fixture()
         expected = copy.deepcopy(original)
