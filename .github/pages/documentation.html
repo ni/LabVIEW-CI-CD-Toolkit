@@ -529,7 +529,7 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
 
       <h3>Thin vs. fat installs</h3>
       <p>A <strong>thin</strong> install references the reusable workflow at a moving major tag
-        (<code>uses: …/labview-ci.reusable.yml@v3</code>) and inherits improvements automatically. A
+        (<code>uses: ni/LabVIEW-CI-CD-Toolkit/.github/workflows/labview-ci.reusable.yml@v4</code>) and inherits improvements automatically. A
         <strong>fat</strong> install copies all workflow files locally and updates them deliberately via
         <code>install.py --update</code>. Both are valid; thin is the lowest-maintenance path and the right
         default for most teams.</p>
@@ -959,6 +959,14 @@ mass-compile:
         platform and the platform flag does the same. The <code>tooling-ref</code> output lets the consumer's
         manifest pin which version of the tooling scripts are checked out at run time (<code>ref:</code> in the
         config), decoupling capability versioning from GitHub's moving major-tag alias.</p>
+      <p>The reusable workflow loads config with
+        <code>ni/LabVIEW-CI-CD-Toolkit/actions/load-config@v4</code> and checks out capability tooling from
+        <code>ni/LabVIEW-CI-CD-Toolkit</code> into <code>_lvci</code> at the manifest's explicit
+        <code>source.ref</code>. If that ref is empty or absent, or the manifest is missing, it falls back to
+        <code>v4</code>, the moving stable major alias, rather than v1-era tooling. Explicit pins are preserved;
+        select an immutable release tag for reproducible capability implementations. The config reader still
+        follows <code>@v4</code> independently of that capability pin. Publication alone does not move the
+        stable alias (see <a href="#versioning">§18</a>).</p>
       <p>GitLab uses the same catalog selection but emits native template includes instead of a reusable workflow.
         Its <code>workflow: rules</code> permits merge-request, default-branch, web, and scheduled pipelines; the
         visible <code>pages</code> job uses <code>when: always</code> so a failed verification job does not suppress

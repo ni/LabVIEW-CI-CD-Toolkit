@@ -1,5 +1,5 @@
-# Reusable workflow (lives at .github/workflows/ in the standalone labview-ci repo).
-# Consumers call this with `uses: your-org/labview-ci/.github/workflows/labview-ci.reusable.yml@v1`.
+# Reusable workflow (lives at .github/workflows/ in the ni/LabVIEW-CI-CD-Toolkit repo).
+# Consumers call this with `uses: ni/LabVIEW-CI-CD-Toolkit/.github/workflows/labview-ci.reusable.yml@v4`.
 #
 # This is where repo settings actually DRIVE behavior: a `config` job reads the
 # consumer's .github/labview-ci.yml via the load-config action, and each activity
@@ -42,23 +42,26 @@ jobs:
       has-snapshots:   ${{ steps.cfg.outputs.has-snapshots }}
       # The capability version this repo has OPTED INTO, read from the consumer's
       # own .github/labview-ci.yml (source.ref). The capability jobs check out the
-      # tooling at this ref and run it, so a repo only changes versions when it
-      # edits that config file (via the token-free "Update now" button) — never
-      # automatically. Defaults to v1 when the config omits a ref.
+      # tooling at this ref and run it. An immutable source.ref changes only
+      # when the manifest is updated. Without a ref (or manifest), use the moving
+      # v4 stable alias; clients needing reproducibility should pin a release.
       tooling-ref:     ${{ steps.ref.outputs.ref }}
     steps:
       - uses: actions/checkout@v5
       - id: cfg
         # Full repo path (not ./actions/...): inside a reusable workflow a ./ path
         # resolves against the CALLER's checked-out workspace, which doesn't contain
-        # this repo's actions. Pin to the same major alias consumers use (@v1).
-        uses: elijah286/LabVIEW-CI-with-Containers/actions/load-config@v1
+        # this repo's actions. Pin to the same major alias consumers use (@v4).
+        uses: ni/LabVIEW-CI-CD-Toolkit/actions/load-config@v4
       - id: ref
         shell: bash
         run: |
-          REF=$(awk '/^[[:space:]]*ref:[[:space:]]/{print $2; exit}' .github/labview-ci.yml 2>/dev/null)
-          echo "ref=${REF:-v1}" >> "$GITHUB_OUTPUT"
-          echo "Capability version (source.ref) this repo opted into: ${REF:-v1}"
+          REF=''
+          if [ -f .github/labview-ci.yml ]; then
+            REF=$(awk '/^[[:space:]]*ref:[[:space:]]/{print $2; exit}' .github/labview-ci.yml)
+          fi
+          echo "ref=${REF:-v4}" >> "$GITHUB_OUTPUT"
+          echo "Capability version (source.ref) this repo opted into: ${REF:-v4}"
 
   # 1b) Dependency gate. If a worker rebuild is in progress for this SHA (an
   #     opt-in dependency update, or a worker-input change), the container
@@ -128,7 +131,7 @@ jobs:
       - name: Check out tooling (opted-in version)
         uses: actions/checkout@v5
         with:
-          repository: elijah286/LabVIEW-CI-with-Containers
+          repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
           path: _lvci
       - name: Mass Compile
@@ -259,7 +262,7 @@ jobs:
       - name: Check out tooling (opted-in version)
         uses: actions/checkout@v5
         with:
-          repository: elijah286/LabVIEW-CI-with-Containers
+          repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
           path: _lvci
       - name: Run VI Analyzer
@@ -422,7 +425,7 @@ jobs:
       - name: Check out tooling (opted-in version)
         uses: actions/checkout@v5
         with:
-          repository: elijah286/LabVIEW-CI-with-Containers
+          repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
           path: _lvci
       - name: VIDiff
@@ -529,7 +532,7 @@ jobs:
       - name: Check out tooling (opted-in version)
         uses: actions/checkout@v5
         with:
-          repository: elijah286/LabVIEW-CI-with-Containers
+          repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
           path: _lvci
       - name: VI Snapshots
