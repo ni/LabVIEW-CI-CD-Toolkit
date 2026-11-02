@@ -58,8 +58,9 @@ function workflowRun(overrides = {}) {
   return {
     id: 71,
     name: 'VIDiff Report — Windows Container',
-    path: '.github/workflows/vidiff-windows-container.yml@refs/heads/main',
+    path: '.github/workflows/vidiff-windows-container.yml',
     repository: { full_name: 'owner/repo' },
+    head_repository: { full_name: 'owner/repo' },
     event: 'pull_request',
     head_sha: 'a'.repeat(40),
     conclusion: 'success',
@@ -79,6 +80,14 @@ test('download script skips deploy when no matching artifact exists', async () =
         downloadArtifact: async () => {
           throw new Error('downloadArtifact should not run without a matching artifact');
         },
+      },
+      pulls: {
+        get: async () => ({
+          data: {
+            base: { repo: { full_name: 'owner/repo' } },
+            head: { repo: { full_name: 'owner/repo' }, sha: 'a'.repeat(40) },
+          },
+        }),
       },
     },
   };
@@ -108,6 +117,17 @@ test('download script writes ZIP and exposes trusted outputs for a matching arti
         downloadArtifact: async request => {
           assert.equal(request.artifact_id, 22);
           return { data: new Uint8Array([80, 75, 3, 4]) };
+        },
+      },
+      pulls: {
+        get: async request => {
+          assert.equal(request.pull_number, 123);
+          return {
+            data: {
+              base: { repo: { full_name: 'owner/repo' } },
+              head: { repo: { full_name: 'owner/repo' }, sha: 'a'.repeat(40) },
+            },
+          };
         },
       },
     },
@@ -157,6 +177,17 @@ test('download script resolves PR association from commit when workflow_run.pull
         listWorkflowRunArtifacts: async () => ({ data: { artifacts: [{ name: expectedName, id: 22 }] } }),
         downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
       },
+      pulls: {
+        get: async request => {
+          assert.equal(request.pull_number, 456);
+          return {
+            data: {
+              base: { repo: { full_name: 'owner/repo' } },
+              head: { repo: { full_name: 'owner/repo' }, sha: 'a'.repeat(40) },
+            },
+          };
+        },
+      },
       repos: {
         listPullRequestsAssociatedWithCommit: async request => {
           assert.equal(request.commit_sha, 'a'.repeat(40));
@@ -205,6 +236,16 @@ test('download script accepts workflow_dispatch artifact head SHA different from
         }),
         downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
       },
+      repos: {
+        get: async () => ({ data: { default_branch: 'main' } }),
+        compareCommitsWithBasehead: async request => {
+          assert.ok([
+            `${'b'.repeat(40)}...main`,
+            `${trustedTargetHead}...main`,
+          ].includes(request.basehead));
+          return { data: { status: 'ahead' } };
+        },
+      },
     },
   };
   const core = {
@@ -218,13 +259,223 @@ test('download script accepts workflow_dispatch artifact head SHA different from
   assert.equal(outputs.get('head_sha'), trustedTargetHead);
   assert.equal(outputs.get('segment'), `push-${trustedTargetHead}`);
   assert.equal(outputs.get('pr_number'), '');
+  assert.equal(outputs.get('publish_pages'), 'true');
+});
+
+test('download script blocks Pages publish for fork pull request and exposes fallback links', async () => {
+  const outputs = new Map();
+  const context = {
+    repo: { owner: 'owner', repo: 'repo' },
+    payload: {
+      workflow_run: workflowRun({ html_url: 'https://github.com/owner/repo/actions/runs/71' }),
+    },
+  };
+  const expectedName = `vidiff-windows-${'a'.repeat(40)}`;
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({ data: { artifacts: [{ name: expectedName, id: 22 }] } }),
+        downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
+      },
+      pulls: {
+        get: async () => ({
+          data: {
+            base: { repo: { full_name: 'owner/repo' } },
+            head: { repo: { full_name: 'fork/repo' }, sha: 'a'.repeat(40) },
+          },
+        }),
+      },
+    },
+  };
+
+  await runGithubScript(downloadScript, {
+    context,
+    github,
+    core: {
+      setOutput: (name, value) => outputs.set(name, String(value)),
+      warning: () => {},
+    },
+  });
+
+  assert.equal(outputs.get('publish_pages'), 'false');
+  assert.equal(outputs.get('publish_reason'), 'untrusted-fork-pr');
+  assert.equal(outputs.get('artifact_url'), 'https://github.com/owner/repo/actions/runs/71/artifacts/22');
+  assert.equal(outputs.get('run_url'), 'https://github.com/owner/repo/actions/runs/71');
+});
+
+test('download script blocks Pages publish when PR head repository is unavailable', async () => {
+  const outputs = new Map();
+  const context = { repo: { owner: 'owner', repo: 'repo' }, payload: { workflow_run: workflowRun() } };
+  const expectedName = `vidiff-windows-${'a'.repeat(40)}`;
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({ data: { artifacts: [{ name: expectedName, id: 22 }] } }),
+        downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
+      },
+      pulls: {
+        get: async () => ({
+          data: {
+            base: { repo: { full_name: 'owner/repo' } },
+            head: { repo: null, sha: 'a'.repeat(40) },
+          },
+        }),
+      },
+    },
+  };
+
+  await runGithubScript(downloadScript, {
+    context,
+    github,
+    core: {
+      setOutput: (name, value) => outputs.set(name, String(value)),
+      warning: () => {},
+    },
+  });
+
+  assert.equal(outputs.get('publish_pages'), 'false');
+  assert.equal(outputs.get('publish_reason'), 'untrusted-missing-pr-head-repo');
+});
+
+test('download script blocks workflow_dispatch publish when target is outside default-branch history', async () => {
+  const outputs = new Map();
+  const context = {
+    repo: { owner: 'owner', repo: 'repo' },
+    payload: {
+      workflow_run: workflowRun({
+        event: 'workflow_dispatch',
+        head_sha: 'b'.repeat(40),
+        pull_requests: [],
+      }),
+    },
+  };
+  const trustedTargetHead = 'c'.repeat(40);
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({
+          data: { artifacts: [{ name: `vidiff-windows-${trustedTargetHead}`, id: 77 }] },
+        }),
+        downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
+      },
+      repos: {
+        get: async () => ({ data: { default_branch: 'main' } }),
+        compareCommitsWithBasehead: async request => {
+          if (request.basehead === `${'b'.repeat(40)}...main`) return { data: { status: 'ahead' } };
+          if (request.basehead === `${trustedTargetHead}...main`) return { data: { status: 'diverged' } };
+          throw new Error(`unexpected basehead ${request.basehead}`);
+        },
+      },
+    },
+  };
+
+  await runGithubScript(downloadScript, {
+    context,
+    github,
+    core: {
+      setOutput: (name, value) => outputs.set(name, String(value)),
+      warning: () => {},
+    },
+  });
+
+  assert.equal(outputs.get('publish_pages'), 'false');
+  assert.equal(outputs.get('publish_reason'), 'untrusted-workflow-dispatch-target');
+  assert.equal(outputs.get('head_sha'), trustedTargetHead);
+});
+
+test('download script blocks workflow_dispatch publish when producer head is outside default-branch history', async () => {
+  const outputs = new Map();
+  const context = {
+    repo: { owner: 'owner', repo: 'repo' },
+    payload: {
+      workflow_run: workflowRun({
+        event: 'workflow_dispatch',
+        head_sha: 'b'.repeat(40),
+        pull_requests: [],
+      }),
+    },
+  };
+  const trustedTargetHead = 'c'.repeat(40);
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({
+          data: { artifacts: [{ name: `vidiff-windows-${trustedTargetHead}`, id: 77 }] },
+        }),
+        downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
+      },
+      repos: {
+        get: async () => ({ data: { default_branch: 'main' } }),
+        compareCommitsWithBasehead: async request => {
+          if (request.basehead === `${'b'.repeat(40)}...main`) return { data: { status: 'diverged' } };
+          if (request.basehead === `${trustedTargetHead}...main`) return { data: { status: 'ahead' } };
+          throw new Error(`unexpected basehead ${request.basehead}`);
+        },
+      },
+    },
+  };
+
+  await runGithubScript(downloadScript, {
+    context,
+    github,
+    core: {
+      setOutput: (name, value) => outputs.set(name, String(value)),
+      warning: () => {},
+    },
+  });
+
+  assert.equal(outputs.get('publish_pages'), 'false');
+  assert.equal(outputs.get('publish_reason'), 'untrusted-workflow-dispatch-producer');
+  assert.equal(outputs.get('head_sha'), trustedTargetHead);
+});
+
+test('download script blocks workflow_dispatch publish when producer head repository is unknown', async () => {
+  const outputs = new Map();
+  const context = {
+    repo: { owner: 'owner', repo: 'repo' },
+    payload: {
+      workflow_run: workflowRun({
+        event: 'workflow_dispatch',
+        head_sha: 'b'.repeat(40),
+        pull_requests: [],
+        head_repository: null,
+      }),
+    },
+  };
+  const trustedTargetHead = 'c'.repeat(40);
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({
+          data: { artifacts: [{ name: `vidiff-windows-${trustedTargetHead}`, id: 77 }] },
+        }),
+        downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
+      },
+      repos: {
+        get: async () => ({ data: { default_branch: 'main' } }),
+        compareCommitsWithBasehead: async () => ({ data: { status: 'ahead' } }),
+      },
+    },
+  };
+
+  await runGithubScript(downloadScript, {
+    context,
+    github,
+    core: {
+      setOutput: (name, value) => outputs.set(name, String(value)),
+      warning: () => {},
+    },
+  });
+
+  assert.equal(outputs.get('publish_pages'), 'false');
+  assert.equal(outputs.get('publish_reason'), 'untrusted-workflow-dispatch-producer');
 });
 
 test('download script rejects untrusted workflow provenance', async () => {
   const outputs = new Map();
   const context = {
     repo: { owner: 'owner', repo: 'repo' },
-    payload: { workflow_run: workflowRun({ path: '.github/workflows/unexpected.yml@refs/heads/main' }) },
+    payload: { workflow_run: workflowRun({ path: '.github/workflows/unexpected.yml' }) },
   };
   const github = {
     rest: {
@@ -251,7 +502,36 @@ test('download script rejects workflow path prefix spoof with same workflow name
     repo: { owner: 'owner', repo: 'repo' },
     payload: {
       workflow_run: workflowRun({
-        path: '.github/workflows/vidiff-windows-container.yml.evil.yml@refs/heads/main',
+        path: '.github/workflows/vidiff-windows-container.yml.evil.yml',
+      }),
+    },
+  };
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({ data: { artifacts: [] } }),
+      },
+    },
+  };
+  const core = {
+    setOutput: (name, value) => outputs.set(name, String(value)),
+    warning: () => {},
+  };
+
+  await assert.rejects(
+    () => runGithubScript(downloadScript, { context, github, core }),
+    /Unexpected workflow_run.path/
+  );
+  assert.equal(outputs.size, 0);
+});
+
+test('download script rejects workflow path suffix spoof that appends refs to file path', async () => {
+  const outputs = new Map();
+  const context = {
+    repo: { owner: 'owner', repo: 'repo' },
+    payload: {
+      workflow_run: workflowRun({
+        path: '.github/workflows/vidiff-windows-container.yml@refs/heads/main',
       }),
     },
   };
@@ -287,6 +567,17 @@ test('workflow uses hardened Python ZIP extractor instead of unzip', () => {
     /python3 -I -S \.github\/labview\/extract-vidiff-artifact\.py \/tmp\/vidiff-artifact\.zip \/tmp\/vidiff-report/
   );
   assert.doesNotMatch(workflowText, /\bunzip\b/);
+});
+
+test('workflow gates merge and Pages deploy behind trusted publication policy', () => {
+  assert.match(
+    workflowText,
+    /name: Merge with existing report index \(keep prior diff entries\)[\s\S]*?steps\.artifact\.outputs\.publish_pages == 'true'/
+  );
+  assert.match(
+    workflowText,
+    /name: Deploy VIDiff report to GitHub Pages[\s\S]*?steps\.artifact\.outputs\.publish_pages == 'true'/
+  );
 });
 
 test('comment script updates existing bot comment for the same platform', async () => {
@@ -360,4 +651,41 @@ test('comment script creates a new comment when no platform-matched bot comment 
   assert.equal(creations[0].issue_number, 123);
   assert.match(creations[0].body, /❌ Failed/);
   assert.match(creations[0].body, /VIDiff Report \(linux\)/);
+});
+
+test('comment script reports artifact and run links when Pages publication is blocked', async () => {
+  const creations = [];
+  const context = { repo: { owner: 'owner', repo: 'repo' } };
+  const github = {
+    rest: {
+      issues: {
+        listComments: async () => ({ data: [] }),
+        updateComment: async () => {
+          throw new Error('updateComment should not run when no existing bot comment exists');
+        },
+        createComment: async request => creations.push(request),
+      },
+    },
+  };
+
+  await runGithubScript(commentScript, {
+    context,
+    github,
+    core: {},
+    env: {
+      PR_NUMBER: '123',
+      PLATFORM: 'windows',
+      OUTCOME: 'failure',
+      REPORT_URL: 'https://github.com/owner/repo/actions/runs/71/artifacts/22',
+      RUN_URL: 'https://github.com/owner/repo/actions/runs/71',
+      PUBLISH_PAGES: 'false',
+      PUBLISH_REASON: 'untrusted-fork-pr',
+    },
+  });
+
+  assert.equal(creations.length, 1);
+  assert.match(creations[0].body, /View diff report\]\(https:\/\/github\.com\/owner\/repo\/actions\/runs\/71\/artifacts\/22\)/);
+  assert.match(creations[0].body, /Open run logs\]\(https:\/\/github\.com\/owner\/repo\/actions\/runs\/71\)/);
+  assert.match(creations[0].body, /Pages publication skipped: untrusted-fork-pr\./);
+  assert.doesNotMatch(creations[0].body, /github\.io/);
 });

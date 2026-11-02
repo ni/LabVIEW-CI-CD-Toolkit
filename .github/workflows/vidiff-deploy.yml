@@ -65,8 +65,7 @@ jobs:
             }
             const expectedWorkflowPath = expectedPathByPlatform[platform];
             const workflowPath = String(workflowRun.path || '');
-            const workflowPathCanonical = workflowPath.split('@', 1)[0];
-            if (workflowPathCanonical !== expectedWorkflowPath) {
+            if (workflowPath !== expectedWorkflowPath) {
               throw new Error(`Unexpected workflow_run.path: ${workflowPath}`);
             }
             const expectedRepo = `${context.repo.owner}/${context.repo.repo}`;
@@ -113,6 +112,32 @@ jobs:
               throw new Error('pull_request workflow_run is missing a trusted PR association.');
             }
             const pr_number = prNumbers.length === 1 ? String(prNumbers[0]) : '';
+            let publishPages = true;
+            let publishReason = 'trusted';
+            if (pr_number) {
+              const pull = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: Number(pr_number),
+              });
+              const baseRepo = pull.data && pull.data.base && pull.data.base.repo && pull.data.base.repo.full_name;
+              if (baseRepo !== expectedRepo) {
+                throw new Error(`Unexpected pull base repository for PR #${pr_number}: ${String(baseRepo)}`);
+              }
+              const headRepo = pull.data && pull.data.head && pull.data.head.repo && pull.data.head.repo.full_name;
+              const headSha = String(pull.data && pull.data.head && pull.data.head.sha || '').toLowerCase();
+              if (headSha !== runHeadSha) {
+                throw new Error(`PR #${pr_number} head SHA mismatch for workflow_run lineage.`);
+              }
+              if (headRepo !== expectedRepo) {
+                publishPages = false;
+                publishReason = 'untrusted-fork-pr';
+              }
+              if (!headRepo) {
+                publishPages = false;
+                publishReason = 'untrusted-missing-pr-head-repo';
+              }
+            }
             const runConclusion = String(workflowRun.conclusion || '').toLowerCase();
             const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
@@ -156,6 +181,44 @@ jobs:
             if (typeof art.id !== 'number' || art.id <= 0) {
               throw new Error(`Invalid artifact id for ${art.name}`);
             }
+            if (sourceEvent === 'workflow_dispatch' && publishPages) {
+              const producerHeadRepo = workflowRun.head_repository && workflowRun.head_repository.full_name;
+              if (producerHeadRepo !== expectedRepo) {
+                publishPages = false;
+                publishReason = 'untrusted-workflow-dispatch-producer';
+              }
+              const repo = await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+              const defaultBranch = String(repo.data && repo.data.default_branch || '');
+              if (!defaultBranch) {
+                throw new Error('Missing default branch for workflow_dispatch trust check.');
+              }
+              const isDefaultReachable = async sha => {
+                try {
+                  const cmp = await github.rest.repos.compareCommitsWithBasehead({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    basehead: `${sha}...${defaultBranch}`,
+                  });
+                  const status = String(cmp.data && cmp.data.status || '');
+                  return ['ahead', 'identical'].includes(status);
+                } catch {
+                  return false;
+                }
+              };
+              const producerHeadReachable = await isDefaultReachable(runHeadSha);
+              if (!producerHeadReachable) {
+                publishPages = false;
+                publishReason = 'untrusted-workflow-dispatch-producer';
+              }
+              const targetHeadReachable = await isDefaultReachable(trustedHeadSha);
+              if (!targetHeadReachable) {
+                publishPages = false;
+                publishReason = 'untrusted-workflow-dispatch-target';
+              }
+            }
             const dl = await github.rest.actions.downloadArtifact({
               owner: context.repo.owner,
               repo:  context.repo.repo,
@@ -164,6 +227,8 @@ jobs:
             });
             const fs = require('fs');
             fs.writeFileSync('/tmp/vidiff-artifact.zip', Buffer.from(dl.data));
+            const runUrl = String(workflowRun.html_url || `https://github.com/${expectedRepo}/actions/runs/${run_id}`);
+            const artifactUrl = `${runUrl}/artifacts/${art.id}`;
             core.setOutput('found', 'true');
             core.setOutput('platform', platform);
             core.setOutput('head_sha', trustedHeadSha);
@@ -171,6 +236,10 @@ jobs:
             core.setOutput('run_conclusion', runConclusion);
             core.setOutput('segment', pr_number ? `pr-${pr_number}` : `push-${trustedHeadSha}`);
             core.setOutput('artifact_name', art.name);
+            core.setOutput('publish_pages', publishPages ? 'true' : 'false');
+            core.setOutput('publish_reason', publishReason);
+            core.setOutput('run_url', runUrl);
+            core.setOutput('artifact_url', artifactUrl);
             return art.name;
 
       - name: Extract artifact
@@ -196,7 +265,9 @@ jobs:
       # Merge the new entries into the already-deployed index (new entries win) so a
       # single-VI run is additive and never regresses a fuller report.
       - name: Merge with existing report index (keep prior diff entries)
-        if: steps.artifact.outputs.found == 'true'
+        if: >
+          steps.artifact.outputs.found == 'true' &&
+          steps.artifact.outputs.publish_pages == 'true'
         env:
           PLATFORM: ${{ steps.artifact.outputs.platform }}
           SEGMENT: ${{ steps.artifact.outputs.segment }}
@@ -230,7 +301,9 @@ jobs:
           PY
 
       - name: Deploy VIDiff report to GitHub Pages
-        if: steps.artifact.outputs.found == 'true'
+        if: >
+          steps.artifact.outputs.found == 'true' &&
+          steps.artifact.outputs.publish_pages == 'true'
         uses: ./.github/actions/publish-gh-pages
         with:
           publish_dir: /tmp/vidiff-report
@@ -245,15 +318,22 @@ jobs:
           PLATFORM: ${{ steps.artifact.outputs.platform }}
           PR_NUMBER: ${{ steps.artifact.outputs.pr_number }}
           SEGMENT: ${{ steps.artifact.outputs.segment }}
+          PUBLISH_PAGES: ${{ steps.artifact.outputs.publish_pages }}
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact_url }}
+          RUN_URL: ${{ steps.artifact.outputs.run_url }}
         run: |
-          if [ -n "$PR_NUMBER" ]; then
+          if [ "$PUBLISH_PAGES" = "true" ] && [ -n "$PR_NUMBER" ]; then
             # PR head snapshots aren't published to the VI Browser, so link the
             # standalone diff report table for PRs.
             echo "url=${PAGES_URL}/vidiff/${SEGMENT}/${PLATFORM}/vidiff/index.html" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "$PUBLISH_PAGES" = "true" ]; then
             # For pushes (what the dashboard shows), open the unified VI Browser
             # filtered to this commit's changed VIs; each links to its diff report.
             echo "url=${PAGES_URL}/vi-snapshots/index.html?sha=${HEAD_SHA}&changed=1" >> "$GITHUB_OUTPUT"
+          elif [ -n "$ARTIFACT_URL" ]; then
+            echo "url=${ARTIFACT_URL}" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=${RUN_URL}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Post commit status
@@ -304,6 +384,9 @@ jobs:
           OUTCOME: ${{ steps.meta.outputs.outcome }}
           PR_NUMBER: ${{ steps.artifact.outputs.pr_number }}
           REPORT_URL: ${{ steps.url.outputs.url }}
+          RUN_URL: ${{ steps.artifact.outputs.run_url }}
+          PUBLISH_PAGES: ${{ steps.artifact.outputs.publish_pages }}
+          PUBLISH_REASON: ${{ steps.artifact.outputs.publish_reason }}
         with:
           script: |
             const prNumber = Number(process.env.PR_NUMBER);
@@ -324,6 +407,9 @@ jobs:
               throw new Error(`Invalid OUTCOME: ${outcome}`);
             }
             const status    = outcome === 'success' ? '✅ Passed' : '❌ Failed';
+            const runUrl = String(process.env.RUN_URL || '');
+            const publishPages = String(process.env.PUBLISH_PAGES || '') === 'true';
+            const publishReason = String(process.env.PUBLISH_REASON || '');
 
             const body = [
               `## VIDiff Report (${platform})`,
@@ -331,6 +417,8 @@ jobs:
               `| Status | Report |`,
               `|--------|--------|`,
               `| ${status} | [View diff report](${reportUrl}) |`,
+              ...(runUrl ? [`| Workflow run | [Open run logs](${runUrl}) |`] : []),
+              ...(!publishPages ? ['', `Pages publication skipped: ${publishReason}.`] : []),
               '',
               `_Generated by the VIDiff workflow on ${new Date().toUTCString()}_`,
             ].join('\n');
