@@ -105,7 +105,6 @@ class SnapshotTests(unittest.TestCase):
             self.assertTrue(target.is_dir())
 
     def test_cli_retirement_runs_only_in_scratch_clients(self):
-        # Never invoke the installer against the source repo, including dry runs.
         rel = '.github/workflows/build-toimages-image.yml'
         rules = INSTALLER.retired_file_rules(self.catalog, ROOT)
         with tempfile.TemporaryDirectory() as directory:
@@ -125,7 +124,6 @@ class SnapshotTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertFalse(retired.exists())
                 self.assertNotIn('snapshots', INSTALLER.read_manifest(target)['activities'])
-            # A client's own release workflow is not evidence of a source fork.
             (target / '.github/workflows/release.yml').write_text('name: Client release')
             result = subprocess.run(command + ['--update'], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -176,7 +174,7 @@ const gh = async url => ({ok:true,json:async () => ({content:textFor[decodeURICo
   assert.equal(retiredWorkflowSignatures(retired), null);
 })().catch(error => {console.error(error);process.exitCode=1;});
 '''
-        result = subprocess.run(['node', '-e', script], text=True, capture_output=True, timeout=15)
+        result = subprocess.run(['node', '-'], input=script, text=True, capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for name in ['integrate.html', 'documentation.html', 'configure.html']:
             self.assertEqual((ROOT / '.github/pages' / name).read_bytes(),

@@ -234,7 +234,6 @@ def prune_retired_files(rules: dict[str, list[str]], target_root: Path,
     target_root = target_root.resolve()
     for rel, signatures in rules.items():
         target = target_root / rel
-        # Reject symlinked parents as well as symlinked workflow files.
         if any(part.is_symlink() for part in (target, target.parent, target.parent.parent)):
             warn(f"skipping symlinked retired workflow: {rel}")
             continue
