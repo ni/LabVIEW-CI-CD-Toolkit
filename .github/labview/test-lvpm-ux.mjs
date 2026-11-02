@@ -56,6 +56,7 @@ vm.runInContext(source.replace('    init();', `
     globalThis.hooks = { parseManifestYaml, resolveColumn, packagesInManifest, pkgCellState,
       candidateSelection, loadLinuxBuildAvailability, linuxWorkflowPayload, dispatchLinuxWorker, dispatchContainerUpdate, loadManifestFor, updTargets, renderLinuxInstaller, nipmCell, enrichPlatformState,
       lvpmFreshness, localFreshnessText, loadPlatformStates, renderGenerated, renderContainers,
+      dragonFileState, updMissingList, renderDragonFiles,
       getColumnStates: () => currentColStates,
       setState: state => {
         selectedRevision = state.revision || "${revision}";
@@ -348,4 +349,66 @@ const vipmState = hooks.enrichPlatformState({ key:'linux', tag:'vipm-existing', 
 assert.equal(vipmState.ready, true);
 assert.equal(hooks.pkgCellState('actual-9.0', vipmState).state, 'present');
 assert.equal(hooks.lvpmFreshness(vipmState), null);
-console.log('LVPM UX dispatch, inventory, historical-revision, no-fallback, tooling-view, build-availability, and revision-bound local freshness tests passed.');
+const dragonPath = 'project.dragon';
+const monitoredDragon = { path:dragonPath, monitored:true, monitorOn:['linux'] };
+function dragonInventory(file, available = true){
+  return { sha:revision, dragon:{ available, files:[{ source_file:dragonPath, ...file }] } };
+}
+const parsedDragon = { inspection:{ status:'parsed', reason:'Trusted declarations parsed.' },
+  dependencies:[{ package_id:'actual', status:'installed' }] };
+hooks.setState({ candidate, inventory:dragonInventory(parsedDragon) });
+assert.match(hooks.dragonFileState(monitoredDragon), />installed</);
+for (const testCase of [
+  { platforms:['linux'], evidence:{ linux:{ status:'installed', scope:'package-files' } }, expected:'installed' },
+  { platforms:['linux'], evidence:{ linux:{ status:'wrong_version' } }, expected:'missing' },
+  { platforms:['linux'], evidence:{ linux:{ status:'unknown', message:'stale or NIPM unsupported' } }, expected:'unknown' },
+  { platforms:['windows'], evidence:{ windows:{ status:'installed' } }, expected:'installed' },
+  { platforms:['windows', 'linux'], evidence:{ windows:{ status:'installed' }, linux:{ status:'unknown' } }, expected:'unknown' },
+  { platforms:['windows', 'linux'], evidence:{ windows:{ status:'missing' }, linux:{ status:'installed' } }, expected:'missing' },
+  { platforms:['windows', 'linux'], evidence:{ windows:{ status:'installed' }, linux:{ status:'installed' } }, expected:'installed' },
+  { platforms:['windows', 'linux'], evidence:{ windows:{ status:'installed' } }, expected:'unknown' }
+]) {
+  hooks.setState({ candidate, inventory:dragonInventory({ ...parsedDragon,
+    dependencies:[{ status:'installed', platform_status:testCase.evidence }] }) });
+  assert.match(hooks.dragonFileState({ ...monitoredDragon, monitorOn:testCase.platforms }),
+    new RegExp('>' + testCase.expected + '<'), JSON.stringify(testCase));
+}
+for (const status of ['missing', 'wrong_version', 'conflict']) {
+  hooks.setState({ candidate, inventory:dragonInventory({ ...parsedDragon, dependencies:[{ status }] }) });
+  assert.match(hooks.dragonFileState(monitoredDragon), />missing</);
+}
+for (const testCase of [
+  { name:'missing parser', inventory:dragonInventory({}, false) },
+  { name:'missing backend', inventory:dragonInventory({ inspection:{ status:'unknown', reason:'TOML backend unavailable.' } }, false) },
+  { name:'malformed declaration', inventory:dragonInventory({ error:'invalid TOML', dependencies:[] }) },
+  { name:'unknown inspection', inventory:dragonInventory({ inspection:{ status:'unknown', reason:'Cannot inspect.' } }) },
+  { name:'legacy empty fallback', inventory:dragonInventory({ dependencies:[] }) },
+  { name:'no inventory', inventory:null },
+  { name:'historical revision', inventory:dragonInventory(parsedDragon), revision:'e'.repeat(40) },
+  { name:'unmeasured packages', inventory:dragonInventory({ ...parsedDragon, dependencies:[{ status:'pending' }] }) },
+  { name:'unattempted packages', inventory:dragonInventory({ ...parsedDragon, dependencies:[{ status:'not_attempted' }] }) }
+]) {
+  hooks.setState({ candidate, inventory:testCase.inventory, revision:testCase.revision });
+  assert.match(hooks.dragonFileState(monitoredDragon), />unknown</, testCase.name);
+  assert.doesNotMatch(hooks.dragonFileState(monitoredDragon), />installed</, testCase.name);
+  assert.match(hooks.dragonFileState({ ...monitoredDragon, monitored:false }), />unmonitored</, testCase.name);
+  assert.match(hooks.dragonFileState({ ...monitoredDragon, monitorOn:[] }), />unmonitored</, testCase.name);
+}
+hooks.setState({ candidate, inventory:dragonInventory({ inspection:{ status:'parsed' }, dependencies:[] }) });
+assert.match(hooks.dragonFileState(monitoredDragon), />no declarations</);
+hooks.setState({ candidate, inventory:{ sha:revision, dragon:{ available:true, files:[
+  { source_file:dragonPath, ...parsedDragon },
+  { source_file:'broken.dragon', inspection:{ status:'unknown', reason:'<untrusted input>' } }
+] } } });
+assert.match(hooks.dragonFileState(monitoredDragon), />installed</);
+assert.match(hooks.dragonFileState({ ...monitoredDragon, path:'broken.dragon' }), />unknown</);
+assert.doesNotMatch(hooks.dragonFileState({ ...monitoredDragon, path:'broken.dragon' }), /<untrusted input>/);
+context.document.querySelectorAll = () => [];
+hooks.renderDragonFiles([monitoredDragon, { ...monitoredDragon, path:'broken.dragon' }]);
+assert.match(elements.get('dragonWrap').innerHTML, />unknown</);
+assert.match(elements.get('dragonWrap').innerHTML, />installed</);
+const unknownPendingHtml = hooks.updMissingList({ dragon:[{ name:dragonPath, status:'unknown', message:'<parser unavailable>' }] });
+assert.match(unknownPendingHtml, /Unresolved .dragon dependencies/);
+assert.match(unknownPendingHtml, /unknown/);
+assert.doesNotMatch(unknownPendingHtml, /<parser unavailable>/);
+console.log('LVPM UX dispatch, inventory, historical-revision, no-fallback, tooling-view, build-availability, revision-bound freshness, and trusted Dragon inspection tests passed.');

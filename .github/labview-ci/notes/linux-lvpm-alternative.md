@@ -29,6 +29,18 @@ requires rebuilding and verifying a candidate.
 Local freshness is bound to the inspected revision and exact selection. Changed inputs
 remain pending even when package pins match; unavailable checks show unknown instead of
 green satisfaction. Local freshness is not registry, provenance, or runtime verification.
+Dragon declarations are inspected only with parser code shipped in the trusted dashboard
+action repository, never Python code from the inspected client. Missing parsers or TOML
+backends, missing monitored files, and malformed declarations now stay unknown/pending
+instead of appearing installed. Unmonitored files do not create pending work, and existing
+measured Windows package statuses are retained. Update tooling or repair declarations and
+regenerate the dashboard to restore inspection; rebuilding an image alone does not fix it.
+Dragon package status now honors each file's monitored platforms: Linux-only declarations
+can be satisfied by exact VIPM name/version matches in the selected, locally current LVPM
+inventory without requiring Windows evidence. Stale/unknown evidence and unsupported
+native/NIPM dependencies remain unknown/pending. Mixed-platform declarations are satisfied
+only when every applicable platform is satisfied; Windows-only inference is unchanged.
+Linux satisfaction remains package-file evidence, not proof of working runtime activities.
 
 This is experimental package-file verification, not proof that the project's CI activities
 passed. LVPM cannot yet report a hook VI's internal error output, and this first integration

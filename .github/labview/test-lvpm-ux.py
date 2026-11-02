@@ -42,7 +42,8 @@ def working_directory(directory):
 def dashboard_functions(*names):
     tree = ast.parse((ROOT / 'actions/dashboard/dashboard.py').read_text())
     nodes = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
-    namespace = {'os': os, 're': re, 'json': json, 'sys': sys, 'pages_url': 'https://pages.invalid'}
+    namespace = {'os': os, 're': re, 'json': json, 'sys': sys, 'pages_url': 'https://pages.invalid',
+                 '__file__': str(ROOT / 'actions/dashboard/dashboard.py')}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), 'dashboard.py', 'exec'), namespace)
     return namespace
 
@@ -407,6 +408,245 @@ class DashboardLvpmTests(unittest.TestCase):
                 self.assertNotIn('client import shadow', result.stderr)
                 if selected:
                     self.assertIn('freshness unknown', result.stdout)
+
+
+class DashboardDragonInspectionTests(unittest.TestCase):
+    def inspect(self, declarations='[vipm.dependencies]\nactual = "1.2"\n', monitored=True,
+                trusted_parser=True, backend=True, manifest=None, configured=True, platforms=None,
+                linux_manifest=None, freshness=None, selection=SELECTION, other_files=None):
+        names = {'_load_dragon_module', '_dragon_inventory', '_repo_dragons', '_build_dragon_section',
+                 '_monitor_on', '_manifest_packages', '_dragon_status_index', '_vipm_version_index',
+                 '_nipkg_version_index', '_infer_dragon_status', '_annotate_dragon_status', '_compute_deps_pending',
+                 '_linux_dragon_status', '_aggregate_dragon_status'}
+        tree = ast.parse((ROOT / 'actions/dashboard/dashboard.py').read_text())
+        definitions = '\n\n'.join(ast.unparse(node) for node in tree.body
+                                  if isinstance(node, ast.FunctionDef) and node.name in names)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            client = root / 'client'
+            client.mkdir()
+            sentinel = client / 'client-code-executed'
+            malicious = f'open({str(sentinel)!r}, "w").write("executed")\nraise RuntimeError("client code executed")\n'
+            client_parser = client / '.github/labview/dragon_deps.py'
+            client_parser.parent.mkdir(parents=True)
+            client_parser.write_text(malicious)
+            for name in ('pathlib', 'tomllib', 'tomli', 'sitecustomize'):
+                (client / f'{name}.py').write_text(malicious)
+            if declarations is not None:
+                (client / 'project.dragon').write_text(declarations)
+            for name, declaration, _entry in other_files or []:
+                (client / name).write_text(declaration)
+            trusted = root / 'trusted'
+            script = trusted / 'actions/dashboard/dashboard.py'
+            script.parent.mkdir(parents=True)
+            if trusted_parser:
+                helper = trusted / '.github/labview/dragon_deps.py'
+                helper.parent.mkdir(parents=True)
+                helper.write_text((ROOT / '.github/labview/dragon_deps.py').read_text())
+            script.write_text('import json, os, re, sys\n' + definitions + '\n'
+                '_DRAGON_MOD = None\nMONITOR_PLATFORMS = ["windows", "linux"]\n'
+                + ('' if backend else 'sys.modules["tomllib"] = None\nsys.modules["tomli"] = None\n')
+                + 'def _worker_manifest(platform, tag): return json.loads(os.environ["TEST_LINUX_MANIFEST" if platform == "linux" else "TEST_MANIFEST"])\n'
+                'def _lvpm_local_freshness(selection, manifest): return json.loads(os.environ["TEST_FRESHNESS"])\n'
+                'section = _build_dragon_section(json.loads(os.environ["TEST_CONFIG"]))\n'
+                'print(json.dumps({"dragon": section, "pending": _compute_deps_pending({"dragon": section})}))\n')
+            config = {'hasDragonList': True, 'dragon': [
+                {'path': 'project.dragon', 'monitor': monitored,
+                 'monitorOn': platforms if platforms is not None else ['linux']}]} if configured else {}
+            config['linuxUse'] = selection
+            for name, _declaration, entry in other_files or []:
+                config.setdefault('dragon', []).append({'path': name, **entry})
+            result = subprocess.run([sys.executable, '-I', '-B', str(script)], cwd=client,
+                env={**os.environ, 'PYTHONPATH': str(client), 'TEST_CONFIG': json.dumps(config),
+                     'TEST_MANIFEST': json.dumps(manifest), 'TEST_LINUX_MANIFEST': json.dumps(linux_manifest),
+                     'TEST_FRESHNESS': json.dumps(freshness or {}), 'GITHUB_SHA': 'f' * 40},
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(sentinel.exists(), result.stderr)
+            return json.loads(result.stdout)
+
+    def assert_unknown(self, result, reason):
+        section = result['dragon']
+        self.assertFalse(section['ready'])
+        self.assertEqual(section['health'], 'unknown')
+        self.assertEqual(section['files'][0]['inspection']['status'], 'unknown')
+        self.assertIn(reason, section['files'][0]['inspection']['reason'])
+        self.assertTrue(result['pending']['pending'])
+        self.assertEqual(result['pending']['containers'], ['linux'])
+        self.assertEqual(result['pending']['dragon'][0]['status'], 'unknown')
+        self.assertEqual(result['pending']['dragon'][0]['source_file'], 'project.dragon')
+
+    def test_real_trusted_parser_executes_without_client_helper_or_import_shadows(self):
+        result = self.inspect(platforms=['windows'], manifest={'vipm_packages': [{'name': 'actual', 'version': '1.2'}]})
+        self.assertTrue(result['dragon']['available'])
+        self.assertEqual(result['dragon']['files'][0]['inspection']['status'], 'parsed')
+        dependency = result['dragon']['install_set'][0]
+        self.assertEqual((dependency['package_id'], dependency['declared_version'], dependency['status']),
+                         ('actual', '1.2', 'installed'))
+        self.assertFalse(result['pending']['pending'])
+
+    def test_missing_trusted_parser_does_not_fall_back_to_client_code(self):
+        result = self.inspect(trusted_parser=False, manifest={'vipm_packages': [{'name': 'actual', 'version': '1.2'}]})
+        self.assertFalse(result['dragon']['available'])
+        self.assert_unknown(result, 'Trusted Dragon parser unavailable')
+
+    def test_missing_toml_backend_is_unknown(self):
+        result = self.inspect(backend=False)
+        self.assertFalse(result['dragon']['available'])
+        self.assert_unknown(result, 'TOML backend unavailable')
+
+    def test_unknown_files_target_only_monitored_platforms(self):
+        for platforms in (['windows'], ['linux'], ['windows', 'linux']):
+            with self.subTest(platforms=platforms):
+                result = self.inspect(trusted_parser=False, platforms=platforms)
+                self.assertEqual(result['pending']['containers'], sorted(platforms))
+                self.assertTrue(result['pending']['pending'])
+
+    def test_legacy_unconfigured_files_keep_default_monitoring(self):
+        result = self.inspect(trusted_parser=False, configured=False)
+        self.assertEqual(result['pending']['containers'], ['linux', 'windows'])
+        self.assertEqual(result['pending']['dragon'][0]['status'], 'unknown')
+
+    def test_malformed_monitored_declaration_is_unknown(self):
+        result = self.inspect(declarations='[vipm.dependencies\n',
+                              manifest={'vipm_packages': [{'name': 'actual', 'version': '1.2'}]})
+        self.assert_unknown(result, 'invalid TOML')
+
+    def test_missing_monitored_file_is_unknown(self):
+        self.assert_unknown(self.inspect(declarations=None), 'Declared Dragon file is missing')
+
+    def test_unknown_unmonitored_files_do_not_raise_pending(self):
+        for options in ({'trusted_parser': False}, {'backend': False},
+                        {'declarations': '[vipm.dependencies\n'}, {'declarations': None}):
+            with self.subTest(options=options):
+                result = self.inspect(monitored=False, **options)
+                self.assertEqual(result['dragon']['files'][0]['inspection']['status'], 'unknown')
+                self.assertFalse(result['pending']['pending'])
+                self.assertEqual(result['pending']['dragon'], [])
+                self.assertEqual(result['pending']['containers'], [])
+
+    def test_no_declarations_do_not_create_pending(self):
+        result = self.inspect(declarations=None, configured=False, trusted_parser=False)
+        self.assertEqual(result['dragon']['files'], [])
+        self.assertFalse(result['pending']['pending'])
+
+    def test_valid_empty_declarations_are_parsed(self):
+        result = self.inspect(declarations='[vipm.dependencies]\n', manifest={})
+        self.assertEqual(result['dragon']['files'][0]['inspection']['status'], 'parsed')
+        self.assertEqual(result['dragon']['install_set'], [])
+        self.assertFalse(result['pending']['pending'])
+
+    def test_measured_windows_statuses_are_preserved(self):
+        for manifest, expected in ((None, 'pending'), ({}, 'missing'),
+                ({'vipm_packages': [{'name': 'actual', 'version': '9.0'}]}, 'wrong_version'),
+                ({'vipm_packages': [{'name': 'actual', 'version': '1.2'}]}, 'installed'),
+                ({'dragon': {'items': [{'manager': 'vipm', 'package_id': 'actual',
+                                      'status': 'installed', 'installed_version': '1.2'}]}}, 'installed')):
+            with self.subTest(expected=expected, manifest=manifest):
+                result = self.inspect(manifest=manifest, platforms=['windows'])
+                self.assertEqual(result['dragon']['install_set'][0]['status'], expected)
+                self.assertEqual(result['pending']['pending'], expected != 'installed')
+                self.assertEqual(result['pending']['containers'], [] if expected == 'installed' else ['windows'])
+                self.assertEqual(set(result['dragon']['install_set'][0]['platform_status']), {'windows'})
+
+    def linux_evidence(self):
+        return {'linux_manifest': {'installer': 'lvpm', 'platform': 'linux', 'architecture': 'amd64',
+                                  'packages': [{'name': 'ACTUAL', 'version': '1.2'}]},
+                'freshness': {'status': 'current', 'selection': SELECTION, 'revision': 'f' * 40}}
+
+    def test_linux_exact_current_inventory_satisfies_without_windows_evidence(self):
+        result = self.inspect(**self.linux_evidence())
+        section = result['dragon']
+        self.assertTrue(section['ready'])
+        self.assertFalse(result['pending']['pending'])
+        for dependency in (section['files'][0]['dependencies'][0], section['install_set'][0]):
+            self.assertEqual(dependency['status'], 'installed')
+            self.assertEqual(set(dependency['platform_status']), {'linux'})
+            self.assertEqual(dependency['platform_status']['linux']['scope'], 'package-files')
+            self.assertIn('runtime activities are not verified', dependency['message'])
+
+    def test_linux_exact_version_required_and_missing_packages_pending(self):
+        for version, expected in (('9.0', 'wrong_version'), ('v1.2', 'wrong_version'), (None, 'missing')):
+            with self.subTest(version=version):
+                options = self.linux_evidence()
+                options['linux_manifest']['packages'] = [{'name': 'actual', 'version': version}] if version else []
+                result = self.inspect(**options)
+                self.assertEqual(result['dragon']['install_set'][0]['status'], expected)
+                self.assertTrue(result['pending']['pending'])
+                self.assertEqual(result['pending']['containers'], ['linux'])
+
+    def test_linux_stale_unknown_or_unbound_freshness_is_unknown_pending(self):
+        current = self.linux_evidence()['freshness']
+        for freshness in ({}, {**current, 'status': 'stale'}, {**current, 'status': 'unknown'},
+                          {**current, 'selection': 'different'}, {**current, 'revision': '0' * 40}):
+            with self.subTest(freshness=freshness):
+                options = self.linux_evidence()
+                options['freshness'] = freshness
+                result = self.inspect(**options)
+                self.assertFalse(result['dragon']['ready'])
+                self.assertEqual(result['dragon']['install_set'][0]['status'], 'unknown')
+                self.assertTrue(result['pending']['pending'])
+                self.assertEqual(result['pending']['containers'], ['linux'])
+
+    def test_linux_unsupported_or_noncanonical_inventory_is_unknown(self):
+        for change in ({'selection': 'latest'}, {'linux_manifest': None},
+                       {'linux_manifest': {'installer': 'vipm'}},
+                       {'linux_manifest': {'installer': 'lvpm', 'platform': 'windows', 'architecture': 'amd64'}},
+                       {'linux_manifest': {'installer': 'lvpm', 'platform': 'linux', 'architecture': 'arm64'}},
+                       {'declarations': '[nipm.dependencies]\nactual = "1.2"\n'}):
+            with self.subTest(change=change):
+                result = self.inspect(**{**self.linux_evidence(), **change})
+                self.assertEqual(result['dragon']['install_set'][0]['status'], 'unknown')
+                self.assertTrue(result['pending']['pending'])
+                self.assertEqual(result['pending']['containers'], ['linux'])
+
+    def test_mixed_platforms_aggregate_conservatively_and_target_unresolved_only(self):
+        windows = {'vipm_packages': [{'name': 'actual', 'version': '1.2'}]}
+        for manifest, linux_current, expected, pending_platforms in (
+                (windows, True, 'installed', []), (windows, False, 'unknown', ['linux']),
+                ({}, True, 'missing', ['windows']), ({}, False, 'missing', ['linux', 'windows']),
+                (None, True, 'pending', ['windows'])):
+            with self.subTest(expected=expected, platforms=pending_platforms):
+                options = self.linux_evidence()
+                if not linux_current:
+                    options['freshness']['status'] = 'stale'
+                result = self.inspect(platforms=['windows', 'linux'], manifest=manifest, **options)
+                dependency = result['dragon']['install_set'][0]
+                self.assertEqual(dependency['status'], expected)
+                self.assertEqual(set(dependency['platform_status']), {'linux', 'windows'})
+                self.assertEqual(result['pending']['pending'], expected != 'installed')
+                self.assertEqual(result['pending']['containers'], pending_platforms)
+
+    def test_windows_only_does_not_read_linux_evidence(self):
+        options = self.linux_evidence()
+        options['freshness']['status'] = 'stale'
+        result = self.inspect(platforms=['windows'],
+                              manifest={'vipm_packages': [{'name': 'actual', 'version': '1.2'}]}, **options)
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'installed')
+        self.assertTrue(result['dragon']['ready'])
+        self.assertFalse(result['pending']['pending'])
+
+    def test_unmonitored_conflicting_file_cannot_pollute_monitored_evidence(self):
+        result = self.inspect(other_files=[('ignored.dragon', '[vipm.dependencies]\nactual = "9.0"\n',
+                                           {'monitor': False})], **self.linux_evidence())
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'installed')
+        self.assertFalse(result['pending']['pending'])
+
+    def test_shared_packages_aggregate_only_their_own_monitored_platforms(self):
+        result = self.inspect(other_files=[('windows.dragon', '[vipm.dependencies]\nactual = "1.2"\n',
+                                           {'monitor': True, 'monitorOn': ['windows']})],
+                              manifest={}, **self.linux_evidence())
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'missing')
+        self.assertEqual(result['pending']['containers'], ['windows'])
+        self.assertEqual(result['dragon']['files'][0]['dependencies'][0]['status'], 'installed')
+        self.assertEqual(result['dragon']['install_set'][0]['platform_status']['linux']['scope'], 'package-files')
+
+    def test_conflicting_monitored_versions_remain_pending(self):
+        result = self.inspect(other_files=[('other.dragon', '[vipm.dependencies]\nactual = "9.0"\n',
+                                           {'monitor': True, 'monitorOn': ['linux']})], **self.linux_evidence())
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'conflict')
+        self.assertEqual(result['pending']['containers'], ['linux'])
+        self.assertTrue(result['pending']['pending'])
 
 
 if __name__ == '__main__':

@@ -1138,11 +1138,15 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         declare the bare form (<code>0.5.0.1</code>), the comparison normalizes that <code>v</code> prefix &mdash; without
         it, correctly-baked packages would be reported as missing and the &ldquo;dependencies need to be installed&rdquo;
         banner would never clear.</p>
-      <p>Dragon dependencies are reconciled against the current <strong>Windows worker</strong> manifest (the worker
+      <p>Dragon dependencies honor each file&rsquo;s <code>monitorOn</code> platforms. Windows declarations are
+        reconciled against the current <strong>Windows worker</strong> manifest (the worker
         rebuilt by <code>build-labview-image.yml</code>). If a manifest has not yet published a dedicated
         <code>dragon.items</code> status block, the dashboard falls back to the installed-package inventories
         (<code>vipm_packages</code> / <code>nipkg_packages</code>) so already-baked dependencies are marked installed
-        instead of staying stuck at <code>not_attempted</code>.</p>
+        instead of staying stuck at <code>not_attempted</code>. Linux declarations require the selected
+        digest-pinned LVPM inventory and locally current freshness, with exact VIPM name/version matches.
+        Unsupported native/NIPM dependencies and stale or unavailable Linux evidence remain unknown/pending.
+        Files monitored on both platforms are satisfied only when both platforms are satisfied.</p>
 
       <h3>When images rebuild</h3>
       <p>A worker rebuild is a heavy, opt-in operation. It runs when you apply a dependency update from the dashboard's
@@ -1496,6 +1500,23 @@ docker run --rm `
         <code>current</code> result does not verify registry access, build provenance, or runtime activities;
         activation and execution still perform their server-side checks. Historical views cannot reuse another
         revision's current result.</p>
+      <p>Dragon declaration inspection loads only the parser from the trusted action repository, resolved relative
+        to the dashboard generator itself; Python helpers in the inspected client checkout are never imported.
+        The parser requires Python 3.11+ with <code>tomllib</code>, or an available <code>tomli</code> backend.
+        Missing tooling/backend, missing monitored files, and malformed declarations produce per-file
+        <code>inspection.status: unknown</code> evidence instead of an empty installed inventory. Monitored unknowns
+        keep the dependency banner pending for their monitored platforms; unmonitored files do not create pending
+        work. The Dependencies page requires matching-revision declaration evidence and measured installed package
+        statuses before displaying installed. Update the trusted tooling or repair the declaration and regenerate
+        the dashboard; rebuilding a worker alone does not repair parser evidence. Per-dependency
+        <code>platform_status</code> records honor the file&rsquo;s <code>monitorOn</code> list; the existing
+        <code>status</code>, <code>installed_version</code>, and <code>message</code> fields aggregate only applicable
+        monitored platforms. Installed requires all applicable platforms installed; conflict, missing, wrong
+        version, unknown, pending, and not attempted take precedence in that order. Windows-only files retain
+        measured Windows inference. Linux-only VIPM declarations can be satisfied by exact name/version in the
+        selected canonical LVPM inventory, only with locally current revision/selection-bound freshness.
+        Linux <code>scope: package-files</code> is not runtime verification; native/NIPM declarations remain unknown.
+        Pending package records include per-platform evidence and target only unresolved monitored platforms.</p>
       <div class="note"><span class="lbl">Public-index fallback (existing VIPM path)</span>
         The resolver-bypass fallback covers packages in the built-in NI LabVIEW Tools Network and VIPM Community
         repositories, including old OpenG <code>sf://opengtoolkit</code> URLs and the legacy
@@ -2075,7 +2096,9 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
           <tr><td><code>vi-snapshots/&lt;sha&gt;/manifest.json</code></td><td>Snapshot gallery builder</td><td>VI Browser</td></tr>
           <tr><td><code>dependencies/index.json</code></td><td>Dashboard publisher</td><td>Dependencies page install-time inventory</td></tr>
           <tr><td><code>columns[].freshness</code> in <code>dependencies/index.json</code></td><td>Trusted dashboard LVPM helper</td><td>Local status, reason, inspected revision, and exact selection; stale/unknown block satisfaction</td></tr>
-          <tr><td><code>deps-pending.json</code></td><td>Dashboard publisher</td><td>Persistent pending banner, including local LVPM freshness under <code>linux_lvpm</code></td></tr>
+          <tr><td><code>dependencies/index.json: dragon.files[].inspection</code></td><td>Trusted Dragon parser in the action repository</td><td>Parsed or unknown declaration evidence with a reason; monitored parse/tooling failures cannot report installed</td></tr>
+          <tr><td><code>dragon.files[].dependencies[].platform_status</code> / <code>dragon.install_set[].platform_status</code></td><td>Monitored Windows inventory and selected, locally current Linux LVPM inventory</td><td>Per-platform status, installed_version and message; Linux scope is package-files. Aggregate status cannot be installed when an applicable platform is missing or unknown.</td></tr>
+          <tr><td><code>deps-pending.json</code></td><td>Dashboard publisher</td><td>Persistent pending banner, including local LVPM freshness under <code>linux_lvpm</code> and monitored Dragon inspection failures as <code>dragon[].status: unknown</code></td></tr>
           <tr><td><code>workers/&lt;platform&gt;/&lt;version&gt;/manifest.json</code></td><td>Worker image workflows</td><td>Dependencies page installed-package status</td></tr>
           <tr><td><code>workers/linux-lvpm/&lt;tag&gt;/manifest.json</code></td><td>LVPM candidate build</td><td>Digest-bound candidate inventory, activation and Linux runtime freshness checks</td></tr>
           <tr><td><code>workers/linux-lvpm/latest.json</code></td><td>LVPM candidate build</td><td>Alternative candidate discovery only; never selects an active worker</td></tr>

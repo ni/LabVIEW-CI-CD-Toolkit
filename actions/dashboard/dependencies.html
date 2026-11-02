@@ -250,11 +250,24 @@
       }
       return '<span class="dep-file-state installed" title="Every requested package is baked into the monitored worker(s)">installed</span>';
     }
-    function dragonFileState(){
-      const hasMissing = !!(updPending && Array.isArray(updPending.dragon) && updPending.dragon.length);
-      return hasMissing
-        ? '<span class="dep-file-state missing" title="A .dragon dependency is currently unresolved">missing</span>'
-        : '<span class="dep-file-state installed" title="No unresolved .dragon dependencies reported">installed</span>';
+    function dragonFileState(file){
+      if (file.monitored === false || (Array.isArray(file.monitorOn) && !file.monitorOn.length)) return '<span class="dep-file-state" title="This declaration is not monitored">unmonitored</span>';
+      const section = generatedInventory && generatedInventory.sha === selectedRevision && generatedInventory.dragon;
+      const evidence = section && Array.isArray(section.files) && section.files.find(item => normPath(item.source_file || item.path) === normPath(file.path));
+      const inspection = evidence && evidence.inspection;
+      const unknown = reason => '<span class="dep-file-state missing" title="' + esc(reason) + '">unknown</span>';
+      if (!evidence || section.available !== true) return unknown('Trusted Dragon inspection unavailable; update tooling and regenerate the dashboard. Do not assume dependencies are installed.');
+      if (evidence.error || (inspection && inspection.status !== "parsed")) return unknown(evidence.error || inspection.reason || 'Dragon declarations could not be inspected.');
+      const dependencies = Array.isArray(evidence.dependencies) ? evidence.dependencies : [];
+      if (!dependencies.length) return inspection && inspection.status === "parsed"
+        ? '<span class="dep-file-state" title="This file declares no packages">no declarations</span>'
+        : unknown('No trusted Dragon declaration evidence is available.');
+      const platforms = Array.isArray(file.monitorOn) ? file.monitorOn : ["windows", "linux"];
+      const statuses = dependencies.flatMap(item => item.platform_status
+        ? platforms.map(platform => (item.platform_status[platform] || {}).status || "unknown") : [item.status]);
+      if (statuses.some(status => ["missing", "wrong_version", "conflict"].includes(status))) return '<span class="dep-file-state missing" title="A declared dependency is unresolved on a monitored platform">missing</span>';
+      if (!statuses.every(status => status === "installed")) return unknown('Current package evidence is unavailable for at least one monitored platform. Linux LVPM requires current exact-version evidence; rebuild, reverify, and re-activate stale candidates.');
+      return '<span class="dep-file-state installed" title="Declared packages are satisfied on every monitored platform. Linux LVPM evidence covers package files, not runtime activities.">installed</span>';
     }
 
     function parseManifestYaml(text){
@@ -1122,8 +1135,8 @@
           pkgs.map(function(p){ return '<span class="upd-pill"><span class="upd-warn-glyph">&#9888;</span> ' + esc(p) + '</span>'; }).join('') + '</div></div>';
       }
       if (dragon.length){
-        out += '<div class="upd-block"><div class="upd-k">Missing .dragon dependencies (' + dragon.length + ')</div><div class="upd-pills">' +
-          dragon.map(function(x){ const n = (x && (x.name || x.package_id)) || x; const st = x && x.status ? ' &#183; ' + esc(x.status) : ''; return '<span class="upd-pill"><span class="upd-warn-glyph">&#9888;</span> ' + esc(n) + st + '</span>'; }).join('') + '</div></div>';
+        out += '<div class="upd-block"><div class="upd-k">Unresolved .dragon dependencies (' + dragon.length + ')</div><div class="upd-pills">' +
+          dragon.map(function(x){ const n = (x && (x.name || x.package_id)) || x; const st = x && x.status ? ' &#183; ' + esc(x.status) : ''; return '<span class="upd-pill" title="' + esc(x.message || '') + '"><span class="upd-warn-glyph">&#9888;</span> ' + esc(n) + st + '</span>'; }).join('') + '</div></div>';
       }
       return out;
     }
@@ -1138,9 +1151,11 @@
       const defKeys = updDefaultKeys();
       const defWin = defKeys.includes("windows");
       const defLin = defKeys.includes("linux");
+      const unknownDragon = (d.dragon || []).some(item => item.status === "unknown");
       el.innerHTML =
         '<h2 class="upd-h">&#9888;&#65039; Dependency update needed</h2>' +
-        '<p class="upd-sub">Your project declares dependencies &mdash; in <strong>VIPC files</strong> (VIPM packages) or <strong>.dragon files</strong> (NIPM packages) &mdash; that are <strong>not yet baked</strong> into the worker container(s). Each missing item is marked with a <span class="upd-warn-glyph">&#9888;</span> in the table below; until you run this update, container CI may fail or show broken code.</p>' +
+        (unknownDragon ? '<p class="note warn">Some monitored Dragon declarations could not be inspected. Update the trusted tooling or correct the declaration, then regenerate this dashboard. Rebuilding a worker alone does not repair missing parser evidence.</p>' : '') +
+        '<p class="upd-sub">Your project declares dependencies &mdash; in <strong>VIPC files</strong> or <strong>.dragon files</strong> &mdash; that are <strong>missing or not yet verified</strong> in the worker container(s). Unknown declarations need inspection before installation can be judged; container CI may fail until dependency coverage is verified.</p>' +
         updMissingList(d) +
         '<div class="note warn upd-exp"><strong>This is a long operation.</strong> It rebuilds the worker container(s) by installing your dependencies with VIPM, which can take a while depending on the dependencies. <strong>Do not run other CI actions until it completes</strong> &mdash; they would run against the old container and may error.</div>' +
         '<div class="upd-block"><div class="upd-k">Containers to rebuild</div>' +
@@ -1317,7 +1332,7 @@
       const heads = COLS.map(headCell).join('');
       const rows = dragons.map(d => {
         const on = Array.isArray(d.monitorOn) ? d.monitorOn : (d.monitored !== false ? MONITOR_PLATFORMS.slice() : []);
-        return '<tr><td class="pkg"><strong>' + esc(d.path) + '</strong>' + dragonFileState() + '<br><span class="why">Dragon dependency file</span></td>' + COLS.map(c => (MONITOR_PLATFORMS.indexOf(c.key) !== -1 ? monitorCell('dragon', d.path, on, false, c.key) : '<td class="cell"></td>')).join('') + '</tr>';
+        return '<tr><td class="pkg"><strong>' + esc(d.path) + '</strong>' + dragonFileState(d) + '<br><span class="why">Dragon dependency file</span></td>' + COLS.map(c => (MONITOR_PLATFORMS.indexOf(c.key) !== -1 ? monitorCell('dragon', d.path, on, false, c.key) : '<td class="cell"></td>')).join('') + '</tr>';
       });
       host.innerHTML = '<table><thead><tr><th>Dragon File</th>' + heads + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
       Array.from(document.querySelectorAll('input[data-monitor-kind="dragon"]')).forEach(cb => cb.addEventListener('change', () => setFileMonitor('dragon', cb.getAttribute('data-monitor-path'), cb.getAttribute('data-monitor-plat'), cb.checked)));
