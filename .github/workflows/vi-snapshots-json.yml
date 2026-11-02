@@ -57,6 +57,7 @@ concurrency:
 permissions:
   contents: write
   packages: read
+  actions: read
 
 jobs:
   # Auto-runs (workflow_run) honour the VI Browser config: Snapshots on Linux is the
@@ -104,21 +105,54 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
+      - name: Checkout repository for verified worker selection
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - name: Resolve the render image (the Linux worker, which bakes in the snapshot render engine; override with TOIMAGES_IMAGE)
         id: img
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_OVERRIDE: ${{ vars.LABVIEW_IMAGE_NAME }}
+          TOIMAGES_OVERRIDE: ${{ vars.TOIMAGES_IMAGE }}
         run: |
-          owner=$(printf '%s' "${{ github.repository_owner }}" | tr 'A-Z' 'a-z')
-          repo=$(printf '%s' "${{ github.event.repository.name }}" | tr 'A-Z' 'a-z')
+          python3 -m pip install --quiet PyYAML==6.0.3 tomli==2.4.0
+          owner=$(printf '%s' "${GITHUB_REPOSITORY%%/*}" | tr 'A-Z' 'a-z')
+          repo=$(printf '%s' "${GITHUB_REPOSITORY##*/}" | tr 'A-Z' 'a-z')
           # The VI Snapshots render engine now ships INSIDE the Linux worker image
           # (seeded/copied on install), so there is no separate image to build. Use
           # the worker's moving Linux tag; override with the TOIMAGES_IMAGE variable.
           fallback="ghcr.io/${owner}/${repo}-labview:linux-latest"
-          override="${{ vars.TOIMAGES_IMAGE }}"
+          name=$(printf '%s' "${IMAGE_OVERRIDE:-${repo}-labview}" | tr 'A-Z' 'a-z')
+          custom="ghcr.io/${owner}/${name}"
+          override="$TOIMAGES_OVERRIDE"
           if [ -n "$override" ]; then
-            echo "image=$override" >> "$GITHUB_OUTPUT"
+            image="$override"
+            normalized=$(printf '%s' "$override" | tr '[:upper:]' '[:lower:]')
+            case "$normalized" in
+              linux-lvpm*|*:linux-lvpm*|lvpm-*|*:lvpm-*)
+                candidate="${override#"${custom}:"}"
+                python3 .github/labview/lvpm/worker.py verify --repo . --candidate "$candidate" \
+                  --repository "$GITHUB_REPOSITORY" --image-name "$IMAGE_OVERRIDE" >/dev/null
+                image="${custom}:${candidate}"
+                echo "lvpm=true" >> "$GITHUB_OUTPUT" ;;
+            esac
           else
-            echo "image=$fallback" >> "$GITHUB_OUTPUT"
+            selected=$(python3 .github/labview/lvpm/worker.py resolve --repo . --action snapshots \
+              --repository "$GITHUB_REPOSITORY" --image-name "$IMAGE_OVERRIDE")
+            case "$selected" in
+              '') image="$fallback" ;;
+              latest) image="${custom}:linux-latest" ;;
+              base|none) image="nationalinstruments/labview:latest-linux" ;;
+              linux-*) image="${custom}:${selected}" ;;
+              *) image="${custom}:linux-${selected}" ;;
+            esac
           fi
+          case "$image" in
+            *:linux-lvpm*) echo "lvpm=true" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "fallback=$fallback" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR (built-in token - no setup required)
@@ -126,14 +160,20 @@ jobs:
 
       - name: Pull the render image (skip gracefully until it has been built)
         id: pull
+        env:
+          IMG: ${{ steps.img.outputs.image }}
+          FALLBACK: ${{ steps.img.outputs.fallback }}
+          LVPM_CANDIDATE: ${{ steps.img.outputs.lvpm }}
         run: |
-          IMG='${{ steps.img.outputs.image }}'
-          FALLBACK='${{ steps.img.outputs.fallback }}'
           if docker pull "$IMG"; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
             echo "image=$IMG" >> "$GITHUB_OUTPUT"
             echo "Using $IMG"
           else
+            if [ "$LVPM_CANDIDATE" = "true" ]; then
+              echo "::error::Verified immutable LVPM candidate could not be pulled; refusing an unverified fallback."
+              exit 1
+            fi
             echo "::warning::Render image $IMG could not be pulled. Falling back to $FALLBACK."
             if [ "$IMG" != "$FALLBACK" ] && docker pull "$FALLBACK"; then
               echo "ok=true" >> "$GITHUB_OUTPUT"
@@ -148,12 +188,6 @@ jobs:
               fi
             fi
           fi
-
-      - name: Checkout repository
-        if: steps.pull.outputs.ok == 'true'
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Checkout deployed gallery (gh-pages) for incremental seed + live publish
         if: steps.pull.outputs.ok == 'true'

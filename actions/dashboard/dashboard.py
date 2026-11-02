@@ -4287,7 +4287,7 @@ def _parse_vipc_packages(vipc_path):
   return sorted(set(names)), ''
 
 def _parse_container_config(path='.github/labview-ci.yml'):
-  cfg = {'use': '', 'actions': {}, 'vipc': [], 'dragon': [], 'hasVipcList': False, 'hasDragonList': False}
+  cfg = {'use': '', 'linuxUse': '', 'actions': {}, 'vipc': [], 'dragon': [], 'hasVipcList': False, 'hasDragonList': False}
   if not os.path.isfile(path):
     return cfg
   section = ''
@@ -4300,6 +4300,11 @@ def _parse_container_config(path='.github/labview-ci.yml'):
           section = 'container'; current = None; continue
         if re.match(r'^\S', line):
           section = ''; current = None
+        if section in ('container', 'vipc', 'dragon', 'actions'):
+          selected = re.match(r'^\s{4}linuxUse:\s*["\']?([^"\'\s]+)', line)
+          if selected:
+            cfg['linuxUse'] = selected.group(1)
+            section = 'container'; current = None
         if section == 'container':
           m = re.match(r'^\s{4}use:\s*"?([^"#]+)"?', line)
           if m:
@@ -4371,6 +4376,14 @@ def _repo_dragons():
 def _worker_manifest(platform, tag):
   if not tag or tag in ('base', 'none'):
     return None
+  if platform == 'linux' and tag.startswith('linux-lvpm-'):
+    selected = re.fullmatch(r'(linux-lvpm-[a-f0-9]{64})@(sha256:[a-f0-9]{64})', tag)
+    if not selected:
+      return None
+    man = http_json(f"{pages_url}/workers/linux-lvpm/{selected.group(1)}/manifest.json")
+    if not isinstance(man, dict) or man.get('installer') != 'lvpm' or man.get('tag') != selected.group(1) or man.get('image_digest') != selected.group(2) or man.get('manifest_path') != f'workers/linux-lvpm/{selected.group(1)}/manifest.json':
+      return None
+    return man
   resolved = tag
   if tag == 'latest':
     latest = http_json(f"{pages_url}/workers/{platform}/latest.json")
@@ -4381,6 +4394,17 @@ def _worker_manifest(platform, tag):
 
 def _manifest_packages(man):
   packages = set()
+  if isinstance(man, dict) and man.get('installer') == 'lvpm':
+    for package in man.get('packages') or []:
+      if not isinstance(package, dict):
+        continue
+      name = str(package.get('name') or '').strip()
+      version = str(package.get('version') or '').strip()
+      if name:
+        packages.add(name)
+        if version:
+          packages.add(f'{name}-{version.lstrip("vV")}')
+    return sorted(packages, key=str.lower)
   if isinstance(man, dict):
     for pkg in man.get('vipm_packages') or []:
       if isinstance(pkg, dict):
@@ -4797,6 +4821,33 @@ def _system_dependencies():
     },
   ]
 
+def _lvpm_local_freshness(selection, manifest):
+  import subprocess
+  unknown = {'status': 'unknown', 'revision': os.environ.get('GITHUB_SHA', ''), 'selection': selection,
+             'reason': 'Local LVPM freshness is unavailable. Rebuild, reverify, and explicitly re-activate the candidate.'}
+  try:
+    revision = subprocess.check_output(['git', 'rev-parse', '--verify', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
+    unknown['revision'] = revision
+    if not re.fullmatch(r'[0-9a-f]{40}', revision) or revision != os.environ.get('GITHUB_SHA', ''):
+      return unknown
+    interpreter = os.environ.get('LVCI_LVPM_PYTHON', '')
+    helper = os.environ.get('LVCI_LVPM_HELPER', '')
+    if not interpreter or not helper or not os.path.isfile(interpreter) or not os.path.isfile(helper) or not isinstance(manifest, dict):
+      return unknown
+    result = subprocess.run([interpreter, '-I', helper, 'freshness', '--repo', os.getcwd(),
+                             '--candidate', selection, '--revision', revision],
+                            input=json.dumps(manifest), capture_output=True, text=True, timeout=120)
+    if result.returncode:
+      return unknown
+    freshness = json.loads(result.stdout)
+    if (not isinstance(freshness, dict) or freshness.get('status') not in ('current', 'stale', 'unknown')
+        or freshness.get('revision') != revision or freshness.get('selection') != selection):
+      return unknown
+    return freshness
+  except Exception:
+    return unknown
+
+
 def _compute_deps_pending(data):
   """Decide whether the repo declares project dependencies that are NOT yet baked
   into its current worker container(s). This drives the persistent dashboard
@@ -4816,7 +4867,7 @@ def _compute_deps_pending(data):
   def baked(key):
     c = cols.get(key) or {}
     pkgs = c.get('packages') or []
-    return {str(p).lower() for p in pkgs}, {_pkg_base(p) for p in pkgs}
+    return {str(p).lower() for p in pkgs}, (set() if c.get('installer') == 'lvpm' else {_pkg_base(p) for p in pkgs})
 
   def _missing(pkgs, baked_pair):
     exact, bases = baked_pair
@@ -4829,6 +4880,10 @@ def _compute_deps_pending(data):
   # Otherwise (Linux unused / base image) there is no worker to bake into and we do
   # not surface a spurious Linux update prompt.
   lin_col = cols.get('linux') or {}
+  freshness = lin_col.get('freshness') or {}
+  lvpm_pending = lin_col.get('installer') == 'lvpm' and (
+    freshness.get('status') != 'current' or freshness.get('revision') != data.get('sha')
+    or freshness.get('selection') != lin_col.get('tag'))
   lin_active = bool(lin_col.get('ready')) and str(lin_col.get('tag') or 'base') not in ('base', 'none')
   lin_baked = baked('linux') if lin_active else set()
   pending_pkgs = set()
@@ -4858,7 +4913,7 @@ def _compute_deps_pending(data):
       if lin_missing_pkgs:
         lin_pending_files.append(v.get('path'))
         pending_pkgs.update(lin_missing_pkgs)
-  lin_missing = bool(lin_pending_files)
+  lin_missing = bool(lin_pending_files) or lvpm_pending
 
   dragon = data.get('dragon') or {}
   monitored_dragon_keys = set()
@@ -4893,6 +4948,7 @@ def _compute_deps_pending(data):
     'vipcs': all_files,
     'dragon': dragon_pending,
     'containers': sorted(set(containers)),
+    **({'linux_lvpm': freshness} if lin_col.get('installer') == 'lvpm' else {}),
     'generated': __import__('datetime').datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
   }
 
@@ -4940,7 +4996,8 @@ def _build_dependencies_index():
   manifest_cache = {}
   for col in columns:
     action_tag = config.get('actions', {}).get(col.get('action')) if col.get('action') else ''
-    tag = col.get('tag') or action_tag or config.get('use') or col.get('defaultTag') or 'base'
+    linux_tag = config.get('linuxUse') if col['platform'] == 'linux' else ''
+    tag = col.get('tag') or action_tag or linux_tag or config.get('use') or col.get('defaultTag') or 'base'
     col['tag'] = tag
     if tag not in ('base', 'none'):
       cache_key = f"{col['platform']}:{tag}"
@@ -4948,12 +5005,17 @@ def _build_dependencies_index():
         manifest_cache[cache_key] = _worker_manifest(col['platform'], tag)
       man = manifest_cache[cache_key]
       col['ready'] = isinstance(man, dict)
+      col['installer'] = man.get('installer', 'vipm') if isinstance(man, dict) else ('lvpm' if tag.startswith('linux-lvpm-') else 'vipm')
+      col['verification'] = man.get('verification', {}) if isinstance(man, dict) else {}
+      if col['installer'] == 'lvpm':
+        col['freshness'] = _lvpm_local_freshness(tag, man)
+        col['ready'] = col['ready'] and col['freshness'].get('status') == 'current'
       col['packages'] = _manifest_packages(man)
       col['failed_packages'] = _manifest_failed_packages(man)
-      col['nipkg_ready'] = isinstance(man, dict)
+      col['nipkg_ready'] = isinstance(man, dict) and isinstance(man.get('nipkg_packages'), list)
       col['nipkg_packages'] = _manifest_nipkg_packages(man)
       col['labview_version'] = man.get('labview_version', '') if isinstance(man, dict) else ''
-      col['version'] = man.get('version', tag) if isinstance(man, dict) else tag
+      col['version'] = (man.get('tag') or man.get('version', tag)) if isinstance(man, dict) else tag
     else:
       col['ready'] = True
       col['packages'] = []
@@ -4962,6 +5024,10 @@ def _build_dependencies_index():
       col['nipkg_packages'] = []
       col['labview_version'] = ''
       col['version'] = tag
+  candidate_pointer = http_json(f'{pages_url}/workers/linux-lvpm/latest.json')
+  candidate_tag = candidate_pointer.get('tag', '') if isinstance(candidate_pointer, dict) else ''
+  candidate_path = f'workers/linux-lvpm/{candidate_tag}/manifest.json'
+  candidate = http_json(f'{pages_url}/{candidate_path}') if re.fullmatch(r'linux-lvpm-[a-f0-9]{64}', candidate_tag) and candidate_pointer.get('manifest_path') == candidate_path else None
   data = {
     'schema': 1,
     'repo': repo,
@@ -4981,6 +5047,7 @@ def _build_dependencies_index():
     'dragon': _build_dragon_section(config),
     'system': _system_dependencies(),
     'columns': columns,
+    'linux_lvpm_candidate': candidate,
   }
   with open('ci-out/dashboard/dependencies/index.json', 'w', encoding='utf-8') as fh:
     json.dump(data, fh, indent=2, ensure_ascii=True)
