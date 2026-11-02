@@ -1,0 +1,31 @@
+name: Reconfigure Preservation Checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/reconfigure.yml'
+      - '.github/workflows/reconfigure-checks.yml'
+      - '.github/labview/test-reconfigure.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/reconfigure.yml'
+      - '.github/workflows/reconfigure-checks.yml'
+      - '.github/labview/test-reconfigure.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preservation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install configuration parser
+        run: python -m pip install PyYAML==6.0.3
+      - name: Verify scoped updates preserve client configuration
+        run: python .github/labview/test-reconfigure.py -v

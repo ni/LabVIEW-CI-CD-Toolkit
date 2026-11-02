@@ -2181,6 +2181,11 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         <li><strong>Dependabot</strong> opens a PR whenever the pinned major alias tag moves; merging it is the
           opt-in.</li>
       </ul>
+      <p>Reconfigure applies only explicitly requested settings to the parsed existing manifest rather than
+        regenerating the entire file. Separate VIPC and Dragon declarations, explicit false dependency policies,
+        operating systems, provenance, and unknown client fields are preserved. Blank or unchanged requests keep
+        the file byte-identical, including comments; actual updates may normalize YAML formatting. Invalid YAML
+        or a non-mapping configuration path is rejected before the manifest is written.</p>
       <p>Upgrade preservation covers the complete existing project configuration, not just runner concurrency.
         <code>Unit Test Runner Checks</code> exercises manifest upgrades alongside execution and report regressions,
         and is triggered by installer changes as well as unit-test runtime changes.</p>
