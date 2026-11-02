@@ -502,7 +502,9 @@ jobs:
               f'    maxParallel: {max_parallel}',
           ]
           lines += ['  container:', f'    use: {container_use}']
-          if vipc:
+          if container_vipc_in.lower() == 'none':
+              lines.append('    vipc: []')
+          elif vipc:
               lines.append('    vipc:')
               for v in vipc:
                   p = str(v['path']).replace('"', '')
@@ -511,7 +513,9 @@ jobs:
                   lines.append(f"        monitor: {'true' if on else 'false'}")
                   if on and set(on) != set(ALL_MON_PLATFORMS):
                       lines.append(f"        monitorOn: {'+'.join(on)}")
-          if dragon:
+          if container_dragon_in.lower() == 'none':
+              lines.append('    dragon: []')
+          elif dragon:
               lines.append('    dragon:')
               for v in dragon:
                   p = str(v['path']).replace('"', '')
@@ -676,7 +680,7 @@ jobs:
                       update_path(('config', 'dependencyPolicy', key), value)
               if updated != original:
                   updated['configuredAt'] = now
-                  rendered = yaml.dump(updated, Dumper=ManifestDumper, sort_keys=False, allow_unicode=True)
+                  rendered = yaml.dump(updated, Dumper=ManifestDumper, sort_keys=False, allow_unicode=True, width=2**31 - 1)
               else:
                   rendered = original_text
           mpath.parent.mkdir(parents=True, exist_ok=True)

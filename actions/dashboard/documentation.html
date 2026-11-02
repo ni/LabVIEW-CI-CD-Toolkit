@@ -2100,7 +2100,9 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         or a non-mapping configuration path is rejected before the manifest is written.</p>
       <p>Changed manifests use the layout expected by existing tooling readers: indented dependency lists,
         path-first dependency records, double-quoted numeric strings, and inline OS lists. Dependencies also
-        recognizes adjacent VIPC, Dragon, and action sections without dropping a header. Scoped updates detach
+        recognizes adjacent VIPC, Dragon, and action sections without dropping a header. Scalar values are not
+        line-wrapped, and explicit <code>none</code> dependency selections remain configured empty lists rather
+        than falling back to automatic discovery. Scoped updates detach
         shared YAML mappings before editing so aliases cannot change unrelated client settings. A no-op remains
         byte-identical. If a prior update left an older dashboard unable to read the formatting, the saved values
         are still present: update tooling, then make an intentional settings change through the GitHub Reconfigure

@@ -259,11 +259,12 @@
         if (/^\s*viBrowser:\s*$/.test(line)) { sec = "viBrowser"; cur = null; return; }
         if (/^\S/.test(line)) { sec = ""; cur = null; }
         if (["container", "vipc", "dragon", "actions"].includes(sec)) {
-          const header = line.match(/^\s{4}(vipc|dragon|actions):\s*$/);
+          const header = line.match(/^\s{4}(vipc|dragon|actions):\s*(\[\]|\{\})?\s*$/);
           if (header) {
             sec = header[1]; cur = null;
             if (sec === "vipc") out.hasVipcList = true;
             if (sec === "dragon") out.hasDragonList = true;
+            if (header[2]) sec = "container";
             return;
           }
         }
