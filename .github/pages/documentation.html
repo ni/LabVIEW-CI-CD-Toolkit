@@ -2210,7 +2210,7 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         the file byte-identical, including comments; actual updates may normalize YAML formatting. Invalid YAML
         or a non-mapping configuration path is rejected before the manifest is written.</p>
       <p>Changed manifests use the layout expected by existing tooling readers: indented dependency lists,
-        path-first dependency records, double-quoted numeric strings, and inline OS lists. Dependencies also
+        path-first dependency records, config-first VI Analyzer rules, double-quoted numeric strings, and inline OS lists. Dependencies also
         recognizes adjacent VIPC, Dragon, and action sections without dropping a header. Scalar values are not
         line-wrapped, and explicit <code>none</code> dependency selections remain configured empty lists rather
         than falling back to automatic discovery. Scoped updates detach

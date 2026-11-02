@@ -168,6 +168,8 @@ jobs:
                   if isinstance(mapping, dict):
                       if 'path' in mapping:
                           order = ('path', 'monitor', 'monitorOn')
+                      elif 'config' in mapping and 'paths' in mapping:
+                          order = ('config', 'paths')
                       elif any(key in mapping for key in ('use', 'linuxUse', 'vipc', 'dragon', 'actions')):
                           order = ('use', 'linuxUse', 'vipc', 'dragon', 'actions')
                       elif 'container' in mapping or 'labviewVersion' in mapping:
