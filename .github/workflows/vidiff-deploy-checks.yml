@@ -9,6 +9,9 @@ on:
       - '.github/labview/validate-vidiff-deploy-metadata.py'
       - '.github/labview/test-vidiff-deploy.py'
       - '.github/labview/test-vidiff-deploy.mjs'
+      - '.github/labview/test-vidiff-distribution.py'
+      - '.github/labview-ci/catalog.json'
+      - '.github/labview-ci/install.py'
   push:
     branches: [main]
     paths:
@@ -18,6 +21,9 @@ on:
       - '.github/labview/validate-vidiff-deploy-metadata.py'
       - '.github/labview/test-vidiff-deploy.py'
       - '.github/labview/test-vidiff-deploy.mjs'
+      - '.github/labview/test-vidiff-distribution.py'
+      - '.github/labview-ci/catalog.json'
+      - '.github/labview-ci/install.py'
   workflow_dispatch:
 
 permissions:
@@ -28,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - uses: actions/setup-node@v6
@@ -37,6 +43,7 @@ jobs:
       - name: Validate workflow metadata guardrails and provenance checks
         run: |
           python .github/labview/test-vidiff-deploy.py
+          python .github/labview/test-vidiff-distribution.py
           node --test .github/labview/test-vidiff-deploy.mjs
       - name: Validate mocked suite under github-script v9 runtime
         uses: actions/github-script@v9

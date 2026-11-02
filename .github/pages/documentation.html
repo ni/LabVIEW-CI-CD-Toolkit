@@ -1765,13 +1765,17 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
           derives SHA/PR lineage and platform from the trusted <code>workflow_run</code> event, then fail-closes if
           <code>vidiff-meta.json</code> disagrees or falls outside strict SHA/PR/platform/outcome validation.
           Artifact extraction is path-safe and rejects ZIP entries with absolute paths, parent traversal, or symlink
-          members before writing to disk.
+          members before writing to disk. The VIDiff installer payload bundles both helper scripts
+          (<code>extract-vidiff-artifact.py</code> and <code>validate-vidiff-deploy-metadata.py</code>) on Windows,
+          Linux, and combined installs.
           For pull-request events where <code>workflow_run.pull_requests</code> is empty, it resolves PR association
           from the commit-to-PR API and requires exactly one trusted match. For manually dispatched historical
           diffs, it keeps the artifact&rsquo;s validated target SHA (instead of silently retargeting to
           <code>workflow_run.head_sha</code>) but only publishes when producer identity is trusted. For push/manual
           producers this requires a canonical producer <code>head_repository</code> plus producer-head ancestry on the
           repository default branch; manual targets also require target-SHA ancestry there.
+          Same-repository writers remain trusted for Pages publication because they already hold equivalent
+          repository privileges to modify <code>gh-pages</code> content directly.
           Fork PR artifacts never publish on the shared Pages origin; the PR comment and commit status
           link to the Actions artifact/run URL instead.</li>
         <li>The <strong>backfill</strong> variant walks <code>git log --reverse -- '*.vi' '*.ctl'</code>, creates
