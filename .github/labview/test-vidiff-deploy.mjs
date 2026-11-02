@@ -471,6 +471,127 @@ test('download script blocks workflow_dispatch publish when producer head reposi
   assert.equal(outputs.get('publish_reason'), 'untrusted-workflow-dispatch-producer');
 });
 
+test('download script permits push publish only for trusted producer lineage', async () => {
+  const outputs = new Map();
+  const context = {
+    repo: { owner: 'owner', repo: 'repo' },
+    payload: {
+      workflow_run: workflowRun({
+        event: 'push',
+        pull_requests: [],
+      }),
+    },
+  };
+  const expectedName = `vidiff-windows-${'a'.repeat(40)}`;
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({ data: { artifacts: [{ name: expectedName, id: 22 }] } }),
+        downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
+      },
+      repos: {
+        get: async () => ({ data: { default_branch: 'main' } }),
+        compareCommitsWithBasehead: async request => {
+          assert.equal(request.basehead, `${'a'.repeat(40)}...main`);
+          return { data: { status: 'ahead' } };
+        },
+      },
+    },
+  };
+
+  await runGithubScript(downloadScript, {
+    context,
+    github,
+    core: {
+      setOutput: (name, value) => outputs.set(name, String(value)),
+      warning: () => {},
+    },
+  });
+
+  assert.equal(outputs.get('publish_pages'), 'true');
+  assert.equal(outputs.get('publish_reason'), 'trusted');
+});
+
+test('download script blocks push publish when producer head is outside default-branch history', async () => {
+  const outputs = new Map();
+  const context = {
+    repo: { owner: 'owner', repo: 'repo' },
+    payload: {
+      workflow_run: workflowRun({
+        event: 'push',
+        pull_requests: [],
+      }),
+    },
+  };
+  const expectedName = `vidiff-windows-${'a'.repeat(40)}`;
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({ data: { artifacts: [{ name: expectedName, id: 22 }] } }),
+        downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
+      },
+      repos: {
+        get: async () => ({ data: { default_branch: 'main' } }),
+        compareCommitsWithBasehead: async request => {
+          assert.equal(request.basehead, `${'a'.repeat(40)}...main`);
+          return { data: { status: 'diverged' } };
+        },
+      },
+    },
+  };
+
+  await runGithubScript(downloadScript, {
+    context,
+    github,
+    core: {
+      setOutput: (name, value) => outputs.set(name, String(value)),
+      warning: () => {},
+    },
+  });
+
+  assert.equal(outputs.get('publish_pages'), 'false');
+  assert.equal(outputs.get('publish_reason'), 'untrusted-push-producer');
+});
+
+test('download script blocks push publish when producer head repository is unknown', async () => {
+  const outputs = new Map();
+  const context = {
+    repo: { owner: 'owner', repo: 'repo' },
+    payload: {
+      workflow_run: workflowRun({
+        event: 'push',
+        pull_requests: [],
+        head_repository: null,
+      }),
+    },
+  };
+  const expectedName = `vidiff-windows-${'a'.repeat(40)}`;
+  const github = {
+    rest: {
+      actions: {
+        listWorkflowRunArtifacts: async () => ({ data: { artifacts: [{ name: expectedName, id: 22 }] } }),
+        downloadArtifact: async () => ({ data: new Uint8Array([80, 75, 3, 4]) }),
+      },
+      repos: {
+        get: async () => ({ data: { default_branch: 'main' } }),
+        compareCommitsWithBasehead: async () => ({ data: { status: 'ahead' } }),
+      },
+    },
+  };
+
+  await runGithubScript(downloadScript, {
+    context,
+    github,
+    core: {
+      setOutput: (name, value) => outputs.set(name, String(value)),
+      warning: () => {},
+    },
+  });
+
+  assert.equal(outputs.get('publish_pages'), 'false');
+  assert.equal(outputs.get('publish_reason'), 'untrusted-push-producer');
+});
+
 test('download script rejects untrusted workflow provenance', async () => {
   const outputs = new Map();
   const context = {

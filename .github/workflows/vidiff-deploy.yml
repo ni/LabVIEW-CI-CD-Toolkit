@@ -114,6 +114,12 @@ jobs:
             const pr_number = prNumbers.length === 1 ? String(prNumbers[0]) : '';
             let publishPages = true;
             let publishReason = 'trusted';
+            const markUntrusted = reason => {
+              if (publishPages) {
+                publishPages = false;
+                publishReason = reason;
+              }
+            };
             if (pr_number) {
               const pull = await github.rest.pulls.get({
                 owner: context.repo.owner,
@@ -129,13 +135,10 @@ jobs:
               if (headSha !== runHeadSha) {
                 throw new Error(`PR #${pr_number} head SHA mismatch for workflow_run lineage.`);
               }
-              if (headRepo !== expectedRepo) {
-                publishPages = false;
-                publishReason = 'untrusted-fork-pr';
-              }
               if (!headRepo) {
-                publishPages = false;
-                publishReason = 'untrusted-missing-pr-head-repo';
+                markUntrusted('untrusted-missing-pr-head-repo');
+              } else if (headRepo !== expectedRepo) {
+                markUntrusted('untrusted-fork-pr');
               }
             }
             const runConclusion = String(workflowRun.conclusion || '').toLowerCase();
@@ -181,11 +184,10 @@ jobs:
             if (typeof art.id !== 'number' || art.id <= 0) {
               throw new Error(`Invalid artifact id for ${art.name}`);
             }
-            if (sourceEvent === 'workflow_dispatch' && publishPages) {
+            if (['workflow_dispatch', 'push'].includes(sourceEvent) && publishPages) {
               const producerHeadRepo = workflowRun.head_repository && workflowRun.head_repository.full_name;
               if (producerHeadRepo !== expectedRepo) {
-                publishPages = false;
-                publishReason = 'untrusted-workflow-dispatch-producer';
+                markUntrusted(sourceEvent === 'push' ? 'untrusted-push-producer' : 'untrusted-workflow-dispatch-producer');
               }
               const repo = await github.rest.repos.get({
                 owner: context.repo.owner,
@@ -210,13 +212,13 @@ jobs:
               };
               const producerHeadReachable = await isDefaultReachable(runHeadSha);
               if (!producerHeadReachable) {
-                publishPages = false;
-                publishReason = 'untrusted-workflow-dispatch-producer';
+                markUntrusted(sourceEvent === 'push' ? 'untrusted-push-producer' : 'untrusted-workflow-dispatch-producer');
               }
-              const targetHeadReachable = await isDefaultReachable(trustedHeadSha);
-              if (!targetHeadReachable) {
-                publishPages = false;
-                publishReason = 'untrusted-workflow-dispatch-target';
+              if (sourceEvent === 'workflow_dispatch') {
+                const targetHeadReachable = await isDefaultReachable(trustedHeadSha);
+                if (!targetHeadReachable) {
+                  markUntrusted('untrusted-workflow-dispatch-target');
+                }
               }
             }
             const dl = await github.rest.actions.downloadArtifact({

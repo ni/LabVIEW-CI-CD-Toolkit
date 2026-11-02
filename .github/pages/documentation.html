@@ -1769,8 +1769,9 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
           For pull-request events where <code>workflow_run.pull_requests</code> is empty, it resolves PR association
           from the commit-to-PR API and requires exactly one trusted match. For manually dispatched historical
           diffs, it keeps the artifact&rsquo;s validated target SHA (instead of silently retargeting to
-          <code>workflow_run.head_sha</code>) but only publishes when both the producer head SHA and target SHA are
-          reachable from the repository default branch and the producer head repository is the base repository.
+          <code>workflow_run.head_sha</code>) but only publishes when producer identity is trusted. For push/manual
+          producers this requires a canonical producer <code>head_repository</code> plus producer-head ancestry on the
+          repository default branch; manual targets also require target-SHA ancestry there.
           Fork PR artifacts never publish on the shared Pages origin; the PR comment and commit status
           link to the Actions artifact/run URL instead.</li>
         <li>The <strong>backfill</strong> variant walks <code>git log --reverse -- '*.vi' '*.ctl'</code>, creates
