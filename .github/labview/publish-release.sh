@@ -145,8 +145,10 @@ out = []
 if rel.get('summary'): out += [rel['summary'], '']
 if rel.get('notes'):   out += [rel['notes'], '']
 for h in rel.get('highlights') or []: out.append(f'- {h}')
-out += ['', 'Consumers pinned at the major alias (e.g. `@v%s`) receive this automatically.'
-        % (str(c.get('version','1')).split('.')[0])]
+out += ['', 'Publication does not promote this release to beta or stable. '
+        'The major alias (e.g. `@v%s`) follows stable promotions, not every publication. '
+        'Pin the immutable tag `@v%s` to opt into this release explicitly.'
+        % (str(c.get('version','1')).split('.')[0], c.get('version',''))]
 open('/tmp/reltitle.txt','w').write(rel.get('title') or f"LabVIEW CI {c.get('version','')}")
 print('\n'.join(out))
 PY
@@ -164,7 +166,9 @@ fi
   echo "## Released ${TAG}"
   echo ""
   echo "- Immutable tag \`${TAG}\` published."
-  echo "- Aliases \`${MAJOR_ALIAS}\` and \`${MINOR_ALIAS}\` now point at \`${TAG}\`."
+  echo "- Minor alias \`${MINOR_ALIAS}\` tracks the newest patch on its line."
+  echo "- Major alias \`${MAJOR_ALIAS}\` follows stable promotions, not every publication."
+  echo "- Configured stable release: \`${STABLE_VER:-not configured}\`."
   echo ""
-  echo "Consumers pinned at \`@${MAJOR_ALIAS}\` get this update automatically — no token, no action."
+  echo "Publication does not promote beta or stable. Pin \`@${TAG}\` to opt in explicitly."
 } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"

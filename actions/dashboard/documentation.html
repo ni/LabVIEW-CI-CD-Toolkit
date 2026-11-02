@@ -2258,6 +2258,9 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         the development tip. Pin <code>@beta</code> for release candidates, <code>@dev</code> for every build, or
         <code>@v&lt;major&gt;.&lt;minor&gt;</code> to follow one line. The major alias never moves backwards, so an
         automatic update can never downgrade a consumer.</p>
+      <p>Published release notes and workflow summaries distinguish publication from promotion. A successful
+        release does not itself move the stable or beta channel. To test a newly published version before
+        promotion, select its immutable version tag explicitly rather than assuming <code>@v4</code> has advanced.</p>
       <p>The browser <strong>Apply to New Repo</strong> flow (re-applied on top of an existing install) mirrors the
         same prune: when it re-vendors a tooling directory it deletes any target file the source no longer ships,
         except the consumer's own preserved config — so re-applying after a file is removed upstream stays in sync
