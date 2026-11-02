@@ -679,7 +679,7 @@
     // ---- file resolution (mirrors install.py) ----------------------------
     function resolveActivities(activities) {
       const map = {}; catalog.capabilities.forEach(c => map[c.id] = c);
-      const chosen = []; const stack = [...activities];
+      const chosen = []; const stack = activities.map(id => id === "snapshots-2" ? "snapshots" : id);
       while (stack.length) {
         const id = stack.shift();
         if (chosen.includes(id)) continue;
@@ -2566,7 +2566,7 @@
       const u = new Set([...((catalog.base && catalog.base.files) || [])]);
       (catalog.capabilities || []).forEach(c => {
         const f = c.files || {};
-        [].concat(f.any || [], f.windows || [], f.linux || []).forEach(x => { if (x && !x.endsWith("/")) u.add(x); });
+        [].concat(f.any || [], f.windows || [], f.linux || []).forEach(x => { if (x) u.add(x); });
       });
       return u;
     }
@@ -2598,14 +2598,14 @@
       let activities = [...selected], osList = [...osSel], version = $("version").value;
       if (keepSettings && priorState && priorState.manifest) {
         const m = priorState.manifest;
-        const acts = (m.activities || []).filter(a => { const c = byId(a); return c && c.status !== "planned"; });
+        const acts = resolveActivities(m.activities || []).filter(a => { const c = byId(a); return c && c.status !== "planned"; });
         if (acts.length) activities = acts;
         if (m.os && m.os.length) osList = m.os.slice();
         // Do NOT carry a prior manifest's labviewVersion forward: the version is
         // locked to the supported year (see renderVersions), so reinstalling a repo
         // that was pinned to an unsupported year heals it instead of re-breaking.
       }
-      return { activities, osList, version };
+      return { activities: resolveActivities(activities), osList, version };
     }
 
     // Tooling files the previous install left that THIS install won't write, so
@@ -2649,27 +2649,41 @@
       return { manifest, branch, canKeep, managedFiles };
     }
 
+    function retiredWorkflowSignatures(p) {
+      if (!/^\.github\/workflows\/[A-Za-z0-9_-]+\.ya?ml$/.test(p) || isUserConfig(p)) return null;
+      const retired = catalog.retiredFiles || {};
+      if (!(retired.files || []).includes(p)) return null;
+      const current = [...managedUniverse()];
+      if (current.some(e => e === p || (e.endsWith("/") && p.startsWith(e)))) return null;
+      const markers = (retired.signatures || {})[p];
+      return Array.isArray(markers) && markers.length && markers.every(s => typeof s === "string" && s.trim()) ? markers : null;
+    }
+
     async function inventoryManagedFiles(repo, branch) {
       const t = await ghWrite(`/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, null, "list your repository's files");
       const paths = (t.tree || []).filter(x => x.type === "blob").map(x => x.path);
       const universe = managedUniverse();
       const managed = new Set();
       const sigCandidates = [];
+      const retiredCandidates = [];
       paths.forEach(p => {
         if (p === ".github/labview-ci.yml" || isUserConfig(p)) return;
         if (p.startsWith(".github/labview-ci/") || p.startsWith(".github/labview/")) { managed.add(p); return; }
         if (/^\.github\/workflows\/[^/]+\.ya?ml$/.test(p)) {
           if (universe.has(p)) managed.add(p);   // a current tooling workflow
+          else if (retiredWorkflowSignatures(p)) retiredCandidates.push(p);
           else sigCandidates.push(p);            // unknown — scan its content
         }
       });
       // Only unknown workflow names need a content fetch (renamed/retired tooling
       // vs. the user's own workflows). Bounded so a huge repo can't fan out.
-      for (const p of sigCandidates.slice(0, 40)) {
+      for (const p of [...retiredCandidates, ...sigCandidates.slice(0, 40)]) {
         try {
           const c = await gh(`/repos/${repo}/contents/${encodeURIComponent(p)}?ref=${encodeURIComponent(branch)}`);
           if (!c.ok) continue;
-          if (LVCI_WF_SIG.test(b64decodeText((await c.json()).content || ""))) managed.add(p);
+          const text = b64decodeText((await c.json()).content || "");
+          const markers = retiredWorkflowSignatures(p);
+          if (markers ? markers.every(marker => text.includes(marker)) : LVCI_WF_SIG.test(text)) managed.add(p);
         } catch (_) { /* skip on error */ }
       }
       return managed;

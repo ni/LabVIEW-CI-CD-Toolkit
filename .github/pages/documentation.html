@@ -434,6 +434,16 @@ flowchart TD
         alternative is the <code>install.py</code> command-line installer. Both read the same catalog and produce
         the same result.</p>
 
+      <p>Updates migrate the legacy <code>snapshots-2</code> selection to the unified
+        <code>snapshots</code> capability, including browser reinstalls that keep current settings.
+        Snapshots remain selectable; updates do not enable them in clients that opted out.</p>
+      <p>The catalog's <code>retiredFiles</code> list identifies obsolete tooling workflows, with
+        ownership signatures checked before deletion. The retired <code>build-toimages-image.yml</code>
+        workflow is removed by the command-line installer; browser reinstalls offer it in the existing
+        stale-file cleanup preview. Unrecognized content is preserved. Command-line cleanup skips
+        symlinks and directories, and installation refuses source checkouts and forks carrying
+        source-only release or relocation files. Test installs belong in a separate scratch client.</p>
+
       <h3>GitLab CI</h3>
       <p>Pass <code>--provider gitlab</code> to the command-line installer, or choose GitLab in the browser
         configurator. It copies the portable LabVIEW drivers under <code>.github/</code>, a native provider package
@@ -906,6 +916,7 @@ flowchart TD
   "schemaVersion": 1,
   "version": "3.24.5",            // must equal history.releases[0].version
   "history": { "releases": [ { "version": "...", "title": "...", "highlights": [...] } ] },
+  "retiredFiles": { "files": [ ... ], "signatures": { "workflow-path": ["ownership marker", "build context"] } },
   "base":   { "files": [ ... ] }, // always installed (dashboard chrome, manifest, …)
   "capabilities": [
     {
@@ -2062,7 +2073,9 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         share links preserve the revision, VI, pane, and platform. Coaching tips can be dismissed locally.</p>
       <p>A VI without frames shows a render-needed, running, or failed state with a link to the render workflow.
         There is no static-image fallback. Use Populate history to generate snapshots for older revisions.
-        Older snapshot links and saved configuration are accepted and open the interactive viewer.</p>
+        Older snapshot links and saved configuration are accepted and open the interactive viewer.
+        Installing the capability makes the renderer workflows available for the selected operating systems;
+        it does not queue historical renders or expand a selected revision scope.</p>
 
       <h3 id="cap-sbom">16.7 SBOM Generation <a class="anchor" href="#cap-sbom">#</a></h3>
       <h4>At a glance</h4>
@@ -2218,6 +2231,10 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         <li><strong>Dependabot</strong> opens a PR whenever the pinned major alias tag moves; merging it is the
           opt-in.</li>
       </ul>
+      <p>Tooling updates retain a selected legacy <code>snapshots-2</code> activity as unified
+        <code>snapshots</code> and clean recognized retired image-build tooling without enabling an
+        opted-out capability. Reconfigure migrates the activity alias when activities are explicitly
+        submitted; a blank request preserves the existing manifest unchanged.</p>
       <p>Reconfigure applies only explicitly requested settings to the parsed existing manifest rather than
         regenerating the entire file. Separate VIPC and Dragon declarations, explicit false dependency policies,
         operating systems, provenance, and unknown client fields are preserved. Blank or unchanged requests keep

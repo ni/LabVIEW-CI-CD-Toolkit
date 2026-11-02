@@ -4488,6 +4488,12 @@
       ".github/labview/vipm/ci-tooling.vipc"
     ]
   },
+  "retiredFiles": {
+    "files": [".github/workflows/build-toimages-image.yml"],
+    "signatures": {
+      ".github/workflows/build-toimages-image.yml": ["group: build-toimages-image", ".github/labview/toimages"]
+    }
+  },
   "base": {
     "comment": "Always installed: the self-describing tooling so the target repo can re-run, inspect, or upgrade the install.",
     "files": [
