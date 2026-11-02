@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "97733445462f2c49cdea2c4dcf5eb4564a01e324",
+  "sha": "e2b457e311196c645da1be563e690b48a3ad2e24",
   "revisions": [
+    {
+      "sha": "e2b457e311196c645da1be563e690b48a3ad2e24",
+      "short": "e2b457e",
+      "message": "Merge pull request #94 from ni/lvci-release/release-4.18.7-7d5ee618b305a2736c2b9bc1369503c540202f2a",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T13:23:35Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "7d5ee618b305a2736c2b9bc1369503c540202f2a",
+      "short": "7d5ee61",
+      "message": "Prepare release 4.18.7",
+      "author": "github-actions[bot]",
+      "date": "2026-11-02T13:17:12Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "97733445462f2c49cdea2c4dcf5eb4564a01e324",
       "short": "9773344",
@@ -883,24 +901,6 @@
       "author": "MIpetrov-NI",
       "date": "2026-08-12T20:24:21Z",
       "project": true,
-      "dep_only": false
-    },
-    {
-      "sha": "50db9eef28e655d9d0e626c7ab8617802bac5788",
-      "short": "50db9ee",
-      "message": "Merge branch 'main' into main",
-      "author": "Elijah Kerry",
-      "date": "2026-08-12T16:30:35Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "cb4611eabf47ed066128b7ea5c5d7d794e819d34",
-      "short": "cb4611e",
-      "message": "Skip Pages publishing for fork pull requests",
-      "author": "elijah286",
-      "date": "2026-08-12T16:27:18Z",
-      "project": false,
       "dep_only": false
     },
     {
