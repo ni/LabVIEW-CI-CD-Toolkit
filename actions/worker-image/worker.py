@@ -43,7 +43,6 @@ def stage(context, workspace, deps_dir, include_tooling):
             single_line(path.name)
             if path.is_symlink() or path.parent != deps or not path.is_file():
                 raise ValueError('Stage dependency files directly in deps-dir; nested files and links are unsupported')
-            # ci-tooling* is best-effort in the source installer: never silently classify project deps that way.
             if path.name.lower() in names or path.name.lower().startswith('ci-tooling'):
                 raise ValueError(f'Reserved or duplicate dependency filename: {path.name}')
             names.add(path.name.lower())
@@ -57,7 +56,6 @@ def stage(context, workspace, deps_dir, include_tooling):
 def fingerprint(context, inputs):
     files = {path.relative_to(context).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
              for path in sorted(context.rglob('*')) if path.is_file()}
-    # Include orchestration semantics as well as every byte Docker can COPY.
     files['worker.py'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     payload = json.dumps({'files': files, 'inputs': inputs}, sort_keys=True, separators=(',', ':'))
     return 'win-' + hashlib.sha256(payload.encode()).hexdigest()[:24]
@@ -70,8 +68,6 @@ def run(args):
 def digest(reference, allow_missing=False):
     result = subprocess.run(['crane', 'digest', reference], capture_output=True, text=True)
     if result.returncode:
-        # Authentication, permission, transport, rate limits and tool errors MUST fail.
-        # Only the registry's explicit missing-manifest code authorizes a build.
         if allow_missing and re.search(r'\b(?:MANIFEST_UNKNOWN|NAME_UNKNOWN)\b', result.stderr):
             return None
         raise RuntimeError(f'Cannot resolve registry image {reference}: {result.stderr.strip()}')
@@ -109,10 +105,9 @@ def publish(context, image, version, base, inputs, has_dependencies, latest):
             subprocess.run(['docker', 'push', ref], check=True)
         else:
             run(['crane', 'copy', base, ref])
-    final = digest(ref)  # Fail before moving aliases if publishing/verification failed.
+    final = digest(ref)
     if existing is not None and final != existing:
         raise RuntimeError('Content tag changed concurrently; refusing to move aliases')
-    # Pin alias operations to the verified digest, so concurrent tag movement cannot change their source.
     for tag in [inputs['LABVIEW_VERSION']] + (['latest'] if latest else []):
         run(['crane', 'tag', f'{image}@{final}', tag])
     return final, existing is None

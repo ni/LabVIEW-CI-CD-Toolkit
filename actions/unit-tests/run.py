@@ -26,16 +26,14 @@ def report_path(workspace, value):
 
 
 def verdict(summary, runner_code, fail_on_test_failure):
-    # Opting out of assertion failures never hides runner/infrastructure errors.
     if runner_code or summary['errored'] or not summary['tests']:
         return 1
     if not summary['passed'] and not summary['failed']:
-        return 1  # all skipped
+        return 1
     return int(fail_on_test_failure and summary['failed'] > 0)
 
 
 def render_report(report, workspace, version, pages):
-    # Load the current renderer without an additional shell or vendored copy.
     spec = importlib.util.spec_from_file_location('unit_report', SOURCE / '.github/labview/build-unittest-report.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -72,7 +70,6 @@ def main():
     image = single_line(os.environ['UT_IMAGE'])
     if not image or image.startswith('-'):
         raise ValueError('image must be an image reference')
-    # Do not let an old HTML/summary make a failed run look successful.
     report.mkdir(parents=True, exist_ok=True)
     for name in ('index.html', 'results.json'):
         (report / name).unlink(missing_ok=True)
@@ -89,7 +86,6 @@ def main():
     with tempfile.TemporaryDirectory(prefix='lvci-unit-', dir=os.environ['RUNNER_TEMP']) as directory:
         env_file = Path(directory) / 'runner.env'
         env_file.write_text(''.join(f'{key}={value}\n' for key, value in values.items()), encoding='utf-8')
-        # Windows PowerShell 5 drops empty/quoted native arguments; env-file preserves them.
         result = subprocess.run([
             'docker', 'run', '--rm', '--env-file', str(env_file),
             '-e', 'GITHUB_REPOSITORY', '-e', 'GITHUB_SHA',

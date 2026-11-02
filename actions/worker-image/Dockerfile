@@ -1,6 +1,4 @@
 # escape=`
-# Composite worker layer. Uses the current source installer staged by worker.py.
-# Mirrors the source worker's C:/vipm contract; Dragon is required here, never best-effort.
 ARG LCWC_BASE_IMAGE
 FROM ${LCWC_BASE_IMAGE}
 SHELL ["powershell", "-NoLogo", "-NoProfile", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
