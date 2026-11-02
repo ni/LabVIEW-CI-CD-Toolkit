@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "c4165551094fae6d3d705a22b3c6ede4a2f48822",
+  "sha": "71e63576ae63678b23dd170f207a2a2b07a0edfc",
   "revisions": [
+    {
+      "sha": "71e63576ae63678b23dd170f207a2a2b07a0edfc",
+      "short": "71e6357",
+      "message": "Merge pull request #96 from ni/lvci-release/release-4.19.0",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T15:18:43Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "d075ea237cb2a21da05c1f16836a483c4745ff83",
+      "short": "d075ea2",
+      "message": "Prepare release 4.19.0",
+      "author": "github-actions[bot]",
+      "date": "2026-11-02T14:59:24Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "c4165551094fae6d3d705a22b3c6ede4a2f48822",
       "short": "c416555",
@@ -882,24 +900,6 @@
       "message": "Merge pull request #55 from elijah286/feat/token-preflight",
       "author": "Elijah Kerry",
       "date": "2026-08-17T23:28:51Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "6be6a7042623e4fd9d7870bb9885a2f10027eede",
-      "short": "6be6a70",
-      "message": "Verify TOOLING_UPDATE_TOKEN before using it, and say so when it has expired",
-      "author": "elijah286",
-      "date": "2026-08-17T23:28:08Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5b0461ce2c6b5a62a02015c80ce908db8b189d16",
-      "short": "5b0461c",
-      "message": "documentation only vi analyzer",
-      "author": "daniel-coons",
-      "date": "2026-08-17T21:50:26Z",
       "project": false,
       "dep_only": false
     },
