@@ -4622,6 +4622,8 @@
       "files": {
         "any": [
           ".github/workflows/vidiff-deploy.yml",
+          ".github/labview/extract-vidiff-artifact.py",
+          ".github/labview/validate-vidiff-deploy-metadata.py",
           ".github/labview/backfill-vidiff-statuses.sh",
           ".github/labview/PrintToSingleFileHtml/"
         ],
