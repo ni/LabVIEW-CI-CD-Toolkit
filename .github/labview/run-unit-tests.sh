@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-exec python3 - "$@" <<'PY'
+exec python3 -I -S - "$@" <<'PY'
 import glob
 import json
 import os

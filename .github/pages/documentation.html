@@ -2053,6 +2053,8 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       <pre><code>docker run --rm -v "$GITHUB_WORKSPACE:/workspace" "$LABVIEW_CONTAINER_IMAGE" \
   bash /workspace/.github/labview/run-unit-tests.sh /workspace /workspace/ci-out/unit-tests/results</code></pre>
       <ul>
+        <li><strong>Python isolation.</strong> The Linux driver uses <code>python3 -I -S -</code> so client-root
+          modules, <code>PYTHONPATH</code> and site startup hooks cannot replace its standard-library imports.</li>
         <li><strong>LUnit.</strong> The driver runs enabled LUnit locations and records other enabled frameworks as
           <code>unsupported-on-linux</code> in <code>_tooling.json</code>. Reports show this as information,
           separately from missing tooling, and update the notice when switching platforms.</li>

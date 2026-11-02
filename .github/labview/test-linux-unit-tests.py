@@ -36,7 +36,7 @@ class LinuxRunnerTests(unittest.TestCase):
         self.config = self.workspace / '.github/labview-ci.yml'
         self.config.parent.mkdir()
         self.cli = self.workspace / 'fake cli'
-        self.cli.write_text('''#!/usr/bin/env python3
+        self.cli.write_text('''#!/usr/bin/env -S python3 -I -S
 import json, os, pathlib, subprocess, sys
 args = sys.argv[1:]
 pathlib.Path(os.environ['CAPTURE']).write_text(json.dumps(args))
@@ -83,10 +83,37 @@ if mode == 'nonzero': sys.exit(7)
 
     def run_runner(self, mode='pass'):
         return subprocess.run(['bash', str(ROOT / 'run-unit-tests.sh'), str(self.workspace), str(self.results)],
-                              env=dict(self.env, MODE=mode), capture_output=True, text=True, timeout=10)
+                              cwd=self.workspace, env=dict(self.env, MODE=mode), capture_output=True, text=True, timeout=10)
 
     def cases(self):
         return [case for path in self.results.glob('*.xml') for case in ET.parse(path).iter('testcase')]
+
+    def assert_poisoned_imports_ignored(self, directory):
+        self.configure()
+        marker = self.workspace / 'poison-imported'
+        for module in ['pathlib', 'glob', 'subprocess', 'sitecustomize', 'usercustomize']:
+            with self.subTest(module=module):
+                poison = directory / (module + '.py')
+                poison.write_text(f'open({str(marker)!r}, "w").write("imported")\nraise RuntimeError("poisoned import")\n')
+                self.capture.unlink(missing_ok=True)
+                try:
+                    result = self.run_runner()
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertFalse(marker.exists())
+                    args = json.loads(self.capture.read_text())
+                    self.assertEqual(args[args.index('-Path') + 1], str(self.workspace))
+                    self.assertEqual(len(self.cases()), 1)
+                    self.assertIsNone(self.cases()[0].find('error'))
+                finally:
+                    poison.unlink()
+
+    def test_client_root_cannot_shadow_driver_stdlib(self):
+        self.assert_poisoned_imports_ignored(self.workspace)
+
+    def test_pythonpath_cannot_shadow_driver_stdlib_or_run_startup_hooks(self):
+        with tempfile.TemporaryDirectory(prefix='lvci poisoned Python path ') as directory:
+            self.env['PYTHONPATH'] = directory
+            self.assert_poisoned_imports_ignored(Path(directory))
 
     def test_nested_config_spaces_literal_metacharacters_and_default_arguments(self):
         location = 'tests $(touch PWNED); "quoted"'
