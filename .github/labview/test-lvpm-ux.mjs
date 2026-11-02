@@ -497,7 +497,7 @@ for (const platform of ['windows', 'linux']) {
   assert.equal(sent.length, 1);
   assert.ok(sent[0].url.endsWith(platform === 'windows' ? '/build-labview-image.yml/dispatches' : '/build-labview-linux-image.yml/dispatches'));
   assert.equal(JSON.parse(sent[0].options.body).inputs.update_mode, 'replace');
-  if (platform === 'windows') assert.ok(requests.slice(start).every(request => !request.url.includes('raw.githubusercontent.com')));
+  if (platform === 'windows') assert.ok(requests.slice(start).every(request => new URL(request.url).hostname !== 'raw.githubusercontent.com'));
   activeConfig = oldConfig;
 }
 let releasePost;
@@ -641,23 +641,58 @@ assert.equal(platformTabs[0].attributes['aria-selected'], 'true');
 const header = fs.readFileSync(new URL('pages/lvci-header.js', root), 'utf8');
 const bannerSource = header.slice(header.indexOf("    try {\n      fetch(base + '/deps-pending.json'"), header.indexOf('    // VI Browser owns #commit-select'));
 assert.ok(bannerSource.includes('platform not identified'));
+function bannerElement(tagName){
+  const element = uiElement();
+  element.tagName = tagName;
+  element.children = [];
+  let content = '';
+  Object.defineProperty(element, 'innerHTML', {
+    get(){ throw new Error('Banner tests must inspect DOM nodes, not HTML'); },
+    set(){ throw new Error('Dependency banner must not parse HTML'); }
+  });
+  Object.defineProperty(element, 'textContent', {
+    get(){ return content + element.children.map(child => child.textContent).join(''); },
+    set(value){ content = String(value); element.children = []; }
+  });
+  element.appendChild = child => { element.children.push(child); return child; };
+  return element;
+}
+function bannerLinks(element){
+  return element.children.flatMap(child => child.tagName === 'a' ? [child] : bannerLinks(child));
+}
 for (const testCase of [
   { path:'/project/dependencies.html', containers:['linux'], show:false },
   { path:'/project/dashboard.html', containers:['linux'], show:true, labels:['Linux'], other:'Windows' },
   { path:'/project/vi-browser.html', containers:['windows-beta'], show:true, labels:['Windows'], other:'Linux' },
   { path:'/project/configure.html', containers:['windows','linux'], show:true, labels:['Windows','Linux'] },
-  { path:'/project/dashboard.html', containers:[], show:true, labels:[] }
+  { path:'/project/dashboard.html', containers:[], show:true, labels:[] },
+  { path:'/project/dashboard.html', containers:['linux', '<img src=x onerror=alert(1)>'], show:true, labels:['Linux'], other:'Windows', navBase:'https://owner.github.io/project/"/><img src=x onerror=alert(1)>' },
+  { path:'/project/dashboard.html', containers:['linux'], show:false, navBase:'javascript:alert(1)' },
+  { path:'/project/dashboard.html', containers:['linux'], show:false, navBase:'data:text/html,<script>alert(1)</script>' }
 ]) {
-  const banner = uiElement();
+  const banner = bannerElement('div');
   vm.runInNewContext(bannerSource, {
-    base:'/project', navBase:'/project', location:{pathname:testCase.path}, pendbar:banner,
+    base:'/project', navBase:testCase.navBase || '/project', location:{pathname:testCase.path, href:'https://owner.github.io' + testCase.path}, pendbar:banner,
+    URL,
+    document:{ createElement:bannerElement, createTextNode:value => {
+      const text = bannerElement('#text'); text.textContent = value; return text;
+    } },
     fetch:async () => ({ok:true, json:async () => ({pending:true, containers:testCase.containers, packages:['a'],dragon:[]})})
   });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(banner.classList.contains('show'), testCase.show);
   if (!testCase.show) continue;
-  assert.match(banner.innerHTML, /aggregate, not per-platform/);
-  for (const label of testCase.labels) assert.match(banner.innerHTML, new RegExp('dependencies.html\\?platform=' + label.toLowerCase()));
-  if (testCase.other) assert.doesNotMatch(banner.innerHTML, new RegExp('Review ' + testCase.other + ' dependencies'));
+  assert.match(banner.textContent, /aggregate, not per-platform/);
+  const links = bannerLinks(banner);
+  assert.equal(links.length, Math.max(1, testCase.labels.length));
+  for (const label of testCase.labels) {
+    const link = links.find(item => item.textContent === 'Review ' + label + ' dependencies ↗');
+    assert.ok(link);
+    assert.equal(new URL(link.href).searchParams.get('platform'), label.toLowerCase());
+  }
+  if (testCase.other) assert.doesNotMatch(banner.textContent, new RegExp('Review ' + testCase.other + ' dependencies'));
+  assert.ok(links.every(link => new URL(link.href).protocol === 'https:'));
+  assert.deepEqual(banner.children[0].children.map(child => child.tagName),
+    testCase.labels.length === 2 ? ['strong', 'span', 'a', '#text', 'a'] : ['strong', 'span', 'a']);
 }
 console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon checks plus OS-isolated status, monitoring preservation, tab keyboard/deep links, preview-only tooling, stale/historical blocking, cross-tab/revision/dirty dispatch races, obsolete approval/token cancellation, and shared-banner scope passed.');

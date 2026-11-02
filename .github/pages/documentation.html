@@ -1438,7 +1438,9 @@ docker run --rm `
       <p>Package rows, unresolved declaration details, native inventory, and candidate provenance are available on
         demand rather than shown as one large checklist. The aggregate dependency banner is replaced by the
         platform summary on Dependencies. Other dashboard pages name the affected platform(s), link to their
-        tabs, and label combined unresolved counts as aggregate rather than attributing them to both workers.</p>
+        tabs, and label combined unresolved counts as aggregate rather than attributing them to both workers.
+        Dependency banners render text and navigation with DOM nodes, not parsed HTML; review links allow only
+        HTTP(S) destinations.</p>
       <h3 id="linux-lvpm">Optional Linux LVPM environments (experimental)</h3>
       <p>The Dependencies page&rsquo;s <strong>Linux</strong> tab offers <strong>VIPM</strong> (the existing default) and <strong>LVPM</strong>
         as alternative installers for Linux. Windows behavior is unchanged. Switching tooling views in the page

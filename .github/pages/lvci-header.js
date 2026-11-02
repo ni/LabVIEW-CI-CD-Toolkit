@@ -2061,12 +2061,29 @@
               || (platform === 'windows' && (d.containers || []).indexOf('windows-beta') !== -1);
           });
           var labels = platforms.map(function (platform) { return platform === 'windows' ? 'Windows' : 'Linux'; });
-          pendbar.innerHTML = '<span class="lvci-dep-txt"><strong>Dependency attention: ' + (labels.join(' + ') || 'platform not identified') + '. </strong>'
-            + '<span class="lvci-dep-sub">' + (total ? total + ' unresolved dependency items across affected workers (aggregate, not per-platform). ' : 'Some dependency evidence is missing or unknown. ')
-            + 'Review each affected platform; this does not imply both workers need an update. </span>'
-            + (platforms.length ? platforms.map(function (platform) {
-              return '<a href="' + navBase + '/dependencies.html?platform=' + platform + '">Review ' + (platform === 'windows' ? 'Windows' : 'Linux') + ' dependencies &#8599;</a>';
-            }).join(' &middot; ') : '<a href="' + navBase + '/dependencies.html">Review dependency evidence &#8599;</a>') + '</span>';
+          var reviewUrl = new URL(navBase + '/dependencies.html', location.href);
+          if (reviewUrl.protocol !== 'https:' && reviewUrl.protocol !== 'http:') return;
+          var text = document.createElement('span');
+          text.className = 'lvci-dep-txt';
+          var heading = document.createElement('strong');
+          heading.textContent = 'Dependency attention: ' + (labels.join(' + ') || 'platform not identified') + '. ';
+          text.appendChild(heading);
+          var summary = document.createElement('span');
+          summary.className = 'lvci-dep-sub';
+          summary.textContent = (total ? total + ' unresolved dependency items across affected workers (aggregate, not per-platform). ' : 'Some dependency evidence is missing or unknown. ')
+            + 'Review each affected platform; this does not imply both workers need an update. ';
+          text.appendChild(summary);
+          (platforms.length ? platforms : [null]).forEach(function (platform, index) {
+            if (index) text.appendChild(document.createTextNode(' · '));
+            var link = document.createElement('a');
+            var target = new URL(reviewUrl.href);
+            if (platform) target.searchParams.set('platform', platform);
+            link.href = target.href;
+            link.textContent = platform ? 'Review ' + (platform === 'windows' ? 'Windows' : 'Linux') + ' dependencies ↗' : 'Review dependency evidence ↗';
+            text.appendChild(link);
+          });
+          pendbar.textContent = '';
+          pendbar.appendChild(text);
           pendbar.classList.add('show');
         })
         .catch(function () {});
