@@ -119,9 +119,11 @@ inclusion is not implied**. Replace these values with the PR's verified facts.
 ## Never edit `catalog.json`
 
 `.github/labview-ci/catalog.json` → `version` is the version of record: the
-release workflow reads it to cut the `v<MAJOR>.<MINOR>.<PATCH>` tag and force-move
-the `v<MAJOR>` alias every client pins to. It is release machinery, not a config
-file, and **CI owns it**. You should never have it open.
+release workflow reads it to cut the `v<MAJOR>.<MINOR>.<PATCH>` tag. Publication
+updates `dev` and the corresponding `v<MAJOR>.<MINOR>` alias; `v<MAJOR>` follows
+stable promotion, not every publication. It is release machinery, not a config
+file, and **CI owns its version and release history**. Capability-schema changes
+must leave those fields untouched.
 
 Every merge to main is published automatically. CI derives the next version from
 the highest published **tag** — never from the file — so a stale or conflicted
@@ -140,8 +142,8 @@ happens, falling back to your PR title.
 **A bump level.** As required by the release-impact policy, label the PR
 `release:patch` for an incremental fix, documentation, or maintenance update,
 `release:minor` for a new capability, or `release:major` for a breaking change.
-The workflow retains its patch default for legacy unlabeled PRs. Major moves
-`@v<major>`, so it should be rare.
+The workflow retains its patch default for legacy unlabeled PRs. A major bump
+signals incompatibility; it does not authorize channel promotion.
 
 To land something without publishing, put `[skip release]` in the merge commit
 message — but use it sparingly. Everything being published is what makes
