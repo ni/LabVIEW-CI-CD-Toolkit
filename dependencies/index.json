@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "71e63576ae63678b23dd170f207a2a2b07a0edfc",
+  "sha": "8f7cb5b94bdc57baf05d8ed822db5f3f297a0cea",
   "revisions": [
+    {
+      "sha": "8f7cb5b94bdc57baf05d8ed822db5f3f297a0cea",
+      "short": "8f7cb5b",
+      "message": "Merge pull request #97 from ni/fix/descriptive-generated-prs-20261102",
+      "author": "Elijah Kerry",
+      "date": "2026-11-02T20:56:42Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "dc4157385537074c6316abd70b8c9720a4329bce",
+      "short": "dc41573",
+      "message": "Describe generated PRs by features and changed settings",
+      "author": "elijah286",
+      "date": "2026-11-02T18:34:14Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "71e63576ae63678b23dd170f207a2a2b07a0edfc",
       "short": "71e6357",
@@ -882,24 +900,6 @@
       "message": "put in a debug line",
       "author": "daniel-coons",
       "date": "2026-08-17T23:50:26Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b8e3719ad9c414d54b8b516ae15bbc128eb5b0ff",
-      "short": "b8e3719",
-      "message": "Release 4.15.1 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-17T23:29:01Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "20c3d76610ee4c62a370066da0336ce47bbb4882",
-      "short": "20c3d76",
-      "message": "Merge pull request #55 from elijah286/feat/token-preflight",
-      "author": "Elijah Kerry",
-      "date": "2026-08-17T23:28:51Z",
       "project": false,
       "dep_only": false
     },
