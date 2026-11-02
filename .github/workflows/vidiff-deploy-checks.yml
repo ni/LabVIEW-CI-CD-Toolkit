@@ -38,3 +38,15 @@ jobs:
         run: |
           python .github/labview/test-vidiff-deploy.py
           node --test .github/labview/test-vidiff-deploy.mjs
+      - name: Validate mocked suite under github-script v9 runtime
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { spawnSync } = require('node:child_process');
+            const result = spawnSync(process.execPath, ['--test', '.github/labview/test-vidiff-deploy.mjs'], {
+              stdio: 'inherit',
+            });
+            if (result.error) throw result.error;
+            if (result.status !== 0) {
+              throw new Error(`node --test exited with status ${result.status}`);
+            }
