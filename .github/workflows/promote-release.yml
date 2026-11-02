@@ -41,6 +41,7 @@ concurrency:
 
 permissions:
   contents: write   # commit the catalog edit to the default branch (built-in token; no PAT)
+  pull-requests: write
 
 jobs:
   promote:
@@ -82,7 +83,8 @@ jobs:
           python3 .github/labview/promote-release.py "${ARGS[@]}"
           python3 -c "import json;json.load(open('.github/labview-ci/catalog.json'))"  # validity re-check
 
-      - name: Commit and push to the default branch
+      - name: Commit the promotion or open a review PR
+        id: catalog
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -90,6 +92,7 @@ jobs:
           CAT=.github/labview-ci/catalog.json
           if git diff --quiet -- "$CAT"; then
             echo "::warning::No catalog change produced; nothing to promote."
+            echo "published=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name  "github-actions[bot]"
@@ -97,16 +100,8 @@ jobs:
           NEWVER=$(python3 -c "import json;print(json.load(open('$CAT'))['version'])")
           STABLE=$(python3 -c "import json;print(json.load(open('$CAT')).get('stableVersion',''))")
           git add "$CAT"
-          git commit -m "Release channel: stable=${STABLE:-none} (catalog ${NEWVER}) [skip release]"
-          # The default branch is hot; rebase-and-retry a few times on a non-FF push.
-          for i in 1 2 3 4 5; do
-            if git push origin "HEAD:${GITHUB_REF_NAME}"; then echo "pushed"; exit 0; fi
-            echo "push rejected (attempt $i); rebasing on the latest default branch"
-            git fetch origin "${GITHUB_REF_NAME}"
-            git rebase "origin/${GITHUB_REF_NAME}" || { echo "::error::rebase conflict"; exit 1; }
-            sleep 3
-          done
-          echo "::error::could not push the promotion after retries"; exit 1
+          git commit -m "Prepare release channel: stable=${STABLE:-none} (catalog ${NEWVER})"
+          python3 .github/labview/release-catalog-pr.py push --version "$NEWVER" --kind promotion
 
       # Publish INSIDE this run. This step used to be absent: the job pushed the
       # catalog with the built-in GITHUB_TOKEN and relied on release.yml noticing,
@@ -116,12 +111,13 @@ jobs:
       # the rolling tag never moved either (the `beta` tag sat on v4.11.8 for
       # three weeks while betaVersion said 4.11.10).
       - name: Tag, move the channel tag, publish the release
+        if: steps.catalog.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/labview/publish-release.sh
 
       - name: Summary
-        if: always()
+        if: success() && steps.catalog.outputs.published == 'true'
         run: |
           CAT=.github/labview-ci/catalog.json
           STABLE=$(python3 -c "import json;print(json.load(open('$CAT')).get('stableVersion',''))" 2>/dev/null || echo "")

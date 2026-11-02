@@ -21,6 +21,8 @@ on:
       - '**.lvproj'
       - '**.lvlib'
       - '**.lvtest'
+      - '**.ps1'
+      - 'tests/**'
       - '!.github/**'
   push:
     branches: [main]
@@ -30,6 +32,8 @@ on:
       - '**.lvproj'
       - '**.lvlib'
       - '**.lvtest'
+      - '**.ps1'
+      - 'tests/**'
       - '!.github/**'
   workflow_dispatch:
     inputs:
@@ -286,7 +290,9 @@ jobs:
             passed=$(jq -r '.summary.passed // 0' "$OUT/results.json")
             failed=$(jq -r '((.summary.failed // 0) + (.summary.errored // 0))' "$OUT/results.json")
             if [ "${tests:-0}" -eq 0 ]; then
-              STATE="success"; DESC="No unit tests found"
+              STATE="failure"; DESC="No unit tests found"
+            elif [ "${passed:-0}" -eq 0 ] && [ "${failed:-0}" -eq 0 ]; then
+              STATE="failure"; DESC="All unit tests skipped"
             elif [ "${failed:-0}" -eq 0 ]; then
               STATE="success"; DESC="${passed} passed"
             else
@@ -300,12 +306,15 @@ jobs:
           # A pull failure means the tests never ran; make the status say so.
           if [ "${{ steps.pull.outcome }}" != "success" ]; then
             DESC="Worker image unavailable - build it via Configure Workers"
+          elif [ "${{ steps.run.outcome }}" != "success" ]; then
+            STATE="failure"; DESC="Unit test runner failed or did not run"
           fi
           curl -s -X POST \
             -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/statuses/${{ steps.sha.outputs.sha }}" \
             -d "{\"state\":\"$STATE\",\"target_url\":\"$REPORT_URL\",\"description\":\"$DESC\",\"context\":\"CI / Unit Tests\"}"
+          if [ "$STATE" != "success" ]; then exit 1; fi
 
       - name: Post worker version status
         if: always() && steps.pull.outcome == 'success' && steps.worker.outputs.version != ''

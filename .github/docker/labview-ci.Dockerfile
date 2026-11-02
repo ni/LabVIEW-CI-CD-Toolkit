@@ -31,7 +31,8 @@ RUN $vipcFiles = Get-ChildItem -Path 'C:\vipm' -Filter '*.vipc' -Recurse -ErrorA
     if ($vipcFiles -and $vipcFiles.Count -gt 0) { `
       if (Test-Path 'C:\vipm\install-vipc.ps1') { `
         Write-Host 'VIPC files detected. Running C:\vipm\install-vipc.ps1 ...'; `
-        powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File 'C:\vipm\install-vipc.ps1' `
+        powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File 'C:\vipm\install-vipc.ps1'; `
+        if ($LASTEXITCODE -ne 0) { throw ('Required VIPM dependency bake failed with exit ' + $LASTEXITCODE) } `
       } else { `
         throw 'VIPC files were detected in C:\vipm but install-vipc.ps1 was not provided.' `
       } `

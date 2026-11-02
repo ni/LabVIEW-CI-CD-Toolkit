@@ -49,7 +49,7 @@
         "version": "0.5.0.1",
         "include": true,
         "summary": "G Image by dataflow_g - read/write/encode images (PNG/JPEG/BMP) in LabVIEW; used by the VI Browser snapshot generator to embed the rendered diagram and front-panel images in its HTML output.",
-        "note": "Action-runner tooling, not a project dependency: the VI Snapshots (VI Browser 1.0) HTML generator uses it to encode/embed images, so it lives in the core CI tooling rather than in any one project's VIPC."
+        "note": "Action-runner tooling, not a project dependency: the VI Snapshots (VI Browser) HTML generator uses it to encode/embed images, so it lives in the core CI tooling rather than in any one project's VIPC."
       },
       {
         "name": "astemes_lib_lunit",

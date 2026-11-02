@@ -166,9 +166,9 @@
     <main class="content">
       <div class="repo-home">
         This documentation describes the
-        <a class="lvci-repo-link" data-show-name href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">LabVIEW-CI-with-Containers</a>
+        <a class="lvci-repo-link" data-show-name href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">LabVIEW-CI-CD-Toolkit</a>
         tooling, maintained by
-        <a class="lvci-owner-link" href="https://github.com/elijah286" target="_blank" rel="noopener">elijah286</a>.
+        <a class="lvci-owner-link" href="https://github.com/ni" target="_blank" rel="noopener">NI</a>.
         Looking for short answers instead? See the <a href="faq.html">FAQ</a>.
       </div>
 
@@ -364,7 +364,7 @@ flowchart TD
   VA --> JOB
   VD --> JOB
   SN --> JOB
-  IMG["images&lt;br/&gt;ghcr.io/owner/repo-labview &mdash; build-labview-image (Windows) / build-labview-linux-image (Linux, incl. VI Browser 2.0 engine)&lt;br/&gt;nationalinstruments/labview &mdash; base layer (public)"] -.->|"pulled by"| JOB
+  IMG["images&lt;br/&gt;ghcr.io/owner/repo-labview &mdash; build-labview-image (Windows) / build-labview-linux-image (Linux, incl. VI Browser engine)&lt;br/&gt;nationalinstruments/labview &mdash; base layer (public)"] -.->|"pulled by"| JOB
   JOB -->|"commit status"| ST["status event"]
   ST --> DP["dashboard-pages.yml&lt;br/&gt;actions/dashboard"]
   DP --> GHP["gh-pages root&lt;br/&gt;index.html, reports, snapshots"]
@@ -379,7 +379,7 @@ flowchart TD
         <li><strong>Per-revision reports</strong> under content paths keyed by commit SHA
           (<code>masscompile/&lt;sha&gt;/</code>, <code>vi-analyzer/&lt;sha&gt;/</code>,
           <code>vidiff/&lt;segment&gt;/</code>).</li>
-        <li><strong>Content-addressed snapshots</strong> under <code>vi-snapshots/by-blob/&lt;ab&gt;/&lt;blob&gt;.html</code>.</li>
+        <li><strong>Content-addressed snapshots</strong> under <code>vi-snapshots/by-blob/&lt;ab&gt;/&lt;blob&gt;.json</code>.</li>
       </ul>
       <p class="plain"><span class="lbl">Where things actually run</span>
         Nothing in this picture runs on the tooling author's servers or NI's. The runner is GitHub's (or yours, if
@@ -401,8 +401,7 @@ flowchart TD
           <tr><td><strong>VIDiff</strong></td><td>Generates visual, side-by-side front-panel + block-diagram diffs of changed VIs between commits.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
           <tr><td><strong>Unit Tests</strong></td><td>Runs Caraya / LUnit / VI Tester / NI Unit Test Framework headlessly and merges JUnit output into one report.</td><td><span class="pill win">Win</span></td></tr>
           <tr><td><strong>Antidoc</strong></td><td>Generates project documentation from the VI hierarchy using Wovalab's Antidoc CLI.</td><td><span class="pill win">Win</span></td></tr>
-          <tr><td><strong>VI Snapshots / Browser</strong></td><td>Renders every VI to a content-addressed HTML snapshot gallery (the classic VI Browser).</td><td><span class="pill win">Win</span></td></tr>
-          <tr><td><strong>VI Snapshots 2.0</strong></td><td>Position-aware, in-place VI Browser frames (JSON) rendered by the cross-platform toimages engine.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
+          <tr><td><strong>VI Snapshots</strong></td><td>Position-aware, in-place VI Browser frames (JSON) rendered by the cross-platform toimages engine.</td><td><span class="pill win">Win</span> <span class="pill lin">Linux</span></td></tr>
           <tr><td><strong>Dashboard</strong></td><td>Aggregates everything above into a single status page on GitHub Pages.</td><td>runner host</td></tr>
         </tbody>
       </table>
@@ -504,7 +503,7 @@ flowchart TD
       <pre><code>schemaVersion: 1
     installedVersion: 4.17.4
 source:
-  repo: elijah286/LabVIEW-CI-with-Containers
+  repo: ni/LabVIEW-CI-CD-Toolkit
       ref:  v4.17.4            # pinned to an IMMUTABLE tag, never "main"
   distribution:            # archive origin chosen by the bootstrapper
     host: gitlab
@@ -580,7 +579,7 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
         <code>linux-&lt;sha&gt;</code> and <code>linux-latest</code>. Let a first worker build finish before a job that
         needs baked dependencies consumes it. On a fresh installation, the default-branch pipeline starts that worker
         because the manifest changed; for a web/manual pipeline, start the relevant <code>lvci:worker-*</code> job
-        first, then run the dependent verification job. The Linux Snapshots 2.0 renderer requires that custom Linux worker or
+        first, then run the dependent verification job. The Linux snapshot renderer requires that custom Linux worker or
         an explicit <code>LVCI_LINUX_IMAGE</code>; without either it records a diagnostic and skips rather than pulling
         a non-existent registry tag.</p>
       <p>GitLab Pages is durable rather than a per-pipeline report folder. The serialized <code>pages</code> job restores
@@ -589,7 +588,7 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
         history despite GitLab artifacts normally being scoped to one pipeline.</p>
       <div class="warn"><span class="lbl">Current GitLab parity boundary</span>
         Native templates cover custom images, Mass Compile, VI Analyzer, Unit Tests, Antidoc, SBOM Generation,
-        Builds, VIDiff, classic Snapshots, and Snapshots 2.0. The GitLab dashboard is intentionally a basic static
+        Builds, VIDiff, and Snapshots. The GitLab dashboard is intentionally a basic static
         index, not the GitHub dashboard's live status/configuration UI. GitLab currently does not add VIDiff merge
         request comments, GitHub-style history backfills or manual configuration screens, or GitHub Release/generic
         package promotion for Builds artifacts.</div>
@@ -655,7 +654,7 @@ activities: [dashboard, masscompile, vi-analyzer, vidiff]</code></pre>
 
       <h3>Migrating or rehoming the project</h3>
       <p>A small relocation pointer (<code>.github/labview-ci/source.json</code>) lets the tooling's source move —
-        for example to an official NI repository — without breaking existing installs. If it names a different
+        now hosted at <code>ni/LabVIEW-CI-CD-Toolkit</code> — without breaking existing installs. If it names a different
         repo than the current one, the bootstrappers and the update workflow follow it automatically and re-pin a
         consumer's manifest to the new home on the next update. See <a href="#versioning">§18</a>.</p>
 
@@ -720,6 +719,16 @@ flowchart TD
         in one click and preserves your configuration; it never rebuilds your containers. Because your manifest is
         pinned to an immutable tag, updates are always something you choose, never something that happens to you.
         See <a href="#versioning">§18</a>.</p>
+      <p>The manifest writer preserves project-owned <code>config</code> blocks verbatim, including
+        <code>unitTests</code>, <code>container</code>, <code>builds</code>, and <code>concurrency</code>, while
+        refreshing the installer-owned LabVIEW version, branch, and OS fields. An existing image name is kept
+        unless explicitly overridden. This prevents an upgrade from silently disabling a native Caraya runner
+        or dropping its dependency selection. If an earlier upgrade already removed those blocks, restore them
+        from the last known-good manifest; preservation cannot reconstruct settings that are no longer present.</p>
+      <p>The legacy top-level <code>unitTests</code> block produced by Configure Pipeline is retained too.
+        Its JSON settings input accepts a single-line per-tool <code>command</code>; the workflow quotes it
+        safely and the runner decodes escaped paths and quotes before token substitution. Restore the native
+        wrapper command as well as enabling Caraya; enabling the framework alone selects its default scaffold.</p>
 
       <!-- 9 ───────────────────────────────────────────────────────────────── -->
       <h2 id="pages">9. The dashboard &amp; Pages site <a class="anchor" href="#pages">#</a></h2>
@@ -1095,12 +1104,12 @@ flowchart TD
 </div>
 
       <p>Linux builds are handled by <code>build-labview-linux-image.yml</code> on the same model. The Linux worker and
-        the standalone VI&nbsp;Browser&nbsp;2.0 render image also bake a set of X11 core and TrueType fonts (DejaVu,
+        the standalone VI&nbsp;Browser&nbsp;snapshot render image also bake a set of X11 core and TrueType fonts (DejaVu,
         Liberation, Noto, and the 75/100&nbsp;dpi <code>xfonts-*</code> families) &mdash; NI&rsquo;s minimal Linux base
         ships almost none, and without them LabVIEW&rsquo;s UI controls and rendered VI text (VI&nbsp;Browser snapshots
         and the Debug&nbsp;Run desktop) come out blank. Images are pushed to <strong>your</strong> GitHub Container
         Registry (GHCR) as packages attached to your repo:</p>
-      <pre><code>ghcr.io/&lt;owner&gt;/&lt;repo&gt;-labview      # your LabVIEW worker (copied from the base, or base + your deps; the Linux worker also bakes the VI Browser 2.0 render engine)
+      <pre><code>ghcr.io/&lt;owner&gt;/&lt;repo&gt;-labview      # your LabVIEW worker (copied from the base, or base + your deps; the Linux worker also bakes the VI Browser render engine)
 ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, owned &amp; published by the source repo</code></pre>
       <p>The image inherits your repository's visibility and is authenticated with the job's built-in
         <code>GITHUB_TOKEN</code>. GHCR rejects uppercase names, so the owner/repo are lowercased at build time.</p>
@@ -1129,11 +1138,15 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         declare the bare form (<code>0.5.0.1</code>), the comparison normalizes that <code>v</code> prefix &mdash; without
         it, correctly-baked packages would be reported as missing and the &ldquo;dependencies need to be installed&rdquo;
         banner would never clear.</p>
-      <p>Dragon dependencies are reconciled against the current <strong>Windows worker</strong> manifest (the worker
+      <p>Dragon dependencies honor each file&rsquo;s <code>monitorOn</code> platforms. Windows declarations are
+        reconciled against the current <strong>Windows worker</strong> manifest (the worker
         rebuilt by <code>build-labview-image.yml</code>). If a manifest has not yet published a dedicated
         <code>dragon.items</code> status block, the dashboard falls back to the installed-package inventories
         (<code>vipm_packages</code> / <code>nipkg_packages</code>) so already-baked dependencies are marked installed
-        instead of staying stuck at <code>not_attempted</code>.</p>
+        instead of staying stuck at <code>not_attempted</code>. Linux declarations require the selected
+        digest-pinned LVPM inventory and locally current freshness, with exact VIPM name/version matches.
+        Unsupported native/NIPM dependencies and stale or unavailable Linux evidence remain unknown/pending.
+        Files monitored on both platforms are satisfied only when both platforms are satisfied.</p>
 
       <h3>When images rebuild</h3>
       <p>A worker rebuild is a heavy, opt-in operation. It runs when you apply a dependency update from the dashboard's
@@ -1394,14 +1407,117 @@ docker run --rm `
         without a captured VIPM list are treated conservatively by the dashboard, with only the known
         Windows core tooling VIPC inferred as installed.</p>
       <div class="note"><span class="lbl">Required essentials vs. best-effort tooling</span>
-        <code>install-vipc.ps1</code> installs the UTF JUnit essentials
+        <code>install-vipc.ps1</code> installs Caraya <code>1.4.4.148</code> and the UTF JUnit essentials
         (<code>ni_lib_utf_junit_report</code> + its <code>ni_lib_junit_results_api</code> /
         <code>ni_lib_simple_xml</code> deps) <strong>first</strong> as <em>required</em>, then applies project
-        <code>.vipc</code> files (also required). Tooling VIPCs (<code>ci-tooling*.vipc</code>, e.g. Antidoc / Caraya /
+        <code>.vipc</code> files (also required). Other tooling VIPCs (<code>ci-tooling*.vipc</code>, e.g. Antidoc /
         VI Tester / LUnit) are <em>best-effort</em>: if a heavy add-on wedges the headless VIPM engine it is logged as a warning
-        and the build still publishes a working, UTF-capable image. Override the required set with
-        <code>VIPM_REQUIRED_PACKAGES</code>.</div>
-      <div class="note"><span class="lbl">Public-index fallback</span>
+        and the build still publishes an image only if the required dependency bake succeeded.
+        The Docker hook propagates a failed installer exit rather than silently publishing an incomplete worker.
+        Override the required set with <code>VIPM_REQUIRED_PACKAGES</code>. A seed-only registry copy does not
+        apply these dependencies: rebuild the project worker before relying on Caraya being present.</div>
+      <h3 id="linux-lvpm">Optional Linux LVPM environments (experimental)</h3>
+      <p>The Dependencies page offers <strong>VIPM</strong> (the existing default) and <strong>LVPM</strong>
+        as alternative installers for Linux. Windows behavior is unchanged. Switching tooling views in the page
+        is exploratory, not a pipeline change: review the declarations, build a candidate, inspect its verification,
+        and explicitly request activation through a Reconfigure pull request. Never apply the client installer to
+        this tooling source repository or a fork to test this feature; use a separate scratch client repository.</p>
+      <ol>
+        <li><strong>Review.</strong> The candidate uses the locked CI-tooling VIPC and project VIPC/Dragon files
+          selected for Linux. One installer owns the environment; no per-package mixing of VIPM and LVPM occurs.
+          Conflicting exact pins (including conflicts between tooling and project declarations), missing files,
+          unsupported declaration settings, and Dragon NIPM requirements fail rather than being silently dropped.</li>
+        <li><strong>Build.</strong> <code>build-labview-lvpm-image.yml</code> is manually dispatched. The Linux
+          custom-image capability must be installed first. The page checks workflow availability on the default
+          branch before enabling Build and again before dispatch; unknown availability blocks dispatch rather than
+          pretending the workflow is missing. It builds upstream
+          <a href="https://github.com/Flydroid/lvpm">Flydroid/lvpm</a> at commit
+          <code>8e8bd7e390b7d4a77558af12cfa52f79079df409</code> with its Cargo lockfile, as an external dependency;
+          the toolkit does not vendor or fork its implementation. Candidates use separate
+          <code>linux-lvpm-*</code> image tags and <code>workers/linux-lvpm/</code> manifests. They never replace
+          the existing Linux VIPM, Windows, seed, or default worker tags.</li>
+        <li><strong>Verify.</strong> The adapter first asks LVPM for read-only package discovery, then expands
+          explicitly declared embedded VIP subpackages into the checked dependency closure. It preserves original
+          archives and their SHA-256 values, and records separate hashes for normalized installation archives.
+          Legacy non-UTF-8 specs use ZIP's CP437 filename encoding; normalized specs and archive names use UTF-8
+          without replacing unknown characters or changing payload bytes. File groups explicitly restricted to
+          other LabVIEW versions are excluded with recorded evidence; package-level incompatibilities, unsupported
+          OS restrictions, unknown conditions, conflicts, and missing transitive dependencies remain errors.
+          Exact root pins are fetched separately with dependency traversal disabled, so upstream's
+          transitive-first resolution cannot silently upgrade a declared version. Transitive discovery cannot
+          replace those roots. Once every dependency constraint has been checked, both the local recheck and
+          actual install disable further dependency resolution and use only the frozen closure.
+          A final, local-only dry run must resolve the complete exact closure without unresolved dependencies or
+          missing archive entries before any real installation. No initial discovery warning counts as verification.
+          The checked closure is frozen to exact local package archives before the actual
+          install with hooks and relinking. Installation rejects non-Linux or non-x86-64 hosts before changing
+          packages. The exact digest-pinned image is inspected and must agree with the installed inventory on
+          <code>linux/amd64</code>. Final verification requires exact installed versions, recorded files on
+          disk, no skipped applicable groups/hooks, and completed relinking. Declared system-package paths are
+          preserved: file verification alone does not prove a Windows-shaped CLI operation works on Linux.
+          SHA-256 values record the acquired package bytes;
+          they are not publisher signatures. The initial indexes are requested over HTTPS.</li>
+        <li><strong>Activate.</strong> Activation proposes a digest-pinned <code>config.container.linuxUse</code>
+          selection through the existing reviewable Reconfigure PR flow. Server-side checks require the canonical
+          candidate manifest, explicit <code>architecture: amd64</code>, successful build provenance, matching registry
+          digest, and current dependency fingerprint. Older manifests lacking architecture evidence require a rebuild.
+          Freshness includes the consumed catalog default, qualification, LabVIEW year, and Linux base tag;
+          release-note or version bookkeeping alone does not invalidate a candidate.
+          Explicit existing per-action container overrides continue to win, then <code>linuxUse</code>, then the
+          previous fallback. Windows never reads this Linux-only selection. Unrelated reconfiguration preserves it;
+          resetting to VIPM removes only <code>linuxUse</code>, preserving existing overrides. Reconfigure applies
+          only explicitly requested settings to the parsed existing manifest: activation/reset preserves separate
+          VIPC and Dragon lists, explicit dependency-policy values, platform settings, provenance, and unknown
+          client fields. A no-op keeps the file byte-identical; an actual update may normalize YAML formatting.</li>
+      </ol>
+      <div class="note"><span class="lbl">Verification is deliberately scoped</span>
+        <strong>Package files verified does not mean CI activities passed.</strong> The first release records
+        <code>verification.scope: package-files</code> and <code>activity_checks: not_run</code>. Upstream LVPM
+        cannot yet observe a hook VI's internal <code>error out</code>; explicit hook failures are rejected, but a
+        completed hook is not proof of functional correctness. Validate the candidate against the project's actual
+        compile, test, build, and rendering activities before depending on it. Conditional file groups the adapter
+        cannot safely validate are rejected conservatively. Private package feeds, embedded Dragon VIPC references,
+        and NIPM installation are not supported by this initial LVPM adapter.</div>
+      <p>These are <strong>global installs inside isolated containers</strong>, not developer virtual environments.
+        Snapshots retain their existing <code>TOIMAGES_IMAGE</code> or repository Linux-latest selection when
+        <code>linuxUse</code> is absent. After opting in, explicit snapshot action overrides precede
+        <code>linuxUse</code>; a verified LVPM pull failure never falls back to another worker.
+        Existing LabVIEW launchers therefore see the installed dependencies without venv activation or preference-file
+        changes. LVPM candidates are immutable selections: monitored dependency changes do not silently rebuild or
+        switch them. Only verified immutable LVPM workers skip the VIPM image wait; existing VIPM waiting and
+        NI-base behavior are unchanged. Linux execution checks the current requirements fingerprint and blocks stale selections until
+        a fresh candidate is built, verified, and explicitly activated. A failed candidate leaves the previous image
+        available but does not make stale requirements current. The selected environment drives Linux inventory;
+        an unused candidate does not create missing-dependency warnings for the active pipeline. LVPM inventories
+        VIP packages, not native NI packages: unmeasured native package coverage is unknown, not evidence of absence.</p>
+      <p>The dashboard separately reports <strong>local freshness</strong> for the exact inspected revision and
+        digest-pinned selection. It uses trusted action-distributed helper code, treating the client checkout only as
+        input data. Optional pinned Python prerequisites are installed in an isolated temporary environment only when
+        LVPM is selected; failure leaves the rest of the dashboard running and reports freshness as unknown.
+        Python startup is isolated so checkout modules and inherited import paths cannot replace trusted imports.
+        Changed declaration bytes invalidate freshness even when package pins are unchanged. Stale or unknown
+        freshness marks Linux dependencies pending and cannot produce green satisfaction. A local
+        <code>current</code> result does not verify registry access, build provenance, or runtime activities;
+        activation and execution still perform their server-side checks. Historical views cannot reuse another
+        revision's current result.</p>
+      <p>Dragon declaration inspection loads only the parser from the trusted action repository, resolved relative
+        to the dashboard generator itself; Python helpers in the inspected client checkout are never imported.
+        The parser requires Python 3.11+ with <code>tomllib</code>, or an available <code>tomli</code> backend.
+        Missing tooling/backend, missing monitored files, and malformed declarations produce per-file
+        <code>inspection.status: unknown</code> evidence instead of an empty installed inventory. Monitored unknowns
+        keep the dependency banner pending for their monitored platforms; unmonitored files do not create pending
+        work. The Dependencies page requires matching-revision declaration evidence and measured installed package
+        statuses before displaying installed. Update the trusted tooling or repair the declaration and regenerate
+        the dashboard; rebuilding a worker alone does not repair parser evidence. Per-dependency
+        <code>platform_status</code> records honor the file&rsquo;s <code>monitorOn</code> list; the existing
+        <code>status</code>, <code>installed_version</code>, and <code>message</code> fields aggregate only applicable
+        monitored platforms. Installed requires all applicable platforms installed; conflict, missing, wrong
+        version, unknown, pending, and not attempted take precedence in that order. Windows-only files retain
+        measured Windows inference. Linux-only VIPM declarations can be satisfied by exact name/version in the
+        selected canonical LVPM inventory, only with locally current revision/selection-bound freshness.
+        Linux <code>scope: package-files</code> is not runtime verification; native/NIPM declarations remain unknown.
+        Pending package records include per-platform evidence and target only unresolved monitored platforms.</p>
+      <div class="note"><span class="lbl">Public-index fallback (existing VIPM path)</span>
         The resolver-bypass fallback covers packages in the built-in NI LabVIEW Tools Network and VIPM Community
         repositories, including old OpenG <code>sf://opengtoolkit</code> URLs and the legacy
         <code>jki_vi_tester</code> alias. Private/custom VIPM repositories still require either a populated VIPM
@@ -1629,6 +1745,19 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
     -ReportDir "C:\workspace\ci-out\vidiff" -LabVIEWPath "...\LabVIEW.exe"</code></pre>
 
       <h4>Output &amp; dashboard</h4>
+      <p>For modified VIs, the Linux runner requests LabVIEW&rsquo;s <code>XML</code> comparison output and
+        renders it as static HTML with <code>build-vidiff-report.py</code>. This avoids native HTML report
+        generation crashes reproduced in LabVIEW&nbsp;26.3. Functional, cosmetic, and VI attribute changes
+        retain their descriptions and all available before/after screenshots; when LabVIEW supplies no image
+        for a change, the report explicitly says so. The source <code>comparison.xml</code> is retained for
+        inspection. These static reports do not include the native HTML renderer&rsquo;s interactive sub-VI
+        hotspots. Added/deleted VIs still use <code>PrintToSingleFileHtml</code>.</p>
+      <p>The Linux runner preserves per-VI <code>cli-attempt-1.log</code> (and, when retried,
+        <code>cli-attempt-2.log</code>) in the report artifact. CLI error&nbsp;66 (connection lost during an operation)
+        or &minus;350000 (VI Server connection failure) resets the container&rsquo;s LabVIEW process
+        using <code>pkill</code> and retries the same VI once. An exhausted retry also resets the session
+        before processing the next VI, but still fails the job; other operation errors are not retried.
+        A successful CLI exit without a nonempty report, or malformed comparison XML, is also treated as failure.</p>
       <ul>
         <li>Reports land at <code>vidiff/&lt;pr-N|push-sha&gt;/&lt;platform&gt;/vidiff/</code> with a
           <code>changes.json</code> manifest (<code>{modified, added, deleted}</code>). <code>vidiff-deploy.yml</code>
@@ -1667,14 +1796,14 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         </tbody>
       </table>
 
-      <h4>The four frameworks &amp; the exact headless command each runs</h4>
+      <h4>The four frameworks &amp; their headless commands</h4>
       <p>Each enabled tool is driven by a per-tool command <strong>template</strong> that <code>run-unit-tests.ps1</code>
         applies verbatim after token substitution. Any template can be overridden per tool with a <code>command:</code>
         key in the config, so a precise invocation can be corrected on a real worker with no script change.</p>
       <table>
         <thead><tr><th>Framework</th><th>Test unit it discovers</th><th>Runs via</th><th>Default command template</th></tr></thead>
         <tbody>
-          <tr><td><strong>Caraya</strong> (JKI)</td><td>VIs containing Caraya assertions, under a directory</td><td><code>g-cli</code></td><td><code>g-cli --lv-ver {ver} -- caraya -- --directory "{dir}" --junit "{out}"</code></td></tr>
+          <tr><td><strong>Caraya</strong> (JKI)</td><td>A project-owned runner with an explicit test inventory</td><td>native <code>LabVIEWCLI RunVI</code> through <code>command:</code></td><td>Use a wrapper that disables Caraya's interactive dialog, writes JUnit to <code>{out}</code>, checks its assertion inventory, and propagates CLI failures (example below). The legacy <code>g-cli ... caraya</code> default is an unverified extension scaffold, not provided by the Caraya package itself.</td></tr>
           <tr><td><strong>LUnit</strong> (Astemes)</td><td>Test Case classes (<code>.lvclass</code>), under a directory</td><td>native <code>LabVIEWCLI</code></td><td><code>"{cli}" -LogToConsole TRUE -OperationName LUnit -Path "{dir}" -ReportPath "{out}" -LabVIEWPath "{lv}" -Headless</code></td></tr>
           <tr><td><strong>VI Tester</strong> (JKI)</td><td>xUnit TestCase classes, under a directory <em>(scaffold)</em></td><td><code>g-cli</code></td><td><code>g-cli --lv-ver {ver} -- vitester -- --directory "{dir}" --junit "{out}"</code></td></tr>
           <tr><td><strong>NI UTF</strong></td><td><code>.lvtest</code> items inside a <code>.lvproj</code></td><td>native <code>LabVIEWCLI</code></td><td><code>"{cli}" -LogToConsole TRUE -OperationName RunUnitTests -ProjectPath "{proj}" -JUnitReportPath "{out}" -LabVIEWPath "{lv}" -Headless</code></td></tr>
@@ -1718,7 +1847,34 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       locations: []</code></pre>
       <p>Only tools with <code>enabled: true</code> run. A <code>location</code> may be a directory (recursed), a glob
         / extension pattern (each match&rsquo;s parent directory becomes a test root), or &mdash; for UTF &mdash; a
-        <code>.lvproj</code> path.</p>
+        <code>.lvproj</code> path. The driver reads indentation relative to <code>unitTests:</code>, including the
+        canonical <code>config.unitTests.tools</code> nesting, preserves quoted command arguments, and stops at
+        sibling blocks.</p>
+      <p><strong>Unconfigured fallback.</strong> When <code>.github/labview-ci.yml</code> has <em>no</em>
+        <code>unitTests:</code> block at all (the <code>unit-tests</code> activity is installed but the Unit Testing
+        settings page was never saved), the driver auto-detects <em>every</em> framework present and runs them all:
+        NI UTF (empty <code>locations</code>) when any <code>.lvproj</code> references a <code>.lvtest</code> /
+        <code>TestItem</code>; Caraya, LUnit and VI Tester when a <code>.vi</code>&rsquo;s linker strings name
+        <code>Caraya.lvlib</code>, <code>LUnit.lvlib</code> or <code>TestCase.lvclass</code> respectively, using the
+        outermost directories holding those VIs as <code>locations</code> (<code>.github</code>, <code>ci-out</code>,
+        <code>build</code> and <code>.git</code> are skipped). The Caraya signature was checked against real Caraya test
+        VIs; the LUnit and VI Tester signatures have not yet been checked against real projects. Any explicit
+        <code>unitTests:</code> block &mdash; even one with every tool disabled &mdash; is respected as-is and produces
+        the &ldquo;No enabled config.unitTests.tools&rdquo; runner error instead.</p>
+      <p>A native Caraya integration can use this override under <code>config.unitTests.tools</code>:</p>
+      <pre><code>caraya:
+  enabled: true
+  locations:
+    - "tests"
+  command: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{dir}\Invoke-CoreTests.ps1" -ResultsPath "{out}" -LabVIEWPath "{lv}" -Headless</code></pre>
+      <p><code>Invoke-CoreTests.ps1</code> is supplied by the project, not generated by the toolkit. Its
+        <code>Run Tests.vi</code> must implement the installed <code>RunVI</code> connector contract and explicitly
+        select test VIs; fixtures and the runner are not independent tests. Local headless validation against the
+        Measurement Utility Reference working tree passed eight suites / 44 assertions on 2026-10-23 without
+        g-cli. This does not certify a clean container. The historical <code>6d69ccd</code> worker failed with
+        LabVIEW error <code>1003</code>; its mass-compile report identified missing Caraya runner VIs and Linked
+        Network Actor dependencies. Bake both the test framework and the project's full dependency closure,
+        including authorized private/offline dependencies that are not in the public VIPM indexes.</p>
 
       <h4>How the workflow composes the runner (per commit)</h4>
       <p>The whole job runs on one <span class="pill win">windows-2022</span> runner and follows a fixed step order
@@ -1762,14 +1918,26 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       <p>The container emits raw JUnit XML; the host builder normalises it. Two files matter:</p>
       <ul>
         <li><strong><code>&lt;ResultsDir&gt;/&lt;tool&gt;-&lt;n&gt;.xml</code></strong> &mdash; one JUnit file per tool per test-root. The report builder infers the framework from the filename (<code>caraya*</code>, <code>lunit*</code>, <code>vi-tester*</code>/<code>vitester*</code>, <code>utf*</code>).</li>
+        <li><strong>Runner diagnostics</strong> &mdash; a failed command, unresolved location, missing CLI, or absent
+          report produces <code>&lt;tool&gt;-runner-&lt;n&gt;.xml</code> with a clearly labelled runner-error case,
+          not a fabricated test assertion. <code>&lt;tool&gt;-&lt;n&gt;.log</code> retains command output and the LabVIEW
+          CLI session log when available. The driver owns <code>ResultsDir</code> and clears prior XML/log files
+          before each run, continues other configured tools after a command failure, and exits nonzero.</li>
         <li><strong><code>unit-tests/&lt;sha&gt;/results.json</code></strong> &mdash; the merged model: per-tool suites, per-case status, and a <code>summary</code> of <code>{tests, passed, failed, errored, skipped}</code>. Each failing case deep-links the test VI (and, when derivable by stripping affixes like <code>Foo Tests.vi &rarr; Foo.vi</code>, the VI <em>under test</em>) into the VI Browser for that revision.</li>
       </ul>
       <p>The commit status is derived straight from <code>results.json</code> so it always matches the report:</p>
       <ul>
-        <li><code>tests == 0</code> &rarr; <strong>success</strong>, &ldquo;No unit tests found&rdquo;.</li>
+        <li><code>tests == 0</code> &rarr; <strong>failure</strong>, &ldquo;No unit tests found&rdquo;.</li>
+        <li>All cases skipped, or the container runner failed &rarr; <strong>failure</strong>, even if a partial JUnit file exists.</li>
         <li><code>failed + errored == 0</code> &rarr; <strong>success</strong>, &ldquo;<em>N</em> passed&rdquo;.</li>
         <li>otherwise &rarr; <strong>failure</strong>, &ldquo;<em>N</em> failed, <em>M</em> passed&rdquo;.</li>
       </ul>
+      <p>Malformed, empty, non-JUnit, or count-inconsistent XML is represented as an explicit report-validation
+        error. An existing empty report renders its zero counts instead of claiming the Windows report is absent.
+        Runner/report errors contribute to <code>summary.errored</code>; assertion results remain separate cases.
+        The workflow fails the job as well as the commit status, and test-script/inventory edits under
+        <code>tests/</code> trigger a run. Regression checks run without LabVIEW in the Windows
+        <code>Unit Test Runner Checks</code> workflow; locally run <code>python .github/labview/test-unit-tests.py</code>.</p>
       <p>The dashboard colours the Unit Tests badge from the <code>passedPercent</code> thresholds above (green at or
         above 100%, yellow at or above 80%, red below 80%). When Linux results are present the cell shows the same
         two-number Windows/Linux pill as Mass Compile.</p>
@@ -1850,51 +2018,43 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         may assist tooling but does not override the committed VIPC.</p>
 
       <h3 id="cap-snapshots">16.6 VI Snapshots &amp; VI Browser <a class="anchor" href="#cap-snapshots">#</a></h3>
-
-      <h4>At a glance</h4>
-      <table>
-        <tbody>
-          <tr><th>Drivers</th><td><code>build-snapshots.ps1</code> (orchestrator) &rarr; <code>render-snapshots.ps1</code> (per-VI); gallery <code>build-gallery.py</code>; 2.0 engine <code>toimages</code> / <code>lvctl toimages</code></td></tr>
-          <tr><th>Workflows</th><td><code>vi-snapshots.yml</code> <span class="pill win">windows-2022</span>; 2.0 <code>vi-snapshots-json.yml</code> <span class="pill lin">Linux</span> / <code>vi-snapshots-json-windows.yml</code> <span class="pill win">Windows</span></td></tr>
-          <tr><th>Output &amp; status</th><td><code>vi-snapshots/</code> (content-addressed <code>by-blob/&lt;ab&gt;/&lt;blob&gt;.html|.json</code>); status <code>CI / VI Snapshots</code></td></tr>
-        </tbody>
-      </table>
-      <p>This is the one place that deliberately reuses a warm container. Snapshots are <strong>content-addressed by
-        git blob SHA</strong>, so each unique VI is rendered exactly once &mdash; ever &mdash; and reused across every
-        commit that contains it. If an older revision references a snapshot or report document not yet published, the VI
-        Browser and framed report viewer show an in-page missing-document state with a Populate history link instead of
-        framing a GitHub Pages 404.</p>
-
-      <h4>The warm-container pattern</h4>
-      <p>Both phases start one long-lived container and push every VI through it with <code>docker exec</code> &mdash;
-        no per-VI or per-commit container churn:</p>
-      <pre><code>docker run -d --name &lt;name&gt; ... $Image powershell -NoProfile `
-  -Command "while ($true) { Start-Sleep -Seconds 3600 }"
-docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # per worklist entry</code></pre>
-
-      <h4>Phase 1 — HTML snapshots and Windows 2.0 frames <span class="pill win">Windows</span></h4>
-      <p>Orchestrated by <code>build-snapshots.ps1</code>, which starts a single long-lived container
-        (<code>docker run -d … while true sleep</code>) and renders many commits through it via
-        <code>docker exec</code> calling <code>render-snapshots.ps1</code> — no per-VI or per-commit container
-        churn. A TSV worklist (<code>&lt;blob&gt;\t&lt;rel-path&gt;</code>) drives rendering;
-        <code>render-snapshots.ps1</code> skips any blob already present in the deployed
-        <code>by-blob</code> store (seeded from <code>gh-pages</code>) and writes a placeholder HTML for any VI that
-        fails to render, so the gallery is never broken by a single bad VI. When
-        <code>config.viBrowser.positionAware</code> includes <code>windows</code> and the bundled
-        <code>PrintToImagesJson</code> operation is available, the same workflow also writes Windows 2.0 frame
-        JSON beside the HTML as <code>&lt;blob&gt;.windows.json</code>. <code>build-gallery.py</code> emits the
-        per-commit <code>manifest.json</code> (VI → by-blob HTML), the rolling <code>commits.json</code>, and the
-        Windows JSON index used by the in-place browser.</p>
-      <h4>Phase 2 — position-aware JSON (VI Snapshots 2.0) <span class="pill win">Windows</span> <span class="pill lin">Linux</span></h4>
-      <p>Phase 2 is the separate <strong>VI Snapshots 2.0</strong> capability, selectable on Windows and Linux (the classic gallery above is Windows-only). The <code>vi-snapshots-json.yml</code> (Linux) and <code>vi-snapshots-json-windows.yml</code> (Windows) workflows render
-        position-aware frame JSON for the in-place browser. The render engine is <strong>baked into the Linux worker image</strong> (and runs in the stock NI image on Windows) &mdash; a Go batch runner
-        (<code>main.go</code>) reads the same TSV worklist and shells out to <code>lvctl toimages</code> — a native
-        Go VI-Server TCP client that launches LabVIEW under Xvfb, captures the front panel and block diagram as
-        positioned frames, and emits a JSON array. Output is written to
-        <code>by-blob/&lt;ab&gt;/&lt;blob&gt;.json</code>, deployed alongside the 1.0 HTML so any VI without JSON
-        gracefully falls back to the classic view.</p>
-      <p>Both 2.0 renderers <strong>auto-run on every new revision</strong> via a <code>workflow_run</code> trigger after the snapshot pipeline finishes, each behind a gate job that reads <code>config.viBrowser.positionAware</code>: the Linux workflow runs when it includes <code>linux</code>, the Windows workflow when it includes <code>windows</code> (the configurator default). Because renders are content-addressed by git blob SHA, the worklist skips every VI whose blob already has a render &mdash; <strong>unchanged VIs reuse their existing frames with no work</strong> &mdash; and queues only the new/changed blobs, so a VI a revision actually changed gets a fresh render automatically.</p>
-      <p>The browser now remembers its viewer mode and 2.0 platform choice in local storage, defaults to 2.0 when a VI has a 2.0 render (preferring the Windows render when both platforms exist), and shows dismissible coaching tip strips for the block-diagram toggle and the case/event selector arrows. The 2.0 auto-default is now enforced on open whenever a 2.0 render exists (unless the URL explicitly pins <code>viewer</code>/<code>plat2</code>). Those tips are browser-local too: dismissing one with <strong>Never show this again</strong> hides it only in that browser profile, and the dismissal keys are versioned so a new coaching rollout can deliberately surface the tips once more for everyone.</p>
+      <p><strong>Populate history respects the selected revisions.</strong> The snapshot workflow receives
+        an explicit space-separated <code>shas</code> list, oldest first, and renders only those commits in one run.
+        Choosing only the newest revision does not walk older history; Fill excludes completed cells, while Re-run
+        forces rendering only within the selection. A single cell&rsquo;s Run action also passes that revision&rsquo;s SHA.
+        The workflow&rsquo;s run name carries the selected SHAs so queued, running, and failed badges belong only to
+        those rows. Direct workflow dispatches without <code>shas</code> retain the manual <code>head</code> and
+        unrestricted <code>backfill</code> modes, with <code>max_commits</code> applying only to the latter.
+        Update installed tooling to receive both the dashboard and the workflow&rsquo;s new input together; an older
+        workflow rejects the input rather than silently expanding the requested scope.</p>
+      <p>The Populate history chooser offers an advisory banner when older, unselected revisions are missing
+        snapshots for an enabled snapshot activity and selected platform. It counts revisions once, excludes hidden
+        dependency-only revisions and browser-tracked queued work, and explains that <strong>Fill</strong> reuses
+        snapshots for unchanged file content. The banner recommends All revisions plus Fill while noting that more
+        revisions may start more workflows and that other enabled activities follow the same revision scope.
+        It never changes the selection or queues work. <strong>Keep selected revisions</strong> dismisses the tip
+        for that dialog session; opening the chooser again enables it again.</p>
+      <p>Snapshots are interactive views of a VI's front panel and block diagram. Pan and zoom the code,
+        switch between the front panel and block diagram, and navigate cases, events, and sequences directly
+        on the diagram without opening LabVIEW. The same viewer is used in the VI Browser, standalone links,
+        and report previews. Snapshots and Diff are the only viewer choices.</p>
+      <h4>Rendering and reuse</h4>
+      <p>The <strong>VI Snapshots</strong> capability installs the browser, revision metadata, and frame renderers.
+        Configure selects the Windows and/or Linux render platforms under <code>config.viBrowser.platforms</code>.
+        Windows uses <code>vi-snapshots-json-windows.yml</code>; Linux uses <code>vi-snapshots-json.yml</code>
+        and the render engine baked into the Linux worker. The gallery workflow is <code>vi-snapshots.yml</code>.
+        The gallery workflow renders Windows frames directly; platform render workflows can fill missing frames for a selected revision.</p>
+      <p>Frames are content-addressed by git blob SHA: <code>by-blob/&lt;ab&gt;/&lt;blob&gt;.windows.json</code>
+        on Windows and <code>by-blob/&lt;ab&gt;/&lt;blob&gt;.json</code> on Linux. Unchanged VIs reuse frames across
+        revisions. Each job keeps a warm container to avoid per-VI startup costs. The dashboard counts frame
+        coverage, not exported HTML files.</p>
+      <h4>Browsing and missing snapshots</h4>
+      <p>When both platforms have frames, the browser initially prefers Windows; a platform-specific shared
+        link preserves its selected render. Front Panel and Block Diagram controls choose the pane, and
+        share links preserve the revision, VI, pane, and platform. Coaching tips can be dismissed locally.</p>
+      <p>A VI without frames shows a render-needed, running, or failed state with a link to the render workflow.
+        There is no static-image fallback. Use Populate history to generate snapshots for older revisions.
+        Older snapshot links and saved configuration are accepted and open the interactive viewer.</p>
 
       <h3 id="cap-sbom">16.7 SBOM Generation <a class="anchor" href="#cap-sbom">#</a></h3>
       <h4>At a glance</h4>
@@ -1935,7 +2095,13 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
           <tr><td><code>sbom/&lt;sha&gt;/results/sbom.json</code></td><td>VIPM CLI</td><td>Native CycloneDX download</td></tr>
           <tr><td><code>vi-snapshots/&lt;sha&gt;/manifest.json</code></td><td>Snapshot gallery builder</td><td>VI Browser</td></tr>
           <tr><td><code>dependencies/index.json</code></td><td>Dashboard publisher</td><td>Dependencies page install-time inventory</td></tr>
+          <tr><td><code>columns[].freshness</code> in <code>dependencies/index.json</code></td><td>Trusted dashboard LVPM helper</td><td>Local status, reason, inspected revision, and exact selection; stale/unknown block satisfaction</td></tr>
+          <tr><td><code>dependencies/index.json: dragon.files[].inspection</code></td><td>Trusted Dragon parser in the action repository</td><td>Parsed or unknown declaration evidence with a reason; monitored parse/tooling failures cannot report installed</td></tr>
+          <tr><td><code>dragon.files[].dependencies[].platform_status</code> / <code>dragon.install_set[].platform_status</code></td><td>Monitored Windows inventory and selected, locally current Linux LVPM inventory</td><td>Per-platform status, installed_version and message; Linux scope is package-files. Aggregate status cannot be installed when an applicable platform is missing or unknown.</td></tr>
+          <tr><td><code>deps-pending.json</code></td><td>Dashboard publisher</td><td>Persistent pending banner, including local LVPM freshness under <code>linux_lvpm</code> and monitored Dragon inspection failures as <code>dragon[].status: unknown</code></td></tr>
           <tr><td><code>workers/&lt;platform&gt;/&lt;version&gt;/manifest.json</code></td><td>Worker image workflows</td><td>Dependencies page installed-package status</td></tr>
+          <tr><td><code>workers/linux-lvpm/&lt;tag&gt;/manifest.json</code></td><td>LVPM candidate build</td><td>Digest-bound candidate inventory, activation and Linux runtime freshness checks</td></tr>
+          <tr><td><code>workers/linux-lvpm/latest.json</code></td><td>LVPM candidate build</td><td>Alternative candidate discovery only; never selects an active worker</td></tr>
           <tr><td><code>catalog.json</code> (root)</td><td>Installer / integrate-deploy</td><td>Version badge, What's New</td></tr>
         </tbody>
       </table>
@@ -1962,8 +2128,47 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
       <h2 id="versioning">18. Versioning &amp; updates <a class="anchor" href="#versioning">#</a></h2>
       <p><code>release.yml</code> runs for every eligible contributor push to <code>main</code>. It derives the next
         version from published tags, writes the matching catalog entry, and cuts the immutable tag and GitHub Release
-        in the same run. The minor alias advances to the newest patch on its line; the major alias advances only when
+        in the same run when the catalog push is permitted. On protected branches it opens a catalog pull request
+        instead and defers publication until that PR is reviewed and merged. The minor alias advances to the newest patch on its line; the major alias advances only when
         a release is promoted to stable. Release notes are generated from <code>history.releases[0]</code>.</p>
+      <p><code>release-catalog-pr.py</code> handles the protected-branch fallback for both release and promotion.
+        It opens a <code>lvci-release/</code> branch only for GitHub's explicit pull-request-required rejection;
+        authentication and other rule failures remain errors. Enable <strong>Allow GitHub Actions to create and
+        approve pull requests</strong> in the repository's Actions settings (subject to organization policy).
+        The workflows request <code>pull-requests: write</code> but never approve or merge their own PRs and
+        do not change branch protection.</p>
+      <p>If an earlier preparation already occupies <code>lvci-release/&lt;kind&gt;-&lt;version&gt;</code> and
+        rejects the new catalog with a non-fast-forward error, the helper retries on a branch suffixed with
+        the full prepared commit SHA. It never force-pushes or rewrites the older review branch. It creates
+        or reuses the PR for that exact retry branch, and reports other push failures with their Git output.
+        Close superseded catalog PRs after checking that the new proposal includes the current release notes;
+        merge only the current proposal. Release-routing regressions run in the Catalog Source Sync PR gate.</p>
+      <p>Generated catalog PR titles describe release-note content first, with the version as secondary context, and
+        bodies identify the update type, baseline, unpublished status, and exact client update guidance.
+        Existing bot PR metadata is refreshed when reused; meaningful missing notes stop generation rather
+        than producing a version-only placeholder. Catalog Source Sync rejects known generic titles on
+        creation and edits. Reconfigure titles name actual changed settings or explicit LVPM activation/reset.
+        Metadata-only release PRs describe already-merged capabilities without claiming to implement them again.</p>
+      <p>After merging a prepared catalog PR, Release verifies that it was created by
+        <code>github-actions[bot]</code> in this repository and changes only the catalog and release-note fragments.
+        It publishes the prepared version without generating another bump. If the merge does not trigger Release,
+        run it manually on the default branch immediately after the merge, before other changes land. Review one
+        pending catalog PR at a time; regenerate a stale or conflicting proposal rather than changing historical
+        tags. Both release workflows must run on the default branch.</p>
+      <h3>Knowing which release contains a fix</h3>
+      <p>Every pull request includes a <strong>Release impact</strong> section after its feature summary:
+        an explicit target <code>vMAJOR.MINOR.PATCH</code>, update type, published baseline, availability,
+        and client update guidance. <strong>Major</strong> identifies incompatible changes;
+        <strong>minor</strong> identifies backward-compatible new capabilities; and
+        <strong>incremental (patch)</strong> identifies backward-compatible fixes or documentation/maintenance
+        updates. The corresponding <code>release:major</code>, <code>release:minor</code>, or
+        <code>release:patch</code> label records the intended bump; no label still defaults to patch.</p>
+      <p>A projected version can change with merge order. A prepared catalog PR is not a published release.
+        After publication, the feature PR must link the verified first containing immutable release.
+        Client owners should select that exact tooling version once available and confirm the installed
+        version after updating. A rolling channel or alias is not proof that a fix is included: check its
+        resolved release separately. Publication does not promote beta or stable. Explicitly skipped
+        releases have no assigned containing version until a subsequent release is verified.</p>
       <h3>Canonical source and GitLab distribution</h3>
       <p>GitHub is the canonical source of implementation and releases. When the optional GitLab mirror is enabled,
         the release workflow runs <code>sync-gitlab-mirror.sh</code> after GitHub has published an immutable tag. It
@@ -1977,7 +2182,7 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         secret <code>GITLAB_MIRROR_TOKEN</code> (optionally <code>GITLAB_MIRROR_USERNAME</code>) to enable the
         post-release push. The token needs GitLab <code>write_repository</code> access, and a protected mirror
         <code>main</code> branch must permit that automation identity to force-update the release snapshot. An enabled
-        mirror failure leaves the release workflow visibly failed. If it needs recovery,
+        mirror failure produces a warning without invalidating the published release. If it needs recovery,
         the source-only <strong>Sync GitLab Distribution</strong> workflow accepts an immutable tag; it never
         manufactures a release or moves an immutable tag.</p>
       <p>A GitLab-only command-line install starts from the mirror's raw bootstrapper with
@@ -2005,6 +2210,23 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         <li><strong>Dependabot</strong> opens a PR whenever the pinned major alias tag moves; merging it is the
           opt-in.</li>
       </ul>
+      <p>Reconfigure applies only explicitly requested settings to the parsed existing manifest rather than
+        regenerating the entire file. Separate VIPC and Dragon declarations, explicit false dependency policies,
+        operating systems, provenance, and unknown client fields are preserved. Blank or unchanged requests keep
+        the file byte-identical, including comments; actual updates may normalize YAML formatting. Invalid YAML
+        or a non-mapping configuration path is rejected before the manifest is written.</p>
+      <p>Changed manifests use the layout expected by existing tooling readers: indented dependency lists,
+        path-first dependency records, config-first VI Analyzer rules, double-quoted numeric strings, and inline OS lists. Dependencies also
+        recognizes adjacent VIPC, Dragon, and action sections without dropping a header. Scalar values are not
+        line-wrapped, and explicit <code>none</code> dependency selections remain configured empty lists rather
+        than falling back to automatic discovery. Scoped updates detach
+        shared YAML mappings before editing so aliases cannot change unrelated client settings. A no-op remains
+        byte-identical. If a prior update left an older dashboard unable to read the formatting, the saved values
+        are still present: update tooling, then make an intentional settings change through the GitHub Reconfigure
+        workflow to regenerate compatible formatting. Do not rely on a misread UI to overwrite monitored lists.</p>
+      <p>Upgrade preservation covers the complete existing project configuration, not just runner concurrency.
+        <code>Unit Test Runner Checks</code> exercises manifest upgrades alongside execution and report regressions,
+        and is triggered by installer changes as well as unit-test runtime changes.</p>
       <p>The major alias <code>@v&lt;major&gt;</code> tracks the newest release <em>promoted to stable</em>, not the
         newest release published. Every merge to the source repo is tagged and released, but a release only reaches
         <code>@v4</code> once the maintainer blesses it — so consumers on the major alias receive reviewed work, not
@@ -2042,12 +2264,24 @@ docker exec &lt;name&gt; powershell -File C:\ops\render-snapshots.ps1 ...   # pe
         &mdash; GitHub requires <code>Actions: write</code> on the source repo) with a <code>tier</code> input, which
         verifies the <code>v&lt;version&gt;</code> tag exists, runs the catalog/source-sync gate, edits the catalog via
         <code>promote-release.py --tier</code> (set the pointer, flag the entry, bump the version), and commits to the
-        default branch; the same buttons un-mark to roll a channel back to the previous build in that tier.</p>
+        default branch or opens a reviewable catalog PR when it is protected. Promotion remains pending until
+        that PR merges and Release publishes it; the same buttons un-mark to roll a channel back to the previous build in that tier.</p>
       <h3>Relocation pointer</h3>
-      <p><code>.github/labview-ci/source.json</code> lets the project migrate (for example to an official NI repo)
+      <p><code>.github/labview-ci/source.json</code> names the canonical NI repository, <code>ni/LabVIEW-CI-CD-Toolkit</code>,
         without breaking installs: if it names a different repo than the current one, the bootstrappers and the
         update workflow follow it automatically, and a redirected update re-pins the consumer's manifest to the new
         home.</p>
+      <p>The source dashboard, documentation, FAQ, and installer are published at
+        <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/">ni.github.io/LabVIEW-CI-CD-Toolkit</a>.
+        GitHub repository redirects do not redirect the old GitHub Pages site, so published links must use this
+        new address. The pointer's GitHub distribution, the catalog's <code>source.repo</code>, and this repository's
+        install manifest all name the same NI source. That matching manifest makes the source dashboard publish
+        its current commit's page bundle rather than an older installed release; consumer dashboards still use
+        their opted-in tooling ref.</p>
+      <p>Immutable releases made before the transfer retain their original source metadata. Publish a release
+        containing the updated metadata and promote it to the desired install channel so new default installs
+        use the NI source. Keep legacy GitHub repository redirects reachable for existing clients following
+        the relocation pointer; do not rewrite historical tags or assume container packages moved with the repo.</p>
 
       <!-- 19 ──────────────────────────────────────────────────────────────── -->
       <h2 id="discovery">19. Client discovery <a class="anchor" href="#discovery">#</a></h2>
@@ -2205,7 +2439,7 @@ flowchart TD
         behavior of the Windows worker. It also accepts the same <code>update_mode</code> dispatch input
         (<code>replace</code> rebuilds the moving <code>linux-latest</code>/<code>linux-&lt;year&gt;</code> tags in place;
         <code>new</code> publishes a fresh <code>&lt;tag&gt;-deps-&lt;date&gt;</code> tag alongside without moving them).
-        (The Linux&nbsp;Beta builds directly on <code>ubuntu-latest</code> with no separate gate; the VI&nbsp;Browser 2.0 render engine is now baked into the Linux worker, so there is no separate render image.)</div>
+        (The Linux&nbsp;Beta builds directly on <code>ubuntu-latest</code> with no separate gate; the VI&nbsp;Browser render engine is now baked into the Linux worker, so there is no separate render image.)</div>
       <div class="note"><span class="lbl">On-demand updates cover both workers</span>
         The Dependencies page&rsquo;s &ldquo;Run the container update&rdquo; flow lets you rebuild the
         <strong>Windows</strong> worker, the <strong>Linux</strong> worker, or both: a &ldquo;Containers to rebuild&rdquo;
@@ -2256,9 +2490,9 @@ flowchart TD
           <tr><td>VIDiff Report — Linux Container</td><td><span class="pill lin">ubuntu-latest</span></td><td>PR / push <code>**.vi/.ctl</code>, dispatch</td><td>Linux counterpart.</td></tr>
           <tr><td>Run Unit Tests — Windows Container</td><td><span class="pill win">windows-2022</span></td><td>PR / push (VIs, <code>**.lvtest</code>), dispatch</td><td>Windows-only (depends on baked VIPM/UTF tooling).</td></tr>
           <tr><td>Run Antidoc — Windows Container</td><td><span class="pill win">windows-2022</span></td><td>push to default branch, dispatch (no PR)</td><td>Windows-only; heavier doc render, so no per-PR run.</td></tr>
-          <tr><td>VI Snapshots and VI Browser</td><td><span class="pill win">windows-2022</span></td><td>push VI source (excl. <code>.github/</code>), dispatch (head / backfill)</td><td>Renders HTML snapshots + Windows 2.0 frames in one warm container.</td></tr>
-          <tr><td>VI Snapshots JSON (VI Browser 2.0, Linux)</td><td><span class="pill lin">ubuntu-latest</span></td><td><code>workflow_run</code> after snapshots, dispatch</td><td>Gate job decides; auto-runs only when <code>positionAware</code> includes <code>linux</code>.</td></tr>
-          <tr><td>VI Browser 2.0 render (Windows container)</td><td><span class="pill win">windows-2022</span></td><td><code>workflow_run</code> after snapshots, dispatch</td><td>Gate job decides; auto-runs only when <code>positionAware</code> includes <code>windows</code> (the configurator default). Additive Windows frames via COM in the stock NI image.</td></tr>
+          <tr><td>VI Snapshots and VI Browser</td><td><span class="pill win">windows-2022</span></td><td>push VI source (excl. <code>.github/</code>), dispatch (head / backfill)</td><td>Builds revision metadata and queues interactive snapshot rendering.</td></tr>
+          <tr><td>VI Snapshots JSON (VI Browser, Linux)</td><td><span class="pill lin">ubuntu-latest</span></td><td><code>workflow_run</code> after snapshots, dispatch</td><td>Gate job decides; auto-runs only when <code>positionAware</code> includes <code>linux</code>.</td></tr>
+          <tr><td>VI Browser render (Windows container)</td><td><span class="pill win">windows-2022</span></td><td><code>workflow_run</code> after snapshots, dispatch</td><td>Gate job decides; auto-runs only when <code>positionAware</code> includes <code>windows</code> (the configurator default). Additive Windows frames via COM in the stock NI image.</td></tr>
         </tbody>
       </table>
 
@@ -2268,7 +2502,7 @@ flowchart TD
         <tbody>
           <tr><td>Build LabVIEW CI Image (Windows worker)</td><td><span class="pill lin">ubuntu-latest</span> gate + coordinate, <span class="pill win">windows-2022</span> build</td><td>dispatch (dashboard &ldquo;Review &amp; update dependencies&rdquo; or manual), monthly cron, and a push that changes a <strong>monitored</strong> <code>.vipc</code>/<code>.dragon</code></td><td>Dependency bake. On a push the gate rebuilds only if a changed dependency file is <code>monitor: true</code>; otherwise it skips. Always builds on <span class="pill win">windows-2022</span>; with no dependencies declared it falls back to a plain crane copy of the base.</td></tr>
           <tr><td>Copy LabVIEW CI Image (install seed)</td><td><span class="pill lin">ubuntu-latest</span></td><td>dispatch (the installer dispatches it on a fresh install)</td><td>Seeds a fresh worker by copying the LCWC base into the repo&rsquo;s GHCR with crane &mdash; no LabVIEW build; the install-time counterpart to the dependency build above.</td></tr>
-          <tr><td>Build LabVIEW CI Image &mdash; Linux</td><td><span class="pill lin">ubuntu-latest</span> (gate + build)</td><td>dispatch (dashboard or manual), monthly cron, and a push that changes a <strong>monitored</strong> <code>.vipc</code></td><td>Dependency bake (mirrors the Windows worker); also bakes the VI&nbsp;Browser 2.0 render engine into the worker. On a push the gate rebuilds only if a changed <code>.vipc</code> is <code>monitor: true</code>; otherwise it skips.</td></tr>
+          <tr><td>Build LabVIEW CI Image &mdash; Linux</td><td><span class="pill lin">ubuntu-latest</span> (gate + build)</td><td>dispatch (dashboard or manual), monthly cron, and a push that changes a <strong>monitored</strong> <code>.vipc</code></td><td>Dependency bake (mirrors the Windows worker); also bakes the VI&nbsp;Browser render engine into the worker. On a push the gate rebuilds only if a changed <code>.vipc</code> is <code>monitor: true</code>; otherwise it skips.</td></tr>
           <tr><td>Copy LabVIEW CI Image &mdash; Linux (install seed)</td><td><span class="pill lin">ubuntu-latest</span></td><td>dispatch (the installer dispatches it on a fresh install)</td><td>Seeds a fresh Linux worker by copying the LCWC Linux base into the repo&rsquo;s GHCR with crane &mdash; no build; the Linux counterpart to the Copy workflow above.</td></tr>
           <tr><td>Bake VIPC Windows Base Image</td><td><span class="pill win">windows-2022</span></td><td>dispatch only</td><td>Proof-and-promote: verifies a VIPC installs before pushing tags.</td></tr>
         </tbody>
@@ -2305,7 +2539,7 @@ flowchart TD
         warm Docker layer cache, so the multi-gigabyte worker image is not re-pulled every job (see §22).</div>
 
       <p style="margin-top:40px"><a href="faq.html">← Back to the FAQ</a> &nbsp;·&nbsp;
-        <a class="lvci-repo-link" data-show-slug href="https://github.com/elijah286/LabVIEW-CI-with-Containers" target="_blank" rel="noopener">View the source on GitHub →</a></p>
+        <a class="lvci-repo-link" data-show-slug href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" target="_blank" rel="noopener">View the source on GitHub →</a></p>
     </main>
   </div>
 
@@ -2315,7 +2549,7 @@ flowchart TD
     // Resolve every repo link the same way faq.html does: read the repo this
     // dashboard was installed from (same-origin catalog.json), then follow the
     // relocation pointer (.github/labview-ci/source.json) to the canonical home.
-    var FALLBACK = { repo: "elijah286/LabVIEW-CI-with-Containers", ref: "main" };
+    var FALLBACK = { repo: "ni/LabVIEW-CI-CD-Toolkit", ref: "main" };
     function paint(repo) {
       var parts = String(repo).split("/"), owner = parts[0] || "", name = parts[1] || "";
       var url = "https://github.com/" + repo, slug = "github.com/" + repo;

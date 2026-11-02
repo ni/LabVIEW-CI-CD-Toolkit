@@ -10,7 +10,7 @@
   structure's cases without the diagram jumping — and nested structures page
   inside the case that owns them, recursively. This replaces the older approach
   that stacked every case in separate steppers BELOW the diagram, because that was
-  all the flat "Print to HTML" export allowed (no positions, no ownership).
+  all the HTML export allowed (no positions, no ownership).
 
   INPUT — the "frames" model (produced by a position-aware renderer such as the
   lvctl `toimages` Convert.vi asset tree). A flat JSON array; each element:

@@ -216,7 +216,7 @@ def resolve_activities(catalog: dict, activities: list[str]) -> list[str]:
     """Expand hard capability dependencies, preserving the requested order."""
     by_id = {c["id"]: c for c in catalog.get("capabilities", [])}
     selected: list[str] = []
-    stack = list(activities)
+    stack = ['snapshots' if activity == 'snapshots-2' else activity for activity in activities]
     while stack:
         cid = stack.pop(0)
         if cid in selected:
@@ -336,7 +336,7 @@ def copy_entry(entry: str, source_root: Path, target_root: Path,
         # REMOVED so a vendored directory matches the source exactly. Without this,
         # a file the tooling deletes (e.g. an obsolete Go source) lingers on the
         # consumer and can break the build - duplicate Go declarations broke the
-        # Windows VI Browser 2.0 render after viserver_windows.go was removed. Only
+        # Windows VI Browser render after viserver_windows.go was removed. Only
         # prune real orphans (never a file still in source) and never the consumer's
         # own preserved config files.
         if update:
@@ -406,11 +406,39 @@ def write_manifest(target_root: Path, catalog: dict, activities: list[str], os_l
     ]
     if image_name:
         lines.append(f"  imageName: {image_name}")
+    dst = target_root / ".github" / "labview-ci.yml"
+    previous = dst.read_text(encoding="utf-8").splitlines() if dst.is_file() else []
+    if previous:
+        managed = {"labviewVersion", "branch", "os"}
+        if image_name:
+            managed.add("imageName")
+        in_config = False
+        preserve = False
+        for line in previous:
+            if re.match(r"^config:\s*$", line):
+                in_config = True
+                continue
+            if not in_config:
+                continue
+            if line and not line[0].isspace() and not line.startswith("#"):
+                break
+            key = re.match(r"^  ([A-Za-z0-9_-]+):", line)
+            if key:
+                preserve = key.group(1) not in managed
+            if preserve:
+                lines.append(line)
     lines.append("activities:")
     for a in activities:
         lines.append(f"  - {a}")
+    in_tests = False
+    for line in previous:
+        if re.match(r"^unitTests:\s*$", line):
+            in_tests = True
+        elif in_tests and line and not line[0].isspace() and not line.startswith("#"):
+            in_tests = False
+        if in_tests:
+            lines.append(line)
     content = "\n".join(lines) + "\n"
-    dst = target_root / ".github" / "labview-ci.yml"
     if dry_run:
         log(f"  would write     .github/labview-ci.yml")
         return

@@ -1,15 +1,12 @@
-# VI Snapshots JSON (in-place VI Browser 2.0)
+# VI Snapshots JSON (in-place VI Snapshots)
 #
 # It pulls THIS repository's OWN toimages render image - built from the vendored
-# engine under .github/labview/toimages by the "Build VI Browser 2.0 render image"
+# engine under .github/labview/toimages by the "Build VI Snapshots render image"
 # workflow and published to this repo's GHCR with the built-in GITHUB_TOKEN - runs
 # it to emit position-aware <blob>.json next to each existing <blob>.html, and
-# deploys to gh-pages. The in-place 2.0 view lights up for any VI that gets a JSON;
-# everything else falls back to the 1.0 flat view.
 #
 # NO token setup is required: the image is pulled with the built-in GITHUB_TOKEN.
 # Override the image with the optional Actions variable TOIMAGES_IMAGE. Until the
-# image has been built, this workflow skips gracefully and VI Browser stays on 1.0.
 #
 # CONTRACT the private image MUST honor when run (this is its entire interface):
 #   mounts:  /work  = repo worktree, read-only   |   /out = output dir, writable
@@ -20,12 +17,20 @@
 #            for each worklist line runs Convert.vi with "VI Path in" =
 #            $WORKSPACE/<relpath> and writes "JSON out" (UTF-8, no BOM) to
 #            $OUT_BY_BLOB/<blob[0:2]>/<blob>.json. Missing/failed VIs are skipped
-#            (no JSON => that VI simply stays on the 1.0 view).
 
 name: VI Snapshots JSON
-run-name: VI Browser 2.0 Linux ${{ github.event.inputs.target_sha || github.event.workflow_run.head_sha || github.sha }}${{ github.event.inputs.force == 'true' && ' force' || '' }}
+run-name: VI Snapshots Linux ${{ github.event.inputs.target_sha || github.event.workflow_run.head_sha || github.sha }}${{ github.event.inputs.force == 'true' && ' force' || '' }}
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '**.vi'
+      - '**.ctl'
+      - '**.lvproj'
+      - '**.lvlib'
+      - '**.lvclass'
+      - '!.github/**'
   workflow_dispatch:
     inputs:
       mode:
@@ -38,7 +43,7 @@ on:
         required: false
         default: ""
       force:
-        description: "Re-render VI Browser 2.0 JSON even when outputs already exist"
+        description: "Re-render VI Snapshots JSON even when outputs already exist"
         required: false
         default: "false"
   workflow_run:
@@ -52,11 +57,12 @@ concurrency:
 permissions:
   contents: write
   packages: read
+  actions: read
 
 jobs:
-  # Auto-runs (workflow_run) honour the VI Browser config: 2.0 on Linux is the
+  # Auto-runs (workflow_run) honour the VI Browser config: Snapshots on Linux is the
   # experimental toimages render (known diagram-capture display bugs), so it runs
-  # automatically only when config.viBrowser.positionAware includes "linux". A
+  # automatically only when config.viBrowser.platforms includes "linux". A
   # manual dispatch always runs. Default (no config / no viBrowser block) = run,
   # preserving prior behaviour. The VI Browser tab on Configure writes this setting.
   gate:
@@ -67,23 +73,31 @@ jobs:
       - name: Check out the config only
         uses: actions/checkout@v5
         with:
-          sparse-checkout: .github/labview-ci.yml
+          sparse-checkout: |
+            .github/labview-ci.yml
+            .github/workflows/vi-snapshots.yml
           sparse-checkout-cone-mode: false
       - name: Decide whether to run
         id: decide
         run: |
           run=true
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             cfg=.github/labview-ci.yml
             if [ -f "$cfg" ]; then
-              pa=$(sed -n 's/^[[:space:]]*positionAware:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+              pa=$(sed -n 's/^[[:space:]]*platforms:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+              [ -n "$pa" ] || pa=$(sed -n 's/^[[:space:]]*positionAware:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+              [ "$pa" != "none" ] || pa=""
+              [ -n "$pa" ] || pa=$(sed -n 's/^[[:space:]]*os:[[:space:]]*\[\([^]]*\)\].*/\1/p' "$cfg" | head -1 | tr -d '[:space:]' | tr \, +)
               if [ -n "$pa" ]; then
                 if printf '%s' "$pa" | tr '+' '\n' | grep -qx 'linux'; then run=true; else run=false; fi
               fi
             fi
           fi
+          if [ "${{ github.event_name }}" = "push" ] && [ -f .github/workflows/vi-snapshots.yml ]; then
+            run=false
+          fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
-          echo "VI Browser 2.0 on Linux auto-run: $run (event=${{ github.event_name }})"
+          echo "VI Snapshots on Linux auto-run: $run (event=${{ github.event_name }})"
 
   export-json:
     needs: gate
@@ -91,21 +105,54 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - name: Resolve the render image (the Linux worker, which bakes in the 2.0 render engine; override with TOIMAGES_IMAGE)
+      - name: Checkout repository for verified worker selection
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the render image (the Linux worker, which bakes in the snapshot render engine; override with TOIMAGES_IMAGE)
         id: img
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_OVERRIDE: ${{ vars.LABVIEW_IMAGE_NAME }}
+          TOIMAGES_OVERRIDE: ${{ vars.TOIMAGES_IMAGE }}
         run: |
-          owner=$(printf '%s' "${{ github.repository_owner }}" | tr 'A-Z' 'a-z')
-          repo=$(printf '%s' "${{ github.event.repository.name }}" | tr 'A-Z' 'a-z')
-          # The VI Browser 2.0 render engine now ships INSIDE the Linux worker image
+          python3 -m pip install --quiet PyYAML==6.0.3 tomli==2.4.0
+          owner=$(printf '%s' "${GITHUB_REPOSITORY%%/*}" | tr 'A-Z' 'a-z')
+          repo=$(printf '%s' "${GITHUB_REPOSITORY##*/}" | tr 'A-Z' 'a-z')
+          # The VI Snapshots render engine now ships INSIDE the Linux worker image
           # (seeded/copied on install), so there is no separate image to build. Use
           # the worker's moving Linux tag; override with the TOIMAGES_IMAGE variable.
           fallback="ghcr.io/${owner}/${repo}-labview:linux-latest"
-          override="${{ vars.TOIMAGES_IMAGE }}"
+          name=$(printf '%s' "${IMAGE_OVERRIDE:-${repo}-labview}" | tr 'A-Z' 'a-z')
+          custom="ghcr.io/${owner}/${name}"
+          override="$TOIMAGES_OVERRIDE"
           if [ -n "$override" ]; then
-            echo "image=$override" >> "$GITHUB_OUTPUT"
+            image="$override"
+            normalized=$(printf '%s' "$override" | tr '[:upper:]' '[:lower:]')
+            case "$normalized" in
+              linux-lvpm*|*:linux-lvpm*|lvpm-*|*:lvpm-*)
+                candidate="${override#"${custom}:"}"
+                python3 .github/labview/lvpm/worker.py verify --repo . --candidate "$candidate" \
+                  --repository "$GITHUB_REPOSITORY" --image-name "$IMAGE_OVERRIDE" >/dev/null
+                image="${custom}:${candidate}"
+                echo "lvpm=true" >> "$GITHUB_OUTPUT" ;;
+            esac
           else
-            echo "image=$fallback" >> "$GITHUB_OUTPUT"
+            selected=$(python3 .github/labview/lvpm/worker.py resolve --repo . --action snapshots \
+              --repository "$GITHUB_REPOSITORY" --image-name "$IMAGE_OVERRIDE")
+            case "$selected" in
+              '') image="$fallback" ;;
+              latest) image="${custom}:linux-latest" ;;
+              base|none) image="nationalinstruments/labview:latest-linux" ;;
+              linux-*) image="${custom}:${selected}" ;;
+              *) image="${custom}:linux-${selected}" ;;
+            esac
           fi
+          case "$image" in
+            *:linux-lvpm*) echo "lvpm=true" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "fallback=$fallback" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR (built-in token - no setup required)
@@ -113,14 +160,20 @@ jobs:
 
       - name: Pull the render image (skip gracefully until it has been built)
         id: pull
+        env:
+          IMG: ${{ steps.img.outputs.image }}
+          FALLBACK: ${{ steps.img.outputs.fallback }}
+          LVPM_CANDIDATE: ${{ steps.img.outputs.lvpm }}
         run: |
-          IMG='${{ steps.img.outputs.image }}'
-          FALLBACK='${{ steps.img.outputs.fallback }}'
           if docker pull "$IMG"; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
             echo "image=$IMG" >> "$GITHUB_OUTPUT"
             echo "Using $IMG"
           else
+            if [ "$LVPM_CANDIDATE" = "true" ]; then
+              echo "::error::Verified immutable LVPM candidate could not be pulled; refusing an unverified fallback."
+              exit 1
+            fi
             echo "::warning::Render image $IMG could not be pulled. Falling back to $FALLBACK."
             if [ "$IMG" != "$FALLBACK" ] && docker pull "$FALLBACK"; then
               echo "ok=true" >> "$GITHUB_OUTPUT"
@@ -128,19 +181,13 @@ jobs:
               echo "Using fallback $FALLBACK"
             else
               echo "ok=false" >> "$GITHUB_OUTPUT"
-              echo "::notice::The Linux worker image $FALLBACK is not available yet (it is seeded on install). The VI Browser uses the 1.0 view until then."
+              echo "::notice::The Linux worker image $FALLBACK is not available yet (it is seeded on install). Snapshots will be available after the worker image is built and rendering completes."
               if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                echo "::error::No pullable VI Browser 2.0 render image was available for this manual run."
+                echo "::error::No pullable VI Snapshots render image was available for this manual run."
                 exit 1
               fi
             fi
           fi
-
-      - name: Checkout repository
-        if: steps.pull.outputs.ok == 'true'
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Checkout deployed gallery (gh-pages) for incremental seed + live publish
         if: steps.pull.outputs.ok == 'true'

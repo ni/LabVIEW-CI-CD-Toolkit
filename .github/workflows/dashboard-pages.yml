@@ -68,7 +68,7 @@ jobs:
       - name: Check out tooling (opted-in version)
         uses: actions/checkout@v5
         with:
-          repository: elijah286/LabVIEW-CI-with-Containers
+          repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ steps.cfg.outputs.ref }}
           path: _lvci
       - name: Build CI dashboard

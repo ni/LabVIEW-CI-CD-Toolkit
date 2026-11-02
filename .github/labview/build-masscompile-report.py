@@ -760,6 +760,14 @@ async function ensureSnapshots(){
   snapMap = {};
   let m = META.sha ? await fetchJson(SNAP_BASE+META.sha+'/manifest.json').catch(()=>null) : null;
   if(m) snapFromSha = META.sha;
+  if(!m && META.sha){
+    const revisions = await fetchJson(SNAP_BASE+'files.json').catch(()=>[]);
+    const revision = Array.isArray(revisions) && revisions.find(entry=>entry.sha===META.sha);
+    if(revision && Array.isArray(revision.vis)){
+      m = revision.vis.map(entry=>({vi_rel:entry.vi_rel,html:'by-blob/'+entry.blob.slice(0,2)+'/'+entry.blob+'.html'}));
+      snapFromSha = META.sha;
+    }
+  }
   if(!m){
     const commits = await fetchJson(SNAP_BASE+'commits.json').catch(()=>[]);
     if(commits && commits.length){
@@ -779,7 +787,7 @@ async function openSnap(viRel, name){
   try{ await ensureSnapshots(); }catch(e){}
   const html = snapMap[viRel];
   if(html){
-    frame.src = SNAP_BASE+html;
+    frame.src = SNAP_BASE+'vi-interactive.html?file='+encodeURIComponent(html);
     frame.style.display='block'; note.style.display='none';
     if(snapFromSha && META.sha && snapFromSha!==META.sha){
       note.style.display='block';
