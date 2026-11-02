@@ -974,10 +974,20 @@ mass-compile:
         <code>ni/LabVIEW-CI-CD-Toolkit/actions/load-config@v4</code> and checks out capability tooling from
         <code>ni/LabVIEW-CI-CD-Toolkit</code> into <code>_lvci</code> at the manifest's explicit
         <code>source.ref</code>. If that ref is empty or absent, or the manifest is missing, it falls back to
-        <code>v4</code>, the moving stable major alias, rather than v1-era tooling. Explicit pins are preserved;
-        select an immutable release tag for reproducible capability implementations. The config reader still
-        follows <code>@v4</code> independently of that capability pin. Publication alone does not move the
-        stable alias (see <a href="#versioning">§18</a>).</p>
+        <code>v4</code>, the major alias that follows releases promoted to stable, rather than v1-era tooling.
+        An explicit immutable <code>source.ref</code> checks out that exact release, including a newer published
+        release that has not reached stable. The config reader still follows <code>@v4</code> independently of
+        that capability pin. The latest published release can be newer than the deployed stable line;
+        publication alone does not promote stable or advance <code>v4</code> to the new release
+        (see <a href="#versioning">§18</a>).</p>
+      <p>The ref resolver uses Python's standard library and Git, with no runtime YAML package dependency.
+        It accepts manifests with plain top-level keys and a block <code>source</code> mapping whose
+        <code>ref</code> is a single-line Git ref, optionally single- or double-quoted and followed by a comment.
+        Empty refs use the default. Refs under <code>config</code> or <code>source.distribution</code> are ignored
+        regardless of ordering. Duplicate source keys, inconsistent indentation, invalid refs, and unsupported
+        source syntax such as flow mappings, aliases, multiline refs, or escaped quoted refs stop the job with
+        a clear error instead of selecting another ref. Reusable Workflow Checks exercises this contract on
+        GitHub Actions; PyYAML is installed only for the test harness.</p>
       <p>GitLab uses the same catalog selection but emits native template includes instead of a reusable workflow.
         Its <code>workflow: rules</code> permits merge-request, default-branch, web, and scheduled pipelines; the
         visible <code>pages</code> job uses <code>when: always</code> so a failed verification job does not suppress
