@@ -218,7 +218,7 @@ jobs:
 
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: masscompile-report
           path: ci-out/masscompile/
@@ -350,7 +350,7 @@ jobs:
 
       - name: Upload report artifact
         if: steps.analyze.outputs.report-exists == 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: vi-analyzer-report-${{ github.sha }}
           path: ci-out/vi-analyzer/
