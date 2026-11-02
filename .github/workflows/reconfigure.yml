@@ -106,6 +106,9 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Install configuration parser
+        run: python3 -m pip install PyYAML==6.0.3
+
       - name: Apply settings to config files
         env:
           IN_VERSION: ${{ inputs.labview_version }}
@@ -128,7 +131,7 @@ jobs:
           IN_UNIT_TESTS: ${{ inputs.unit_tests }}
         run: |
           python3 - <<'PY'
-          import os, re, json, datetime, pathlib
+          import copy, os, re, json, datetime, pathlib, yaml
 
           ver_in  = os.environ['IN_VERSION'].strip()
           oss     = os.environ['IN_OS'].strip()
@@ -151,6 +154,12 @@ jobs:
 
           # Preserve provenance fields from any existing manifest.
           mpath = pathlib.Path('.github/labview-ci.yml')
+          original_text = mpath.read_text(encoding='utf-8') if mpath.exists() else None
+          original = yaml.safe_load(original_text) if original_text is not None else None
+          if original_text is not None and not isinstance(original, dict):
+              raise ValueError('The existing manifest must be a mapping')
+          if original is not None and not isinstance(original.get('config', {}), dict):
+              raise ValueError('config must be a mapping')
           prev = {'activities': [], 'installedVersion': '', 'repo': '', 'ref': 'main',
                   'container_use': '', 'vipc': [], 'dragon': [], 'actions': {}, 'triggers': {}, 'viBrowser': {}, 'actionOs': {}, 'dependencyPolicy': {}, 'unitTests_block': [],
                   'labviewVersion': '', 'os': [], 'maxParallel': None}
@@ -585,8 +594,66 @@ jobs:
           unit_tests_block = _unit_tests_block_from_json(unit_tests_in) if unit_tests_in else prev.get('unitTests_block')
           if unit_tests_block:
               lines += unit_tests_block + ['']
+          rendered = '\n'.join(lines)
+          if original is not None:
+              proposed = yaml.safe_load(rendered)
+              updated = copy.deepcopy(original)
+              missing = object()
+
+              def proposed_value(path):
+                  value = proposed
+                  for key in path:
+                      if not isinstance(value, dict) or key not in value:
+                          return missing
+                      value = value[key]
+                  return value
+
+              def update_path(path, value):
+                  target = updated
+                  for key in path[:-1]:
+                      if key not in target:
+                          if value is missing:
+                              return
+                          target[key] = {}
+                      if not isinstance(target[key], dict):
+                          raise ValueError('.'.join(path[:-1]) + ' must be a mapping')
+                      target = target[key]
+                  if value is missing:
+                      target.pop(path[-1], None)
+                  else:
+                      target[path[-1]] = value
+
+              fields = [
+                  (ver_in, ('config', 'labviewVersion')),
+                  (oss if oss != 'keep' else '', ('config', 'os')),
+                  (runners, ('config', 'concurrency', 'maxParallel')),
+                  (acts_in, ('activities',)),
+                  (container_use_in, ('config', 'container', 'use')),
+                  (container_vipc_in, ('config', 'container', 'vipc')),
+                  (container_dragon_in, ('config', 'container', 'dragon')),
+                  (container_actions_in, ('config', 'container', 'actions')),
+                  (action_triggers_in, ('config', 'triggers')),
+                  (vi_browser_in, ('config', 'viBrowser')),
+                  (action_os_in, ('config', 'actionOs')),
+                  (via_default_in, ('config', 'viAnalyzer', 'default')),
+                  (via_default_in or via_rules_in, ('config', 'viAnalyzer', 'rules')),
+                  (builds_in, ('config', 'builds')),
+                  (unit_tests_in, ('unitTests',)),
+              ]
+              for requested, path in fields:
+                  if requested:
+                      update_path(path, proposed_value(path))
+              for requested, key, value in ((require_deps_in, 'requireInstalled', require_installed),
+                                            (auto_install_in, 'autoInstall', auto_install)):
+                  if requested not in ('', 'keep'):
+                      update_path(('config', 'dependencyPolicy', key), value)
+              if updated != original:
+                  updated['configuredAt'] = now
+                  rendered = yaml.safe_dump(updated, sort_keys=False, allow_unicode=True)
+              else:
+                  rendered = original_text
           mpath.parent.mkdir(parents=True, exist_ok=True)
-          mpath.write_text('\n'.join(lines), encoding='utf-8')
+          mpath.write_text(rendered, encoding='utf-8')
           print('Wrote', mpath)
 
           # Hand the resolved LabVIEW version to the VIPC-regen step (the input may
