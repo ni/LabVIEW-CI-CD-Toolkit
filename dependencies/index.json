@@ -1,8 +1,53 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "d321bd24bf123880590f6ebdd4e66ab0c5baf53f",
+  "sha": "b22697703b944c9145feccc42e974af986049112",
   "revisions": [
+    {
+      "sha": "b22697703b944c9145feccc42e974af986049112",
+      "short": "b226977",
+      "message": "Merge pull request #123 from ni/lvci-release/release-4.20.1-05ad3964e0dedcc9689fdeb9101a7620d2bca0f1",
+      "author": "Elijah Kerry",
+      "date": "2026-11-03T19:12:03Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "05ad3964e0dedcc9689fdeb9101a7620d2bca0f1",
+      "short": "05ad396",
+      "message": "Prepare release 4.20.1",
+      "author": "github-actions[bot]",
+      "date": "2026-11-03T19:08:49Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "74792fbf4752ecfc76cfb09ae981a0003269bc1a",
+      "short": "74792fb",
+      "message": "Merge pull request #122 from ni/fix/dependencies-linux-progress-20261103",
+      "author": "Elijah Kerry",
+      "date": "2026-11-03T19:08:22Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "8022db20463a3c3277d81e30d6be060511146bdc",
+      "short": "8022db2",
+      "message": "Merge remote-tracking branch 'origin/main' into fix/dependencies-linux-progress-20261103",
+      "author": "elijah286",
+      "date": "2026-11-03T18:13:19Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "1c9a25ca6dfc96d18a485a09ce887eeac320fe72",
+      "short": "1c9a25c",
+      "message": "dashboard: clarify Linux actions and track dispatched runs",
+      "author": "elijah286",
+      "date": "2026-11-03T18:13:19Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "d321bd24bf123880590f6ebdd4e66ab0c5baf53f",
       "short": "d321bd2",
@@ -855,51 +900,6 @@
       "message": "Merge pull request #88 from ni/captain/ship-fleet-2026-10-29",
       "author": "Elijah Kerry",
       "date": "2026-10-29T22:04:54Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "4ae85938a9d3b714314fa501831c940c867a2827",
-      "short": "4ae8593",
-      "message": "Require feature-focused PR descriptions and scope checks",
-      "author": "elijah286",
-      "date": "2026-10-29T22:00:11Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "a811a22e0946aa1c2348bd96151055632822b870",
-      "short": "a811a22",
-      "message": "Synchronize dependency page copies and enforce dashboard asset parity",
-      "author": "elijah286",
-      "date": "2026-10-29T20:18:01Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "d4e9697fb4fb86a81fff16d6270f7cdbb3336e25",
-      "short": "d4e9697",
-      "message": "Coordinate fleet integration and document snapshot and VIDiff changes",
-      "author": "elijah286",
-      "date": "2026-10-29T20:16:21Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "229513e67a867eb6067e32190b77a07183e775de",
-      "short": "229513e",
-      "message": "Unify snapshots around rich interactive code views",
-      "author": "elijah286",
-      "date": "2026-10-29T20:03:52Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "0e9500410d30587d175345e46b704c625d81ab26",
-      "short": "0e95004",
-      "message": "Fix snapshot history population to respect selected revisions",
-      "author": "elijah286",
-      "date": "2026-10-29T07:45:37Z",
       "project": false,
       "dep_only": false
     },

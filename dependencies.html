@@ -75,6 +75,16 @@
     #linuxInstaller label{display:inline-flex;align-items:center;gap:6px;margin:6px 12px 6px 0}
     #linuxInstaller button{margin:6px 8px 6px 0}
     #linuxInstaller code{overflow-wrap:anywhere}
+    #linuxInstaller h2{margin:0 0 6px;font-size:1.05em}
+    #linuxInstaller h3{margin:12px 0 6px;font-size:1em}
+    #linuxInstaller p{margin:6px 0}
+    #linuxInstaller fieldset{border:0;padding:0;margin:12px 0}
+    #linuxInstaller legend{font-size:.84em;color:var(--fg-muted)}
+    .lvpm-next{border-left:3px solid var(--accent);padding:4px 12px;margin:12px 0}
+    #lvpmStatus:empty{display:none}
+    #lvpmStatus{padding:10px 0;font-weight:600;white-space:pre-line}
+    #lvpmRunLink{display:inline-block;margin-bottom:8px}
+    #lvpmRunLink[hidden]{display:none}
     .dep-global-tabs{margin:8px 0 12px}
     .dep-global-tabs .dep-tablist{margin:0}
     .dep-file-state{display:inline-block;font-size:.77em;padding:1px 8px;border-radius:999px;border:1px solid var(--border);margin-left:8px;font-weight:700}
@@ -229,6 +239,9 @@
     let defaultRevision = "";
     let defaultBranch = "";
     let lvpmCandidate = null;
+    let linuxOperation = null;
+    let linuxDispatchPending = false;
+    let linuxContextEpoch = 0;
 
     function repoFromUrl(){
       if (cfg.repo) return cfg.repo;
@@ -278,6 +291,7 @@
     }
     function selectPlatform(platform){
       if (!MONITOR_PLATFORMS.includes(platform)) return;
+      if (platform !== activePlatform) invalidateLinuxOperation();
       activePlatform = platform;
       pendingTokenAction = null;
       hideTokenPanel();
@@ -645,13 +659,14 @@
       };
       const image = pkg ? esc(pkg.image) : "worker image";
       host.innerHTML =
-        '<div class="ct-head"><span class="ct-title">' + MONITOR_LABELS[activePlatform] + ' worker</span>'
+        (activePlatform === "linux" ? '<details><summary>Linux worker image</summary>' : '')
+        + '<div class="ct-head"><span class="ct-title">' + MONITOR_LABELS[activePlatform] + ' worker</span>'
         + '<span class="ct-sub">Configured default. Per-action overrides remain unchanged.</span></div>'
         + '<div class="table-wrap"><table class="ct-table">'
         + '<thead><tr><th>Worker image</th><th class="ct-col">' + MONITOR_LABELS[activePlatform] + '</th></tr></thead>'
         + '<tbody><tr><td><span class="ct-ref">' + image + '</span></td>'
         + '<td class="ct-cell">' + cell(activePlatform) + '</td></tr></tbody>'
-        + '</table></div>' + (activePlatform === "linux" ? '<section class="note" id="linuxInstaller"></section>' : '<p class="ct-sub">Windows uses VIPM. Linux tooling choices never change this worker.</p>');
+        + '</table></div>' + (activePlatform === "linux" ? '</details><section class="note" id="linuxInstaller"></section>' : '<p class="ct-sub">Windows uses VIPM. Linux tooling choices never change this worker.</p>');
       if (activePlatform === "linux") renderLinuxInstaller();
     }
     function activeLvpm(){ return String(liveLinuxConfig.linuxUse || selectedConfig.linuxUse || "").startsWith("linux-lvpm-"); }
@@ -707,25 +722,151 @@
       if (!selection || (action === "activate" && selection !== candidateSelection(lvpmCandidate))) throw new Error("Candidate changed or is unavailable; refresh and review it again.");
       return { file:"reconfigure.yml", body:{ ref, inputs:{ linux_worker:selection } } };
     }
+    function invalidateLinuxOperation(){
+      linuxContextEpoch++;
+      if (linuxOperation && linuxOperation.timer) clearInterval(linuxOperation.timer);
+      if (linuxOperation) {
+        const status = $("lvpmStatus");
+        if (status) status.textContent = "Tracking stopped because the page context changed. Submitted workflows may continue on GitHub.";
+        const link = $("lvpmRunLink");
+        if (link) link.hidden = true;
+      }
+      linuxOperation = null;
+    }
+    function linuxOperationCurrent(operation){
+      return linuxOperation === operation && operation.epoch === linuxContextEpoch
+        && activePlatform === "linux" && operation.revision === selectedRevision && !monitorDirty && operation.token === token();
+    }
+    function syncLinuxOperationButtons(){
+      for (const id of ["lvpmBuild", "lvpmActivate", "lvpmReset"]) {
+        const button = $(id);
+        if (!button) continue;
+        if (button.lvpmBlocked === undefined) button.lvpmBlocked = !!button.disabled;
+        button.disabled = button.lvpmBlocked || monitorDirty || selectedRevision !== defaultRevision || linuxDispatchPending || !!(linuxOperation && linuxOperation.busy);
+      }
+    }
+    function linuxOperationStatus(operation, message, runId){
+      if (!linuxOperationCurrent(operation)) return;
+      operation.message = message;
+      const status = $("lvpmStatus");
+      if (status) status.textContent = message;
+      const link = $("lvpmRunLink");
+      if (link) {
+        link.hidden = false;
+        link.href = "https://github.com/" + repo + "/actions/" + (runId ? "runs/" + runId : "workflows/" + operation.file);
+        link.textContent = runId ? "Open run #" + runId + " and logs ↗" : "Open workflow runs and logs ↗";
+      }
+    }
+    function validateLinuxRun(operation, run){
+      return run && run.id === operation.runId && run.workflow_id === operation.workflowId
+        && run.path === ".github/workflows/" + operation.file && run.event === "workflow_dispatch"
+        && run.repository && String(run.repository.full_name || "").toLowerCase() === repo.toLowerCase()
+        && run.head_repository && String(run.head_repository.full_name || "").toLowerCase() === repo.toLowerCase()
+        && run.head_branch === operation.ref && run.head_sha === operation.revision
+        && run.actor && run.actor.id === operation.actorId
+        && run.triggering_actor && run.triggering_actor.id === operation.actorId
+        && run.run_attempt === 1;
+    }
+    async function pollLinuxOperation(operation){
+      if (!linuxOperationCurrent(operation) || operation.polling) return;
+      operation.polling = true;
+      try {
+        const response = await fetch(api("/actions/runs/" + operation.runId), { cache:"no-cache", headers:updHeaders() });
+        if (!linuxOperationCurrent(operation)) return;
+        if (response.status === 404 && ++operation.visibilityChecks <= 12) {
+          linuxOperationStatus(operation, "Dispatch accepted. Awaiting the identified run becoming visible…", operation.runId);
+          return;
+        }
+        if (!response.ok) throw new Error("Run status unavailable (" + response.status + "). Check the run and logs; do not assume the build succeeded.");
+        const run = await response.json();
+        if (!linuxOperationCurrent(operation)) return;
+        if (!validateLinuxRun(operation, run)) throw new Error("Run identity could not be verified against this request. Tracking stopped; inspect workflow runs before retrying.");
+        if (run.status !== "completed") {
+          linuxOperationStatus(operation, run.status === "in_progress" ? "Workflow running. Active worker unchanged." : "Workflow " + String(run.status || "pending") + ". Active worker unchanged.", operation.runId);
+          return;
+        }
+        operation.busy = false;
+        clearInterval(operation.timer);
+        const message = run.conclusion === "success"
+          ? operation.action === "build" ? "Build workflow succeeded. Refresh to check for a published candidate and review its package-file evidence before requesting activation. This does not prove CI activities passed; the active worker is unchanged."
+            : "Reconfigure workflow succeeded. Review its pull request; only merging the proposal applies the change."
+          : "Workflow " + String(run.conclusion || "finished without a success result") + ". Open the logs for the failing step. No successful candidate or configuration change is established.";
+        linuxOperationStatus(operation, message, operation.runId);
+      } catch (error) {
+        if (!linuxOperationCurrent(operation)) return;
+        clearInterval(operation.timer);
+        linuxOperationStatus(operation, error.message, operation.runId);
+      } finally {
+        operation.polling = false;
+        if (linuxOperationCurrent(operation)) syncLinuxOperationButtons();
+      }
+    }
     async function dispatchLinuxWorker(action){
       const platform = activePlatform;
       const revision = selectedRevision;
-      if (platform !== "linux") return;
+      if (platform !== "linux" || !["build", "activate", "reset"].includes(action) || linuxDispatchPending || (linuxOperation && linuxOperation.busy)) return;
       const status = $("lvpmStatus");
       if (!token()) { pendingTokenAction = () => dispatchLinuxWorker(action); showTokenPanel(); if (status) status.textContent = "Paste a token with Actions: write to continue."; return; }
+      const operation = { action, revision, token:token(), epoch:linuxContextEpoch, busy:true, file:action === "build" ? "build-labview-lvpm-image.yml" : "reconfigure.yml", visibilityChecks:0 };
+      linuxOperation = operation;
+      linuxDispatchPending = true;
+      syncLinuxOperationButtons();
+      linuxOperationStatus(operation, "Checking the current revision and workflow…");
       try {
+        if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) throw new Error("Invalid repository identity; no workflow dispatched.");
         const payload = await linuxWorkflowPayload(action);
-        if (platform !== activePlatform || revision !== selectedRevision || monitorDirty) return;
+        if (!linuxOperationCurrent(operation)) return;
+        const actorResponse = await fetch("https://api.github.com/user", { cache:"no-cache", headers:updHeaders() });
+        if (!linuxOperationCurrent(operation)) return;
+        if (!actorResponse.ok) throw new Error("Cannot verify the authenticated Actions user (" + actorResponse.status + ").");
+        const actor = await actorResponse.json();
+        if (!linuxOperationCurrent(operation)) return;
+        const workflowResponse = await fetch(api("/actions/workflows/" + payload.file), { cache:"no-cache", headers:updHeaders() });
+        if (!linuxOperationCurrent(operation)) return;
+        if (!workflowResponse.ok) throw new Error("Cannot verify workflow identity (" + workflowResponse.status + ").");
+        const workflow = await workflowResponse.json();
+        if (!linuxOperationCurrent(operation)) return;
+        if (!Number.isSafeInteger(actor.id) || actor.id <= 0 || !Number.isSafeInteger(workflow.id) || workflow.id <= 0 || workflow.path !== ".github/workflows/" + payload.file) throw new Error("Invalid user or workflow identity; no workflow dispatched.");
+        operation.actorId = actor.id;
+        operation.workflowId = workflow.id;
+        const head = await fetchJson(api("/commits/" + encodeURIComponent(payload.body.ref)));
+        if (!linuxOperationCurrent(operation)) return;
+        if (head.sha !== operation.revision) throw new Error("The default branch changed. Refresh and review the current revision before dispatching.");
+        operation.ref = payload.body.ref;
+        linuxOperationStatus(operation, "Submitting workflow request…");
         const response = await fetch(api("/actions/workflows/" + payload.file + "/dispatches"), {
-          method:"POST", headers:Object.assign({}, updHeaders(), { "Content-Type":"application/json" }), body:JSON.stringify(payload.body)
+          method:"POST", headers:Object.assign({}, updHeaders(), { "Content-Type":"application/json" }), body:JSON.stringify({ ...payload.body, return_run_details:true })
         });
-        if (platform !== activePlatform || revision !== selectedRevision || monitorDirty) return;
-        if (response.status !== 204) throw new Error("Workflow dispatch failed (" + response.status + "); no fallback was attempted.");
+        if (!linuxOperationCurrent(operation)) return;
+        if (response.status !== 204 && response.status !== 200) {
+          if ([400, 401, 403, 404, 405, 410, 415, 422, 429].includes(response.status)) {
+            operation.busy = false;
+            throw new Error("Workflow dispatch rejected (" + response.status + "); no fallback was attempted.");
+          }
+          throw new Error("Workflow dispatch outcome is uncertain (HTTP " + response.status + "). The request may already have taken effect; check workflow runs before retrying.");
+        }
         hideTokenPanel();
-        if (status) status.textContent = action === "build" ? "Candidate build queued on the default branch. Active configuration is unchanged. Refresh after it finishes to review and activate." : "Reconfigure queued. Review and merge its pull request to apply; explicit per-action overrides and Windows remain unchanged.";
+        linuxOperationStatus(operation, "Dispatch accepted, not completed. Awaiting an identified run. Active worker unchanged.");
+        if (response.status === 204) {
+          linuxOperationStatus(operation, "Dispatch accepted, but GitHub returned no run identity. Open workflow runs to check progress and failures before refreshing or retrying. No run has been guessed from timing or the latest build.");
+          return;
+        }
+        const details = await response.json();
+        if (!linuxOperationCurrent(operation)) return;
+        const runId = details && details.workflow_run_id;
+        if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo) || !Number.isSafeInteger(runId) || runId <= 0
+          || typeof details.run_url !== "string" || details.run_url.toLowerCase() !== api("/actions/runs/" + runId).toLowerCase()
+          || typeof details.html_url !== "string" || details.html_url.toLowerCase() !== ("https://github.com/" + repo + "/actions/runs/" + runId).toLowerCase()) throw new Error("Dispatch accepted, but its run identity is invalid. Inspect workflow runs before retrying.");
+        operation.runId = runId;
+        operation.timer = setInterval(() => pollLinuxOperation(operation), 15000);
+        await pollLinuxOperation(operation);
       } catch (error) {
-        if (platform !== activePlatform || revision !== selectedRevision || monitorDirty) return;
-        if (status) status.textContent = error.message;
+        if (!linuxOperationCurrent(operation)) return;
+        if (!operation.ref) operation.busy = false;
+        linuxOperationStatus(operation, (operation.busy ? "Dispatch outcome is uncertain. Do not retry yet; inspect workflow runs. " : "") + error.message);
+      } finally {
+        linuxDispatchPending = false;
+        syncLinuxOperationButtons();
       }
     }
     async function renderLinuxInstaller(){
@@ -735,13 +876,13 @@
       const selectedLvpm = String(configuredSelection).startsWith("linux-lvpm-");
       linuxToolingView = selectedLvpm ? "lvpm" : "vipm";
       lvpmCandidate = null;
-      host.innerHTML = '<h2>Linux package manager</h2><p>Configured Linux default (selected revision <code>' + esc(short(revision)) + '</code>): <strong>' + (selectedLvpm ? 'LVPM Experimental' : 'VIPM') + '</strong>. Explicit per-action overrides win.</p>'
-        + '<p>Choose an installer to explore. Switching these views does not change configuration or dispatch a workflow. Windows is never changed.</p>'
-        + '<fieldset><legend>Explore Linux tooling</legend><label><input type="radio" name="linuxInstaller" value="vipm"' + (selectedLvpm ? '' : ' checked') + '> VIPM (existing workflow)</label> <label><input type="radio" name="linuxInstaller" value="lvpm"' + (selectedLvpm ? ' checked' : '') + '> LVPM (experimental)</label></fieldset>'
-        + '<p id="linuxVipmView"' + (selectedLvpm ? ' hidden' : '') + '>' + (selectedLvpm ? 'The current worker still uses LVPM. To return to the existing default selection, request the reset pull request under Configured image, overrides and rollback, merge it, then refresh. Reset does not guarantee VIPM.' : 'VIPM installs committed VIPC packages into the Linux worker. Use the Linux VIPM update below to review and start a build.') + '</p>'
+      host.innerHTML = '<h2>Linux dependency tooling</h2><p>Configured Linux default (selected revision <code>' + esc(short(revision)) + '</code>): <strong>' + (selectedLvpm ? 'LVPM Experimental' : 'VIPM') + '</strong>.</p>'
+        + '<fieldset><legend>Preview an approach · Windows unchanged</legend><label><input type="radio" name="linuxInstaller" value="vipm"' + (selectedLvpm ? '' : ' checked') + '> VIPM</label> <label><input type="radio" name="linuxInstaller" value="lvpm"' + (selectedLvpm ? ' checked' : '') + '> LVPM (experimental)</label></fieldset>'
+        + '<p id="linuxVipmView"' + (selectedLvpm ? ' hidden' : '') + '>' + (selectedLvpm ? 'The current worker still uses LVPM. To return to the existing default selection, use the reset PR in the details below. Reset does not guarantee VIPM.' : 'Review and build the Linux VIPM worker using the update panel below.') + '</p>'
         + '<div id="lvpmReview"' + (selectedLvpm ? '' : ' hidden') + '>Loading candidate evidence…</div>'
-        + '<details><summary>Configured image, overrides and rollback</summary><p><code>' + esc(configuredSelection) + '</code></p><p>Per-action overrides: ' + esc(Object.entries(selectedConfig.actions || {}).map(([activity, selection]) => activity + ': ' + selection).join('; ') || 'none') + '. These are preserved and may prevent the Linux default from applying to an activity.</p>'
-        + (selectedLvpm ? '<p>Reset removes only <code>linuxUse</code>. The existing default selection remains <code>' + esc(selectedConfig.use || "latest") + '</code>; per-action overrides are retained. This may be a base or custom image, not VIPM.</p><button type="button" id="lvpmReset"' + (revision === defaultRevision && !monitorDirty ? '' : ' disabled') + '>Reset Linux to existing default selection via PR</button>' : '') + '</details><div role="status" id="lvpmStatus"></div>';
+        + '<div role="status" aria-live="polite" id="lvpmStatus"></div><a id="lvpmRunLink" target="_blank" rel="noopener" hidden></a>'
+        + '<details><summary>Current selection and rollback</summary><p>Switching these views does not change configuration or dispatch a workflow. Explicit per-action overrides win.</p><p><code>' + esc(configuredSelection) + '</code></p><p>Per-action overrides: ' + esc(Object.entries(selectedConfig.actions || {}).map(([activity, selection]) => activity + ': ' + selection).join('; ') || 'none') + '. These are preserved and may prevent the Linux default from applying to an activity.</p>'
+        + (selectedLvpm ? '<p>Reset removes only <code>linuxUse</code>. The existing default selection remains <code>' + esc(selectedConfig.use || "latest") + '</code>; per-action overrides are retained. This may be a base or custom image, not VIPM.</p><button type="button" id="lvpmReset"' + (revision === defaultRevision && !monitorDirty ? '' : ' disabled') + '>Reset Linux to existing default selection via PR</button>' : '') + '</details>';
       host.querySelectorAll('input[name=linuxInstaller]').forEach(input => input.addEventListener("change", () => {
         linuxToolingView = input.value;
         $("lvpmReview").hidden = input.value !== "lvpm";
@@ -749,32 +890,40 @@
         renderUpdatePanel();
       }));
       if ($("lvpmReset")) $("lvpmReset").addEventListener("click", () => dispatchLinuxWorker("reset"));
+      syncLinuxOperationButtons();
       let candidate = null;
       try { candidate = await loadLvpmCandidate(); } catch (_) {}
       const buildAvailability = await loadLinuxBuildAvailability();
-      if ($("linuxInstaller") !== host || revision !== selectedRevision) return;
+      if ($("linuxInstaller") !== host || revision !== selectedRevision || activePlatform !== "linux") return;
       lvpmCandidate = candidate;
       const run = candidate && candidate.workflow_run || {};
       const review = $("lvpmReview");
       const declarations = currentVipcs.concat(currentDragons).filter(item => Array.isArray(item.monitorOn) && item.monitorOn.includes("linux"));
       const current = !!defaultRevision && revision === defaultRevision;
+      const alreadySelected = candidateSelection(candidate) === configuredSelection;
+      const canActivate = candidate && !alreadySelected;
+      const freshness = lvpmFreshness(resolveColumn(COLS.find(col => col.key === "linux"), selectedConfig));
+      const buildButton = '<button type="button" id="lvpmBuild"' + (current && !monitorDirty && buildAvailability.state === "available" ? '' : ' disabled') + '>Build experimental LVPM candidate</button>';
       const candidateHeading = candidateSelection(candidate) === configuredSelection ? 'Currently selected Linux default' : 'Alternative candidate — not automatically used';
-      review.innerHTML = '<h3>1. Build a separate LVPM candidate</h3>'
-        + '<p>Experimental, Linux x86-64 only. Verification checks installed package versions/files, not CI activities or full LabVIEW runtime compatibility.</p>'
+      review.innerHTML = '<p class="ct-sub">Linux x86-64 · Experimental · Package-file verification only, not CI activity validation.</p>'
+        + (selectedLvpm && freshness.status !== "current" ? '<p><strong>Current Linux dependencies are ' + esc(freshness.status) + '.</strong> Build a new candidate, reverify it, then reactivate.</p>' : '')
+        + '<div class="lvpm-next"><h3>' + (canActivate ? 'Next: review candidate activation' : 'Next: build a separate candidate') + '</h3>'
+        + (canActivate ? '<p>Package files verified; CI activities not yet tested. Activation opens a reviewable PR; merge it to change the Linux default.</p><button type="button" id="lvpmActivate"' + (current && !monitorDirty ? '' : ' disabled') + '>Activate candidate via reviewable PR</button>'
+          : '<p>' + (alreadySelected ? 'The published candidate is already selected. Rebuild only when dependency inputs change.' : 'Build from committed Linux declarations. Your active worker stays unchanged.') + '</p>' + buildButton)
+        + (!current ? '<p>Select the current default-branch revision to build, activate, or reset.</p>' : monitorDirty ? '<p>Save and merge monitored declaration changes before building or changing the Linux worker.</p>' : '')
+        + (buildAvailability.state !== "available" ? '<p>' + esc(buildAvailability.reason) + '</p>' : '') + '</div>'
+        + '<details><summary>Candidate evidence and build inputs</summary>'
         + '<p>' + esc(localFreshnessText(resolveColumn(COLS.find(col => col.key === "linux"), selectedConfig))) + '</p>'
-        + '<details><summary>Committed Linux declarations (' + declarations.length + (declarations.length === 1 ? ' file' : ' files') + ')</summary><ul>' + declarations.map(item => '<li><code>' + esc(item.path) + '</code> — ' + (item.packages || []).length + ' declared packages</li>').join('') + '</ul></details>'
-        + '<p>The build reads committed declarations on the default branch. It does not change the active worker.</p>'
-        + '<p>' + esc(buildAvailability.reason) + '</p><button type="button" id="lvpmBuild"' + (current && !monitorDirty && buildAvailability.state === "available" ? '' : ' disabled') + '>Build experimental LVPM candidate</button>'
-        + '<h3>2. Review package-file verification</h3>'
         + (candidate ? '<h4>' + candidateHeading + '</h4><p>Package files verified; CI activities not yet tested. ' + (candidate.packages || []).length + ' inventoried packages.</p>'
           + '<details><summary>Image identity and verification evidence</summary><p><code>' + esc(candidate.image_ref) + '</code></p><p>Requirements: <code>' + esc(candidate.requirements_fingerprint || "") + '</code>. Source: <code>' + esc(run.head_sha || "") + '</code>; workflow <code>' + esc(run.workflow_path || "") + '</code>; run ' + esc(run.id || "") + ', attempt ' + esc(run.attempt || "") + '.</p><ul>' + (candidate.packages || []).map(pkg => '<li>' + esc(pkg.name || "") + ' ' + esc(pkg.version || "") + '</li>').join('') + '</ul></details>' : '<p>No eligible candidate manifest is available. The VIPM worker is not substituted.</p>')
         + (Number.isSafeInteger(run.id) && run.id > 0 ? '<p><a href="https://github.com/' + esc(repo) + '/actions/runs/' + run.id + '" target="_blank" rel="noopener">Review candidate build run</a></p>' : '')
-        + '<h3>3. Request activation</h3><p>Activation opens a reviewable Reconfigure pull request for the Linux default only. Review and merge it to apply. Server-side checks revalidate provenance, digest and current inputs; existing action overrides are preserved.</p>'
-        + (candidate ? '<button type="button" id="lvpmActivate"' + (current && !monitorDirty ? '' : ' disabled') + '>Activate candidate via reviewable PR</button>' : '')
-        + '<details><summary>Limitations and recovery</summary><p>Hook VI error-out results cannot be observed upstream. Hook-dependent packages and native/NIPM installation are not established. Exact-pin conflicts fail preflight; reconcile declarations rather than silently changing pins. There is no automatic LVPM rebuild: after input changes, build, reverify and explicitly re-activate a new candidate. Runtime freshness fails closed; no VIPM fallback occurs.</p></details>'
-        + (current ? '' : '<p>Select the current default-branch revision to build, activate, or reset.</p>');
+        + '<p>Committed Linux declarations (' + declarations.length + (declarations.length === 1 ? ' file' : ' files') + ')</p><ul>' + declarations.map(item => '<li><code>' + esc(item.path) + '</code> — ' + (item.packages || []).length + ' declared packages</li>').join('') + '</ul>'
+        + '<p>' + esc(buildAvailability.reason) + '</p>' + (canActivate ? buildButton : '') + '</details>'
+        + '<details><summary>Limitations and recovery</summary><p>Hook VI error-out results cannot be observed upstream. Hook-dependent packages and native/NIPM installation are not established. Exact-pin conflicts fail preflight; reconcile declarations rather than silently changing pins. There is no automatic LVPM rebuild: after input changes, build, reverify and explicitly re-activate a new candidate. Runtime freshness fails closed; no VIPM fallback occurs. Activation revalidates provenance, digest and inputs server-side; action overrides are preserved.</p></details>';
       $("lvpmBuild").addEventListener("click", () => dispatchLinuxWorker("build"));
       if ($("lvpmActivate")) $("lvpmActivate").addEventListener("click", () => dispatchLinuxWorker("activate"));
+      syncLinuxOperationButtons();
+      if (linuxOperationCurrent(linuxOperation || {})) linuxOperationStatus(linuxOperation, linuxOperation.message || "Checking workflow…", linuxOperation.runId);
     }
     // Compose the dependency-warning note. Returns "" when there is nothing worth
     // warning about, so the note stays hidden instead of restating the obvious.
@@ -900,6 +1049,7 @@
       const list = kind === "dragon" ? currentDragons : currentVipcs;
       const item = list.find(v => normPath(v.path) === normPath(path));
       if (!item || item.locked) return;
+      invalidateLinuxOperation();
       let on = Array.isArray(item.monitorOn) ? item.monitorOn.slice() : (item.monitored !== false ? MONITOR_PLATFORMS.slice() : []);
       on = on.filter(p => p !== plat);
       if (checked === true) on.push(plat);
@@ -907,6 +1057,7 @@
       item.monitored = item.monitorOn.length > 0;
       item.configured = item.monitored;
       monitorDirty = true;
+      syncLinuxOperationButtons();
       if (kind === "dragon") renderDragonFiles(currentDragons);
       else renderVipc(currentVipcs, currentColStates);
       updateMonitorUi();
@@ -1316,16 +1467,16 @@
       const blocked = !current || monitorDirty;
       const lvpm = activePlatform === "linux" && activeLvpm();
       const exploringLvpm = activePlatform === "linux" && linuxToolingView === "lvpm";
+      el.hidden = lvpm || exploringLvpm;
+      if (el.hidden) { el.innerHTML = ""; return; }
       el.innerHTML = '<h2 class="upd-h">' + label + ' dependency management</h2>'
         + (coverage.pending ? '<details><summary>Review unresolved dependencies</summary>' + updMissingList(coverage)
           + (coverage.unknown.length ? '<p>Unknown evidence: ' + coverage.unknown.map(esc).join(', ') + '. Repair declaration/tooling errors or regenerate the dashboard before assuming installation is complete.</p>' : '') + '</details>' : '')
-        + (lvpm ? '<p>LVPM is active for Linux. After dependency changes, build a new candidate, review its package-file verification, then request activation in the Linux tooling steps above. The active image is never rebuilt in place or replaced with VIPM.</p>'
-          : exploringLvpm ? '<p>You are exploring LVPM. The configured Linux worker still uses VIPM until an activation pull request is merged. Use the candidate steps above, or switch the tooling view back to VIPM to update the current worker.</p>'
-          : '<p>Install committed declarations with VIPM into the <strong>' + label + ' worker only</strong>. The other platform is unchanged. Builds can take several minutes; existing actions keep using the current worker until completion.</p>'
+        + '<p>Install committed declarations with VIPM into the <strong>' + label + ' worker only</strong>. The other platform is unchanged. Builds can take several minutes; existing actions keep using the current worker until completion.</p>'
           + '<details><summary>Update options</summary>'
           + '<label class="upd-radio"><input type="radio" name="updMode" value="replace" checked> <span>Update existing ' + label + ' worker (default)</span></label>'
           + '<label class="upd-radio"><input type="radio" name="updMode" value="new"> <span>Create a separately tagged ' + label + ' worker; select it per action in Configure Pipeline</span></label></details>'
-          + '<div class="upd-actions"><button type="button" class="upd-btn" id="updRun"' + (blocked ? ' disabled' : '') + '>Review ' + label + ' VIPM update</button></div>')
+          + '<div class="upd-actions"><button type="button" class="upd-btn" id="updRun"' + (blocked ? ' disabled' : '') + '>Review ' + label + ' VIPM update</button></div>'
         + (!current ? '<p>Select the current default-branch revision to request an update.</p>' : monitorDirty ? '<p>Save and merge monitoring changes, then refresh this revision before updating committed dependencies.</p>' : '')
         + '<div class="status upd-run-status" id="updStatus"></div>'
         + '<div class="upd-progress" id="updProgress"><div class="upd-prog-head"><span class="upd-prog-phase" id="updProgPhase"></span><span class="upd-prog-meta" id="updProgMeta"></span></div><div class="upd-prog-track"><div class="upd-prog-bar" id="updProgBar"></div></div></div>';
@@ -1524,6 +1675,7 @@
     }
 
     async function loadRevision(sha){
+      invalidateLinuxOperation();
       selectedRevision = sha;
       $("status").hidden = false;
       $("status").className = "note";
@@ -1567,6 +1719,7 @@
     }
 
     function renderGenerated(data){
+      invalidateLinuxOperation();
       const config = data.config || {};
       selectedRevision = data.sha || "";
       selectedConfig = config;
