@@ -211,6 +211,112 @@ Write-Output "REQUIRED=$applyFailed OPTIONAL=$script:bestEffortFailed"
 """)
                 self.assertIn(f'REQUIRED={required} OPTIONAL={optional}', output)
 
+    def test_normalized_exact_version_resolves_public_packaging_release(self):
+        output = self.run_script("""
+$package = [pscustomobject]@{
+    Name = 'jki_rsc_toolkits_palette'; Version = '1.1-1'
+    VersionKey = Get-NumericVersionKey '1.1-1'
+}
+$request = Split-VipmPackageSpec 'jki_rsc_toolkits_palette@1.1'
+$selected = Select-PublicVipmPackage $request @($package)
+if ($selected) { Write-Output "SELECTED=$($selected.Version)" }
+""")
+        self.assertIn('SELECTED=1.1-1', output)
+
+    def test_skipped_transitive_dependency_cannot_satisfy_explicit_root(self):
+        output = self.run_script("""
+$VipcDir = ''
+$env:TEMP = [System.IO.Path]::GetTempPath()
+function Get-PublicVipmRepositoryPackages {
+    [pscustomobject]@{
+        Id = 'parent-1.0'; Name = 'parent'; Version = '1.0'
+        VersionKey = Get-NumericVersionKey '1.0'
+        Dependencies = 'missing_palette = 1.1'
+    }
+}
+function Get-LocalVipFileIndex { @() }
+function Save-PublicVipmPackage { throw 'No download before every root resolves' }
+$caught = $false
+try { $null = Get-LocalVipFilesForSpecs @('parent@1.0', 'missing_palette@1.1') }
+catch {
+    $caught = $true
+    Write-Output "ERROR=$($_.Exception.Message)"
+}
+Write-Output "CAUGHT=$caught"
+""")
+        self.assertIn("Package 'missing_palette' version '1.1' was not found", output)
+
+    def test_public_and_local_selection_preserve_exact_and_minimum_pins(self):
+        output = self.run_script("""
+$packages = @('1.0-1', '1.1-1', '1.1-2', '1.2-1') | ForEach-Object {
+    [pscustomobject]@{
+        Name = 'palette'; Version = $_; VersionKey = Get-NumericVersionKey $_
+    }
+}
+foreach ($selector in @('Select-PublicVipmPackage', 'Select-LocalVipPackage')) {
+    foreach ($case in @(
+        @('palette@1.1', '1.1-2'), @('palette@1.1-1', '1.1-1'),
+        @('palette>=1.1-2', '1.2-1'), @('palette', '1.2-1'),
+        @('palette@1.10', ''), @('palette@1.1-3', ''), @('palette>=1.3', '')
+    )) {
+        $selected = & $selector (Split-VipmPackageSpec $case[0]) $packages
+        $actual = if ($selected) { $selected.Version } else { '' }
+        if ($actual -ne $case[1]) { throw "$selector $($case[0]): got '$actual', expected '$($case[1])'" }
+    }
+}
+Write-Output 'PIN_MATRIX=passed'
+""")
+        self.assertIn('PIN_MATRIX=passed', output)
+
+    def test_resolved_release_dependency_is_downloaded_once_and_satisfies_root(self):
+        output = self.run_script("""
+$VipcDir = ''
+$env:TEMP = [System.IO.Path]::GetTempPath()
+function Get-PublicVipmRepositoryPackages {
+    [pscustomobject]@{
+        Id = 'parent-1.0'; Name = 'parent'; Version = '1.0'
+        VersionKey = Get-NumericVersionKey '1.0'
+        Dependencies = 'palette >= 1.1'
+    }
+    [pscustomobject]@{
+        Id = 'palette-1.1-1'; Name = 'palette'; Version = '1.1-1'
+        VersionKey = Get-NumericVersionKey '1.1-1'
+        Dependencies = ''
+    }
+}
+function Get-LocalVipFileIndex { @() }
+function Save-PublicVipmPackage { param($Package, $OutDir); "/packages/$($Package.Id).ogp" }
+$files = @(Get-LocalVipFilesForSpecs @('parent@1.0', 'palette@1.1'))
+Write-Output "FILES=$($files -join ',')"
+""")
+        self.assertIn('FILES=/packages/palette-1.1-1.ogp,/packages/parent-1.0.ogp', output)
+
+    def test_missing_transitive_only_keeps_existing_optional_policy(self):
+        output = self.run_script("""
+$VipcDir = ''
+$env:TEMP = [System.IO.Path]::GetTempPath()
+function Get-PublicVipmRepositoryPackages {
+    [pscustomobject]@{
+        Id = 'parent-1.0'; Name = 'parent'; Version = '1.0'
+        VersionKey = Get-NumericVersionKey '1.0'
+        Dependencies = 'bundled_component = 1.1'
+    }
+}
+function Get-LocalVipFileIndex { @() }
+function Save-PublicVipmPackage { param($Package, $OutDir); "/packages/$($Package.Id).vip" }
+$files = @(Get-LocalVipFilesForSpecs @('parent@1.0'))
+Write-Output "FILES=$($files -join ',')"
+""")
+        self.assertIn("Skipping dependency 'bundled_component'", output)
+        self.assertIn('FILES=/packages/parent-1.0.vip', output)
+
+    def test_legacy_release_still_requires_installed_root_evidence(self):
+        for inventory, expected in ((['Palette (palette v1.1-1)'], True),
+                                    (['Palette (palette v1.0-1)'], False), ([], False)):
+            with self.subTest(inventory=inventory):
+                output = self.verify(inventory, ['palette@1.1'])
+                self.assertIn(f'RESULT={expected}', output)
+
 
 if __name__ == '__main__':
     unittest.main()

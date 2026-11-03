@@ -1436,6 +1436,20 @@ docker run --rm `
           fail with package-not-found, the script downloads the public <code>.vipr</code>/<code>.ogpd</code> indexes
           directly, resolves the VIPC package set plus transitive dependencies, downloads the public <code>.vip</code>
           / <code>.ogp</code> files, validates them, and installs those local files with VIPM.</li>
+        <li><strong>Resolve OpenG packaging releases without losing required roots</strong> — a VIPC-normalized
+          exact request such as <code>palette@1.1</code> can select the indexed <code>1.1-1</code> packaging
+          release; an explicitly release-pinned request remains exact, and minimum-version constraints retain
+          their meaning. Public/local selection and installed-inventory verification use the same version
+          predicate. A missing transitive dependency may still be assumed bundled, but is not marked resolved:
+          if the VIPC explicitly requests it later, that required root must resolve or fail the install.</li>
+        <li><strong>Do not repair legacy packages by changing their archives</strong> — the official
+          <code>jki_rsc_toolkits_palette-1.1-1.ogp</code> matches its repository checksum but uses legacy
+          <code>[Package Name]</code> metadata. VIPM build <code>3954</code> rejects it with
+          <code>Missing Name in Package section</code>. The vendor's
+          <a href="https://docs.vipm.io/latest/release-notes/2026.3.2/">2026 Q3 f2 release notes</a>
+          describe the package-file compatibility fix. Resolver correction alone does not upgrade the worker's
+          VIPM or prove legacy installation works; that requires a separately reviewed runtime upgrade and
+          Windows bake. Required Antidoc/palette packages remain required, and archive integrity checks stay enabled.</li>
         <li><strong>Verify local-file recovery, not earlier retry failures</strong> — VIPM can reject a legacy
           transitive <code>.ogp</code> with <code>Missing Name in Package section</code>, then successfully install
           the requested packages during per-file retries. After local-file installation, the hook queries
@@ -1444,6 +1458,9 @@ docker run --rm `
           file failed. Missing or wrong-version requested packages, an unreadable inventory, or an exhausted
           engine recovery still fail the install; required project dependencies and UTF/Caraya essentials remain
           fail-closed, and best-effort tooling remains best-effort.</li>
+        <li><strong>Batch recovery is not a final-image pin guarantee</strong> — a later best-effort tooling
+          install can change versions already verified for a project VIPC. Validate the final target inventory
+          as well as each recovered batch before claiming that all project pins hold in the completed image.</li>
         <li><strong>Treat direct VIPC no-op applies as failures</strong> — in the container VIPM can return exit
           <code>0</code> from <code>vipm install -y project.vipc</code> while printing
           <code>No packages were installed</code>. The hook treats that text as a failed apply and continues to the
