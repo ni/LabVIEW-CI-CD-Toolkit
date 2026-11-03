@@ -313,5 +313,37 @@ class PrMetadataTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
 
 
+class PublishedReleaseGuidanceTests(unittest.TestCase):
+    def test_release_notes_distinguish_publication_from_stable_promotion(self):
+        publisher = Path(__file__).with_name('publish-release.sh').read_text()
+        program = publisher.split('python3 - "$CAT" > /tmp/relnotes.md <<\'PY\'\n', 1)[1].split('\nPY\n', 1)[0]
+        for stable in (None, '4.16.3', '4.19.3'):
+            with self.subTest(stable=stable), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                catalog = root / 'catalog.json'
+                catalog.write_text(json.dumps({
+                    'version': '4.19.3', 'stableVersion': stable,
+                    'history': {'releases': [{'version': '4.19.3', 'notes': 'Preserve snapshot selections.'}]},
+                }))
+                result = subprocess.run(
+                    [sys.executable, '-c', program.replace('/tmp/reltitle.txt', str(root / 'title.txt')), str(catalog)],
+                    capture_output=True, text=True, timeout=10,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('Preserve snapshot selections.', result.stdout)
+                self.assertIn('Publication does not promote this release to beta or stable.', result.stdout)
+                self.assertIn('`@v4`', result.stdout)
+                self.assertIn('`@v4.19.3`', result.stdout)
+                self.assertNotIn('receive this automatically', result.stdout)
+
+    def test_workflow_summary_does_not_claim_major_alias_was_promoted(self):
+        publisher = Path(__file__).with_name('publish-release.sh').read_text()
+        summary = publisher.split('## Released ${TAG}', 1)[1]
+        self.assertIn('follows stable promotions, not every publication', summary)
+        self.assertIn('Publication does not promote beta or stable.', summary)
+        self.assertNotIn('get this update automatically', summary)
+        self.assertNotIn('now point at', summary)
+
+
 if __name__ == '__main__':
     unittest.main()

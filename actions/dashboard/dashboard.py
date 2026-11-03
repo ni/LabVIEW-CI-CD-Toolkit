@@ -536,12 +536,10 @@ RUN_TARGETS = {
       'snapshots2': {'label': 'VI Snapshots', 'platforms': {
         'windows': {'wf': 'vi-snapshots-json-windows.yml', 'inputs': {'target_sha': '{sha}'}},
         'linux':   {'wf': 'vi-snapshots-json.yml',         'inputs': {'mode': 'head', 'target_sha': '{sha}'}}}},
-    # Unit tests run in the Windows worker only: Caraya, VI Tester and LUnit are
-    # VIPM packages (Windows-only) and NI UTF runs via the native LabVIEW CLI. The
-    # runner emits JUnit that build-unittest-report.py normalises into one report.
     'unit-tests': {'label': 'Unit Tests', 'platforms': {
         'windows': {'wf': 'unit-tests-windows-container.yml', 'inputs': {'commit_sha': '{sha}'},
-                    'batch': {'wf': 'unit-tests-backfill-windows.yml', 'shas_input': 'shas'}}}},
+                    'batch': {'wf': 'unit-tests-backfill-windows.yml', 'shas_input': 'shas'}},
+        'linux':   {'wf': 'unit-tests-linux-container.yml', 'inputs': {'commit_sha': '{sha}'}}}},
     # Antidoc (Wovalab) documentation generation runs in the Windows worker only
     # (the Antidoc CLI is a VIPM package baked into the custom image). Doc-gen is
     # heavier than the per-VI checks, so it is on-demand / push-to-default-branch.

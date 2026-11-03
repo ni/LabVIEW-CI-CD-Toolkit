@@ -1,0 +1,31 @@
+name: Reusable Workflow Checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/labview-ci.reusable.yml'
+      - '.github/workflows/reusable-workflow-checks.yml'
+      - '.github/labview/test-reusable-workflow.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/labview-ci.reusable.yml'
+      - '.github/workflows/reusable-workflow-checks.yml'
+      - '.github/labview/test-reusable-workflow.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reusable-workflow-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install PyYAML==6.0.3
+      - name: Verify reusable workflow tooling selection
+        run: python .github/labview/test-reusable-workflow.py -v

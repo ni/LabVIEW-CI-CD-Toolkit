@@ -1,0 +1,1 @@
+Published release notes and workflow summaries no longer claim that every new release automatically reaches clients on the major alias. Publication and stable or beta promotion remain separate; clients can opt into a new release using its immutable version tag. Channel movement and promotion requirements are unchanged.

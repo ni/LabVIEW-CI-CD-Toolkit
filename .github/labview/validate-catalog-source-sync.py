@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
@@ -345,6 +346,14 @@ def main() -> int:
                 "must name a published release; clients on that channel would resolve "
                 "to a version that does not exist."
             )
+
+    spec = importlib.util.spec_from_file_location("catalog_installer", ROOT / ".github/labview-ci/install.py")
+    installer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(installer)
+    try:
+        installer.retired_file_rules(catalog, ROOT)
+    except ValueError as exc:
+        failures.append(str(exc))
 
     capabilities = catalog.get("capabilities") or []
     failures.extend(validate_source_distributions(catalog))

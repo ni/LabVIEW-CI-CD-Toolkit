@@ -32,6 +32,11 @@
     every *.xml here and infers the tool from the file name (caraya*.xml -> Caraya,
     vitester*/vi-tester* -> VI Tester, utf*/unit-test* -> UTF).
 
+.PARAMETER Framework
+    Optional single-framework mode for the composite action. Overrides config and
+    autodetection. TestDir and Command accept the same locations/templates as config.
+    LVCI_FRAMEWORK / LVCI_TEST_DIR / LVCI_COMMAND are environment fallbacks.
+
 .PARAMETER ConfigPath
     Path to labview-ci.yml. Default: <WorkspaceRoot>\.github\labview-ci.yml.
 #>
@@ -40,7 +45,11 @@ param(
     [string]$ResultsDir     = 'C:\workspace\ci-out\unit-tests\results',
     [string]$ConfigPath     = '',
     [string]$LabVIEWVersion = '2026',
-    [string]$LabVIEWPath    = ''
+    [string]$LabVIEWPath    = '',
+    [ValidatePattern('^[A-Za-z0-9_.-]+$')]
+    [string]$Framework      = $env:LVCI_FRAMEWORK,
+    [string]$TestDir        = $env:LVCI_TEST_DIR,
+    [string]$Command        = $env:LVCI_COMMAND
 )
 
 $ErrorActionPreference = 'Stop'
@@ -511,15 +520,19 @@ function Invoke-UtfTests($tool, [int]$index) {
         Write-Host "  [utf] $cmd"
 
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        $cliOut = ''
+        $cliOut = ''; $runnerExitCode = -1
         try {
             $cliOut = (& cmd.exe /c $cmd 2>&1 | Out-String)
+            $runnerExitCode = $LASTEXITCODE
             Write-Host $cliOut
             Write-Host ("  [utf] exit={0}" -f $LASTEXITCODE)
         } catch {
             Write-Warning "  [utf] runner error: $($_.Exception.Message)"
         }
         $ErrorActionPreference = $prevEAP
+        if ($Framework -and ($runnerExitCode -ne 0 -or -not (Test-Path -LiteralPath $out))) {
+            Write-RunnerFailure $id ($index * 100 + $i) "UTF runner exited with code $runnerExitCode or produced no JUnit output.`n$cliOut"
+        }
 
         if (Test-Path -LiteralPath $out) { Write-Host "  [utf] wrote $out" }
         else {
@@ -602,15 +615,19 @@ function Invoke-LUnitTests($tool, [int]$index) {
         Write-Host "  [lunit] $cmd"
 
         $prevEAP = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        $cliOut = ''
+        $cliOut = ''; $runnerExitCode = -1
         try {
             $cliOut = (& cmd.exe /c $cmd 2>&1 | Out-String)
+            $runnerExitCode = $LASTEXITCODE
             Write-Host $cliOut
             Write-Host ("  [lunit] exit={0}" -f $LASTEXITCODE)
         } catch {
             Write-Warning "  [lunit] runner error: $($_.Exception.Message)"
         }
         $ErrorActionPreference = $prevEAP
+        if ($Framework -and ($runnerExitCode -ne 0 -or -not (Test-Path -LiteralPath $out))) {
+            Write-RunnerFailure $id ($index * 100 + $i) "LUnit runner exited with code $runnerExitCode or produced no JUnit output.`n$cliOut"
+        }
 
         if (Test-Path -LiteralPath $out) { Write-Host "  [lunit] wrote $out" }
         else {
@@ -685,11 +702,20 @@ function Find-UnitTestFrameworks {
 }
 
 # -- Main ---------------------------------------------------------------------
-$tools = Read-UnitTestTools $ConfigPath
+if ($Framework) {
+    if ($Framework -notmatch '^[A-Za-z0-9_.-]+$') { throw 'Framework must be a nonempty identifier.' }
+    $Framework = $Framework.ToLowerInvariant()
+    if ($Framework -notin @('caraya', 'vi-tester', 'utf', 'lunit') -and -not $Command) {
+        throw "Unknown framework '$Framework' requires an explicit Command template."
+    }
+    $tools = @([ordered]@{ tool = $Framework; enabled = $true; command = $Command; locations = @($TestDir) })
+} else {
+    $tools = Read-UnitTestTools $ConfigPath
+}
 # Never configured (no unitTests: block at all): run every framework detected in
 # the repo. An explicit unitTests: block with nothing enabled is respected as-is.
 $hasUnitTestsBlock = (Test-Path -LiteralPath $ConfigPath) -and [bool](Select-String -LiteralPath $ConfigPath -Pattern '^\s*unitTests:\s*$' -Quiet)
-if ((-not $tools -or $tools.Count -eq 0) -and -not $hasUnitTestsBlock) {
+if (-not $Framework -and (-not $tools -or $tools.Count -eq 0) -and -not $hasUnitTestsBlock) {
     $detected = Find-UnitTestFrameworks
     if ($detected.Count -gt 0) {
         Write-Host ("No config.unitTests block in {0}; auto-detected frameworks: {1}" -f $ConfigPath, (@($detected.Keys) -join ', '))
@@ -709,7 +735,8 @@ Write-Host ""
 
 $idx = 0
 foreach ($t in $tools) {
-    if ($t.tool -eq 'utf') { Invoke-UtfTests $t $idx }
+    if ($Framework -and $t.command -and $t.tool -ne 'utf') { Invoke-Tool $t $idx }
+    elseif ($t.tool -eq 'utf') { Invoke-UtfTests $t $idx }
     elseif ($t.tool -eq 'lunit') { Invoke-LUnitTests $t $idx }
     else { Invoke-Tool $t $idx }
     $idx++; Write-Host ""

@@ -1,0 +1,239 @@
+name: Run Unit Tests — Linux Container
+run-name: Unit Tests Linux container - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit_sha || github.event.pull_request.head.sha || github.sha }}
+
+on:
+  pull_request:
+    paths:
+      - '**.vi'
+      - '**.lvclass'
+      - '**.lvproj'
+      - '**.lvlib'
+      - '**.lvtest'
+      - '**.sh'
+      - 'tests/**'
+      - '!.github/**'
+  push:
+    branches: [main]
+    paths:
+      - '**.vi'
+      - '**.lvclass'
+      - '**.lvproj'
+      - '**.lvlib'
+      - '**.lvtest'
+      - '**.sh'
+      - 'tests/**'
+      - '!.github/**'
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA to test (leave blank for current HEAD)'
+        required: false
+        default: ''
+
+env:
+  LABVIEW_CONTAINER_IMAGE: ''
+  PAGES_URL: ${{ vars.PAGES_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
+
+permissions:
+  contents: write
+  pages: write
+  statuses: write
+  packages: read
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.commit_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  unit-tests-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine target SHA
+        id: sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT: ${{ github.event.inputs.commit_sha }}
+        run: |
+          if printf '%s' "$INPUT" | grep -Eiq '^[0-9a-f]{40}$'; then
+            echo "sha=$INPUT" >> "$GITHUB_OUTPUT"
+          elif [ -n "$INPUT" ]; then
+            FULL=$(gh api "repos/${{ github.repository }}/commits/$INPUT" --jq '.sha')
+            [[ "$FULL" =~ ^[0-9a-fA-F]{40}$ ]] || exit 1
+            echo "sha=$FULL" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post pending status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -s -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ steps.sha.outputs.sha }}" \
+            -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"Unit tests (Linux) in progress\",\"context\":\"CI / Unit Tests (Linux)\"}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Restore CI scripts from main
+        if: github.event.inputs.commit_sha != ''
+        run: |
+          git fetch --no-tags origin "${{ github.event.repository.default_branch }}"
+          git checkout FETCH_HEAD -- .github/labview .github/actions/publish-gh-pages
+
+      - name: Resolve Linux container image name
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_OVERRIDE: ${{ vars.LABVIEW_IMAGE_NAME }}
+          ACTION_ID: unit-tests
+        run: |
+          python3 -m pip install --quiet PyYAML==6.0.3 tomli==2.4.0
+          selected=$(python3 .github/labview/lvpm/worker.py resolve \
+            --repo . --action "$ACTION_ID" --repository "$GITHUB_REPOSITORY" --image-name "$IMAGE_OVERRIDE")
+          owner=$(printf '%s' "${GITHUB_REPOSITORY%%/*}" | tr '[:upper:]' '[:lower:]')
+          name="${IMAGE_OVERRIDE:-${GITHUB_REPOSITORY##*/}-labview}"
+          name=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
+          verified_lvpm=false
+          case "$selected" in
+            ''|latest) image="ghcr.io/${owner}/${name}:linux-latest"; worker_workflow="Build LabVIEW CI Image - Linux" ;;
+            base|none) image="nationalinstruments/labview:latest-linux"; worker_workflow="" ;;
+            linux-beta-*) image="ghcr.io/${owner}/${name}:${selected}"; worker_workflow="Build LabVIEW CI Image - Linux Beta" ;;
+            linux-lvpm-*@sha256:*) image="ghcr.io/${owner}/${name}:${selected}"; worker_workflow=""; verified_lvpm=true ;;
+            linux-*) image="ghcr.io/${owner}/${name}:${selected}"; worker_workflow="Build LabVIEW CI Image - Linux" ;;
+            *) image="ghcr.io/${owner}/${name}:linux-${selected}"; worker_workflow="Build LabVIEW CI Image - Linux" ;;
+          esac
+          echo "LABVIEW_CONTAINER_IMAGE=$image" >> "$GITHUB_ENV"
+          echo "LINUX_WORKER_WORKFLOW=$worker_workflow" >> "$GITHUB_ENV"
+          echo "LVCI_VERIFIED_LVPM=$verified_lvpm" >> "$GITHUB_ENV"
+          echo "Using Linux container image: $image"
+
+      - name: Wait for Linux worker image build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$LABVIEW_CONTAINER_IMAGE" = "nationalinstruments/labview:latest-linux" ]; then
+            echo "Using the NI Linux base image; no Linux worker build to wait for."
+            exit 0
+          fi
+          if [ "$LVCI_VERIFIED_LVPM" = "true" ]; then
+            echo "Using a verified immutable LVPM candidate; no VIPM build to wait for."
+            exit 0
+          fi
+          bash .github/labview/wait-for-worker-image.sh "${{ steps.sha.outputs.sha }}" "${{ github.event.before }}" "$LINUX_WORKER_WORKFLOW"
+
+      - name: Log in to GHCR
+        if: env.LABVIEW_CONTAINER_IMAGE != 'nationalinstruments/labview:latest-linux'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull LabVIEW Linux container
+        id: pull
+        run: docker pull "$LABVIEW_CONTAINER_IMAGE"
+        continue-on-error: true
+
+      - name: Run unit tests inside Linux container
+        if: steps.pull.outcome == 'success'
+        id: run
+        run: |
+          mkdir -p "${{ github.workspace }}/ci-out/unit-tests/results"
+          docker run --rm \
+            -e "GITHUB_REPOSITORY=${{ github.repository }}" \
+            -e "GITHUB_SHA=${{ steps.sha.outputs.sha }}" \
+            -e "LABVIEW_VERSION=${{ vars.LABVIEW_VERSION || '2026' }}" \
+            -v "${{ github.workspace }}:/workspace" \
+            "$LABVIEW_CONTAINER_IMAGE" \
+            bash /workspace/.github/labview/run-unit-tests.sh \
+              /workspace \
+              /workspace/ci-out/unit-tests/results
+        continue-on-error: true
+
+      - name: Build friendly report (merge JUnit + join snapshots)
+        id: report
+        if: steps.pull.outcome == 'success'
+        continue-on-error: true
+        run: |
+          OUT="${{ github.workspace }}/ci-out/unit-tests"
+          python3 .github/labview/build-unittest-report.py \
+            --results   "$OUT/results" \
+            --out       "$OUT" \
+            --workspace "${{ github.workspace }}" \
+            --sha       "${{ steps.sha.outputs.sha }}" \
+            --platform  linux \
+            --repo      "${{ github.repository }}" \
+            --pages-url "${{ env.PAGES_URL }}" \
+            --labview-version "${{ vars.LABVIEW_VERSION || '2026' }}" \
+            --commit-msg "$(git log -1 --pretty=%s   ${{ steps.sha.outputs.sha }})" \
+            --author     "$(git log -1 --pretty=%an  ${{ steps.sha.outputs.sha }})" \
+            --date       "$(git log -1 --pretty=%cI  ${{ steps.sha.outputs.sha }})"
+          if [ -f "$OUT/index.html" ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Upload report artifact
+        if: steps.report.outcome == 'success' && steps.report.outputs.exists == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-tests-linux-report-${{ steps.sha.outputs.sha }}
+          path: ${{ github.workspace }}/ci-out/unit-tests/
+          if-no-files-found: warn
+
+      - name: Deploy report to GitHub Pages
+        if: steps.report.outcome == 'success' && steps.report.outputs.exists == 'true'
+        uses: ./.github/actions/publish-gh-pages
+        with:
+          publish_dir: ${{ github.workspace }}/ci-out/unit-tests
+          destination_dir: unit-tests/${{ steps.sha.outputs.sha }}/linux
+
+      - name: Post commit status
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OUT="${{ github.workspace }}/ci-out/unit-tests"
+          STATE="failure"; DESC="Unit tests (Linux) did not run"
+          if [ "${{ steps.report.outcome }}" = "success" ] && [ "${{ steps.report.outputs.exists }}" = "true" ] && [ -f "$OUT/results.json" ]; then
+            REPORT_URL="${{ env.PAGES_URL }}/unit-tests/${{ steps.sha.outputs.sha }}/linux/index.html"
+            tests=$(jq -r '.summary.tests // 0'   "$OUT/results.json")
+            passed=$(jq -r '.summary.passed // 0' "$OUT/results.json")
+            failed=$(jq -r '((.summary.failed // 0) + (.summary.errored // 0))' "$OUT/results.json")
+            if [ "${tests:-0}" -eq 0 ]; then
+              STATE="failure"; DESC="No unit tests found"
+            elif [ "${passed:-0}" -eq 0 ] && [ "${failed:-0}" -eq 0 ]; then
+              STATE="failure"; DESC="All unit tests skipped"
+            elif [ "${failed:-0}" -eq 0 ]; then
+              STATE="success"; DESC="${passed} passed"
+            else
+              STATE="failure"; DESC="${failed} failed, ${passed} passed"
+            fi
+          elif [ "${{ steps.report.outcome }}" = "success" ] && [ "${{ steps.report.outputs.exists }}" = "true" ]; then
+            REPORT_URL="${{ env.PAGES_URL }}/unit-tests/${{ steps.sha.outputs.sha }}/linux/index.html"
+          else
+            REPORT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+          if [ "${{ steps.pull.outcome }}" != "success" ]; then
+            STATE="failure"; DESC="Worker image unavailable - build it via Configure Workers"
+          elif [ "${{ steps.run.outcome }}" != "success" ]; then
+            STATE="failure"; DESC="Unit test runner failed or did not run"
+          elif [ "${{ steps.report.outcome }}" != "success" ]; then
+            STATE="failure"; DESC="Unit test report failed or did not run"
+          fi
+          curl -s -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ steps.sha.outputs.sha }}" \
+            -d "{\"state\":\"$STATE\",\"target_url\":\"$REPORT_URL\",\"description\":\"$DESC\",\"context\":\"CI / Unit Tests (Linux)\"}"
+          if [ "$STATE" != "success" ]; then exit 1; fi
+
+      - name: Fail the job if the worker image was unavailable
+        if: always() && steps.pull.outcome != 'success'
+        run: |
+          echo "::error::The worker container image could not be pulled, so the unit tests never ran. If it has never been built for this repository, run 'Build LabVIEW CI Image - Linux' (Actions) or use Configure Workers on the dashboard, then re-run this job."
+          exit 1

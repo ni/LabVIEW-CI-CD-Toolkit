@@ -363,6 +363,7 @@ jobs:
               else (['windows', 'linux'] if oss == 'both' else [oss])
           acts = [a.strip() for a in acts_in.split(',') if a.strip()] \
               or prev['activities'] or ['dashboard', 'masscompile', 'vi-analyzer', 'vidiff']
+          acts = list(dict.fromkeys('snapshots' if a == 'snapshots-2' else a for a in acts))
           now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
           max_parallel = int(runners) if runners.isdigit() and int(runners) > 0 else (prev.get('maxParallel') or 5)
 

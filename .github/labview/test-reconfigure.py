@@ -74,6 +74,14 @@ class ReconfigurePreservationTests(unittest.TestCase):
         actual.pop('configuredAt', None)
         self.assertEqual(actual, expected)
 
+    def test_explicit_legacy_snapshot_activity_migrates_without_forcing_snapshots(self):
+        result, text = self.apply_settings(IN_ACTS='dashboard,snapshots-2,snapshots')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(yaml.safe_load(text)['activities'], ['dashboard', 'snapshots'])
+        result, text = self.apply_settings(IN_ACTS='dashboard')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(yaml.safe_load(text)['activities'], ['dashboard'])
+
     def test_blank_inputs_are_byte_preserving(self):
         initial = '# Retain client comments on a no-op.\n' + yaml.safe_dump(self.preservation_fixture())
         result, text = self.apply_settings(initial=initial)

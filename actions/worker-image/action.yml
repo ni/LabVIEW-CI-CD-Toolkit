@@ -1,0 +1,65 @@
+name: LabVIEW Worker Image
+description: Build or reuse a Windows LabVIEW worker from its base digest and staged dependencies.
+author: labview-ci
+inputs:
+  image:
+    description: GHCR package name without registry, owner or tag; defaults to <repo>-labview.
+    default: ''
+  labview-version:
+    description: LabVIEW year matching the qualified base image, also published as a moving tag.
+    default: '2026'
+  base-image:
+    description: Explicit readable Windows LCWC base image with VIPM and LabVIEW; Dragon files additionally require Dragon CLI in this base.
+    required: true
+  deps-dir:
+    description: Existing workspace-relative flat directory of .vipc/.dragon declarations and referenced .vip payloads.
+    default: ''
+  include-ci-tooling:
+    description: Include the current source ci-tooling.vipc and required unit-test essentials; optional framework packages retain source best-effort semantics.
+    default: 'true'
+  tag-latest:
+    description: Also move the latest worker tag after verifying the immutable image.
+    default: 'true'
+outputs:
+  image:
+    description: Resolved GHCR image name without tag.
+    value: ${{ steps.worker.outputs.image }}
+  tag:
+    description: Deterministic content tag (win- followed by 24 hex digits).
+    value: ${{ steps.worker.outputs.tag }}
+  digest:
+    description: Verified published or reused manifest digest.
+    value: ${{ steps.worker.outputs.digest }}
+  built:
+    description: True when a build or registry copy occurred, false when reused.
+    value: ${{ steps.worker.outputs.built }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v7
+      with:
+        python-version: '3.13'
+    - uses: actions/setup-go@v6
+      with:
+        go-version: '1.26.3'
+        cache: false
+    - name: Install registry client
+      shell: pwsh
+      run: go install github.com/google/go-containerregistry/cmd/crane@v0.20.2
+    - uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+    - name: Build or reuse worker
+      id: worker
+      shell: pwsh
+      env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
+        WI_IMAGE: ${{ inputs.image }}
+        WI_VERSION: ${{ inputs.labview-version }}
+        WI_BASE: ${{ inputs.base-image }}
+        WI_DEPS: ${{ inputs.deps-dir }}
+        WI_TOOLING: ${{ inputs.include-ci-tooling }}
+        WI_LATEST: ${{ inputs.tag-latest }}
+      run: python "$env:ACTION_DIRECTORY/worker.py"
