@@ -4,7 +4,10 @@ on:
   pull_request:
     paths:
       - '.github/labview/lvpm/**'
+      - '.github/labview/vipm/ci-tooling.vipc'
       - '.github/labview/test-lvpm*'
+      - 'example/Dependencies.vipc'
+      - 'example/Example.dragon'
       - '.github/labview-ci/catalog.json'
       - '.github/labview-ci/install.py'
       - '.github/docker/labview-ci-lvpm.Dockerfile'
@@ -21,7 +24,10 @@ on:
     branches: [main]
     paths:
       - '.github/labview/lvpm/**'
+      - '.github/labview/vipm/ci-tooling.vipc'
       - '.github/labview/test-lvpm*'
+      - 'example/Dependencies.vipc'
+      - 'example/Example.dragon'
       - '.github/labview-ci/catalog.json'
       - '.github/labview-ci/install.py'
       - '.github/docker/labview-ci-lvpm.Dockerfile'
