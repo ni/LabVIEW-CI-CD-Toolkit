@@ -1400,6 +1400,41 @@ docker run --rm `
           CLI prompt contract. The Linux hook forces <code>--show-progress --verbose</code> so its phase is visible,
           reports focused process/display diagnostics on failure, and preserves the nonzero result instead of publishing
           a partial worker.</li>
+        <li><strong>Verify both Windows VIPM executables before required installs</strong> — the shared
+          base/dependency bootstrap defaults to the official
+          <a href="https://docs.vipm.io/latest/installation/">VIPM 2026 Q3 f2/build 4056 installer</a>.
+          The <a href="https://docs.vipm.io/latest/release-notes/2026.3.2/">vendor release notes</a>
+          identify the legacy package-file <code>Missing Name in Package section</code> fix; this is
+          not proof of container compatibility. The unmodified payload embeds CLI version <code>26.3.2</code>
+          and Desktop file version <code>2026.3.2.4056</code>. The hook logs the actual selected paths,
+          probes CLI <code>--version</code> within 30 seconds, reads Desktop product/file identity,
+          and requires Windows-trusted <strong>James Kring, Inc.</strong> Authenticode signatures on both.
+          A missing/old executable triggers one verified upgrade and full rediscovery; stale preferred
+          paths, unverifiable binaries, or an already-running Desktop at a different path fail closed.
+          A supported newer pair is not downgraded. Mixed newer/old installations require an explicit
+          paired upgrade rather than risking replacement of the newer half.</li>
+        <li><strong>Keep installer overrides authoritative and bounded</strong> — when an upgrade is needed,
+          <code>VIPM_INSTALLER_URL</code> must be HTTPS without embedded credentials and supply a
+          Windows-trusted vendor-signed VIPM installer at least <code>26.3.4056</code>; both installed
+          executable floors still apply. Custom URLs are not silently replaced; unreachable, old,
+          untrusted, or unverifiable installers fail the build. A supported preinstalled pair leaves
+          the URL unused. Downloads time out at 300 seconds; installation at 1200 seconds, with
+          <code>/exenoui /qn /norestart REBOOT=ReallySuppress</code>. Nonzero and reboot-required
+          (<code>1641</code>/<code>3010</code>) exits fail closed; timeout cleanup targets only the
+          invoked process tree and temporary files. Signature trust, not an unpublished hash, checks
+          integrity. Base Docker builds use the same hook's <code>-BootstrapOnly</code> mode, which exits
+          before environment/headless changes, memory checks, Git/settings setup, engine/LabVIEW launches,
+          or package operations. Both base-build workflows hash the bootstrap's actual file bytes into
+          the immutable cache key. The catalog's <code>2026q3.vipmInstallerUrl</code> also points to 4056
+          so catalog-driven overrides cannot silently retain 3954; other release records are unchanged.
+          Old explicit overrides fail the floor when an upgrade is needed, without implying other-release
+          qualification.</li>
+        <li><strong>Require final Windows runtime evidence</strong> — static payload inspection and
+          AST/mock tests do not prove legacy OGP installation. A reviewed real bake must verify required
+          Antidoc/palette and the final target inventory. Later best-effort tooling can upgrade earlier
+          project pins, so recovered-batch validation is not a final-image pin guarantee. Package
+          archives, required/optional policy, integrity verification, target identity, and exact/minimum
+          pin semantics are not relaxed.</li>
         <li><strong>Seed <code>Settings.ini</code></strong> before installing — a fresh image lacks
           <code>C:\ProgramData\JKI\VIPM\Settings.ini</code>, without which the CLI aborts with an IO error.</li>
         <li><strong>Run LabVIEW headless first</strong> — the modern CLI installs <em>into a running LabVIEW</em> over

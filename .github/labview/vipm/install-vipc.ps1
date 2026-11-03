@@ -8,14 +8,19 @@
     which is distributed only through VIPM and is the supported way to produce
     project documentation headlessly in CI/CD.
 
+.PARAMETER BootstrapOnly
+    Verify/upgrade the selected CLI and Desktop, then exit before environment,
+    LabVIEW, Git/settings, or package operations. Used by the Windows base image.
+
 .NOTES
     These values can be overridden at image-build time via environment variables
     so the script does not need editing for each LabVIEW major version:
       LABVIEW_VERSION     LabVIEW year passed to `vipm install`; MUST match the
                           LabVIEW in the NI base image. Default: 2026.
       LABVIEW_BITNESS     LabVIEW bitness passed to `vipm install`. Default: 64.
-      VIPM_INSTALLER_URL  VIPM community installer (https://vipm.jki.net) for a
-                          VIPM build that supports LABVIEW_VERSION.
+      VIPM_INSTALLER_URL  Authoritative HTTPS vendor-signed installer when an
+                          upgrade is needed. Both selected executable floors
+                          are verified independently of the installer version.
 
     Headless install model: the vipm CLI installs packages in Community Edition
     (no VIPM Pro license needed) -- the script sets VIPM_COMMUNITY_EDITION and
@@ -24,6 +29,7 @@
     LabVIEW or it fails with "IO error: Failed to load". VIPM Pro activation is
     still honored if VIPM_SERIAL_NUMBER / VIPM_FULL_NAME / VIPM_EMAIL are supplied.
 #>
+param([switch] $BootstrapOnly)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference   = 'SilentlyContinue'
@@ -33,7 +39,167 @@ $VipmExe          = $null
 $VipcDir          = 'C:\vipm'
 $LabVIEWVersion   = if ($Env:LABVIEW_VERSION)    { $Env:LABVIEW_VERSION }    else { '2026' }  # match the LabVIEW version in the NI base image
 $LabVIEWBitness   = if ($Env:LABVIEW_BITNESS)    { $Env:LABVIEW_BITNESS }    else { '64' }    # NI base image ships 64-bit LabVIEW
-$VipmInstallerUrl = if ($Env:VIPM_INSTALLER_URL) { $Env:VIPM_INSTALLER_URL } else { 'https://traffic.libsyn.com/secure/jkinc/vipm-26.3.3954-windows-setup.exe' }
+$VipmInstallerUrl = if ($Env:VIPM_INSTALLER_URL) { $Env:VIPM_INSTALLER_URL } else { 'https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe' }
+
+function Find-VipmExecutable {
+    param([ValidateSet('CLI', 'Desktop')] [string] $Kind)
+    $candidates = if ($Kind -eq 'CLI') {
+        @(
+            'C:\Program Files\JKI\VIPM\vipm.exe',
+            'C:\Program Files (x86)\JKI\VIPM\vipm.exe',
+            'C:\Program Files\JKI\VI Package Manager\vipm.exe',
+            'C:\Program Files\JKI\VI Package Manager\support\vipm.exe'
+        )
+    } else {
+        @(
+            'C:\Program Files\JKI\VI Package Manager\VI Package Manager.exe',
+            'C:\Program Files (x86)\JKI\VI Package Manager\VI Package Manager.exe'
+        )
+    }
+    $selected = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if ($selected) { return $selected }
+    if ($Kind -eq 'CLI') {
+        foreach ($root in @('C:\Program Files\JKI', 'C:\Program Files (x86)\JKI')) {
+            if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
+            $found = Get-ChildItem -LiteralPath $root -Filter 'vipm.exe' -Recurse -File -ErrorAction Stop |
+                Sort-Object @{ Expression = { $_.FullName -notmatch '\\VIPM\\' } }, FullName |
+                Select-Object -First 1
+            if ($found) { return $found.FullName }
+        }
+    }
+}
+
+function Assert-VipmPublisher {
+    param([string] $Path)
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop
+    if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate -or
+        $signature.SignerCertificate.GetNameInfo(
+            [System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false) -ne 'James Kring, Inc.') {
+        throw "VIPM signature verification failed for '$Path': expected a Windows-trusted James Kring, Inc. signature; status=$($signature.Status)."
+    }
+}
+
+function Invoke-VipmBootstrapProcess {
+    param([string] $Path, [string[]] $Arguments, [int] $TimeoutSeconds)
+    $outputFile = Join-Path $Env:TEMP ("vipm-bootstrap-" + [guid]::NewGuid().ToString('N') + '.out')
+    $errorFile = $outputFile + '.err'
+    $process = $null
+    try {
+        $process = Start-Process -FilePath $Path -ArgumentList $Arguments -PassThru `
+            -RedirectStandardOutput $outputFile -RedirectStandardError $errorFile -ErrorAction Stop
+        $null = $process.Handle
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Host
+            if ($LASTEXITCODE -ne 0 -and -not $process.HasExited) {
+                throw "VIPM bootstrap timed out after ${TimeoutSeconds}s; could not stop process $($process.Id)."
+            }
+            if (-not $process.WaitForExit(5000)) {
+                throw "VIPM bootstrap timed out after ${TimeoutSeconds}s; process $($process.Id) did not terminate after cleanup."
+            }
+            throw "VIPM bootstrap process '$Path' timed out after ${TimeoutSeconds}s."
+        }
+        $output = @(
+            Get-Content -LiteralPath $outputFile -ErrorAction Stop
+            Get-Content -LiteralPath $errorFile -ErrorAction Stop
+        ) -join "`n"
+        return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output }
+    } finally {
+        if ($process) { $process.Dispose() }
+        foreach ($file in @($outputFile, $errorFile)) {
+            if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force -ErrorAction Stop }
+        }
+    }
+}
+
+function Get-VipmRuntime {
+    $cliPath = Find-VipmExecutable 'CLI'
+    $desktopPath = Find-VipmExecutable 'Desktop'
+    $cliVersion = $null
+    $desktopVersion = $null
+    if ($cliPath) {
+        Assert-VipmPublisher $cliPath
+        $result = Invoke-VipmBootstrapProcess -Path $cliPath -Arguments @('--version') -TimeoutSeconds 30
+        if ($result.ExitCode -ne 0 -or $result.Output -notmatch '(?m)^\s*vipm\s+v?(\d+\.\d+\.\d+(?:\.\d+)?)\s*$') {
+            throw "Cannot verify selected VIPM CLI version at '$cliPath': exit=$($result.ExitCode); $($result.Output)"
+        }
+        $cliVersion = [version]$Matches[1]
+    }
+    if ($desktopPath) {
+        Assert-VipmPublisher $desktopPath
+        $identity = (Get-Item -LiteralPath $desktopPath -ErrorAction Stop).VersionInfo
+        if ($identity.ProductName -ne 'VI Package Manager' -or
+            -not [version]::TryParse($identity.FileVersion, [ref]$desktopVersion)) {
+            throw "Cannot verify selected VIPM Desktop identity/version at '$desktopPath'."
+        }
+    }
+    Write-Host "Selected VIPM CLI: '$cliPath' version='$cliVersion'; Desktop: '$desktopPath' version='$desktopVersion'."
+    return [pscustomobject]@{
+        CliPath = $cliPath; CliVersion = $cliVersion
+        DesktopPath = $desktopPath; DesktopVersion = $desktopVersion
+    }
+}
+
+function Test-VipmRuntimeSupported {
+    param($Runtime)
+    return ($Runtime.CliPath -and $Runtime.DesktopPath -and
+        $Runtime.CliVersion -ge [version]'26.3.2' -and
+        $Runtime.DesktopVersion -ge [version]'2026.3.2.4056')
+}
+
+function Initialize-VipmRuntime {
+    param([string] $InstallerUrl)
+    $before = Get-VipmRuntime
+    if (Test-VipmRuntimeSupported $before) {
+        Write-Host 'Both selected VIPM executables satisfy the supported floor; installer URL is unused (no downgrade).'
+        return $before
+    }
+    if (($before.CliVersion -and $before.CliVersion -gt [version]'26.3.2') -or
+        ($before.DesktopVersion -and $before.DesktopVersion -gt [version]'2026.3.2.4056')) {
+        throw 'Mixed VIPM installation includes a newer executable but lacks a supported pair. Upgrade both executables explicitly; refusing a possible downgrade.'
+    }
+    $uri = $null
+    if (-not [uri]::TryCreate($InstallerUrl, [UriKind]::Absolute, [ref]$uri) -or
+        $uri.Scheme -ne 'https' -or $uri.UserInfo) {
+        throw 'VIPM_INSTALLER_URL must be an absolute HTTPS URL without embedded credentials.'
+    }
+    $installerFile = Join-Path $Env:TEMP ("vipm-installer-" + [guid]::NewGuid().ToString('N') + '.exe')
+    try {
+        Write-Host "Upgrading missing/old VIPM pair from configured HTTPS installer host '$($uri.Host)' (download limit 300s)."
+        Invoke-WebRequest -Uri $uri -OutFile $installerFile -UseBasicParsing -TimeoutSec 300 -ErrorAction Stop | Out-Null
+        Assert-VipmPublisher $installerFile
+        $identity = (Get-Item -LiteralPath $installerFile -ErrorAction Stop).VersionInfo
+        $installerVersion = $null
+        if ($identity.ProductName -notlike 'VIPM *' -or
+            -not [version]::TryParse($identity.FileVersion, [ref]$installerVersion) -or
+            $installerVersion -lt [version]'26.3.4056') {
+            throw "Configured VIPM installer has an unsupported/unverifiable identity or version '$($identity.FileVersion)'; minimum installer version is 26.3.4056."
+        }
+        Write-Host "Verified vendor installer version $installerVersion; installing without reboot (limit 1200s)."
+        $result = Invoke-VipmBootstrapProcess -Path $installerFile `
+            -Arguments @('/exenoui', '/qn', '/norestart', 'REBOOT=ReallySuppress') -TimeoutSeconds 1200
+        if ($result.ExitCode -in @(1641, 3010)) {
+            throw "VIPM installer requires a reboot (exit $($result.ExitCode)); a container layer cannot safely continue."
+        }
+        if ($result.ExitCode -ne 0) {
+            throw "VIPM installer failed (exit $($result.ExitCode)): $($result.Output)"
+        }
+        $after = Get-VipmRuntime
+        if (-not (Test-VipmRuntimeSupported $after)) {
+            throw 'VIPM upgrade did not produce a supported selected CLI/Desktop pair. Check preferred stale paths; required packages have not been attempted.'
+        }
+        return $after
+    } finally {
+        if (Test-Path -LiteralPath $installerFile) { Remove-Item -LiteralPath $installerFile -Force -ErrorAction Stop }
+    }
+}
+
+$vipmRuntime = Initialize-VipmRuntime -InstallerUrl $VipmInstallerUrl
+$VipmExe = $vipmRuntime.CliPath
+$script:VipmEngineExe = $vipmRuntime.DesktopPath
+if ($BootstrapOnly) {
+    Write-Host 'VIPM bootstrap verified; no LabVIEW, engine, Git context, or package operations requested.'
+    exit 0
+}
 # VIPM 26.3 Community Edition only installs packages when the working directory is
 # inside a PUBLIC Git repository (otherwise it exits 6 with "VIPM Community Edition
 # requires a public Git repository"). The worker image is built from this public
@@ -149,62 +315,6 @@ try {
             "If installs time out at 'wait for VIPM startup', raise the docker build memory limit (-m 8GB).")
     }
 } catch { Write-Host ("Memory preflight skipped: " + $_.Exception.Message) }
-
-# -- 1. Install VIPM if not already present -----------------------------------
-# VIPM is normally pre-installed into the image by labview-ci.Dockerfile, which
-# downloads the official VIPM 2026 Q3 (26.3.3954) Windows installer from the JKI
-# CDN and runs it silently, so this script just finds vipm.exe and applies the
-# .vipc. If it is NOT already present we fall back to downloading the same
-# installer here ($VipmInstallerUrl, overridable via VIPM_INSTALLER_URL). That
-# fallback is OPTIONAL and fetched from a vendor-controlled URL that can move or
-# 404 at any time, so a download/install failure must NOT brick the core CI image
-# (LabVIEW + VI Analyzer were installed above). Treat the fallback as best-effort:
-# on failure, warn and skip the add-ons (exit 0) instead of failing the build.
-# Prefer the MODERN vipm CLI (C:\Program Files\JKI\VIPM) over the legacy
-# LabVIEW-based CLI (C:\Program Files\JKI\VI Package Manager\...). The modern CLI
-# has first-class headless/container support (--refresh, Community Edition mode)
-# and installs packages without a VIPM Pro license.
-$vipmCandidates = @(
-    'C:\Program Files\JKI\VIPM\vipm.exe',
-    'C:\Program Files (x86)\JKI\VIPM\vipm.exe',
-    "$VipmDir\vipm.exe",
-    "$VipmDir\support\vipm.exe"
-)
-$VipmExe = $vipmCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $VipmExe) {
-    # Fall back to a recursive search of the JKI install roots, preferring any
-    # path under a '\VIPM\' folder (the modern CLI) over the legacy product folder.
-    $found = Get-ChildItem -Path 'C:\Program Files\JKI', 'C:\Program Files (x86)\JKI' `
-        -Filter 'vipm.exe' -Recurse -ErrorAction SilentlyContinue |
-        Sort-Object @{ Expression = { $_.FullName -notmatch '\\VIPM\\' } }, FullName |
-        Select-Object -First 1
-    if ($found) { $VipmExe = $found.FullName }
-}
-if ($VipmExe) { Write-Host "Using VIPM CLI: $VipmExe" }
-if (-not $VipmExe -or -not (Test-Path $VipmExe)) {
-    Write-Host 'VIPM not found - downloading installer...'
-    $InstallerFile = Join-Path $Env:TEMP 'vipm-installer.exe'
-    try {
-        Invoke-WebRequest -Uri $VipmInstallerUrl -OutFile $InstallerFile -UseBasicParsing
-
-        Write-Host 'Running VIPM installer silently...'
-        $p = Start-Process -FilePath $InstallerFile `
-            -ArgumentList '/exenoui', '/qn' `
-            -Wait -PassThru
-        if ($p.ExitCode -ne 0) {
-            throw "VIPM installer exited with code $($p.ExitCode)"
-        }
-        Write-Host "VIPM installed to: $VipmDir"
-        $VipmExe = $vipmCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-        if (-not $VipmExe) { $VipmExe = "$VipmDir\vipm.exe" }
-    }
-    catch {
-        Write-Warning ("VIPM add-on install SKIPPED: could not install VIPM from '" + $VipmInstallerUrl + "' (" + $_.Exception.Message + "). " +
-            "Core image (LabVIEW + VI Analyzer) is unaffected; VIPM-only add-ons such as Antidoc are NOT baked in. " +
-            "Provide a reachable VIPM_INSTALLER_URL to enable them.")
-        exit 1
-    }
-}
 
 # -- 2. Apply each .vipc file -------------------------------------------------
 $vipcFiles = @(Get-ChildItem $VipcDir -Filter '*.vipc')
@@ -338,13 +448,15 @@ function Start-HeadlessLabVIEW {
 # engine is already running. Pre-launch the engine here (best-effort) and give it
 # time to come up so the install can attach to an already-running engine.
 $VipmEngineProc = $null
-$script:VipmEngineExe = @(
-    (Join-Path $VipmDir 'VI Package Manager.exe'),
-    'C:\Program Files (x86)\JKI\VI Package Manager\VI Package Manager.exe'
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
 function Start-VipmEngineProcess {
     if (-not $script:VipmEngineExe) { return }
-    if (Get-Process -Name 'VI Package Manager' -ErrorAction SilentlyContinue) { return }
+    $running = @(Get-Process -Name 'VI Package Manager' -ErrorAction SilentlyContinue)
+    foreach ($engine in $running) {
+        if ($engine.Path -ne $script:VipmEngineExe) {
+            throw "Running VIPM Desktop '$($engine.Path)' does not match verified selected executable '$script:VipmEngineExe'."
+        }
+    }
+    if ($running.Count) { return }
     Write-Host "Pre-launching VIPM engine so the CLI can attach: $script:VipmEngineExe"
     try {
         $script:VipmEngineProc = Start-Process -FilePath $script:VipmEngineExe -PassThru -ErrorAction Stop

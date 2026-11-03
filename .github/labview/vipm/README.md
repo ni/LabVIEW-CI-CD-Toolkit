@@ -119,24 +119,67 @@ its own.
 These are the non-obvious requirements. Each one was a distinct failure mode we
 hit and fixed; keep them in mind when changing the install path.
 
-### 1. Use VIPM 2026 Q3 (26.3) or newer — not the NI-feed `ni-vipm`
+### 1. Verify both VIPM executables at the 2026 Q3 f2 floor
 
 The NI Package Manager feed ships an **older** VIPM (`2026.1.0`) whose CLI cannot
 complete a headless package install in a Windows container: its `library_list`
 call into LabVIEW times out (~330 s) and the old CLI does **not** surface the
-underlying error. The **2026 Q3** build (`26.3.3954`) surfaces underlying install
-errors and improves headless/container support.
+underlying error. Build `3954` improves diagnostics but rejects intact legacy
+OpenG package files with `Missing Name in Package section`. The vendor's
+[2026 Q3 f2 release notes](https://docs.vipm.io/latest/release-notes/2026.3.2/)
+identify that package-file fix in build **4056**.
 
-The Dockerfile now downloads the official installer from the JKI CDN and runs it
-silently:
+The Windows base and dependency hook share the same fail-closed bootstrap. The
+official [Windows installer](https://docs.vipm.io/latest/installation/) is:
 
 ```
-https://traffic.libsyn.com/secure/jkinc/vipm-26.3.3954-windows-setup.exe
+https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe
 ```
 
-It is a standard InstallShield setup — `/exenoui /qn` runs it fully silent
-(per <https://docs.vipm.io/latest/installation/>). Override the URL with the
-`VIPM_INSTALLER_URL` build-arg / env var to pin a different version.
+Installer identity is **not** executable identity: the unmodified official payload
+contains a CLI with embedded version `26.3.2` (no PE version resource) and Desktop
+with PE file version `2026.3.2.4056`. Before any required installs, the hook logs
+the actual selected paths, checks the CLI's `--version` with a 30-second bound,
+and reads Desktop's product name/file version. Both binaries must have a
+Windows-trusted Authenticode signature from **James Kring, Inc.** and meet those
+respective minimum versions. Desktop is launched from the verified path; an
+already-running engine at another path fails closed.
+
+A missing or old executable triggers one upgrade, including on reused older
+bases, followed by full rediscovery and verification of both selected paths.
+A stale higher-priority CLI is not silently bypassed. A supported newer pair is
+reused without downloading or downgrading. A mixed installation with one
+executable newer than the floor and the other old/missing fails before installation:
+the installer-to-CLI version mapping is not sufficient to guarantee no downgrade
+of the newer half; explicitly upgrade both before rebuilding.
+
+`VIPM_INSTALLER_URL` is authoritative **when an upgrade is needed**: it must be
+HTTPS without embedded credentials. Custom mirrors/versions must still provide
+a Windows-trusted, vendor-signed VIPM installer with file version at least
+`26.3.4056`, and the installed pair must satisfy the measured floors. There is no
+silent replacement URL or fallback on unreachable, old, untrusted, or unverifiable
+installers. Supported preinstalled pairs leave the URL unused. Signature and
+Windows trust validation, not an invented vendor hash, enforce installer integrity.
+
+Downloads have a 300-second timeout; installation has a 1200-second process bound
+and uses `/exenoui /qn /norestart REBOOT=ReallySuppress`. Nonzero exits, including
+reboot-required `1641`/`3010`, fail the layer. Timeouts terminate only that process
+tree; temporary installer/output files are cleaned up. `-BootstrapOnly` performs
+only this bootstrap, exiting before environment/headless changes, memory checks,
+Git/settings setup, LabVIEW/Desktop launches, VIPC discovery, or package operations.
+The base Dockerfile calls this mode, and both base-build workflows include the
+bootstrap's file-byte SHA256 in their immutable cache key. The catalog's
+`2026q3.vipmInstallerUrl` is updated because workflow/GitLab catalog overrides
+otherwise defeat the Docker default. Other release records are unchanged; an
+old explicitly configured URL fails the floor if an upgrade is necessary.
+
+These are bootstrap and vendor-provenance guarantees, **not** Windows container
+qualification. AST/mock tests and static payload inspection do not prove that the
+legacy OGP installs successfully. A reviewed real Windows bake must still verify
+required Antidoc/palette and the final target inventory. Later best-effort tooling
+can change earlier project pins; recovered-batch verification is not a final-image
+pin guarantee. No package archive is rewritten and required/optional accounting,
+target selection, integrity checks, and exact/minimum pin semantics are unchanged.
 
 ### 2. No VIPM Pro license is required — but the current container resolver has a bug
 
@@ -313,7 +356,7 @@ changed shape vs. the older `2026.1.0` build — mind the differences:**
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `VIPM_INSTALLER_URL` | `…/vipm-26.3.3954-windows-setup.exe` | VIPM installer to download if the CLI isn't already present. |
+| `VIPM_INSTALLER_URL` | `…/vipm-26.3.4056-windows-setup.exe` | Authoritative HTTPS vendor-signed installer when either selected executable is old/missing; minimum installer `26.3.4056`, CLI `26.3.2`, Desktop `2026.3.2.4056`. Supported preinstalled pairs do not use the URL. |
 | `VIPM_COMMUNITY_EDITION` | _(unset)_ | Optional override. Do not force it unless you specifically need to exercise the Community public-repo entitlement gate. |
 | `VIPM_NONINTERACTIVE` | `1` | Never block on prompts. |
 | `VIPM_ASSUME_YES` | `1` | Auto-confirm. |
