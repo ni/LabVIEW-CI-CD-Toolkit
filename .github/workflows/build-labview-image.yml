@@ -89,7 +89,7 @@ jobs:
       build: ${{ steps.decide.outputs.build }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Decide whether to rebuild
@@ -199,7 +199,7 @@ jobs:
       contents: read     # read .github/labview-ci.yml for the policy
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       - name: Coordinate in-flight CI before the rebuild
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -309,7 +309,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v7

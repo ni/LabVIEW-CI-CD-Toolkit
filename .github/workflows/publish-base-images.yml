@@ -54,7 +54,7 @@ jobs:
       base_repo: ${{ steps.plan.outputs.base_repo }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       - name: Plan release matrix from catalog
         id: plan
         shell: bash
@@ -92,7 +92,7 @@ jobs:
     timeout-minutes: 150
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Ensure Docker daemon is running
         shell: powershell

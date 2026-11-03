@@ -47,7 +47,7 @@ jobs:
       # v4 major alias, which follows stable; pin a release for reproducibility.
       tooling-ref:     ${{ steps.ref.outputs.ref }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - id: cfg
         # Full repo path (not ./actions/...): inside a reusable workflow a ./ path
         # resolves against the CALLER's checked-out workspace, which doesn't contain
@@ -145,7 +145,7 @@ jobs:
     needs: config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Wait for worker image rebuild (dependency gate)
@@ -173,7 +173,7 @@ jobs:
       statuses: write     # post the CI / Mass Compile commit status
     steps:
       - name: Checkout caller repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -200,7 +200,7 @@ jobs:
       # (config source.ref), checked out at runtime, so the capability never
       # changes version automatically — only when the config is updated.
       - name: Check out tooling (opted-in version)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
@@ -305,7 +305,7 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"VI Analyzer in progress\",\"context\":\"CI / VI Analyzer\"}"
 
       - name: Checkout caller repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -331,7 +331,7 @@ jobs:
         continue-on-error: true
 
       - name: Check out tooling (opted-in version)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
@@ -460,14 +460,14 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"VIDiff in progress\",\"context\":\"CI / VIDiff\"}"
 
       - name: Checkout head commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.shas.outputs.head }}
           fetch-depth: 0
           path: head
 
       - name: Checkout base commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         if: steps.shas.outputs.base != ''
         with:
           ref: ${{ steps.shas.outputs.base }}
@@ -494,7 +494,7 @@ jobs:
           docker version
 
       - name: Check out tooling (opted-in version)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
@@ -560,12 +560,12 @@ jobs:
       statuses: write
     steps:
       - name: Checkout caller repository (full history)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Checkout deployed gallery (gh-pages) for incremental seeding
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         continue-on-error: true
         with:
           ref: gh-pages
@@ -601,7 +601,7 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"VI Snapshots in progress\",\"context\":\"CI / VI Snapshots\"}"
 
       - name: Check out tooling (opted-in version)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
