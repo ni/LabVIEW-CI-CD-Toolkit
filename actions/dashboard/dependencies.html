@@ -1552,7 +1552,7 @@
       currentVipcs = vipcs;
       currentDragons = dragons;
       currentColStates = colStates;
-      monitorDirty = (!vipcHasConfig && vipcs.length > 0) || (!dragonHasConfig && dragons.length > 0);
+      monitorDirty = false;
       const system = await systemForRevision(sha);
       renderContainers(platformStates);
       const baseCols = COLS.filter(c => colStates[c.key].tag === "base").map(c => c.label);
@@ -1590,7 +1590,7 @@
       const generatedDragons = dragonPaths.map(path => { const entry = dragonConfig.get(normPath(path)); const monitorOn = monitorOnFrom(entry, dragonHasConfig); const monitored = monitorOn.length > 0; return { path, monitored, monitorOn, configured:monitored }; });
       currentVipcs = generatedVipcs;
       currentDragons = generatedDragons;
-      monitorDirty = (!vipcHasConfig && generatedVipcs.length > 0) || (!dragonHasConfig && generatedDragons.length > 0);
+      monitorDirty = false;
       const platformStates = {};
       (data.platforms || []).forEach(p => { platformStates[p.key] = { tag:p.tag || 'base', label:p.version || p.tag || 'base', installer:p.installer || 'vipm', ready:p.ready !== false, packages:new Set(p.packages || []), nipkg_ready:p.nipkg_ready !== false && Array.isArray(p.nipkg_packages), nipkg:p.nipkg_packages || [], nipkgNames:new Set((p.nipkg_packages || []).map(x => String(x.name || '').toLowerCase())), labview:p.labview_version || '' }; });
       platformStates.nipmDeps = data.nipm || [];

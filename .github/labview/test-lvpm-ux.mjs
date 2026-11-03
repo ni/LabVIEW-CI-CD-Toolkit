@@ -64,7 +64,13 @@ vm.runInContext(source.replace('    init();', `
       lvpmFreshness, localFreshnessText, loadPlatformStates, renderGenerated, renderContainers,
       dragonFileState, updMissingList, renderDragonFiles, platformCoverage, visibleColumns, selectPlatform,
       renderUpdatePanel, renderVipc, encodeMonitorList, setFileMonitor, syncPlatformTabs, initPlatformTabs,
-      monitorCounts, monitorInputs, dispatchMonitor, openUpdateApprovalDialog,
+      monitorCounts, monitorInputs, dispatchMonitor, openUpdateApprovalDialog, loadRevision,
+      isMonitorDirty:() => monitorDirty,
+      setRevisionFiles:files => {
+        listDependencyFiles = async () => files;
+        vipcPackages = async () => ['actual-1.2'];
+        systemForRevision = async () => [];
+      },
       pendingAction:() => pendingTokenAction,
       setModal:modal => { updModal = modal; },
       getColumnStates: () => currentColStates,
@@ -721,4 +727,95 @@ for (const testCase of [
   assert.deepEqual(banner.children[0].children.map(child => child.tagName),
     testCase.labels.length === 2 ? ['strong', 'span', 'a', '#text', 'a'] : ['strong', 'span', 'a']);
 }
-console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon checks plus OS-isolated status, monitoring preservation, tab keyboard/deep links, preview-only tooling, stale/historical blocking, cross-tab/revision/dirty dispatch races, obsolete approval/token cancellation, and shared-banner scope passed.');
+elements.set('status', uiElement());
+const monitoringFiles = {
+  vipc:['project.vipc', 'other.vipc', '.github/labview/vipm/ci-tooling.vipc'],
+  dragon:['project.dragon']
+};
+hooks.setRevisionFiles(monitoringFiles);
+const monitoringPrefix = 'config:\n  container:\n    use: base\n';
+const monitoringCases = [
+  { name:'missing manifest', yaml:'',
+    project:'windows+linux', other:'windows+linux', dragon:'windows+linux' },
+  { name:'implicit legacy', yaml:monitoringPrefix,
+    project:'windows+linux', other:'windows+linux', dragon:'windows+linux' },
+  { name:'implicit Dragon with explicit VIPC', yaml:monitoringPrefix + '    vipc: []\n',
+    project:'none', other:'none', dragon:'windows+linux' },
+  { name:'implicit VIPC with explicit Dragon', yaml:monitoringPrefix + '    dragon: []\n',
+    project:'windows+linux', other:'windows+linux', dragon:'none' },
+  { name:'explicit platform lists', yaml:monitoringPrefix
+      + '    vipc:\n      - path: project.vipc\n        monitorOn: windows\n'
+      + '    dragon:\n      - path: project.dragon\n        monitorOn: linux\n',
+    project:'windows', other:'none', dragon:'linux' },
+  { name:'explicit empty lists', yaml:monitoringPrefix + '    vipc: []\n    dragon: []\n',
+    project:'none', other:'none', dragon:'none' },
+  { name:'explicit opt-out', yaml:monitoringPrefix
+      + '    vipc:\n      - path: project.vipc\n        monitor: false\n'
+      + '    dragon:\n      - path: project.dragon\n        monitor: false\n',
+    project:'none', other:'none', dragon:'none' },
+  { name:'legacy monitor true', yaml:monitoringPrefix
+      + '    vipc:\n      - path: project.vipc\n        monitor: true\n'
+      + '    dragon:\n      - path: project.dragon\n        monitor: true\n',
+    project:'windows+linux', other:'none', dragon:'windows+linux' }
+];
+const savedMonitoringConfig = activeConfig;
+for (const path of ['generated', 'live']) {
+  for (const fixture of monitoringCases) {
+    activeConfig = fixture.yaml;
+    const config = hooks.parseManifestYaml(fixture.yaml);
+    const generated = {
+      sha:revision, config, columns:[], system:[],
+      vipc:monitoringFiles.vipc.map(file => ({ path:file, packages:['actual-1.2'] })),
+      dragon:{ files:monitoringFiles.dragon.map(file => ({ path:file, dependencies:[] })) }
+    };
+    const load = async sha => {
+      if (path === 'generated') hooks.renderGenerated({ ...generated, sha });
+      else await hooks.loadRevision(sha);
+      await hooks.renderUpdatePanel();
+    };
+    hooks.setState({ platform:'windows', vipcs:[], dragons:[], dirty:true });
+    const beforeLoad = requests.length;
+    await load(revision);
+    const label = path + ': ' + fixture.name;
+    assert.equal(hooks.isMonitorDirty(), false, label);
+    assert.equal(elements.get('saveMonitor').disabled, true, label);
+    assert.match(elements.get('updatePanel').innerHTML, /id="updRun">Review Windows VIPM update/, label);
+    assert.doesNotMatch(elements.get('monitorStatus').innerHTML, /Save to update/, label);
+    const inputs = plain(hooks.monitorInputs());
+    const vipcEntries = new Map(inputs.container_vipc.split(';').map(entry => entry.split('::')));
+    assert.equal(vipcEntries.get('project.vipc'), fixture.project, label);
+    assert.equal(vipcEntries.get('other.vipc'), fixture.other, label);
+    assert.equal(vipcEntries.get('.github/labview/vipm/ci-tooling.vipc'), 'windows+linux', label);
+    assert.equal(inputs.container_dragon, 'project.dragon::' + fixture.dragon, label);
+    hooks.setFileMonitor('vipc', 'project.vipc', 'windows', fixture.project === 'none');
+    await hooks.renderUpdatePanel();
+    assert.equal(hooks.isMonitorDirty(), true, label);
+    assert.equal(elements.get('saveMonitor').disabled, false, label);
+    assert.match(elements.get('updatePanel').innerHTML, /id="updRun" disabled/, label);
+    assert.match(elements.get('monitorStatus').innerHTML, /Save to update/, label);
+    const edited = plain(hooks.monitorInputs());
+    const projectEntry = edited.container_vipc.split(';').find(entry => entry.startsWith('project.vipc::'));
+    assert.equal(projectEntry.includes('linux'), fixture.project.includes('linux'), label);
+    assert.equal(edited.container_dragon, inputs.container_dragon, label);
+    await load('e'.repeat(40));
+    assert.equal(hooks.isMonitorDirty(), false, label);
+    assert.equal(elements.get('saveMonitor').disabled, true, label);
+    assert.match(elements.get('updatePanel').innerHTML, /id="updRun" disabled/, label);
+    assert.match(elements.get('updatePanel').innerHTML, /Select the current default-branch revision/, label);
+    await load(revision);
+    assert.equal(hooks.isMonitorDirty(), false, label);
+    assert.deepEqual(plain(hooks.monitorInputs()), inputs, label);
+    assert.match(elements.get('updatePanel').innerHTML, /id="updRun">Review Windows VIPM update/, label);
+    hooks.setFileMonitor('dragon', 'project.dragon', 'windows', fixture.dragon === 'none' || fixture.dragon === 'linux');
+    await hooks.renderUpdatePanel();
+    assert.equal(hooks.isMonitorDirty(), true, label);
+    assert.match(elements.get('updatePanel').innerHTML, /id="updRun" disabled/, label);
+    assert.equal(plain(hooks.monitorInputs()).container_vipc, inputs.container_vipc, label);
+    await load(revision);
+    assert.equal(hooks.isMonitorDirty(), false, label);
+    assert.deepEqual(plain(hooks.monitorInputs()), inputs, label);
+    assert.ok(requests.slice(beforeLoad).every(request => request.options.method !== 'POST'), label);
+  }
+}
+activeConfig = savedMonitoringConfig;
+console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety checks plus implicit and explicit monitoring loads, actual-edit dirty gates, platform preservation and historical/reload safety passed.');

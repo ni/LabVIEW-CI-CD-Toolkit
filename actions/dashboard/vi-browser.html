@@ -73,19 +73,14 @@
     .tree-row.folder.open>.twisty{transform:rotate(90deg)}
     .tree-row .icon{flex:0 0 16px;display:inline-flex;align-items:center;justify-content:center;color:var(--fg-muted)}
     .tree-row .label{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+    .tree-row.file>.label{flex:0 1 auto}
     .tree-row.folder>.label{font-weight:500;color:var(--fg)}
     .tree-row.file.active{background:var(--sidebar-active);color:var(--link)}
     .tree-row.file.active .icon{color:var(--link)}
     .sidebar-note{padding:16px;color:var(--fg-muted);font-size:.8em}
     /* change indicators sourced from the VIDiff changes.json for the selected commit */
-    .chg{flex:0 0 auto;font-size:.64em;font-weight:700;padding:1px 6px;border-radius:10px;
-         color:#fff;text-transform:uppercase;letter-spacing:.03em;cursor:pointer}
-    .chg.modified{background:#9a6700}.chg.added{background:#1a7f37}.chg.deleted{background:#cf222e}
-    .chg:hover{filter:brightness(1.15)}
     .chg-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:#9a6700;opacity:.85}
-    .g2{flex:0 0 auto;font-size:.6em;font-weight:700;padding:1px 5px;border-radius:9px;
-        background:var(--link);color:#fff;letter-spacing:.02em;cursor:default;
-        font-variant-numeric:tabular-nums}
+    .snapshot-missing{flex:0 0 auto;color:var(--error);font-size:.9em;font-weight:700;line-height:1;cursor:default}
     /* "Changed only" toggle (shown only when the commit has VIDiff data) */
     .changed-toggle{display:none;align-items:center;gap:6px;margin-top:8px;font-size:.74em;
                     color:var(--fg-muted);cursor:pointer;user-select:none}
@@ -403,6 +398,8 @@ const viewerMode = 'snapshot';
 let currentSnapshot = null;
 let json2Set = null;
 let json2WinSet = null;
+let json2IndexKnown = false;
+let json2WinIndexKnown = false;
 let frameRequestId = 0;
 let snapshotPlatformChosen = false;
 // (frames[1] + its nested case frames). Sticky across VIs; defaults to the front
@@ -765,27 +762,6 @@ function renderTree(node, depth, f, frag) {
       `<span class="icon">${ICON.vi}</span>` +
       `<span class="label">${escapeHtml(v.vi_rel.split('/').pop() || v.vi_name)}</span>`;
     row.addEventListener('click', () => openVI(row));
-    const chg = changeMap[v.vi_rel];
-    if (chg) {
-      const badge = document.createElement('span');
-      badge.className = 'chg ' + chg.type;
-      // A NEW VI (no previous revision) has nothing to diff, so it shows a "New"
-      // badge that opens its snapshot. A modified VI shows a "Diff" badge that opens
-      // the side-by-side report (or the panel to run VIDiff when none exists yet).
-      // The badge colour still encodes added/modified/deleted.
-      if (chg.type === 'added') {
-        badge.textContent = 'New';
-        badge.title = 'New VI in this revision';
-        badge.addEventListener('click', (e) => { e.stopPropagation(); openVI(row); });
-      } else {
-        badge.textContent = 'Diff';
-        badge.title = chg.isDiff
-          ? `View the side-by-side diff report (${chg.type})`
-          : `${chg.type} in this revision \u2014 diff report not generated yet (click to run it)`;
-        badge.addEventListener('click', (e) => { e.stopPropagation(); openDiff(v.vi_rel, chg.type, row); });
-      }
-      row.appendChild(badge);
-    }
     frag.appendChild(row);
   }
 }
@@ -819,28 +795,36 @@ function rowBlob(row) {
   return m ? m[1].toLowerCase() : '';
 }
 function decorate2() {
-  if (!json2Set && !json2WinSet) return;
   document.querySelectorAll('#vi-list .tree-row.file').forEach(row => {
-    const has = !!(json2Set && json2Set.has(rowBlob(row))) || !!(json2WinSet && json2WinSet.has(rowBlob(row)));
-    let g = row.querySelector('.g2');
-    if (has && !g) {
-      g = document.createElement('span');
-      g.className = 'g2'; g.textContent = 'Snapshot';
-      g.title = 'Interactive snapshot available';
+    const blob = rowBlob(row);
+    const has = !!(json2Set && json2Set.has(blob)) || !!(json2WinSet && json2WinSet.has(blob));
+    const missing = blob && (json2Set || json2IndexKnown) && (json2WinSet || json2WinIndexKnown) && !has;
+    let marker = row.querySelector('.snapshot-missing');
+    if (missing && !marker) {
+      marker = document.createElement('span');
+      marker.className = 'snapshot-missing';
+      marker.textContent = '\u00d7';
+      marker.title = 'No snapshot available';
+      marker.setAttribute('role', 'img');
+      marker.setAttribute('aria-label', 'No snapshot available');
       const label = row.querySelector('.label');
-      row.insertBefore(g, label ? label.nextSibling : null);
-    } else if (!has && g) { g.remove(); }
+      row.insertBefore(marker, label ? label.nextSibling : null);
+    } else if (!missing && marker) { marker.remove(); }
   });
 }
 async function loadJson2Index() {
   try {
     const arr = await fetchJson(BASE + 'json-blobs.json');
     if (Array.isArray(arr)) json2Set = new Set(arr.map(b => String(b).toLowerCase()));
-  } catch (e) { /* no index yet (repo unprovisioned / first run) */ }
+  } catch (e) {
+    if (/^404 /.test(e.message)) json2IndexKnown = true;
+  }
   try {
     const win = await fetchJson(BASE + 'json-blobs.windows.json');
     if (Array.isArray(win)) json2WinSet = new Set(win.map(b => String(b).toLowerCase()));
-  } catch (e) {}
+  } catch (e) {
+    if (/^404 /.test(e.message)) json2WinIndexKnown = true;
+  }
   decorate2();
   syncVb2PlatToggle();
   if (vb2Prefer2Default() && currentSnapshot && !currentDiffVi) openSnapshot(currentSnapshot.html, currentSnapshot.title);
@@ -1156,10 +1140,6 @@ function openVI(row) {
 function openDiff(viRel, type, row) {
   vbCloseFilesDrawer();                  // collapse the mobile VI-list drawer once a diff is chosen
   const chgInfo = changeMap[viRel];
-  // A NEW VI has no previous version to diff against. The tree badge opens its
-  // snapshot and the Diff toggle is disabled for it, so this is reachable only via
-  // a stale ?view=diff deep link \u2014 fall back to the snapshot so the Diff view
-  // never shows a bogus "diff" of a brand-new VI.
   if (chgInfo && chgInfo.type === 'added') {
     const r = row || findRowByName(viRel);
     if (r) { openVI(r); return; }
@@ -1187,11 +1167,6 @@ function openDiff(viRel, type, row) {
 // ───────────────────────────────────────────────────────────────────────────
 // Run / regenerate a VIDiff side-by-side report from the viewer
 //
-// A changed VI shows a "diff" badge whether or not its side-by-side report has
-// been generated. When it hasn't, openDiff() shows the panel below instead of the
-// snapshot: it explains the report hasn't been run and offers to run VIDiff
-// for just this VI or for every VI the revision changed. When a report IS shown, a
-// "Regenerate diff" link appears in the toolbar and opens the same panel.
 //
 // The run is a GitHub Actions workflow_dispatch (LabVIEW can't run in a browser),
 // localStorage. When the run finishes and the dashboard redeploys, reloading shows
