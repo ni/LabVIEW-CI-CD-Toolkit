@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "8490152de724dec0e004463a63d7f8d45ecc520e",
+  "sha": "d5aa851d2b2802b647afd62ced1e80b231629f6e",
   "revisions": [
+    {
+      "sha": "d5aa851d2b2802b647afd62ced1e80b231629f6e",
+      "short": "d5aa851",
+      "message": "Merge pull request #129 from ni/fix/linux-lvpm-example-pins-20261103",
+      "author": "Elijah Kerry",
+      "date": "2026-11-03T23:51:16Z",
+      "project": true,
+      "dep_only": true
+    },
+    {
+      "sha": "627627c5a5a7a95921f9707c08dfd6969a683033",
+      "short": "627627c",
+      "message": "lvpm: align example OpenG pins with existing tooling roots",
+      "author": "elijah286",
+      "date": "2026-11-03T22:08:48Z",
+      "project": true,
+      "dep_only": true
+    },
     {
       "sha": "8490152de724dec0e004463a63d7f8d45ecc520e",
       "short": "8490152",
@@ -886,24 +904,6 @@
       "dep_only": false
     },
     {
-      "sha": "2c9f159b74651d1875123de1a20f8578923978eb",
-      "short": "2c9f159",
-      "message": "Add opt-in digest-pinned Linux LVPM dependency candidates",
-      "author": "elijah286",
-      "date": "2026-11-02T00:12:58Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "1b3383f45e9090acc9104de5e50c0693147bf3c0",
-      "short": "1b3383f",
-      "message": "Preserve unrelated client settings during Reconfigure",
-      "author": "elijah286",
-      "date": "2026-11-02T00:12:14Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
       "sha": "d0e080c128589707c82a13a45d842952fb3a5fc8",
       "short": "d0e080c",
       "message": "Merge remote-tracking branch 'origin/main' into via-debug",
@@ -1240,11 +1240,11 @@
         "ni_lib_simple_xml-1.0.0.4",
         "ni_lib_utf_junit_report-1.0.1.43",
         "oglib_appcontrol-4.1.0.7",
-        "oglib_array-4.1.0.13",
-        "oglib_error-4.2.0.23",
-        "oglib_file-4.0.0.20",
-        "oglib_lvdata-4.2.0.21",
-        "oglib_string-4.1.0.12"
+        "oglib_array-6.0.1.20",
+        "oglib_error-6.0.0.26",
+        "oglib_file-6.0.2.28",
+        "oglib_lvdata-6.0.0.45",
+        "oglib_string-6.0.2.35"
       ],
       "error": ""
     }

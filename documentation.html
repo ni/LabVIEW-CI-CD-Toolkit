@@ -1617,6 +1617,13 @@ docker run --rm `
           VIPC and Dragon lists, explicit dependency-policy values, platform settings, provenance, and unknown
           client fields. A no-op keeps the file byte-identical; an actual update may normalize YAML formatting.</li>
       </ol>
+      <p>Project declarations that intentionally duplicate CI-tooling roots (for example
+        <code>example/Dependencies.vipc</code>) must keep shared roots pinned to the exact same versions;
+        Linux planning rejects declaration drift instead of selecting a newer or transitive alternative.
+        The current OpenG File root pin (<code>oglib_file-6.0.2.28</code>) targets LabVIEW 2020+ on all
+        operating systems and supports automatic caller relinking into <code>openg_file.lvlib</code>.
+        Downgrading to older OpenG file packages can require manual relinking, which planning and
+        package-file verification do not prove at runtime.</p>
       <div class="note"><span class="lbl">Verification is deliberately scoped</span>
         <strong>Package files verified does not mean CI activities passed.</strong> The first release records
         <code>verification.scope: package-files</code> and <code>activity_checks: not_run</code>. Upstream LVPM
