@@ -1506,11 +1506,25 @@ docker run --rm `
         and explicitly request activation through a Reconfigure pull request. While exploring LVPM, the current
         VIPM update controls are hidden; returning to the VIPM view does not change the active worker. If LVPM
         is already selected, returning to the existing default selection requires the explicit reset PR under the
-        collapsed configured-image, overrides and rollback section. Reset removes only <code>linuxUse</code>,
+        collapsed Current selection and rollback section. Reset removes only <code>linuxUse</code>,
         retaining <code>container.use</code> and per-action overrides; a base or custom image may be selected,
         so reset does not guarantee VIPM. The retained default ref is shown before requesting reset.
         Never apply the client installer to
         this tooling source repository or a fork to test this feature; use a separate scratch client repository.</p>
+      <p>The Linux tooling card shows one next action: build a separate candidate, or review activation of an
+        available candidate. Candidate evidence, declarations, image identity, limitations, and rollback stay
+        collapsed until needed. A candidate build never changes the active worker, and the separate VIPM update
+        panel is hidden while previewing or using LVPM.</p>
+      <p>Linux requests ask GitHub for dispatch run details. An accepted request is not a successful build.
+        When GitHub returns a run identity, the page checks the exact repository, workflow ID and path,
+        dispatch event, branch, reviewed HEAD, authenticated actor, and first run attempt before showing
+        queued/running/completed status with a direct log link. It never picks the latest run or infers ownership
+        from timing. Delayed run visibility is retried; permission/network errors or mismatched identities stop
+        tracking without automatically retrying the dispatch. Legacy HTTP 204 responses establish only acceptance:
+        open the workflow runs and inspect them before refreshing or retrying. Repeated clicks are blocked while
+        submitting, tracking, or the outcome is uncertain. Changing platform, revision, or monitoring invalidates
+        the observer, not the remote run. Workflow success alone does not establish a published, verified candidate
+        or activate it: refresh and review candidate evidence, then request and merge the activation PR separately.</p>
       <ol>
         <li><strong>Review.</strong> The candidate uses the locked CI-tooling VIPC and project VIPC/Dragon files
           selected for Linux. One installer owns the environment; no per-package mixing of VIPM and LVPM occurs.

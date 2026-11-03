@@ -24,20 +24,40 @@ let failMetadata = false;
 let workflowResponse = 'available';
 let postBarrier = null;
 let dispatchStatus = 204;
+let dispatchDetails = null;
+let runResponse = null;
+let actorStatus = 200;
+let runBarrier = null;
+let runPoll = null;
+let lookupBarrier = null;
+let runJsonBarrier = null;
+let dispatchJsonBarrier = null;
+let workflowMetadata = null;
+let workflowMetadataStatus = 200;
+let dispatchError = null;
+let commitResponses = [];
 const context = vm.createContext({
   window:{ LVCI:{ repo:'owner/project' } },
   location:{ hostname:'owner.github.io', pathname:'/project/dependencies.html', href:'https://owner.github.io/project/dependencies.html?sha=' + revision },
   history:{ replaceState(_state, _title, url){ context.location.href = String(url); } },
   document:{ getElementById:id => elements.get(id) || null },
   localStorage:{ getItem:() => 'test-token' },
-  URL, URLSearchParams, console, setInterval:() => 0, clearInterval:() => {},
+  URL, URLSearchParams, console, setInterval:callback => { runPoll = callback; return 1; }, clearInterval:() => { runPoll = null; },
   fetch:async (url, options = {}) => {
     requests.push({ url, options });
+    if (lookupBarrier && lookupBarrier.match(url)) await lookupBarrier.promise;
+    if (url === 'https://api.github.com/user') return { ok:actorStatus === 200, status:actorStatus, json:async () => ({ id:17 }) };
+    if (/\/actions\/workflows\/[^/]+\.yml$/.test(url)) return { ok:workflowMetadataStatus === 200, status:workflowMetadataStatus, json:async () => workflowMetadata || ({ id:91, path:'.github/workflows/' + url.split('/').at(-1) }) };
+    if (/\/actions\/runs\/\d+$/.test(url)) {
+      if (runBarrier) await runBarrier;
+      if (runResponse instanceof Error) throw runResponse;
+      return { ok:true, json:async () => { if (runJsonBarrier) await runJsonBarrier; return runResponse; }, ...runResponse?.response };
+    }
     if (url === 'https://api.github.com/repos/owner/project') {
       if (failMetadata) throw new Error('unavailable');
       return { ok:true, json:async () => ({ default_branch:'trunk' }) };
     }
-    if (url.includes('/commits/')) return { ok:true, json:async () => ({ sha:revision }) };
+    if (url.includes('/commits/')) return { ok:true, json:async () => ({ sha:commitResponses.shift() || revision }) };
     if (url.includes('/contents/.github/workflows?ref=')) {
       assert.equal(url, 'https://api.github.com/repos/owner/project/contents/.github/workflows?ref=trunk');
       assert.equal(options.cache, 'no-cache');
@@ -53,7 +73,8 @@ const context = vm.createContext({
     if (new URL(url).hostname === 'raw.githubusercontent.com') return { ok:true, text:async () => activeConfig };
     if (options.method === 'POST') {
       if (postBarrier) await postBarrier;
-      return { status:dispatchStatus };
+      if (dispatchError) throw dispatchError;
+      return { status:dispatchStatus, json:async () => { if (dispatchJsonBarrier) await dispatchJsonBarrier; if (dispatchDetails instanceof Error) throw dispatchDetails; return dispatchDetails; } };
     }
     throw new Error('Unexpected request: ' + url);
   }
@@ -61,6 +82,7 @@ const context = vm.createContext({
 vm.runInContext(source.replace('    init();', `
     globalThis.hooks = { parseManifestYaml, resolveColumn, packagesInManifest, pkgCellState,
       candidateSelection, loadLinuxBuildAvailability, linuxWorkflowPayload, dispatchLinuxWorker, dispatchContainerUpdate, loadManifestFor, updTargets, renderLinuxInstaller, nipmCell, enrichPlatformState,
+      pollLinuxOperation, validateLinuxRun, invalidateLinuxOperation, getLinuxOperation:() => linuxOperation,
       lvpmFreshness, localFreshnessText, loadPlatformStates, renderGenerated, renderContainers,
       dragonFileState, updMissingList, renderDragonFiles, platformCoverage, visibleColumns, selectPlatform,
       renderUpdatePanel, renderVipc, encodeMonitorList, setFileMonitor, syncPlatformTabs, initPlatformTabs,
@@ -75,6 +97,7 @@ vm.runInContext(source.replace('    init();', `
       setModal:modal => { updModal = modal; },
       getColumnStates: () => currentColStates,
       setState: state => {
+        invalidateLinuxOperation();
         activePlatform = state.platform || "linux";
         linuxToolingView = state.tooling || "vipm";
         if (state.vipcs) currentVipcs = state.vipcs;
@@ -181,7 +204,7 @@ hooks.setState({ candidate });
 await hooks.dispatchLinuxWorker('activate');
 const dispatched = requests.filter(request => request.options.method === 'POST');
 assert.equal(dispatched.length, 1);
-assert.deepEqual(JSON.parse(dispatched[0].options.body), { ref:'trunk', inputs:{ linux_worker:tag + '@' + digest } });
+assert.deepEqual(JSON.parse(dispatched[0].options.body), { ref:'trunk', inputs:{ linux_worker:tag + '@' + digest }, return_run_details:true });
 assert.match(html, /Package files verified; CI activities not yet tested/);
 assert.doesNotMatch(html, /CI checks passed/);
 function installerView(){
@@ -247,7 +270,7 @@ for (const retainedDefault of ['base', 'ghcr.io/owner/custom-linux:reviewed@' + 
   assert.equal(resetRequests.length, 1);
   assert.ok(resetRequests[0].url.endsWith('/reconfigure.yml/dispatches'));
   assert.deepEqual(JSON.parse(resetRequests[0].options.body), {
-    ref:'trunk', inputs:{linux_worker:'reset'}
+    ref:'trunk', inputs:{linux_worker:'reset'}, return_run_details:true
   });
   assert.equal(JSON.stringify(resetConfig), originalConfig);
 }
@@ -318,10 +341,10 @@ elements.set('lvpmStatus', {});
 const beforeAvailableBuild = requests.length;
 await hooks.dispatchLinuxWorker('build');
 const buildRequests = requests.slice(beforeAvailableBuild);
-assert.ok(buildRequests.at(-2).url.includes('/contents/.github/workflows?ref=trunk'));
+assert.ok(buildRequests.some(request => request.url.includes('/contents/.github/workflows?ref=trunk')));
 assert.equal(buildRequests.at(-1).options.method, 'POST');
 assert.ok(buildRequests.at(-1).url.endsWith('/actions/workflows/build-labview-lvpm-image.yml/dispatches'));
-assert.deepEqual(JSON.parse(buildRequests.at(-1).options.body), { ref:'trunk', inputs:{} });
+assert.deepEqual(JSON.parse(buildRequests.at(-1).options.body), { ref:'trunk', inputs:{}, return_run_details:true });
 const freshnessCases = [
   { name:'genuine current', inventory:inventoryFor(), status:'current' },
   { name:'stale unchanged pins', inventory:inventoryFor({ ...currentFreshness, status:'stale', reason:'Declaration paths or ordering changed.' }), status:'stale' },
@@ -526,7 +549,7 @@ for (const action of ['build', 'activate', 'reset']) {
       dispatchStatus = responseStatus;
       const start = requests.length;
       const pending = hooks.dispatchLinuxWorker(action);
-      for (let attempt = 0; attempt < 30 && !requests.slice(start).some(request => request.options.method === 'POST'); attempt++) {
+      for (let attempt = 0; attempt < 100 && !requests.slice(start).some(request => request.options.method === 'POST'); attempt++) {
         await Promise.resolve();
       }
       assert.equal(requests.slice(start).filter(request => request.options.method === 'POST').length, 1);
@@ -582,7 +605,8 @@ for (const status of ['stale', 'unknown']) {
   await hooks.renderUpdatePanel();
   assert.match(elements.get('platformSummary').innerHTML, /Linux dependencies need attention/);
   assert.doesNotMatch(elements.get('updatePanel').innerHTML, /id="updRun"/);
-  assert.match(elements.get('updatePanel').innerHTML, /active image is never rebuilt/);
+  assert.equal(elements.get('updatePanel').hidden, true);
+  assert.equal(elements.get('updatePanel').innerHTML, '');
 }
 hooks.setState({ candidate, vipcs:[{ ...projectVipc, monitored:false, monitorOn:[] }], dragons:[], columns:{} });
 await hooks.renderUpdatePanel();
@@ -610,7 +634,8 @@ for (const staleState of [{ revision:'historical' }, { dirty:true }]) {
 }
 hooks.setState({ candidate, vipcs:[], dragons:[], tooling:'lvpm' });
 await hooks.renderUpdatePanel();
-assert.match(elements.get('updatePanel').innerHTML, /You are exploring LVPM/);
+assert.equal(elements.get('updatePanel').hidden, true);
+assert.equal(elements.get('updatePanel').innerHTML, '');
 assert.doesNotMatch(elements.get('updatePanel').innerHTML, /id="updRun"/);
 const postStart = requests.length;
 const explorationView = installerView();
@@ -818,4 +843,307 @@ for (const path of ['generated', 'live']) {
   }
 }
 activeConfig = savedMonitoringConfig;
-console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety checks plus implicit and explicit monitoring loads, actual-edit dirty gates, platform preservation and historical/reload safety passed.');
+const identifiedRun = {
+  id:123, workflow_id:91, path:'.github/workflows/build-labview-lvpm-image.yml', event:'workflow_dispatch',
+  repository:{full_name:'owner/project'}, head_repository:{full_name:'owner/project'}, head_branch:'trunk', head_sha:revision,
+  actor:{id:17}, triggering_actor:{id:17}, run_attempt:1, status:'queued', conclusion:null
+};
+const acceptedDetails = {
+  workflow_run_id:123, run_url:'https://api.github.com/repos/owner/project/actions/runs/123',
+  html_url:'https://github.com/owner/project/actions/runs/123'
+};
+let progressCases = 0;
+function progressFixture(){
+  hooks.setState({candidate, vipcs:[], dragons:[]});
+  dispatchStatus = 200;
+  dispatchDetails = {...acceptedDetails};
+  runResponse = {...identifiedRun};
+  actorStatus = 200;
+  workflowMetadata = null;
+  workflowMetadataStatus = 200;
+  dispatchError = null;
+  commitResponses = [];
+  elements.set('lvpmStatus', uiElement());
+  elements.set('lvpmRunLink', uiElement());
+  for (const id of ['lvpmBuild','lvpmActivate','lvpmReset']) elements.set(id, {disabled:false});
+  return requests.length;
+}
+const postCount = start => requests.slice(start).filter(request => request.options.method === 'POST').length;
+async function until(predicate){
+  for (let attempt = 0; attempt < 150 && !predicate(); attempt++) await Promise.resolve();
+  assert.ok(predicate(), 'Expected asynchronous stage to be reached');
+}
+let progressStart = progressFixture();
+postBarrier = new Promise(resolve => { releasePost = resolve; });
+const pendingDispatch = hooks.dispatchLinuxWorker('build');
+await hooks.dispatchLinuxWorker('build');
+await until(() => postCount(progressStart) === 1);
+await hooks.dispatchLinuxWorker('activate');
+assert.equal(postCount(progressStart), 1);
+assert.equal(elements.get('lvpmBuild').disabled, true);
+releasePost();
+await pendingDispatch;
+postBarrier = null;
+assert.match(elements.get('lvpmStatus').textContent, /Workflow queued/);
+assert.equal(elements.get('lvpmRunLink').href, acceptedDetails.html_url);
+assert.equal(typeof runPoll, 'function');
+await hooks.dispatchLinuxWorker('build');
+assert.equal(postCount(progressStart), 1);
+runResponse = {...identifiedRun, status:'in_progress'};
+await runPoll();
+assert.match(elements.get('lvpmStatus').textContent, /Workflow running/);
+runResponse = {...identifiedRun, status:'completed', conclusion:'failure'};
+await runPoll();
+assert.match(elements.get('lvpmStatus').textContent, /Workflow failure.*Open the logs/);
+assert.equal(elements.get('lvpmBuild').disabled, false);
+assert.equal(runPoll, null);
+assert.ok(requests.slice(progressStart).every(request => !request.url.includes('/runs?')));
+progressCases++;
+
+progressFixture();
+dispatchDetails = {...acceptedDetails, run_url:acceptedDetails.run_url.replace('owner/project','Owner/Project'), html_url:acceptedDetails.html_url.replace('owner/project','Owner/Project')};
+runResponse = {...identifiedRun, repository:{full_name:'Owner/Project'},head_repository:{full_name:'Owner/Project'}};
+await hooks.dispatchLinuxWorker('build');
+assert.match(elements.get('lvpmStatus').textContent, /Workflow queued/);
+assert.equal(elements.get('lvpmRunLink').href, acceptedDetails.html_url);
+progressCases++;
+
+progressFixture();
+runResponse = {response:{ok:false,status:404}};
+await hooks.dispatchLinuxWorker('build');
+assert.match(elements.get('lvpmStatus').textContent, /Awaiting the identified run becoming visible/);
+runResponse = {...identifiedRun};
+await runPoll();
+assert.match(elements.get('lvpmStatus').textContent, /Workflow queued/);
+progressCases++;
+
+for (const conclusion of ['success','cancelled','timed_out','action_required','neutral','skipped']) {
+  progressStart = progressFixture();
+  runResponse = {...identifiedRun, status:'completed', conclusion};
+  const configBefore = plain(candidate);
+  await hooks.dispatchLinuxWorker('build');
+  assert.match(elements.get('lvpmStatus').textContent, conclusion === 'success' ? /Build workflow succeeded\. Refresh to check for a published candidate/ : new RegExp('Workflow ' + conclusion));
+  assert.equal(postCount(progressStart), 1);
+  assert.equal(runPoll, null);
+  assert.deepEqual(plain(candidate), configBefore);
+  assert.equal(requests.slice(progressStart).filter(request => request.url.includes('manifest.json')).length, 0);
+  assert.doesNotMatch(elements.get('lvpmStatus').textContent, /^(Candidate verified|CI activities passed|Activation complete)/);
+  progressCases++;
+}
+for (const action of ['activate','reset']) {
+  progressStart = progressFixture();
+  runResponse = {...identifiedRun, path:'.github/workflows/reconfigure.yml', status:'completed', conclusion:'success'};
+  await hooks.dispatchLinuxWorker(action);
+  assert.match(elements.get('lvpmStatus').textContent, /Reconfigure workflow succeeded.*only merging the proposal applies/);
+  assert.equal(postCount(progressStart), 1);
+  progressCases++;
+}
+for (const invalid of [
+  null, {}, {...acceptedDetails, workflow_run_id:'123'}, {...acceptedDetails, workflow_run_id:-1},
+  {...acceptedDetails, run_url:'https://api.github.com/repos/other/project/actions/runs/123'},
+  {...acceptedDetails, html_url:'javascript:alert(1)'},
+  {...acceptedDetails, html_url:acceptedDetails.html_url + '?untrusted=1'},
+  new Error('Unreadable dispatch response')
+]) {
+  progressStart = progressFixture();
+  dispatchDetails = invalid;
+  await hooks.dispatchLinuxWorker('build');
+  assert.match(elements.get('lvpmStatus').textContent, /run identity is invalid|Unreadable dispatch response/);
+  assert.equal(elements.get('lvpmRunLink').href, 'https://github.com/owner/project/actions/workflows/build-labview-lvpm-image.yml');
+  await hooks.dispatchLinuxWorker('build');
+  assert.equal(postCount(progressStart), 1);
+  assert.equal(runPoll, null);
+  progressCases++;
+}
+for (const invalid of [
+  {id:124}, {workflow_id:92}, {path:'.github/workflows/other.yml'}, {event:'push'},
+  {repository:{full_name:'foreign/project'}}, {head_repository:{full_name:'foreign/project'}},
+  {head_branch:'other'}, {head_sha:'e'.repeat(40)}, {actor:{id:18}}, {triggering_actor:{id:18}}, {run_attempt:2}
+]) {
+  progressStart = progressFixture();
+  runResponse = {...identifiedRun, ...invalid};
+  await hooks.dispatchLinuxWorker('build');
+  assert.match(elements.get('lvpmStatus').textContent, /Run identity could not be verified/);
+  assert.equal(runPoll, null);
+  await hooks.dispatchLinuxWorker('build');
+  assert.equal(postCount(progressStart), 1);
+  progressCases++;
+}
+progressStart = progressFixture();
+dispatchStatus = 204;
+await hooks.dispatchLinuxWorker('build');
+assert.match(elements.get('lvpmStatus').textContent, /Dispatch accepted.*no run identity/);
+assert.equal(runPoll, null);
+await hooks.dispatchLinuxWorker('build');
+assert.equal(postCount(progressStart), 1);
+assert.ok(requests.slice(progressStart).every(request => !/\/actions\/runs/.test(request.url)));
+progressCases++;
+
+progressStart = progressFixture();
+dispatchError = new Error('Connection interrupted after submission');
+await hooks.dispatchLinuxWorker('build');
+assert.match(elements.get('lvpmStatus').textContent, /Do not retry yet; inspect workflow runs.*Connection interrupted/);
+assert.match(elements.get('lvpmStatus').textContent, /Dispatch outcome is uncertain/);
+assert.equal(elements.get('lvpmRunLink').href, 'https://github.com/owner/project/actions/workflows/build-labview-lvpm-image.yml');
+assert.equal(elements.get('lvpmBuild').disabled, true);
+await hooks.dispatchLinuxWorker('build');
+assert.equal(postCount(progressStart), 1);
+assert.ok(requests.slice(progressStart).every(request => !/\/actions\/runs/.test(request.url)));
+progressCases++;
+
+for (const status of [400,401,403,404,405,410,415,422,429]) {
+  progressStart = progressFixture();
+  dispatchStatus = status;
+  await hooks.dispatchLinuxWorker('build');
+  assert.match(elements.get('lvpmStatus').textContent, new RegExp('Workflow dispatch rejected \\(' + status + '\\)'));
+  assert.equal(postCount(progressStart), 1);
+  assert.equal(elements.get('lvpmBuild').disabled, false);
+  await hooks.dispatchLinuxWorker('build');
+  assert.equal(postCount(progressStart), 2);
+  assert.equal(runPoll, null);
+  progressCases++;
+}
+
+for (const status of [500,502,503,504,408,409,202,302]) {
+  progressStart = progressFixture();
+  dispatchStatus = status;
+  await hooks.dispatchLinuxWorker('build');
+  assert.match(elements.get('lvpmStatus').textContent, /Dispatch outcome is uncertain/);
+  assert.match(elements.get('lvpmStatus').textContent, new RegExp('HTTP ' + status));
+  assert.match(elements.get('lvpmStatus').textContent, /request may already have taken effect/);
+  assert.equal(elements.get('lvpmBuild').disabled, true);
+  assert.equal(elements.get('lvpmRunLink').href, 'https://github.com/owner/project/actions/workflows/build-labview-lvpm-image.yml');
+  await hooks.dispatchLinuxWorker('build');
+  assert.equal(postCount(progressStart), 1);
+  assert.ok(requests.slice(progressStart).every(request => !/\/actions\/runs/.test(request.url)));
+  assert.equal(runPoll, null);
+  progressCases++;
+}
+
+for (const failure of [401,403,500,new Error('<img src=x onerror=alert(1)>')]) {
+  progressStart = progressFixture();
+  runResponse = failure instanceof Error ? failure : {response:{ok:false,status:failure}};
+  await hooks.dispatchLinuxWorker('build');
+  assert.match(elements.get('lvpmStatus').textContent, failure instanceof Error ? /<img/ : /Run status unavailable/);
+  assert.equal(elements.get('lvpmStatus').innerHTML, '');
+  assert.equal(runPoll, null);
+  await hooks.dispatchLinuxWorker('build');
+  assert.equal(postCount(progressStart), 1);
+  progressCases++;
+}
+progressStart = progressFixture();
+runResponse = {response:{ok:false,status:404}};
+await hooks.dispatchLinuxWorker('build');
+for (let attempt = 0; attempt < 12; attempt++) await runPoll();
+assert.equal(runPoll, null);
+assert.match(elements.get('lvpmStatus').textContent, /Run status unavailable/);
+progressCases++;
+for (const status of [403,404,500]) {
+  progressStart = progressFixture();
+  workflowMetadataStatus = status;
+  await hooks.dispatchLinuxWorker('build');
+  assert.equal(postCount(progressStart), 0);
+  assert.match(elements.get('lvpmStatus').textContent, /Cannot verify workflow identity/);
+  progressCases++;
+}
+
+for (const failure of [401,403]) {
+  progressStart = progressFixture();
+  actorStatus = failure;
+  await hooks.dispatchLinuxWorker('build');
+  assert.equal(postCount(progressStart), 0);
+  assert.match(elements.get('lvpmStatus').textContent, /Cannot verify the authenticated Actions user/);
+  assert.equal(elements.get('lvpmBuild').disabled, false);
+  progressCases++;
+}
+progressStart = progressFixture();
+workflowMetadata = {id:91, path:'.github/workflows/wrong.yml'};
+await hooks.dispatchLinuxWorker('build');
+assert.equal(postCount(progressStart), 0);
+assert.match(elements.get('lvpmStatus').textContent, /Invalid user or workflow identity/);
+progressCases++;
+progressStart = progressFixture();
+commitResponses = [revision, 'f'.repeat(40)];
+await hooks.dispatchLinuxWorker('build');
+assert.equal(postCount(progressStart), 0);
+assert.match(elements.get('lvpmStatus').textContent, /default branch changed/);
+progressCases++;
+
+for (const change of [{platform:'windows'}, {revision:'historical'}, {dirty:true}, {}]) {
+  for (const stage of ['actor','workflow','dispatch-json','run-json','poll']) {
+    progressStart = progressFixture();
+    let release;
+    const barrier = new Promise(resolve => { release = resolve; });
+    if (stage === 'actor' || stage === 'workflow') lookupBarrier = {
+      match:url => stage === 'actor' ? url.endsWith('/user') : /\/actions\/workflows\/[^/]+\.yml$/.test(url), promise:barrier
+    };
+    if (stage === 'dispatch-json') dispatchJsonBarrier = barrier;
+    if (stage === 'run-json') runJsonBarrier = barrier;
+    const pending = hooks.dispatchLinuxWorker('build');
+    await until(() => stage === 'actor' ? requests.slice(progressStart).some(request => request.url.endsWith('/user'))
+      : stage === 'workflow' ? requests.slice(progressStart).some(request => /\/actions\/workflows\/[^/]+\.yml$/.test(request.url))
+      : stage === 'dispatch-json' ? postCount(progressStart) === 1 : requests.slice(progressStart).some(request => /\/actions\/runs\/123$/.test(request.url)));
+    let polling;
+    if (stage === 'poll') {
+      await pending;
+      runBarrier = barrier;
+      polling = runPoll();
+    }
+    hooks.setState({candidate, vipcs:[], dragons:[], ...change});
+    elements.get('lvpmStatus').textContent = 'New context unchanged';
+    elements.get('lvpmRunLink').href = 'New link unchanged';
+    release();
+    await pending;
+    if (polling) await polling;
+    assert.equal(elements.get('lvpmStatus').textContent, 'New context unchanged', stage + JSON.stringify(change));
+    assert.equal(elements.get('lvpmRunLink').href, 'New link unchanged');
+    if (stage === 'actor' || stage === 'workflow') assert.equal(postCount(progressStart), 0);
+    lookupBarrier = null;
+    dispatchJsonBarrier = null;
+    runJsonBarrier = null;
+    runBarrier = null;
+    progressCases++;
+  }
+}
+hooks.invalidateLinuxOperation();
+progressStart = progressFixture();
+let releaseIdentity;
+lookupBarrier = {match:url => url.endsWith('/user'), promise:new Promise(resolve => { releaseIdentity = resolve; })};
+const changedTokenRequest = hooks.dispatchLinuxWorker('build');
+await until(() => requests.slice(progressStart).some(request => request.url.endsWith('/user')));
+context.localStorage = {getItem:() => 'different-token'};
+elements.get('lvpmStatus').textContent = 'New auth context unchanged';
+releaseIdentity();
+await changedTokenRequest;
+assert.equal(postCount(progressStart), 0);
+assert.equal(elements.get('lvpmStatus').textContent, 'New auth context unchanged');
+context.localStorage = savedStorage;
+lookupBarrier = null;
+hooks.invalidateLinuxOperation();
+progressCases++;
+
+progressStart = progressFixture();
+await hooks.dispatchLinuxWorker('build');
+let releaseOldPoll;
+runBarrier = new Promise(resolve => { releaseOldPoll = resolve; });
+const oldPoll = runPoll();
+const requestsDuringPoll = requests.length;
+await runPoll();
+await hooks.dispatchLinuxWorker('build');
+assert.equal(requests.length, requestsDuringPoll);
+runBarrier = null;
+hooks.setState({candidate, vipcs:[], dragons:[]});
+dispatchDetails = {workflow_run_id:125,run_url:acceptedDetails.run_url.replace('/123','/125'),html_url:acceptedDetails.html_url.replace('/123','/125')};
+runResponse = {...identifiedRun,id:125};
+await hooks.dispatchLinuxWorker('build');
+const replacementPoll = runPoll;
+elements.get('lvpmStatus').textContent = 'New operation unchanged';
+releaseOldPoll();
+await oldPoll;
+assert.equal(elements.get('lvpmStatus').textContent, 'New operation unchanged');
+assert.equal(elements.get('lvpmRunLink').href, acceptedDetails.html_url.replace('/123','/125'));
+assert.equal(runPoll, replacementPoll);
+assert.equal(postCount(progressStart), 2);
+hooks.invalidateLinuxOperation();
+progressCases++;
+console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety and monitoring regressions passed; ' + progressCases + ' dispatch identity/progress/error/duplicate/stale-context cases passed.');
