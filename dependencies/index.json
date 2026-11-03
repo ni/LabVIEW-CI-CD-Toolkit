@@ -1,8 +1,53 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "8e66f4b5ebdde7ed0708418895a130b03e585d6c",
+  "sha": "5b886823c36f1239e4f2e8e5a931e20980f9de1c",
   "revisions": [
+    {
+      "sha": "5b886823c36f1239e4f2e8e5a931e20980f9de1c",
+      "short": "5b88682",
+      "message": "Merge pull request #105 from ni/dependabot/github_actions/actions/checkout-7",
+      "author": "Elijah Kerry",
+      "date": "2026-11-03T00:23:49Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "0ccc540c38411162a77effd4bf58ca72c792265b",
+      "short": "0ccc540",
+      "message": "Merge pull request #106 from ni/integration/validated-open-prs-20261102",
+      "author": "Elijah Kerry",
+      "date": "2026-11-03T00:23:02Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "00bfd126ca4f253d0223764523fd7259f820d821",
+      "short": "00bfd12",
+      "message": "Merge pull request #109 from ni/integration/vidiff-deploy-security-20261102",
+      "author": "Elijah Kerry",
+      "date": "2026-11-03T00:22:44Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "622c3b795a37456777d127818660f0045258e278",
+      "short": "622c3b7",
+      "message": "Merge remote-tracking branch 'origin/main' into integration/vidiff-deploy-security-20261102",
+      "author": "elijah286",
+      "date": "2026-11-02T22:19:49Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "2f5152b3145d1502aa48793c63557164a5268705",
+      "short": "2f5152b",
+      "message": "Merge remote-tracking branch 'origin/main' into integration/validated-open-prs-20261102",
+      "author": "elijah286",
+      "date": "2026-11-02T22:19:48Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "8e66f4b5ebdde7ed0708418895a130b03e585d6c",
       "short": "8e66f4b",
@@ -31,6 +76,69 @@
       "dep_only": false
     },
     {
+      "sha": "964047f2e9f693a7fea0c916d9030b8e07d3a812",
+      "short": "964047f",
+      "message": "Fix VIDiff client payload closure for deployment guards",
+      "author": "elijah286",
+      "date": "2026-11-02T21:57:08Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "b1d39072304982450f7ccccbb1f02c8084a7a820",
+      "short": "b1d3907",
+      "message": "security: declare actions read for vidiff artifact access",
+      "author": "elijah286",
+      "date": "2026-11-02T21:56:46Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "eb0600b04a8dc4ee3e1d099c339841a17b3b91e1",
+      "short": "eb0600b",
+      "message": "ci: wire vidiff distribution security checks",
+      "author": "elijah286",
+      "date": "2026-11-02T21:56:11Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "55a6d023ad03b319d510a3b41019459dd01bc62a",
+      "short": "55a6d02",
+      "message": "security: fail-close vidiff publish on untrusted producers",
+      "author": "elijah286",
+      "date": "2026-11-02T21:54:06Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "fcced1fbf5941cd7c221d6331358093812062f4c",
+      "short": "fcced1f",
+      "message": "security: block untrusted VIDiff Pages publication",
+      "author": "elijah286",
+      "date": "2026-11-02T21:51:47Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "ffe0878b6c1827c5ad34a36b82c4a334bb181493",
+      "short": "ffe0878",
+      "message": "Merge remote-tracking branch 'origin/main' into integration/vidiff-deploy-security-20261102",
+      "author": "elijah286",
+      "date": "2026-11-02T21:51:30Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "aedd8994584c0a640eb87f49705dccd33d481eb3",
+      "short": "aedd899",
+      "message": "Use newly validated Python and artifact actions in added capabilities",
+      "author": "elijah286",
+      "date": "2026-11-02T21:45:23Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "5121c60c11bda66eda7ab9220f32d05afbfde1a5",
       "short": "5121c60",
       "message": "Merge branch 'main' into fix/dependencies-platform-ux-20261102",
@@ -40,11 +148,47 @@
       "dep_only": false
     },
     {
+      "sha": "3193220a5bad0ab334fcab99c4786bcb2c7ba51c",
+      "short": "3193220",
+      "message": "Merge remote-tracking branch 'origin/main' into integration/validated-open-prs-20261102",
+      "author": "elijah286",
+      "date": "2026-11-02T21:44:45Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "34c44ea78071e6b8087c06d7983094df83e6c345",
+      "short": "34c44ea",
+      "message": "security: require canonical producer workflow path",
+      "author": "elijah286",
+      "date": "2026-11-02T21:44:37Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "2db092f8fd6056e9ea57528cde64a262f11f8391",
       "short": "2db092f",
       "message": "Merge pull request #108 from ni/lvci-release/release-4.19.4",
       "author": "Elijah Kerry",
       "date": "2026-11-02T21:44:09Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "5d2841d753e6067334b8e00dab5b9a2e709c6055",
+      "short": "5d2841d",
+      "message": "ci: run vidiff node mocks under github-script v9 runtime",
+      "author": "elijah286",
+      "date": "2026-11-02T21:43:42Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "25214f4cf8070a58c8fb6db43b112632b2b2b691",
+      "short": "25214f4",
+      "message": "Harden VIDiff deploy workflow_run provenance and metadata validation",
+      "author": "elijah286",
+      "date": "2026-11-02T21:36:59Z",
       "project": false,
       "dep_only": false
     },
@@ -85,11 +229,29 @@
       "dep_only": false
     },
     {
+      "sha": "cb65c9f9e45a4300b4bba34a787b948a71570621",
+      "short": "cb65c9f",
+      "message": "Bump actions/checkout from 4 to 7",
+      "author": "dependabot[bot]",
+      "date": "2026-11-02T21:35:32Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "d2908784eaf4f5f22733b39d077b2648502f64c2",
       "short": "d290878",
       "message": "Merge branch 'main' into dependabot/github_actions/actions/upload-artifact-7",
       "author": "Elijah Kerry",
       "date": "2026-11-02T21:34:51Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "fe69bf4a20f51648e24ad34ed710427de1b2d742",
+      "short": "fe69bf4",
+      "message": "Merge remote-tracking branch 'origin/main' into integration/validated-open-prs-20261102",
+      "author": "elijah286",
+      "date": "2026-11-02T21:33:44Z",
       "project": false,
       "dep_only": false
     },
@@ -112,11 +274,119 @@
       "dep_only": false
     },
     {
+      "sha": "7963ebf2b5f1edf317f1e90a81ee89ec274c8b7e",
+      "short": "7963ebf",
+      "message": "Exercise artifact v7 REST ZIP compatibility on Linux and Windows",
+      "author": "elijah286",
+      "date": "2026-11-02T21:32:41Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "ed0fd3a8e1280fb0c67908eb47ab5ec3eec24331",
+      "short": "ed0fd3a",
+      "message": "Isolate Linux unit-test driver from client Python imports",
+      "author": "elijah286",
+      "date": "2026-11-02T21:30:44Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "1f125688e960e25690660eb802bd6bb11ba23b47",
+      "short": "1f12568",
+      "message": "Isolate tooling ref resolution from client Python modules",
+      "author": "elijah286",
+      "date": "2026-11-02T21:30:26Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "e62fdb05b14699ff0a57a56015ff11a46a9d4467",
       "short": "e62fdb0",
       "message": "Merge branch 'main' into dependabot/github_actions/actions/setup-python-7",
       "author": "Elijah Kerry",
       "date": "2026-11-02T21:30:21Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "5378887233dca12ee6c6a4164d75e83998d47dee",
+      "short": "5378887",
+      "message": "Pass large browser regression fixtures through stdin on every OS",
+      "author": "elijah286",
+      "date": "2026-11-02T21:29:27Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "84b4fc917a70e03d1ffe0b00f3cf280a2dc0de97",
+      "short": "84b4fc9",
+      "message": "Fail Linux unit-test status when report generation fails",
+      "author": "elijah286",
+      "date": "2026-11-02T21:27:09Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "9be6646d50c053e8055a3d14570b877f35b3d3fd",
+      "short": "9be6646",
+      "message": "Remove explanatory comments from composite action sources",
+      "author": "elijah286",
+      "date": "2026-11-02T21:26:09Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "f5f227281230a6e1348b7f7de83fe984524daf4c",
+      "short": "f5f2272",
+      "message": "Add safe standalone worker-image and unit-test actions",
+      "author": "elijah286",
+      "date": "2026-11-02T21:24:09Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "c82b7d17e3e7cfc11214166407e67cad550290ff",
+      "short": "c82b7d1",
+      "message": "Run LUnit tests on Linux and preserve VIPM revision suffixes",
+      "author": "elijah286",
+      "date": "2026-11-02T21:24:10Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "bbec9adf090a1d31ee72ab35759c2c76b3df2968",
+      "short": "bbec9ad",
+      "message": "Align contributor guidance with stable-major alias policy",
+      "author": "elijah286",
+      "date": "2026-11-02T21:25:44Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "1d9c5c0d04ecc3eae1a7a3aa4269d8cbfada15a7",
+      "short": "1d9c5c0",
+      "message": "Resolve reusable workflow pins only from source.ref",
+      "author": "elijah286",
+      "date": "2026-11-02T21:23:12Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "387009112ad7fa23416ae9bfcc58a956683c6cbf",
+      "short": "3870091",
+      "message": "Distinguish release publication from production promotion",
+      "author": "elijah286",
+      "date": "2026-11-02T21:22:09Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "2f06c0d8b9b537a58c2d87c7af71ace167d4e4b9",
+      "short": "2f06c0d",
+      "message": "Merge remote-tracking branch 'origin/main' into integration/validated-open-prs-20261102",
+      "author": "elijah286",
+      "date": "2026-11-02T21:20:36Z",
       "project": false,
       "dep_only": false
     },
@@ -153,6 +423,24 @@
       "message": "Bump actions/setup-python from 5 to 7",
       "author": "dependabot[bot]",
       "date": "2026-11-02T21:19:04Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "5298f6f79b6cfa60d745f5563a066a644b34deed",
+      "short": "5298f6f",
+      "message": "Preserve snapshot selections and safely retire obsolete image builds",
+      "author": "elijah286",
+      "date": "2026-11-02T21:17:53Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "44bbb131879f9f207f731adb3376a64cd22ed1e9",
+      "short": "44bbb13",
+      "message": "Use canonical v4 tooling in the reusable workflow",
+      "author": "elijah286",
+      "date": "2026-11-02T21:16:19Z",
       "project": false,
       "dep_only": false
     },
@@ -616,294 +904,6 @@
       "dep_only": false
     },
     {
-      "sha": "8137a7c6f221326ef7da09d9a64b8b5f510465d9",
-      "short": "8137a7c",
-      "message": "Merge pull request #80 from ni/lvci-release/release-4.18.5",
-      "author": "Elijah Kerry",
-      "date": "2026-10-23T18:19:22Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "46daa1d3b107ce7b1b609ded92cee5b25e8673f9",
-      "short": "46daa1d",
-      "message": "Prepare release 4.18.5",
-      "author": "github-actions[bot]",
-      "date": "2026-10-23T18:11:25Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "92509bb078c26841e93436c94c61d5a58ec99017",
-      "short": "92509bb",
-      "message": "Handle stale protected-branch release preparations safely",
-      "author": "Elijah Kerry",
-      "date": "2026-10-23T18:09:58Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "84f3acaf96467866f69c2df0aa6dce52459b8eb0",
-      "short": "84f3aca",
-      "message": "Merge pull request #78 from ni/fix/caraya-runner-diagnostics",
-      "author": "Elijah Kerry",
-      "date": "2026-10-23T17:24:51Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "86f14ab8f5acdb326e585a564a6c642d45c64ea0",
-      "short": "86f14ab",
-      "message": "Fix Caraya runner diagnostics and unit-test failure reporting",
-      "author": "Elijah Kerry",
-      "date": "2026-10-23T17:22:29Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "c50f706226e4ad341f5c5b20ee3653bed660e862",
-      "short": "c50f706",
-      "message": "Merge pull request #75 from ni/fix/protected-branch-release-prs",
-      "author": "Milena",
-      "date": "2026-10-05T19:47:17Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "f7a54ca5d65a83c30876e509399533830709bc27",
-      "short": "f7a54ca",
-      "message": "Fix release and promotion on PR-protected branches",
-      "author": "Elijah Kerry",
-      "date": "2026-10-05T19:41:31Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b1fbd533642824157066879493697e03459cd2e0",
-      "short": "b1fbd53",
-      "message": "Fix Pages links and tooling source after NI repository transfer",
-      "author": "Elijah Kerry",
-      "date": "2026-10-05T19:04:44Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "64ae1a13255b3b648dc4b642532d5c418627b366",
-      "short": "64ae1a1",
-      "message": "Configure Dependabot for multiple ecosystems",
-      "author": "Milena",
-      "date": "2026-10-01T21:40:13Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "46c8590034008d7e11f1bd72d83074fd3cc6baa2",
-      "short": "46c8590",
-      "message": "Release 4.18.4 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-09-18T17:44:54Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "692ac0ed8cf21e4ec2ba442e66fd25e24db283c2",
-      "short": "692ac0e",
-      "message": "Merge pull request #69 from MIpetrov-NI/feature/sbom-dashboard-integration",
-      "author": "Milena",
-      "date": "2026-09-18T17:44:41Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "152540c209200d135dcafbbfa40bf501de85dbb1",
-      "short": "152540c",
-      "message": "Release 4.18.3 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-09-18T17:18:38Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "dc4f78e83643323385c3b8f7898356516745d1ad",
-      "short": "dc4f78e",
-      "message": "Merge pull request #70 from MIpetrov-NI/Bug-fix-populate-history-checkboxes",
-      "author": "Milena",
-      "date": "2026-09-18T17:18:26Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b258970795fd4c3d9715461c5a6c6cd97ce5e961",
-      "short": "b258970",
-      "message": "Fix dashboard history platform selection",
-      "author": "MIpetrov-NI",
-      "date": "2026-09-18T16:33:16Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "ac9cade31fd8e45a7f3c310f159c670bb7c10f28",
-      "short": "ac9cade",
-      "message": "Regenerate consumer dashboards after SBOM runs",
-      "author": "MIpetrov-NI",
-      "date": "2026-09-16T20:54:38Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5a5d8305648e96930bf00fc038cc1af6368fdc88",
-      "short": "5a5d830",
-      "message": "Surface SBOM reports in the GitHub Pages dashboard",
-      "author": "MIpetrov-NI",
-      "date": "2026-09-16T20:52:03Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "ff4daab9ff9a92cbd90dda1c5dfff27f6a88f73e",
-      "short": "ff4daab",
-      "message": "Release 4.18.2 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-31T12:51:13Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "485c5fef96f3fe21578a7f07d9bcdb7018a3e2c3",
-      "short": "485c5fe",
-      "message": "Merge pull request #60 from elijah286/fix/fork-first-run-worker-image",
-      "author": "Elijah Kerry",
-      "date": "2026-08-31T12:51:02Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "fa4affb724ac18a5b22bf205365d9ada7c5e6544",
-      "short": "fa4affb",
-      "message": "Release 4.18.1 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-31T12:50:16Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "127c8793640cc5b8aec1b8c59b9fdbe1606c3181",
-      "short": "127c879",
-      "message": "Merge pull request #67 from elijah286/fix/quiet-maintenance-failures",
-      "author": "Elijah Kerry",
-      "date": "2026-08-31T12:50:02Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "4db57e9c9edbb296882a16ec166029f607928c70",
-      "short": "4db57e9",
-      "message": "Quiet owner-only mirror failures and fix GitLab-mode configurator hints",
-      "author": "Elijah Kerry",
-      "date": "2026-08-31T03:51:37Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "c7d0df871eaa85ef18a7095ee705bc10bd2eed1a",
-      "short": "c7d0df8",
-      "message": "Release 4.18.0 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-31T00:44:10Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "3f7e6d84af2460890772bbb6c0e9b2359fa36b78",
-      "short": "3f7e6d8",
-      "message": "Merge pull request #66 from elijah286/copilot/publish-gitlab-distribution",
-      "author": "Elijah Kerry",
-      "date": "2026-08-31T00:43:58Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "7022ae8178b6aac0b5167a1570942224c648ba17",
-      "short": "7022ae8",
-      "message": "feat: native GitLab CI distribution [minor]",
-      "author": "Elijah Kerry",
-      "date": "2026-08-31T00:40:10Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "dc09f4cd38c4552d69048504a1af1ce87f04bbf9",
-      "short": "dc09f4c",
-      "message": "Release 4.17.2 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-23T22:19:44Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "e78344b6df1c2abde4feccf15765c0f5fdc20240",
-      "short": "e78344b",
-      "message": "Merge pull request #63 from elijah286/fix/install-watcher-twin-cancel",
-      "author": "Elijah Kerry",
-      "date": "2026-08-23T22:19:31Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b8049760f473e04e98716181c0764d5fd2b8e69f",
-      "short": "b804976",
-      "message": "Install watcher: don't misread a cancelled copy-twin as a failed seed",
-      "author": "Elijah Kerry",
-      "date": "2026-08-23T22:18:09Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "74477c8364a39561c05bc960fe75e55707397d8f",
-      "short": "74477c8",
-      "message": "Release 4.17.1 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-23T15:50:28Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "0716a0e0ef4414c853473f393b8a6cfbfff7042e",
-      "short": "0716a0e",
-      "message": "Merge pull request #62 from elijah286/fix/fork-workflow-registration",
-      "author": "Elijah Kerry",
-      "date": "2026-08-23T15:50:16Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "cdde6fd72b461af8f6f770bfd089a968566b9d70",
-      "short": "cdde6fd",
-      "message": "Version-stamp vendored workflows so updates re-register them on forks",
-      "author": "Elijah Kerry",
-      "date": "2026-08-23T13:38:24Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "087224a30ece39d5bd499d7ee847499ed7dc1001",
-      "short": "087224a",
-      "message": "Release 4.17.0 [skip release]",
-      "author": "github-actions[bot]",
-      "date": "2026-08-22T16:46:51Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "f007975c794ab6a09786b9c44ebaab0e5510f504",
-      "short": "f007975",
-      "message": "Merge pull request #61 from elijah286/fix/dashboard-dead-run-visibility",
-      "author": "Elijah Kerry",
-      "date": "2026-08-22T16:46:41Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
       "sha": "d0e080c128589707c82a13a45d842952fb3a5fc8",
       "short": "d0e080c",
       "message": "Merge remote-tracking branch 'origin/main' into via-debug",
@@ -1193,7 +1193,7 @@
       "locked": true,
       "packages": [
         "astemes_lib_lunit-2.0.13.6",
-        "astemes_lib_lunit_cli-1.6.1.23",
+        "astemes_lib_lunit_cli-1.7.1.32",
         "astemes_lib_lunit_coverage_analysis_add_on-1.0.0.2",
         "astemes_lib_lunit_global_fixture_add_on-1.0.5.4",
         "astemes_lib_lunit_parameterized_add_on-1.1.10.8",
@@ -1495,7 +1495,7 @@
       "verification": {},
       "packages": [
         "astemes_lib_lunit-2.0.13.6",
-        "astemes_lib_lunit_cli-1.6.1.23",
+        "astemes_lib_lunit_cli-1.7.1.32",
         "astemes_lib_lunit_coverage_analysis_add_on-1.0.0.2",
         "astemes_lib_lunit_global_fixture_add_on-1.0.5.4",
         "astemes_lib_lunit_parameterized_add_on-1.1.10.8",
