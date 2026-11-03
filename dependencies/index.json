@@ -1,8 +1,35 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "b22697703b944c9145feccc42e974af986049112",
+  "sha": "8490152de724dec0e004463a63d7f8d45ecc520e",
   "revisions": [
+    {
+      "sha": "8490152de724dec0e004463a63d7f8d45ecc520e",
+      "short": "8490152",
+      "message": "Merge pull request #127 from ni/fix/windows-vipm4056-bootstrap-20261103",
+      "author": "Elijah Kerry",
+      "date": "2026-11-03T21:41:40Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "06068cf93d8e12f8edf2c8f838af7c0e790bcaeb",
+      "short": "06068cf",
+      "message": "vipm: retain native process exit codes on Windows PowerShell",
+      "author": "elijah286",
+      "date": "2026-11-03T21:27:53Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "7c8d514c870fde7f9ad3d97ada4ac60948c67dc4",
+      "short": "7c8d514",
+      "message": "vipm: verify and upgrade Windows CLI and Desktop together",
+      "author": "elijah286",
+      "date": "2026-11-03T21:24:05Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "b22697703b944c9145feccc42e974af986049112",
       "short": "b226977",
@@ -873,33 +900,6 @@
       "message": "Preserve unrelated client settings during Reconfigure",
       "author": "elijah286",
       "date": "2026-11-02T00:12:14Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "c5d89fe8896fe878cb3e1c98a9d050643b3ecb16",
-      "short": "c5d89fe",
-      "message": "Merge pull request #90 from ni/captain/ship-fleet-2026-10-29",
-      "author": "Elijah Kerry",
-      "date": "2026-10-29T23:11:46Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5d8b1e9e861b1135ddde3779324b9b359c6ad999",
-      "short": "5d8b1e9",
-      "message": "Require PR release versions and client update guidance",
-      "author": "elijah286",
-      "date": "2026-10-29T22:09:00Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "7ce369fe2022dcc641b10fdd9ba3252d6e833efb",
-      "short": "7ce369f",
-      "message": "Merge pull request #88 from ni/captain/ship-fleet-2026-10-29",
-      "author": "Elijah Kerry",
-      "date": "2026-10-29T22:04:54Z",
       "project": false,
       "dep_only": false
     },
