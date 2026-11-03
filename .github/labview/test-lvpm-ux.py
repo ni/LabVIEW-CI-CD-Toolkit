@@ -77,6 +77,27 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
                 self.assertEqual((ROOT / '.github/pages' / name).read_bytes(),
                                  (ROOT / 'actions/dashboard' / name).read_bytes())
 
+    def test_linux_next_action_details_and_live_feedback_contract(self):
+        page = (ROOT / '.github/pages/dependencies.html').read_text()
+        self.assertIn('Next: review candidate activation', page)
+        self.assertIn('Next: build a separate candidate', page)
+        self.assertIn('<details><summary>Candidate evidence and build inputs</summary>', page)
+        self.assertIn('<details><summary>Current selection and rollback</summary>', page)
+        self.assertIn('role="status" aria-live="polite" id="lvpmStatus"', page)
+        self.assertIn('id="lvpmRunLink" target="_blank" rel="noopener" hidden', page)
+        self.assertNotIn('<h3>1. Build a separate LVPM candidate</h3>', page)
+
+    def test_linux_dispatch_feedback_documents_acceptance_not_verification(self):
+        page = (ROOT / '.github/pages/dependencies.html').read_text()
+        documentation = (ROOT / '.github/pages/documentation.html').read_text()
+        self.assertIn('return_run_details:true', page)
+        self.assertIn('Dispatch accepted, not completed', page)
+        self.assertIn('GitHub returned no run identity', page)
+        self.assertIn('Refresh to check for a published candidate', page)
+        self.assertIn('Workflow success alone does not establish a published, verified candidate', documentation)
+        self.assertEqual((ROOT / '.github/pages/documentation.html').read_bytes(),
+                         (ROOT / 'actions/dashboard/documentation.html').read_bytes())
+
 
 class ReconfigureLvpmTests(unittest.TestCase):
     def preservation_fixture(self):
