@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline regression tests for the toolkit's external LVPM adapter."""
 
+import configparser
 import importlib.util
 import io
 import json
@@ -11,9 +12,11 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import zipfile
+from xml.etree import ElementTree
 
 
 ROOT = Path(__file__).resolve().parent
+REPOSITORY = ROOT.parent.parent
 SPEC = importlib.util.spec_from_file_location("lvpm_adapter", ROOT / "lvpm/adapter.py")
 ADAPTER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(ADAPTER)
@@ -85,6 +88,70 @@ class LvpmAdapterTests(unittest.TestCase):
         self.write_vipc("Dependencies.vipc", ["core_lib-2.0.0"])
         with self.assertRaisesRegex(ValueError, "Conflicting versions.*core_lib"):
             ADAPTER.make_plan(self.root)
+
+    def test_repository_example_shared_vipc_pins_match_core_versions(self):
+        core = REPOSITORY / ADAPTER.CORE
+        example = REPOSITORY / "example/Dependencies.vipc"
+        core_pins = {package["name"]: package["version"]
+                     for package in ADAPTER.declarations(core, ADAPTER.CORE)}
+        example_pins = {package["name"]: package["version"]
+                        for package in ADAPTER.declarations(example, "example/Dependencies.vipc")}
+        shared = sorted(set(core_pins) & set(example_pins))
+        self.assertGreater(len(shared), 0)
+        for name in shared:
+            self.assertEqual(example_pins[name], core_pins[name],
+                             f"example/Dependencies.vipc drifted from core for {name}")
+
+    def test_repository_plan_keeps_shared_core_and_example_roots_exact(self):
+        plan = ADAPTER.make_plan(REPOSITORY, labview_version="2026")
+        requirements = {package["name"]: package for package in plan["requirements"]}
+        expected = {
+            "oglib_array": "6.0.1.20",
+            "oglib_error": "6.0.0.26",
+            "oglib_file": "6.0.2.28",
+            "oglib_lvdata": "6.0.0.45",
+            "oglib_string": "6.0.2.35",
+        }
+        for name, version in expected.items():
+            package = requirements.get(name)
+            self.assertIsNotNone(package)
+            self.assertEqual(package["version"], version)
+            self.assertIn(ADAPTER.CORE, package["source_files"])
+            self.assertIn("example/Dependencies.vipc", package["source_files"])
+
+    def test_repository_example_vipc_members_match_declared_packages(self):
+        path = REPOSITORY / "example/Dependencies.vipc"
+        expected = {
+            "oglib_array-6.0.1.20",
+            "oglib_error-6.0.0.26",
+            "oglib_file-6.0.2.28",
+            "oglib_lvdata-6.0.0.45",
+            "oglib_string-6.0.2.35",
+            "dataflow_g_lib_g_image-0.5.0.1",
+            "oglib_appcontrol-4.1.0.7",
+            "ni_lib_utf_junit_report-1.0.1.43",
+            "ni_lib_junit_results_api-1.0.1.6",
+            "ni_lib_simple_xml-1.0.0.4",
+        }
+        expected_members = {"config.xml"} | {
+            f"{package}.{suffix}" for package in expected for suffix in ("spec", "bmp")}
+        with zipfile.ZipFile(path) as archive, zipfile.ZipFile(REPOSITORY / ADAPTER.CORE) as core:
+            self.assertCountEqual(archive.namelist(), expected_members)
+            tree = ElementTree.fromstring(archive.read("config.xml"))
+            declared = [(package.findtext("Name") or "").strip()
+                        for package in tree.iter("Package")]
+            self.assertCountEqual(declared, expected)
+            for package in declared:
+                with self.subTest(package=package):
+                    spec = configparser.ConfigParser(interpolation=None, strict=False)
+                    spec.read_string(archive.read(f"{package}.spec").decode("utf-8-sig"))
+                    name = spec["Package"]["Name"].strip('"')
+                    version = spec["Package"]["Version"].strip('"')
+                    self.assertEqual(f"{name}-{version}", package)
+                    for suffix in ("spec", "bmp"):
+                        member = f"{package}.{suffix}"
+                        if member in core.namelist():
+                            self.assertEqual(archive.read(member), core.read(member))
 
     def test_same_version_retains_both_sources(self):
         self.write_vipc("Dependencies.vipc", ["core_lib-1.0.0"])
