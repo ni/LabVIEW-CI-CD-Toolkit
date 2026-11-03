@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Software Bill of Materials (SBOM) — LabVIEW CI</title>
+<script>window.LVCI = {"context": "sbom-report", "repo": "ni/LabVIEW-CI-CD-Toolkit", "pagesUrl": "https://ni.github.io/LabVIEW-CI-CD-Toolkit", "sha": "4db5c2081ba0be4dd3bcc30e6f51825b78bc1614", "short": "4db5c20", "platform": "windows", "rawUrl": "results/sbom.json"};</script>
+<script src="../../lvci-header.js" defer></script>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#0d1117;--border:#30363d;--fg:#e6edf3;--muted:#8b949e;--link:#58a6ff;--code:#010409}
+@media(prefers-color-scheme:light){:root{--bg:#fff;--surface:#f6f8fa;--surface2:#fff;--border:#d0d7de;--fg:#1f2328;--muted:#57606a;--link:#0969da;--code:#f6f8fa}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 18px 64px}
+h1{font-size:1.45em;margin:0 0 2px}
+.sub{color:var(--muted);font-size:.86em;margin:2px 0 16px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.card{flex:1 1 120px;min-width:110px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.card .n{font-size:1.6em;font-weight:700;line-height:1}
+.card .l{color:var(--muted);font-size:.78em;margin-top:3px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 14px}
+.toolbar input[type=search]{flex:1 1 220px;min-width:180px;padding:8px 10px;background:var(--surface2);color:var(--fg);border:1px solid var(--border);border-radius:7px;font-size:.9em}
+.count{color:var(--muted);font-size:.8em;margin-left:auto}
+.plat{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-left:8px;vertical-align:middle}
+.plat button{background:transparent;color:var(--muted);border:0;padding:4px 11px;font-size:.8em;cursor:pointer}
+.plat button.active{background:rgba(177,186,196,.16);color:var(--fg)}
+.plat button[disabled]{opacity:.4;cursor:default}
+.table-container{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)}
+table{width:100%;border-collapse:collapse;text-align:left;font-size:.88em}
+th,td{padding:10px 14px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:0}
+th{background:var(--surface2);color:var(--muted);font-weight:600}
+.pkg-name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:600}
+.empty{color:var(--muted);text-align:center;padding:40px 0}
+.hidden{display:none!important}
+.lvci-needtool{display:flex;align-items:flex-start;gap:12px;max-width:1040px;margin:16px auto 0;padding:13px 16px;background:rgba(187,128,9,.13);border:1px solid rgba(187,128,9,.45);border-left:4px solid #bb8009;border-radius:10px}
+.lvci-needtool svg{flex:0 0 auto;width:20px;height:20px;color:#bb8009;margin-top:1px}
+.lvci-needtool-t{flex:1 1 auto;font-size:.9em}
+.lvci-needtool-t strong{display:block;margin-bottom:2px}
+.lvci-needtool-d{color:var(--muted);font-size:.92em;margin-top:5px}
+.lvci-needtool-cta{flex:0 0 auto;align-self:center;font-size:.85em;font-weight:600;color:#fff;background:#bb8009;border-radius:7px;padding:8px 13px;text-decoration:none;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>Software Bill of Materials (SBOM) <span class="plat" id="plat-toggle"></span></h1>
+  <div class="sub" id="sub"></div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="toolbar">
+    <input id="q" type="search" placeholder="Filter packages by name or vendor…">
+    <span class="count" id="rescount"></span>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Package Name</th>
+          <th>Version</th>
+          <th>Vendor / Supplier</th>
+        </tr>
+      </thead>
+      <tbody id="pkg-list"></tbody>
+    </table>
+  </div>
+</div>
+
+<script id="sbom-data" type="application/json">{"meta": {"sha": "4db5c2081ba0be4dd3bcc30e6f51825b78bc1614", "short": "4db5c20", "platform": "windows", "repo": "ni/LabVIEW-CI-CD-Toolkit", "pages_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit", "dash_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit/", "labview_version": "2026", "commit": {"message": "Merge 627627c5a5a7a95921f9707c08dfd6969a683033 into 8490152de724dec0e004463a63d7f8d45ecc520e", "author": "Elijah Kerry", "date": "2026-11-03T16:09:16-06:00"}, "generated_utc": "2026-11-03 22:24 UTC", "spdx_version": "CycloneDX 1.5", "created": ""}, "summary": {"total_packages": 3}, "platforms": [{"id": "windows", "url": null}, {"id": "linux", "url": null}], "packages": [{"name": "ni-labview-2026-coreother", "version": "26.3.0.49792-0+f640", "vendor": "National Instruments"}, {"name": "ni-labview-2026-vilib", "version": "26.3.0.49792-0+f640", "vendor": "National Instruments"}, {"name": "ni-utf-labview-support", "version": "26.3.0.49249-0+f97", "vendor": "National Instruments"}], "tooling": {"missing": []}}</script>
+<script>
+const SELF = JSON.parse(document.getElementById('sbom-data').textContent);
+const PLATFORMS = SELF.platforms || [{id:SELF.meta.platform,url:null}];
+const SELF_PLATFORM = SELF.meta.platform;
+const CACHE = { [SELF_PLATFORM]: SELF };
+let CUR = SELF_PLATFORM, D = SELF;
+const META = SELF.meta;
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PLAT_LABEL = {windows:'Windows', linux:'Linux'};
+let query='';
+
+(function header(){
+  const m = META;
+  const commitMsg = (m.commit && m.commit.message) ? esc(m.commit.message) : '';
+  const shaLink = m.repo && m.sha ? `https://github.com/${m.repo}/commit/${m.sha}` : '';
+  document.getElementById('sub').innerHTML =
+    (m.short ? `Commit ${shaLink?`<a href="${shaLink}" target="_top">${esc(m.short)}</a>`:esc(m.short)} ` : '') +
+    (commitMsg ? `&middot; ${commitMsg} ` : '') +
+    (m.spdx_version ? `&middot; ${esc(m.spdx_version)} ` : '') +
+    `&middot; generated ${esc(m.generated_utc||'')}`;
+})();
+
+function renderToggle(){
+  const host = document.getElementById('plat-toggle');
+  host.innerHTML = PLATFORMS.map(p=>{
+    const dis = (p.id!==SELF_PLATFORM && p.url==null) ? 'disabled' : '';
+    return `<button data-plat="${p.id}" class="${p.id===CUR?'active':''}" ${dis}>${esc(PLAT_LABEL[p.id]||p.id)}</button>`;
+  }).join('');
+  host.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>switchPlatform(b.dataset.plat)));
+}
+
+async function switchPlatform(pid){
+  if(pid===CUR) return;
+  const p = PLATFORMS.find(x=>x.id===pid); if(!p) return;
+  let data = CACHE[pid];
+  if(data===undefined){
+    try{ data = await fetch(p.url).then(r=>r.json()); }catch(e){ data = null; }
+    CACHE[pid] = data;
+  }
+  CUR = pid;
+  if(!data){ renderToggle(); showEmpty(pid); return; }
+  D = data; renderToggle(); renderAll();
+}
+
+function showEmpty(pid){
+  document.getElementById('cards').innerHTML='';
+  document.getElementById('pkg-list').innerHTML=`<tr><td colspan="3" class="empty">No SBOM available for ${esc(PLAT_LABEL[pid]||pid)}.</td></tr>`;
+  document.getElementById('rescount').textContent='';
+}
+
+function renderAll(){
+  const s = D.summary;
+  document.getElementById('cards').innerHTML = `<div class="card"><div class="n">${(s.total_packages||0).toLocaleString()}</div><div class="l">Packages</div></div>`;
+  renderPackages();
+  apply();
+}
+
+function renderPackages(){
+  const host = document.getElementById('pkg-list');
+  if(!D.packages || !D.packages.length){
+    host.innerHTML = `<tr><td colspan="3" class="empty">No packages found in SBOM.</td></tr>`;
+    return;
+  }
+  host.innerHTML = D.packages.map(p => {
+    const hay = (p.name + ' ' + p.vendor + ' ' + p.version).toLowerCase();
+    return `<tr class="pkg-row" data-text="${esc(hay)}">
+      <td class="pkg-name">${esc(p.name)}</td>
+      <td>${esc(p.version)}</td>
+      <td>${esc(p.vendor)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function apply(){
+  let vis = 0;
+  document.querySelectorAll('#pkg-list .pkg-row').forEach(row => {
+    const show = !query || row.dataset.text.includes(query);
+    row.classList.toggle('hidden', !show);
+    if(show) vis++;
+  });
+  document.getElementById('rescount').textContent = `${vis} package${vis===1?'':'s'} shown`;
+}
+
+document.getElementById('q').addEventListener('input', e => {
+  query = e.target.value.trim().toLowerCase();
+  apply();
+});
+
+renderToggle();
+renderAll();
+</script>
+</body>
+</html>

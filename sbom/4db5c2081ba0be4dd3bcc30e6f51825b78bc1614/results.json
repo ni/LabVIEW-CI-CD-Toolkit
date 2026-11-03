@@ -1,0 +1,52 @@
+{
+ "meta": {
+  "sha": "4db5c2081ba0be4dd3bcc30e6f51825b78bc1614",
+  "short": "4db5c20",
+  "platform": "windows",
+  "repo": "ni/LabVIEW-CI-CD-Toolkit",
+  "pages_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit",
+  "dash_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit/",
+  "labview_version": "2026",
+  "commit": {
+   "message": "Merge 627627c5a5a7a95921f9707c08dfd6969a683033 into 8490152de724dec0e004463a63d7f8d45ecc520e",
+   "author": "Elijah Kerry",
+   "date": "2026-11-03T16:09:16-06:00"
+  },
+  "generated_utc": "2026-11-03 22:24 UTC",
+  "spdx_version": "CycloneDX 1.5",
+  "created": ""
+ },
+ "summary": {
+  "total_packages": 3
+ },
+ "platforms": [
+  {
+   "id": "windows",
+   "url": null
+  },
+  {
+   "id": "linux",
+   "url": null
+  }
+ ],
+ "packages": [
+  {
+   "name": "ni-labview-2026-coreother",
+   "version": "26.3.0.49792-0+f640",
+   "vendor": "National Instruments"
+  },
+  {
+   "name": "ni-labview-2026-vilib",
+   "version": "26.3.0.49792-0+f640",
+   "vendor": "National Instruments"
+  },
+  {
+   "name": "ni-utf-labview-support",
+   "version": "26.3.0.49249-0+f97",
+   "vendor": "National Instruments"
+  }
+ ],
+ "tooling": {
+  "missing": []
+ }
+}
