@@ -2,6 +2,6 @@
   "version": "linux-4ce478ba9bb6",
   "platform": "linux",
   "manifest_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit/workers/linux/linux-4ce478ba9bb6/manifest.html",
-  "build_date": "2026-11-02T21:45:32Z",
-  "git_sha": "5121c60c11bda66eda7ab9220f32d05afbfde1a5"
+  "build_date": "2026-11-03T00:24:05Z",
+  "git_sha": "5b886823c36f1239e4f2e8e5a931e20980f9de1c"
 }
