@@ -87,6 +87,7 @@ function Invoke-VipmBootstrapProcess {
     try {
         $process = Start-Process -FilePath $Path -ArgumentList $Arguments -PassThru `
             -RedirectStandardOutput $outputFile -RedirectStandardError $errorFile -ErrorAction Stop
+        $null = $process.Handle
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
             & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Host
             if ($LASTEXITCODE -ne 0 -and -not $process.HasExited) {

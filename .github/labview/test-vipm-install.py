@@ -2,6 +2,7 @@
 """Exercise Windows VIPM bootstrap and fallback accounting without LabVIEW/VIPM."""
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -42,9 +43,11 @@ function Mock-Vipm {{
 }}
 {body}
 """
+        environment = {key: value for key, value in os.environ.items()
+                       if key.casefold() != 'psmodulepath'}
         result = subprocess.run(
             [POWERSHELL, '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', code],
-            capture_output=True, text=True, timeout=30, cwd=INSTALLER.parents[3])
+            capture_output=True, text=True, timeout=30, cwd=INSTALLER.parents[3], env=environment)
         self.assertEqual(result.returncode, expected_exit, result.stdout + result.stderr)
         return result.stdout
 
@@ -290,6 +293,9 @@ $global:DesktopPath = 'C:\\Program Files\\JKI\\VI Package Manager\\VI Package Ma
 function Test-Path {
     param($LiteralPath, $PathType)
     if ($LiteralPath -in @($global:CliPath, $global:DesktopPath)) { return $true }
+    if ($LiteralPath -in $global:VersionFiles) {
+        return Microsoft.PowerShell.Management\\Test-Path -LiteralPath $LiteralPath
+    }
     if ($LiteralPath -like 'C:*') { 'UNEXPECTED filesystem discovery'; exit 99 }
     Microsoft.PowerShell.Management\\Test-Path -LiteralPath $LiteralPath
 }
@@ -381,10 +387,13 @@ if ($result.ExitCode -ne 7 -or $result.Output -notmatch 'vipm 26.3.2') {{ throw 
 $script:Waits = 0
 $script:Killed = $false
 $script:Disposed = $false
+$script:RetainedHandle = $false
 $script:Files = @()
 $script:FakeProcess = [pscustomobject]@{ Id = 73451; HasExited = $false }
+$script:FakeProcess | Add-Member ScriptProperty Handle { $script:RetainedHandle = $true; 1 }
 $script:FakeProcess | Add-Member ScriptMethod WaitForExit {
     param($Milliseconds)
+    if (-not $script:RetainedHandle) { throw 'Process handle was not retained before waiting' }
     $script:Waits++
     if ($script:Waits -eq 1 -and $Milliseconds -ne 1000) { throw 'Wrong process timeout' }
     if ($script:Waits -eq 2 -and $Milliseconds -ne 5000) { throw 'Wrong cleanup timeout' }
