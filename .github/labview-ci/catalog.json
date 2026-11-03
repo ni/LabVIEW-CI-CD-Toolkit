@@ -4446,7 +4446,7 @@
         "windowsTag": "nationalinstruments/labview:2026q3-windows",
         "linuxTag": "nationalinstruments/labview:2026q3-linux",
         "nipmFeedUrl": "https://download.ni.com/support/nipkg/products/ni-l/ni-labview-2026/26.3/released",
-        "vipmInstallerUrl": "https://traffic.libsyn.com/secure/jkinc/vipm-26.3.3954-windows-setup.exe",
+        "vipmInstallerUrl": "https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe",
         "status": "qualified",
         "notes": "Qualified 2026-08-21: VIPM startup probe passed on the stock NI image and the full dependency bake (34 packages incl. UTF essentials and the Antidoc suite) succeeded end-to-end (run 32510104950). The Aug 2026 bake wedge was a baked LV_RTE_HEADLESS=1, not this pairing."
       },

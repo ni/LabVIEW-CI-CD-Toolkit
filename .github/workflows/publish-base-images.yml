@@ -114,6 +114,7 @@ jobs:
           # Immutable tag hashes the Dockerfile AND the release triple, matching
           # build-labview-image.yml, so any pairing change yields a new tag.
           $hashInput = (Get-Content -LiteralPath '.github/docker/labview-ci-base.Dockerfile' -Raw) +
+            "`n" + (Get-FileHash -LiteralPath '.github/labview/vipm/install-vipc.ps1' -Algorithm SHA256).Hash +
             "`n" + '${{ matrix.windowsTag }}' + "`n" + '${{ matrix.nipmFeedUrl }}' + "`n" + '${{ matrix.vipmInstallerUrl }}'
           $sha = [System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($hashInput))
           $baseHash = (-join ($sha | ForEach-Object { $_.ToString('x2') })).Substring(0, 12)

@@ -10,6 +10,7 @@ on:
       - '.github/labview/ensure-docker.ps1'
       - '.github/labview/vipm/**'
       - '.github/labview/test-composite-actions.py'
+      - '.github/labview/test-vipm-install.py'
       - '.github/pages/documentation.html'
       - 'actions/dashboard/documentation.html'
       - '.github/workflows/composite-action-checks.yml'
@@ -23,6 +24,7 @@ on:
       - '.github/labview/ensure-docker.ps1'
       - '.github/labview/vipm/**'
       - '.github/labview/test-composite-actions.py'
+      - '.github/labview/test-vipm-install.py'
       - '.github/pages/documentation.html'
       - 'actions/dashboard/documentation.html'
       - '.github/workflows/composite-action-checks.yml'
@@ -48,3 +50,6 @@ jobs:
       - name: Check existing runner and report behavior
         if: runner.os == 'Windows'
         run: python .github/labview/test-unit-tests.py
+      - name: Check VIPM bootstrap and dependency recovery without LabVIEW
+        if: runner.os == 'Windows'
+        run: python .github/labview/test-vipm-install.py
