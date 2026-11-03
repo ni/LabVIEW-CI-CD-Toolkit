@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "8571ef4a8cdf37567fa49466c538fe6283075ad8",
+  "sha": "ed3c2014a7e3a57b89a6933b7c44688ce4cbda5a",
   "revisions": [
+    {
+      "sha": "ed3c2014a7e3a57b89a6933b7c44688ce4cbda5a",
+      "short": "ed3c201",
+      "message": "Merge pull request #118 from ni/fix/dashboard-monitoring-and-vi-markers-20261103",
+      "author": "Elijah Kerry",
+      "date": "2026-11-03T04:18:05Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "26934da9495006fa4f6dab3d7f1830200251aac2",
+      "short": "26934da",
+      "message": "dashboard: enable clean worker review and simplify VI markers",
+      "author": "elijah286",
+      "date": "2026-11-03T04:15:48Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "8571ef4a8cdf37567fa49466c538fe6283075ad8",
       "short": "8571ef4",
@@ -882,24 +900,6 @@
       "message": "Keep workspace path spelling during framework detection (8.3 short-name fix)",
       "author": "Elijah Kerry",
       "date": "2026-10-26T18:35:44Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5d322ea6d39f31626cb6d6d0ae30c55cad3f982c",
-      "short": "5d322ea",
-      "message": "Auto-detect and run every unit-test framework when unitTests is unconfigured",
-      "author": "Elijah Kerry",
-      "date": "2026-10-26T18:09:00Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "cbd5d84c0d6118fae27b810e027c0c9876ef12b3",
-      "short": "cbd5d84",
-      "message": "Merge pull request #82 from ni/fix/preserve-caraya-configuration",
-      "author": "Elijah Kerry",
-      "date": "2026-10-26T13:38:41Z",
       "project": false,
       "dep_only": false
     },
