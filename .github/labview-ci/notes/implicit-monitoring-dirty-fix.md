@@ -1,0 +1,1 @@
+The Dependencies page no longer treats existing implicit dependency monitoring as unsaved changes when opening generated or live revision data. Worker update review is available on the current default-branch revision without a needless monitoring-save PR; explicit lists, empty lists, opt-outs, platform choices, and actual-edit safety gates are preserved.

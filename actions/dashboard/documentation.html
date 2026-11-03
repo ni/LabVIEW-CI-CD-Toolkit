@@ -1451,7 +1451,11 @@ docker run --rm `
         and do not produce warnings or automatic dependency-update triggers. When this template repo updates the base,
         consumers receive the new base on their next tooling update and the next container rebuild re-applies base +
         project together. Because each repo publishes to its own GHCR namespace, those rebuilds produce that repo's own
-        unique worker image.
+        unique worker image. Opening a revision loads its committed monitoring settings without marking them
+        unsaved. When explicit VIPC or Dragon lists are absent, the existing default monitors discovered files on
+        both worker platforms; explicit empty lists and opt-outs retain their meaning. Only changing a monitoring
+        checkbox requires saving and merging a configuration PR before reviewing a worker update. Updates remain
+        restricted to the current default-branch revision.
       </div>
       <p>After a worker image is built locally, the publish workflow captures both <code>nipkg list</code> and
         <code>vipm list --installed</code> from inside the image and writes them into the worker manifest. Fresh-install
@@ -2273,6 +2277,11 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         revisions. Each job keeps a warm container to avoid per-VI startup costs. The dashboard counts frame
         coverage, not exported HTML files.</p>
       <h4>Browsing and missing snapshots</h4>
+      <p>VI file rows have no Snapshot, New, or Diff pills. Once the frame indexes confirm that neither
+        platform has a snapshot, a small red X beside the filename indicates <strong>No snapshot available</strong>,
+        with the same accessible label and hover text. Unknown or still-loading availability has no marker.
+        The X disappears when polling finds frames from either platform. Folder change indicators and the
+        toolbar&rsquo;s <strong>Diff</strong> control remain available.</p>
       <p>When both platforms have frames, the browser initially prefers Windows; a platform-specific shared
         link preserves its selected render. Front Panel and Block Diagram controls choose the pane, and
         share links preserve the revision, VI, pane, and platform. Coaching tips can be dismissed locally.</p>
