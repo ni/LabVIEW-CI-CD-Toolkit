@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "ed3c2014a7e3a57b89a6933b7c44688ce4cbda5a",
+  "sha": "d321bd24bf123880590f6ebdd4e66ab0c5baf53f",
   "revisions": [
+    {
+      "sha": "d321bd24bf123880590f6ebdd4e66ab0c5baf53f",
+      "short": "d321bd2",
+      "message": "Merge pull request #120 from ni/fix/windows-vipm-bake-20261103",
+      "author": "Elijah Kerry",
+      "date": "2026-11-03T17:52:41Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "59aa26b4918f5ea7d2eed1fcdb3372744f44f0bf",
+      "short": "59aa26b",
+      "message": "vipm: verify recovered Windows dependency installs",
+      "author": "elijah286",
+      "date": "2026-11-03T17:48:12Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "ed3c2014a7e3a57b89a6933b7c44688ce4cbda5a",
       "short": "ed3c201",
@@ -882,24 +900,6 @@
       "message": "Fix snapshot history population to respect selected revisions",
       "author": "elijah286",
       "date": "2026-10-29T07:45:37Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "8221d6c62bfb35f32b8af485152c86f4e6736067",
-      "short": "8221d6c",
-      "message": "Merge pull request #84 from ni/feat/auto-detect-unit-test-frameworks",
-      "author": "Elijah Kerry",
-      "date": "2026-10-26T18:36:41Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "1f9ecb7679588356bd8d3a52cdbe32140272047b",
-      "short": "1f9ecb7",
-      "message": "Keep workspace path spelling during framework detection (8.3 short-name fix)",
-      "author": "Elijah Kerry",
-      "date": "2026-10-26T18:35:44Z",
       "project": false,
       "dep_only": false
     },
