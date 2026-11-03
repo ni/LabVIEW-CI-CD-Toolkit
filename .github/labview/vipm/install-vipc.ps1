@@ -834,6 +834,65 @@ function Invoke-VipmInstall {
     return $vipmExit
 }
 
+# A failed transitive file (notably legacy .ogp metadata rejected by the CLI) does
+# not prove the requested packages failed: later per-file installs can recover.
+# Only the target's installed inventory can confirm that recovery.
+function Test-VipmSpecsInstalled {
+    param([string[]] $Specs)
+    Write-Host '  Verifying requested packages against the target LabVIEW installed inventory ...'
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $out = & $VipmExe @GlobalFlags list --installed 2>&1
+        $inventoryExit = $LASTEXITCODE
+        if ($inventoryExit -eq 2) {
+            Write-Host '  (list rejected global LabVIEW flags; retrying bare form against active target)'
+            $out = & $VipmExe list --installed 2>&1
+            $inventoryExit = $LASTEXITCODE
+        }
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    $out | Out-Host
+    if ($inventoryExit -ne 0) {
+        Write-Warning "  Cannot verify installed packages: vipm list --installed failed (exit $inventoryExit)."
+        return $false
+    }
+
+    $installed = @{}
+    foreach ($line in ($out | Out-String -Stream -Width 8192)) {
+        # Modern CLI: Display Name (package_id v1.2.3); older CLI: id 1.2.3 or id-1.2.3.
+        if ($line -match '^\s*.*\((?<name>[A-Za-z0-9_.-]+)\s+v(?<version>\d[\w.-]*)\)\s*$' -or
+            $line -match '^\s*(?<name>[A-Za-z0-9_.-]+)\s+v?(?<version>\d[\w.-]*)\s*$' -or
+            $line -match '^\s*(?<name>[A-Za-z0-9_.-]+?)-(?<version>\d+(?:\.\d+)+(?:-\d+)?)\s*$') {
+            $installed[$Matches.name] = $Matches.version
+        }
+    }
+
+    $verified = $true
+    foreach ($spec in $Specs) {
+        $request = Split-VipmPackageSpec $spec
+        $version = $installed[$request.Name]
+        $matchesVersion = $false
+        if ($version) {
+            if (-not $request.Version) {
+                $matchesVersion = $true
+            } elseif ($request.Minimum) {
+                $matchesVersion = (Get-NumericVersionKey $version) -ge (Get-NumericVersionKey $request.Version)
+            } else {
+                # VIPC specs omit the old OpenG packaging-release suffix (e.g. 1.1-1).
+                $matchesVersion = $version -eq $request.Version -or
+                    ($request.Version -notmatch '-' -and ($version -replace '-\d+$', '') -eq $request.Version)
+            }
+        }
+        if (-not $matchesVersion) {
+            Write-Warning "  Requested package '$spec' is not installed at the requested version."
+            $verified = $false
+        }
+    }
+    return $verified
+}
+
 # Install a set of package SPECS (name@version) using the by-name path first and,
 # when the container resolver index is empty, the public-index local-file fallback.
 # Returns $true only if every spec installed. Stops early (returns $false) the
@@ -860,16 +919,15 @@ function Install-VipmSpecs {
         $vipFiles = @(Get-LocalVipFilesForSpecs $Specs)
         Write-Host ("  Installing local VIP files: " + (($vipFiles | ForEach-Object { Split-Path $_ -Leaf }) -join ', '))
         $rc = Invoke-VipmInstall @vipFiles
-        if ($rc -eq 0) { return $true }
+        if ($rc -eq 0) { return (Test-VipmSpecsInstalled $Specs) }
         Write-Host "  local VIP file batch install failed (exit $rc); retrying each file individually ..."
-        $localFailed = $false
         foreach ($vipFile in $vipFiles) {
             if ($script:VipmEngineDead) { Write-Warning '  VIPM engine wedged; stopping per-file retries.'; return $false }
             $rc = Invoke-VipmInstall $vipFile
-            if ($rc -ne 0) { Write-Warning "  local package file '$vipFile' failed (exit $rc)."; $localFailed = $true }
+            if ($rc -ne 0) { Write-Warning "  local package file '$vipFile' failed (exit $rc)." }
             if ($script:VipmEngineDead) { Write-Warning '  VIPM engine wedged; stopping per-file retries.'; return $false }
         }
-        return (-not $localFailed)
+        return (Test-VipmSpecsInstalled $Specs)
     } catch {
         Write-Warning ("  local VIP file fallback failed: " + $_.Exception.Message)
         return $false
