@@ -63,7 +63,7 @@
         "version": null,
         "include": true,
         "summary": "LUnit CLI by Astemes - registers the native 'LabVIEWCLI -OperationName LUnit' operation that run-unit-tests.ps1 invokes headlessly to run LUnit Test Cases and emit a JUnit report (.xml -ReportPath).",
-        "note": "REQUIRED for headless LUnit, exactly as ni_lib_utf_junit_report is for UTF: without it the 'LUnit' CLI operation cannot load and the runner fails with -350053. Its VIPM install must run AS ADMINISTRATOR on Windows (it registers a LabVIEW CLI operation under Program Files); the worker image build runs VIPM as ContainerAdministrator, so this is satisfied. Published in the VIPM Community (JKI) index. Its declared dependency astemes_lib_lunit_cli_system ships INSIDE this .vip and is not published standalone, so the resolver skips that unresolvable transitive dependency with a note. Version null (latest)."
+        "note": "REQUIRED for headless LUnit on Windows and Linux (Linux requires CLI 1.7.1.32 or newer), exactly as ni_lib_utf_junit_report is for UTF: without it the 'LUnit' CLI operation cannot load and the runner fails with -350053. On Linux its post-install action registers the operation under /usr/local/natinst/nilvcli/Operations/LUnitCLI; install-vipc-linux.sh starts LabVIEW for that action. Its VIPM install must run AS ADMINISTRATOR on Windows (it registers a LabVIEW CLI operation under Program Files); the worker image build runs VIPM as ContainerAdministrator, so this is satisfied. Published in the VIPM Community (JKI) index. Its declared dependency astemes_lib_lunit_cli_system ships INSIDE this .vip and is not published standalone, so the resolver skips that unresolvable transitive dependency with a note. Version null (latest)."
       }
     ]
   },
