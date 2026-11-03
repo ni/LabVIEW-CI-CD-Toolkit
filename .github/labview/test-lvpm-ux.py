@@ -98,6 +98,23 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
         self.assertEqual((ROOT / '.github/pages/documentation.html').read_bytes(),
                          (ROOT / 'actions/dashboard/documentation.html').read_bytes())
 
+    def test_linux_visual_progress_is_indeterminate_and_separate_from_windows(self):
+        page = (ROOT / '.github/pages/dependencies.html').read_text()
+        self.assertIn('class="lvpm-progress" id="lvpmProgress" hidden', page)
+        self.assertIn('class="upd-prog-phase" id="lvpmProgressPhase"', page)
+        self.assertIn('class="upd-prog-track" aria-hidden="true"', page)
+        self.assertIn('class="upd-prog-bar" id="lvpmProgressBar"', page)
+        self.assertIn('@media(prefers-reduced-motion:reduce){.lvpm-progress .indeterminate', page)
+        render = page.split('function renderLinuxProgress(phase){', 1)[1].split('function linuxOperationStatus', 1)[0]
+        self.assertIn('moving ? "indeterminate"', render)
+        self.assertIn('label.textContent = text', render)
+        self.assertNotIn('innerHTML', render)
+        self.assertNotIn('updProgBar', render)
+        self.assertNotIn('aria-valuenow', render)
+        status = page.split('function linuxOperationStatus(', 1)[1].split('function validateLinuxRun', 1)[0]
+        self.assertLess(status.index('if (!linuxOperationCurrent(operation)) return'),
+                        status.index('renderLinuxProgress(operation.phase)'))
+
 
 class ReconfigureLvpmTests(unittest.TestCase):
     def preservation_fixture(self):

@@ -853,6 +853,15 @@ const acceptedDetails = {
   html_url:'https://github.com/owner/project/actions/runs/123'
 };
 let progressCases = 0;
+let visualChecks = 0;
+function assertLinuxProgress(label, kind, moving){
+  assert.equal(elements.get('lvpmProgress').hidden, false);
+  assert.equal(elements.get('lvpmProgressPhase').textContent, label);
+  assert.equal(elements.get('lvpmProgress').className, 'lvpm-progress ' + kind);
+  assert.equal(elements.get('lvpmProgressBar').className.includes('indeterminate'), moving);
+  assert.equal(elements.get('lvpmProgressBar').style.width, moving ? '' : '100%');
+  visualChecks++;
+}
 function progressFixture(){
   hooks.setState({candidate, vipcs:[], dragons:[]});
   dispatchStatus = 200;
@@ -865,6 +874,8 @@ function progressFixture(){
   commitResponses = [];
   elements.set('lvpmStatus', uiElement());
   elements.set('lvpmRunLink', uiElement());
+  for (const id of ['lvpmProgress','lvpmProgressPhase','lvpmProgressBar']) elements.set(id, uiElement());
+  elements.get('lvpmProgress').hidden = true;
   for (const id of ['lvpmBuild','lvpmActivate','lvpmReset']) elements.set(id, {disabled:false});
   return requests.length;
 }
@@ -876,8 +887,10 @@ async function until(predicate){
 let progressStart = progressFixture();
 postBarrier = new Promise(resolve => { releasePost = resolve; });
 const pendingDispatch = hooks.dispatchLinuxWorker('build');
+assertLinuxProgress('Checking request', '', true);
 await hooks.dispatchLinuxWorker('build');
 await until(() => postCount(progressStart) === 1);
+assertLinuxProgress('Submitting request', '', true);
 await hooks.dispatchLinuxWorker('activate');
 assert.equal(postCount(progressStart), 1);
 assert.equal(elements.get('lvpmBuild').disabled, true);
@@ -885,6 +898,7 @@ releasePost();
 await pendingDispatch;
 postBarrier = null;
 assert.match(elements.get('lvpmStatus').textContent, /Workflow queued/);
+assertLinuxProgress('Workflow queued', '', true);
 assert.equal(elements.get('lvpmRunLink').href, acceptedDetails.html_url);
 assert.equal(typeof runPoll, 'function');
 await hooks.dispatchLinuxWorker('build');
@@ -892,9 +906,12 @@ assert.equal(postCount(progressStart), 1);
 runResponse = {...identifiedRun, status:'in_progress'};
 await runPoll();
 assert.match(elements.get('lvpmStatus').textContent, /Workflow running/);
+assertLinuxProgress('Workflow running', '', true);
 runResponse = {...identifiedRun, status:'completed', conclusion:'failure'};
 await runPoll();
 assert.match(elements.get('lvpmStatus').textContent, /Workflow failure.*Open the logs/);
+assertLinuxProgress('Workflow failed · inspect logs', 'err', false);
+assert.equal(elements.get('lvpmRunLink').href, acceptedDetails.html_url);
 assert.equal(elements.get('lvpmBuild').disabled, false);
 assert.equal(runPoll, null);
 assert.ok(requests.slice(progressStart).every(request => !request.url.includes('/runs?')));
@@ -912,9 +929,21 @@ progressFixture();
 runResponse = {response:{ok:false,status:404}};
 await hooks.dispatchLinuxWorker('build');
 assert.match(elements.get('lvpmStatus').textContent, /Awaiting the identified run becoming visible/);
+assertLinuxProgress('Awaiting identified run', '', true);
 runResponse = {...identifiedRun};
 await runPoll();
 assert.match(elements.get('lvpmStatus').textContent, /Workflow queued/);
+progressCases++;
+
+progressStart = progressFixture();
+await hooks.dispatchLinuxWorker('build');
+installerView();
+for (const id of ['lvpmProgress','lvpmProgressPhase','lvpmProgressBar']) elements.set(id, uiElement());
+await hooks.renderLinuxInstaller();
+assertLinuxProgress('Workflow queued', '', true);
+assert.equal(elements.get('lvpmRunLink').href, acceptedDetails.html_url);
+assert.equal(postCount(progressStart), 1);
+assert.equal(elements.get('lvpmBuild').disabled, true);
 progressCases++;
 
 for (const conclusion of ['success','cancelled','timed_out','action_required','neutral','skipped']) {
@@ -923,6 +952,7 @@ for (const conclusion of ['success','cancelled','timed_out','action_required','n
   const configBefore = plain(candidate);
   await hooks.dispatchLinuxWorker('build');
   assert.match(elements.get('lvpmStatus').textContent, conclusion === 'success' ? /Build workflow succeeded\. Refresh to check for a published candidate/ : new RegExp('Workflow ' + conclusion));
+  assertLinuxProgress(conclusion === 'success' ? 'Workflow succeeded · review required' : conclusion === 'cancelled' ? 'Workflow cancelled' : conclusion === 'timed_out' ? 'Workflow failed · inspect logs' : 'Workflow did not succeed · inspect logs', conclusion === 'success' ? 'ok' : 'err', false);
   assert.equal(postCount(progressStart), 1);
   assert.equal(runPoll, null);
   assert.deepEqual(plain(candidate), configBefore);
@@ -935,6 +965,7 @@ for (const action of ['activate','reset']) {
   runResponse = {...identifiedRun, path:'.github/workflows/reconfigure.yml', status:'completed', conclusion:'success'};
   await hooks.dispatchLinuxWorker(action);
   assert.match(elements.get('lvpmStatus').textContent, /Reconfigure workflow succeeded.*only merging the proposal applies/);
+  assertLinuxProgress('Workflow succeeded · review required', 'ok', false);
   assert.equal(postCount(progressStart), 1);
   progressCases++;
 }
@@ -949,6 +980,7 @@ for (const invalid of [
   dispatchDetails = invalid;
   await hooks.dispatchLinuxWorker('build');
   assert.match(elements.get('lvpmStatus').textContent, /run identity is invalid|Unreadable dispatch response/);
+  assertLinuxProgress('Outcome uncertain · check workflow runs before retrying', 'warn', false);
   assert.equal(elements.get('lvpmRunLink').href, 'https://github.com/owner/project/actions/workflows/build-labview-lvpm-image.yml');
   await hooks.dispatchLinuxWorker('build');
   assert.equal(postCount(progressStart), 1);
@@ -964,6 +996,7 @@ for (const invalid of [
   runResponse = {...identifiedRun, ...invalid};
   await hooks.dispatchLinuxWorker('build');
   assert.match(elements.get('lvpmStatus').textContent, /Run identity could not be verified/);
+  assertLinuxProgress('Tracking stopped · check workflow runs', 'warn', false);
   assert.equal(runPoll, null);
   await hooks.dispatchLinuxWorker('build');
   assert.equal(postCount(progressStart), 1);
@@ -973,6 +1006,7 @@ progressStart = progressFixture();
 dispatchStatus = 204;
 await hooks.dispatchLinuxWorker('build');
 assert.match(elements.get('lvpmStatus').textContent, /Dispatch accepted.*no run identity/);
+assertLinuxProgress('Tracking stopped · check workflow runs', 'warn', false);
 assert.equal(runPoll, null);
 await hooks.dispatchLinuxWorker('build');
 assert.equal(postCount(progressStart), 1);
@@ -984,6 +1018,7 @@ dispatchError = new Error('Connection interrupted after submission');
 await hooks.dispatchLinuxWorker('build');
 assert.match(elements.get('lvpmStatus').textContent, /Do not retry yet; inspect workflow runs.*Connection interrupted/);
 assert.match(elements.get('lvpmStatus').textContent, /Dispatch outcome is uncertain/);
+assertLinuxProgress('Outcome uncertain · check workflow runs before retrying', 'warn', false);
 assert.equal(elements.get('lvpmRunLink').href, 'https://github.com/owner/project/actions/workflows/build-labview-lvpm-image.yml');
 assert.equal(elements.get('lvpmBuild').disabled, true);
 await hooks.dispatchLinuxWorker('build');
@@ -996,6 +1031,7 @@ for (const status of [400,401,403,404,405,410,415,422,429]) {
   dispatchStatus = status;
   await hooks.dispatchLinuxWorker('build');
   assert.match(elements.get('lvpmStatus').textContent, new RegExp('Workflow dispatch rejected \\(' + status + '\\)'));
+  assertLinuxProgress('Request not submitted or rejected', 'err', false);
   assert.equal(postCount(progressStart), 1);
   assert.equal(elements.get('lvpmBuild').disabled, false);
   await hooks.dispatchLinuxWorker('build');
@@ -1011,6 +1047,7 @@ for (const status of [500,502,503,504,408,409,202,302]) {
   assert.match(elements.get('lvpmStatus').textContent, /Dispatch outcome is uncertain/);
   assert.match(elements.get('lvpmStatus').textContent, new RegExp('HTTP ' + status));
   assert.match(elements.get('lvpmStatus').textContent, /request may already have taken effect/);
+  assertLinuxProgress('Outcome uncertain · check workflow runs before retrying', 'warn', false);
   assert.equal(elements.get('lvpmBuild').disabled, true);
   assert.equal(elements.get('lvpmRunLink').href, 'https://github.com/owner/project/actions/workflows/build-labview-lvpm-image.yml');
   await hooks.dispatchLinuxWorker('build');
@@ -1026,6 +1063,8 @@ for (const failure of [401,403,500,new Error('<img src=x onerror=alert(1)>')]) {
   await hooks.dispatchLinuxWorker('build');
   assert.match(elements.get('lvpmStatus').textContent, failure instanceof Error ? /<img/ : /Run status unavailable/);
   assert.equal(elements.get('lvpmStatus').innerHTML, '');
+  assertLinuxProgress('Tracking stopped · check workflow runs', 'warn', false);
+  assert.equal(elements.get('lvpmProgressPhase').innerHTML, '');
   assert.equal(runPoll, null);
   await hooks.dispatchLinuxWorker('build');
   assert.equal(postCount(progressStart), 1);
@@ -1083,6 +1122,10 @@ for (const change of [{platform:'windows'}, {revision:'historical'}, {dirty:true
     await until(() => stage === 'actor' ? requests.slice(progressStart).some(request => request.url.endsWith('/user'))
       : stage === 'workflow' ? requests.slice(progressStart).some(request => /\/actions\/workflows\/[^/]+\.yml$/.test(request.url))
       : stage === 'dispatch-json' ? postCount(progressStart) === 1 : requests.slice(progressStart).some(request => /\/actions\/runs\/123$/.test(request.url)));
+    if (stage === 'dispatch-json') {
+      await until(() => elements.get('lvpmProgressPhase').textContent === 'Awaiting identified run');
+      assertLinuxProgress('Awaiting identified run', '', true);
+    }
     let polling;
     if (stage === 'poll') {
       await pending;
@@ -1090,13 +1133,16 @@ for (const change of [{platform:'windows'}, {revision:'historical'}, {dirty:true
       polling = runPoll();
     }
     hooks.setState({candidate, vipcs:[], dragons:[], ...change});
+    assertLinuxProgress('Tracking stopped · check workflow runs', 'warn', false);
     elements.get('lvpmStatus').textContent = 'New context unchanged';
     elements.get('lvpmRunLink').href = 'New link unchanged';
+    elements.get('lvpmProgressPhase').textContent = 'New progress unchanged';
     release();
     await pending;
     if (polling) await polling;
     assert.equal(elements.get('lvpmStatus').textContent, 'New context unchanged', stage + JSON.stringify(change));
     assert.equal(elements.get('lvpmRunLink').href, 'New link unchanged');
+    assert.equal(elements.get('lvpmProgressPhase').textContent, 'New progress unchanged');
     if (stage === 'actor' || stage === 'workflow') assert.equal(postCount(progressStart), 0);
     lookupBarrier = null;
     dispatchJsonBarrier = null;
@@ -1113,10 +1159,12 @@ const changedTokenRequest = hooks.dispatchLinuxWorker('build');
 await until(() => requests.slice(progressStart).some(request => request.url.endsWith('/user')));
 context.localStorage = {getItem:() => 'different-token'};
 elements.get('lvpmStatus').textContent = 'New auth context unchanged';
+elements.get('lvpmProgressPhase').textContent = 'New auth progress unchanged';
 releaseIdentity();
 await changedTokenRequest;
 assert.equal(postCount(progressStart), 0);
 assert.equal(elements.get('lvpmStatus').textContent, 'New auth context unchanged');
+assert.equal(elements.get('lvpmProgressPhase').textContent, 'New auth progress unchanged');
 context.localStorage = savedStorage;
 lookupBarrier = null;
 hooks.invalidateLinuxOperation();
@@ -1138,12 +1186,14 @@ runResponse = {...identifiedRun,id:125};
 await hooks.dispatchLinuxWorker('build');
 const replacementPoll = runPoll;
 elements.get('lvpmStatus').textContent = 'New operation unchanged';
+elements.get('lvpmProgressPhase').textContent = 'New operation progress unchanged';
 releaseOldPoll();
 await oldPoll;
 assert.equal(elements.get('lvpmStatus').textContent, 'New operation unchanged');
+assert.equal(elements.get('lvpmProgressPhase').textContent, 'New operation progress unchanged');
 assert.equal(elements.get('lvpmRunLink').href, acceptedDetails.html_url.replace('/123','/125'));
 assert.equal(runPoll, replacementPoll);
 assert.equal(postCount(progressStart), 2);
 hooks.invalidateLinuxOperation();
 progressCases++;
-console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety and monitoring regressions passed; ' + progressCases + ' dispatch identity/progress/error/duplicate/stale-context cases passed.');
+console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety and monitoring regressions passed; ' + progressCases + ' dispatch identity/progress/error/duplicate/stale-context cases and ' + visualChecks + ' visual progress checks passed.');
