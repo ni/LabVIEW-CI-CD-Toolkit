@@ -1,0 +1,52 @@
+{
+ "meta": {
+  "sha": "d5aa851d2b2802b647afd62ced1e80b231629f6e",
+  "short": "d5aa851",
+  "platform": "windows",
+  "repo": "ni/LabVIEW-CI-CD-Toolkit",
+  "pages_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit",
+  "dash_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit/",
+  "labview_version": "2026",
+  "commit": {
+   "message": "Merge pull request #129 from ni/fix/linux-lvpm-example-pins-20261103",
+   "author": "Elijah Kerry",
+   "date": "2026-11-03T17:51:16-06:00"
+  },
+  "generated_utc": "2026-11-04 00:07 UTC",
+  "spdx_version": "CycloneDX 1.5",
+  "created": ""
+ },
+ "summary": {
+  "total_packages": 3
+ },
+ "platforms": [
+  {
+   "id": "windows",
+   "url": null
+  },
+  {
+   "id": "linux",
+   "url": null
+  }
+ ],
+ "packages": [
+  {
+   "name": "ni-labview-2026-coreother",
+   "version": "26.3.0.49792-0+f640",
+   "vendor": "National Instruments"
+  },
+  {
+   "name": "ni-labview-2026-vilib",
+   "version": "26.3.0.49792-0+f640",
+   "vendor": "National Instruments"
+  },
+  {
+   "name": "ni-utf-labview-support",
+   "version": "26.3.0.49249-0+f97",
+   "vendor": "National Instruments"
+  }
+ ],
+ "tooling": {
+  "missing": []
+ }
+}
