@@ -558,6 +558,7 @@ Write-Output "HOOK-FAILED=$failed"
             escaped = directory.replace("'", "''")
             output = self.run_script(f"""
 $PublicRepoUrl = 'https://example.test/public.git'
+$prevLocation = Get-Location
 $Env:VIPM_REQUIRED_PACKAGES = '-'
 $Env:VIPM_EARLY_PACKAGES = '-'
 $dragonPlan = [pscustomobject]@{{ Specs = @('oglib_boolean@6.0.0.9') }}
