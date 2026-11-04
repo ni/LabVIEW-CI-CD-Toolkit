@@ -565,6 +565,16 @@ function Get-NumericVersionKey([string] $Version) {
     return ($nums[0..5] | ForEach-Object { '{0:D8}' -f $_ }) -join '.'
 }
 
+function Test-VipmPackageVersion($Request, [string] $Version) {
+    if (-not $Version) { return $false }
+    if (-not $Request.Version) { return $true }
+    if ($Request.Minimum) {
+        return (Get-NumericVersionKey $Version) -ge (Get-NumericVersionKey $Request.Version)
+    }
+    return $Version -eq $Request.Version -or
+        ($Request.Version -notmatch '-' -and ($Version -replace '-\d+$', '') -eq $Request.Version)
+}
+
 function ConvertFrom-VipmRepositoryIndex([string] $IndexPath, [string] $BaseUrl, [string] $Name) {
     $packages = New-Object System.Collections.Generic.List[object]
     $current = $null
@@ -661,7 +671,7 @@ function Select-PublicVipmPackage($Request, [object[]] $Packages) {
             $minKey = Get-NumericVersionKey $Request.Version
             $matches = @($matches | Where-Object { $_.VersionKey -ge $minKey })
         } else {
-            $matches = @($matches | Where-Object { $_.Version -eq $Request.Version })
+            $matches = @($matches | Where-Object { Test-VipmPackageVersion $Request $_.Version })
         }
     }
     return @($matches | Sort-Object VersionKey -Descending | Select-Object -First 1)[0]
@@ -769,7 +779,7 @@ function Select-LocalVipPackage($Request, [object[]] $LocalVips) {
             $minKey = Get-NumericVersionKey $Request.Version
             $cands = @($cands | Where-Object { $_.VersionKey -ge $minKey })
         } else {
-            $cands = @($cands | Where-Object { $_.Version -eq $Request.Version })
+            $cands = @($cands | Where-Object { Test-VipmPackageVersion $Request $_.Version })
         }
     }
     if ($cands.Count -eq 0) { return $null }
@@ -828,7 +838,6 @@ function Get-LocalVipFilesForSpecs([string[]] $Specs) {
             # installs the parent fine without a separate file for it.
             if ($IsDependency) {
                 Write-Warning ("  Skipping dependency '$($Request.Name)'$vtext" + ": not in the reachable public VIPM indexes (assumed bundled in its parent package).")
-                $visited[$key] = $true
                 $visiting.Remove($key)
                 return
             }
@@ -985,18 +994,7 @@ function Test-VipmSpecsInstalled {
     foreach ($spec in $Specs) {
         $request = Split-VipmPackageSpec $spec
         $version = $installed[$request.Name]
-        $matchesVersion = $false
-        if ($version) {
-            if (-not $request.Version) {
-                $matchesVersion = $true
-            } elseif ($request.Minimum) {
-                $matchesVersion = (Get-NumericVersionKey $version) -ge (Get-NumericVersionKey $request.Version)
-            } else {
-                # VIPC specs omit the old OpenG packaging-release suffix (e.g. 1.1-1).
-                $matchesVersion = $version -eq $request.Version -or
-                    ($request.Version -notmatch '-' -and ($version -replace '-\d+$', '') -eq $request.Version)
-            }
-        }
+        $matchesVersion = Test-VipmPackageVersion $request $version
         if (-not $matchesVersion) {
             Write-Warning "  Requested package '$spec' is not installed at the requested version."
             $verified = $false
