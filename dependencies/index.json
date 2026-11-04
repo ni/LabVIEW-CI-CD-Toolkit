@@ -1,8 +1,17 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "d5aa851d2b2802b647afd62ced1e80b231629f6e",
+  "sha": "b38b1f023a2663b879f9da69f8c0706510f0d38a",
   "revisions": [
+    {
+      "sha": "b38b1f023a2663b879f9da69f8c0706510f0d38a",
+      "short": "b38b1f0",
+      "message": "Merge pull request #126 from ni/fix/windows-vipm-openg-resolution-20261103",
+      "author": "Elijah Kerry",
+      "date": "2026-11-04T01:41:08Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "d5aa851d2b2802b647afd62ced1e80b231629f6e",
       "short": "d5aa851",
@@ -45,6 +54,15 @@
       "message": "vipm: verify and upgrade Windows CLI and Desktop together",
       "author": "elijah286",
       "date": "2026-11-03T21:24:05Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "321082f7d88a09c9bb3975d70d3712e710a65d8f",
+      "short": "321082f",
+      "message": "vipm: resolve OpenG packaging releases and required roots",
+      "author": "elijah286",
+      "date": "2026-11-03T21:09:50Z",
       "project": false,
       "dep_only": false
     },
@@ -882,24 +900,6 @@
       "message": "Merge branch 'fix/preserve-reconfigure-settings-20261101' into feat/linux-lvpm-candidates-20261101",
       "author": "elijah286",
       "date": "2026-11-02T00:14:54Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "e971ab84399015a557b0922600e4a25b80f92925",
-      "short": "e971ab8",
-      "message": "Keep platform defaults unchanged for scoped Reconfigure requests",
-      "author": "elijah286",
-      "date": "2026-11-02T00:14:29Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "7783b7f1dd4525c58a76002f959f21729e831afe",
-      "short": "7783b7f",
-      "message": "Integrate the standalone Reconfigure preservation patch",
-      "author": "elijah286",
-      "date": "2026-11-02T00:13:29Z",
       "project": false,
       "dep_only": false
     },
