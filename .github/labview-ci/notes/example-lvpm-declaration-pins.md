@@ -1,3 +1,0 @@
-The example dependency configuration now uses the same five OpenG versions already pinned by the CI tooling, removing the conflicting declarations that prevented Linux LVPM candidate planning. Matching package metadata and icons are retained, and repository-backed tests check the real declarations and archive contents. Exact-version conflicts in client configurations still fail closed rather than silently selecting a winner.
-
-These OpenG versions require LabVIEW 2020 or newer. OpenG File 6.0.2.28 supports automatic caller relinking into `openg_file.lvlib`; downgrading to older packages can require manual relinking. Successful planning does not establish VI compatibility or a successful image build; those require runtime validation.
