@@ -1,5 +1,6 @@
 """Build/reuse the Windows worker from a closed, content-addressed context."""
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -25,17 +26,26 @@ def boolean(value):
     return value == 'true'
 
 
-def stage(context, workspace, deps_dir, include_tooling):
+def stage(context, workspace, deps_dir, include_tooling, target_year='2026', target_bitness='64'):
     vipm = context / '.github/labview/vipm'
     vipm.mkdir(parents=True)
     shutil.copyfile(Path(__file__).with_name('Dockerfile'), context / 'Dockerfile')
     shutil.copyfile(SOURCE / '.github/labview/vipm/install-vipc.ps1', vipm / 'install-vipc.ps1')
+    parser_path = SOURCE / '.github/labview/dragon_deps.py'
+    shutil.copyfile(parser_path, context / '.github/labview/dragon_deps.py')
+    parser_spec = importlib.util.spec_from_file_location('lvci_trusted_dragon', parser_path)
+    dragon = importlib.util.module_from_spec(parser_spec)
+    parser_spec.loader.exec_module(dragon)
+    dragon_paths = []
     if include_tooling:
         shutil.copyfile(SOURCE / '.github/labview/vipm/ci-tooling.vipc', vipm / 'ci-tooling.vipc')
     if deps_dir:
-        deps = (workspace / single_line(deps_dir)).resolve()
-        if Path(deps_dir).is_absolute() or not deps.is_relative_to(workspace) or not deps.is_dir():
+        deps = workspace / single_line(deps_dir)
+        if (Path(deps_dir).is_absolute() or '..' in Path(deps_dir).parts or
+                not deps.resolve().is_relative_to(workspace) or not deps.is_dir()):
             raise ValueError('deps-dir must be an existing directory inside the workspace')
+        if any(parent.is_symlink() for parent in (deps, *deps.parents) if parent.is_relative_to(workspace)):
+            raise ValueError('deps-dir links are unsupported')
         names = {path.name.lower() for path in vipm.iterdir()}
         for path in sorted(deps.rglob('*')):
             if path.suffix.lower() not in EXTENSIONS:
@@ -46,7 +56,11 @@ def stage(context, workspace, deps_dir, include_tooling):
             if path.name.lower() in names or path.name.lower().startswith('ci-tooling'):
                 raise ValueError(f'Reserved or duplicate dependency filename: {path.name}')
             names.add(path.name.lower())
-            shutil.copyfile(path, vipm / path.name)
+            if path.suffix.lower() == '.dragon':
+                dragon_paths.append(str(path))
+            else:
+                shutil.copyfile(path, vipm / path.name)
+    dragon.stage_windows_sources(dragon_paths, str(vipm), str(workspace), target_year, target_bitness)
     files = list(vipm.iterdir())
     if any(p.suffix.lower() == '.vip' for p in files) and not any(p.suffix.lower() == '.vipc' for p in files):
         raise ValueError('Loose .vip payloads require a VIPC referencing them; they are not installed on their own')
@@ -137,7 +151,7 @@ def main():
     workspace = Path(os.environ['GITHUB_WORKSPACE']).resolve()
     with tempfile.TemporaryDirectory(prefix='lvci-worker-', dir=os.environ['RUNNER_TEMP']) as directory:
         context = Path(directory)
-        deps = stage(context, workspace, os.environ.get('WI_DEPS', ''), tooling)
+        deps = stage(context, workspace, os.environ.get('WI_DEPS', ''), tooling, version)
         tag = fingerprint(context, {'base': base, **inputs})
         final, built = publish(context, image, tag, base, inputs, deps, latest)
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:

@@ -13,17 +13,10 @@ RUN if ($env:LVCI_UNIT_TESTS_INSTALLED -eq 'false') { `
       $env:VIPM_REQUIRED_PACKAGES = '-'; $env:VIPM_EARLY_PACKAGES = '-' `
     }; `
     $vipcs = @(Get-ChildItem -LiteralPath 'C:\vipm' -File | Where-Object { $_.Extension -eq '.vipc' }); `
-    if ($vipcs.Count -gt 0) { `
+    $dragons = @(Get-ChildItem -LiteralPath 'C:\vipm' -File | Where-Object { $_.Extension -eq '.dragon' }); `
+    if ($vipcs.Count -gt 0 -or $dragons.Count -gt 0) { `
       powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File C:\vipm\install-vipc.ps1; `
       if ($LASTEXITCODE -ne 0) { throw ('Required VIPM bake failed: ' + $LASTEXITCODE) } `
-    }
-RUN $dragons = @(Get-ChildItem -LiteralPath 'C:\vipm' -File | Where-Object { $_.Extension -eq '.dragon' }); `
-    if ($dragons.Count -gt 0) { `
-      $cli = Get-Command dragon -ErrorAction Stop; `
-      foreach ($d in $dragons) { `
-        & $cli.Source apply $d.FullName; `
-        if ($LASTEXITCODE -ne 0) { throw ('Required Dragon bake failed: ' + $LASTEXITCODE) } `
-      } `
     }
 ENV CI_WORKER_VERSION=${CI_WORKER_VERSION}
 LABEL com.cotc.ci-worker.version=${CI_WORKER_VERSION} `

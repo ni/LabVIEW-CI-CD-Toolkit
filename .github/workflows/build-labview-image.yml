@@ -92,6 +92,11 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install trusted YAML parser
+        run: python -I -m pip install PyYAML==6.0.3
       - name: Decide whether to rebuild
         id: decide
         env:
@@ -99,8 +104,8 @@ jobs:
           BEFORE: ${{ github.event.before }}
           SHA: ${{ github.sha }}
         run: |
-          python3 - <<'PY'
-          import os, re, subprocess, pathlib
+          python -I - <<'PY'
+          import os, subprocess, pathlib, importlib.util
 
           def emit(build, why):
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
@@ -135,40 +140,18 @@ jobs:
               # no monitorOn is set (monitor:true with no list = every platform).
               # Anything not listed, or listed without monitor: true, defaults OFF.
               PLATFORM = 'windows'
-              monitor = {}
-              monitor_on = {}
-              cfg = pathlib.Path('.github/labview-ci.yml')
-              if cfg.exists():
-                  in_c = False; in_list = None; cur = None
-                  for line in cfg.read_text(encoding='utf-8').splitlines():
-                      if re.match(r'^container:\s*$', line):
-                          in_c = True; in_list = None; cur = None; continue
-                      if not in_c:
-                          continue
-                      if re.match(r'^\S', line):            # next top-level key
-                          in_c = False; in_list = None; cur = None; continue
-                      mk = re.match(r'^\s{4}(\w+):\s*$', line)
-                      if mk:                                # a 4-space block key
-                          in_list = mk.group(1) if mk.group(1) in ('vipc', 'dragon') else None
-                          cur = None; continue
-                      if re.match(r'^\s{4}\w+:\s*\S', line):  # 4-space key: value
-                          in_list = None; cur = None; continue
-                      if in_list:
-                          m = re.match(r'^\s{6}-\s*path:\s*"?([^"]+?)"?\s*$', line)
-                          if m:
-                              cur = m.group(1).strip().replace('\\', '/')
-                              monitor.setdefault(cur, False); monitor_on.setdefault(cur, None); continue
-                          m = re.match(r'^\s{8}monitorOn:\s*(\S+)', line)
-                          if m and cur is not None:
-                              monitor_on[cur] = [s.strip().lower() for s in m.group(1).split('+') if s.strip()]; continue
-                          m = re.match(r'^\s{8}monitor:\s*(\S+)', line)
-                          if m and cur is not None:
-                              monitor[cur] = (m.group(1).strip().lower() == 'true')
+              parser_path = pathlib.Path('.github/labview/dragon_deps.py').resolve()
+              parser_spec = importlib.util.spec_from_file_location('lvci_trusted_dragon', parser_path)
+              dragon_parser = importlib.util.module_from_spec(parser_spec)
+              parser_spec.loader.exec_module(dragon_parser)
+              selected = set()
+              for kind in ('vipc', 'dragon'):
+                  paths, _ = dragon_parser.windows_monitored_paths('.github/labview-ci.yml', kind)
+                  selected.update(paths)
 
               for f in dep_changed:
                   key = f.replace(os.sep, '/')
-                  on = monitor_on.get(key)
-                  if monitor.get(key, False) and (on is None or PLATFORM in on):
+                  if key in selected:
                       emit(True, 'monitored dependency changed: ' + f)
               emit(False, 'changed dependencies are not monitored for ' + PLATFORM + ' -> skip')
           except SystemExit:
@@ -178,6 +161,7 @@ jobs:
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                   f.write('build=false\n')
               print('gate error -> build=false:', e)
+              raise
           PY
 
   # Before a heavy (~15+ min) worker rebuild, coordinate the CI runs that USE the
@@ -314,7 +298,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.x'
+          python-version: '3.13'
+      - name: Install trusted YAML parser
+        run: python -I -m pip install PyYAML==6.0.3
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -352,53 +338,18 @@ jobs:
         id: vipc
         shell: bash
         run: |
-          python - <<'PY'
-          import os, re, glob, shutil, pathlib
+          python -I - <<'PY'
+          import os, glob, shutil, pathlib, importlib.util
+          parser_path = pathlib.Path('.github/labview/dragon_deps.py').resolve()
+          parser_spec = importlib.util.spec_from_file_location('lvci_trusted_dragon', parser_path)
+          dragon_parser = importlib.util.module_from_spec(parser_spec)
+          parser_spec.loader.exec_module(dragon_parser)
           dest = pathlib.Path('.github/labview/vipm'); dest.mkdir(parents=True, exist_ok=True)
           cfg = pathlib.Path('.github/labview-ci.yml')
           PLATFORM = 'windows'
 
           def configured_paths(kind):
-              # Files monitored for THIS platform (monitor:true AND monitorOn
-              # includes it, or no monitorOn = every platform). Collect first, then
-              # filter, so a trailing monitorOn line is always seen.
-              entries = []
-              saw_list = False
-              cur = None
-              if not cfg.exists():
-                  return [], saw_list
-              in_c = False
-              in_list = None
-              for line in cfg.read_text(encoding='utf-8').splitlines():
-                  if re.match(r'^\s*container:\s*$', line):
-                      in_c = True; in_list = None; cur = None; continue
-                  if not in_c:
-                      continue
-                  if re.match(r'^\S', line):
-                      in_c = False; in_list = None; cur = None; continue
-                  mk = re.match(r'^\s{4}(\w+):\s*$', line)
-                  if mk:
-                      in_list = kind if mk.group(1) == kind else None
-                      if in_list:
-                          saw_list = True
-                      cur = None; continue
-                  if re.match(r'^\s{4}\w+:\s*\S', line):
-                      in_list = None; cur = None; continue
-                  if in_list:
-                      m = re.match(r'^\s{6}-\s*path:\s*"?([^"]+?)"?\s*$', line)
-                      if m:
-                          cur = {'path': m.group(1).strip().replace('\\', '/'), 'monitor': False, 'on': None}
-                          entries.append(cur); continue
-                      m = re.match(r'^\s{8}monitorOn:\s*(\S+)', line)
-                      if m and cur is not None:
-                          cur['on'] = [s.strip().lower() for s in m.group(1).split('+') if s.strip()]
-                          continue
-                      m = re.match(r'^\s{8}monitor:\s*(\S+)', line)
-                      if m and cur is not None:
-                          cur['monitor'] = (m.group(1).strip().lower() == 'true'); continue
-              selected = [e['path'] for e in entries
-                          if e['monitor'] and (e['on'] is None or PLATFORM in e['on'])]
-              return selected, saw_list
+              return dragon_parser.windows_monitored_paths(str(cfg), kind)
 
           paths, saw_vipc_list = configured_paths('vipc')
           if not paths and not saw_vipc_list:
@@ -442,13 +393,11 @@ jobs:
                   p for p in glob.glob('**/*.dragon', recursive=True)
                   if not p.replace(os.sep, '/').startswith('.github/')
               )
-          dstaged = 0
-          for p in dpaths:
-              if os.path.isfile(p):
-                  shutil.copy2(p, dest / os.path.basename(p))
-                  print('Staged Dragon:', p); dstaged += 1
-              else:
-                  print('Configured Dragon not found (skipping):', p)
+          dragon_plan = dragon_parser.stage_windows_sources(
+              dpaths, str(dest), repository_root='.', target_year=os.environ.get('DEFAULT_TAG', '2026'))
+          dstaged = len(dragon_plan['files'])
+          for source in dragon_plan['files']:
+              print('Staged required Dragon:', source['source_file'])
           if not dstaged:
               print('No Dragon files to stage.')
 
@@ -604,6 +553,8 @@ jobs:
           if ($vipcFiles.Count -gt 0 -or $dragonFiles.Count -gt 0 -or $vipFiles.Count -gt 0) {
             $files += '.github/docker/labview-ci.Dockerfile'
             $files += '.github/labview/vipm/install-vipc.ps1'
+            $files += '.github/labview/vipm/dragon-plan.json'
+            $files += '.github/labview/dragon_deps.py'
             $files += ($vipcFiles | ForEach-Object FullName)
             $files += ($dragonFiles | ForEach-Object FullName)
             $files += ($vipFiles | ForEach-Object FullName)
@@ -699,6 +650,7 @@ jobs:
             # build above; defense-in-depth with the script's memory preflight.
             docker build -m 8GB -f .github/docker/labview-ci.Dockerfile `
               --build-arg LCWC_BASE_IMAGE=$lcwcBase `
+              --build-arg LABVIEW_VERSION='${{ vars.LABVIEW_VERSION || '2026' }}' `
               --build-arg CI_WORKER_VERSION=$wv `
               --build-arg VIPM_PUBLIC_REPO_URL=$repoUrl `
               --build-arg LVCI_UNIT_TESTS_INSTALLED=$unitTestsArg @tagFlags .

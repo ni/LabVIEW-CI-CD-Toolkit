@@ -9,7 +9,7 @@ inputs:
     description: LabVIEW year matching the qualified base image, also published as a moving tag.
     default: '2026'
   base-image:
-    description: Explicit readable Windows LCWC base image with VIPM and LabVIEW; Dragon files additionally require Dragon CLI in this base.
+    description: Explicit readable Windows LCWC base image with VIPM and LabVIEW. Exact Dragon VIPM declarations use the shared verified installer; NIPM/feeds and custom Dragon hooks are unsupported.
     required: true
   deps-dir:
     description: Existing workspace-relative flat directory of .vipc/.dragon declarations and referenced .vip payloads.
@@ -62,4 +62,4 @@ runs:
         WI_DEPS: ${{ inputs.deps-dir }}
         WI_TOOLING: ${{ inputs.include-ci-tooling }}
         WI_LATEST: ${{ inputs.tag-latest }}
-      run: python "$env:ACTION_DIRECTORY/worker.py"
+      run: python -I "$env:ACTION_DIRECTORY/worker.py"

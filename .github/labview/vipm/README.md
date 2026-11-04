@@ -1,8 +1,9 @@
-# Baking VIPM (VIPC) dependencies into the CI workers
+# Baking VIPM (VIPC and Dragon) dependencies into the CI workers
 
 This folder holds everything the Windows CI worker needs to install **VIPM**
 (JKI VI Package Manager) packages into the LabVIEW container image at build time,
-so that a project's custom dependencies — declared in a `.vipc` configuration —
+so that a project's custom dependencies — declared in a `.vipc` configuration
+or the supported VIPM subset of a `.dragon` file —
 are already present when CI jobs (unit tests, VI Analyzer, documentation, …) run.
 
 It exists because some CI operations link against VIPM-distributed libraries that
@@ -18,7 +19,8 @@ false "no unit tests found".
 
 | File | Role |
 | --- | --- |
-| `install-vipc.ps1` | Build-time hook. Uses the VIPM CLI already present in the shared VIPM base image, launches headless LabVIEW, then installs the packages listed in every staged `*.vipc`. A failed bake fails the image build unless `VIPM_ALLOW_MISSING_PACKAGES=1` is explicitly set. |
+| `install-vipc.ps1` | Shared Windows build-time hook. Verifies the selected VIPM CLI/Desktop, starts headless LabVIEW, and installs staged VIPC packages plus required normalized Dragon VIPM declarations. Dragon requirements and their final target inventory cannot be bypassed with `VIPM_ALLOW_MISSING_PACKAGES`. |
+| `dragon-plan.json` (generated, not committed) | Host-parsed exact VIPM specifications, source filenames/SHA256s, and requested LabVIEW year for selected Windows Dragon files. The container verifies the source binding before installing anything. |
 | `install-vipc-linux.sh` | Linux build-time hook. Starts Xvfb and headless LabVIEW, clears the runtime-only `LV_RTE_HEADLESS` default while the VIPM engine starts, extracts each VIPC's `config.xml`, installs the resulting `name@version` specs with the VIPM 26.3 CLI, forces phase progress in CI logs, and prints focused process/display diagnostics when a package action fails. |
 | `ci-tooling.vipc` | The default CI-tooling configuration (Caraya, VI Tester, LUnit base + CLI, UTF JUnit Report, G Image). This committed file is the **source of truth** and must remain VIPM-openable. Edit it in VIPM when changing dependency intent. |
 | `ci-tooling.packages.json` / `ci-tooling.defaults.json` | Optional metadata and automation inputs used by dashboards/config tools and by ad-hoc regeneration. They are **not authoritative** for what gets installed at build time. |
@@ -31,14 +33,14 @@ false "no unit tests found".
 ```mermaid
 flowchart LR
   A[".vipc anywhere in the repo<br/>(discovered recursively, outside .github/)"] --> B["build-labview-image.yml<br/>copies project *.vipc into .github/labview/vipm/"]
-  B --> C["labview-vipm-base.Dockerfile<br/>builds/pulls LabVIEW + VIPM + Git base"]
-  C --> D["labview-vipc-layer.Dockerfile<br/>COPY .github/labview/vipm/ -> C:/vipm/"]
-  D --> E["Dockerfile runs install-vipc.ps1<br/>when any *.vipc is present"]
+  B --> C["labview-ci-base.Dockerfile<br/>builds/pulls LabVIEW + VIPM + Git base"]
+  C --> D["labview-ci.Dockerfile<br/>COPY .github/labview/vipm/ -> C:/vipm/"]
+  D --> E["Dockerfile runs install-vipc.ps1<br/>when VIPC or Dragon files are present"]
   E --> F["packages baked into vi.lib /<br/>user.lib of the image"]
 ```
 
 The expensive, slow-moving tooling layer is published separately as
-`ghcr.io/<owner>/<repo>-labview-vipm-base:<labview-year>`. That image already
+`ghcr.io/<owner>/<repo>-labview-base:<container-release>`. That image already
 contains VIPM 2026 Q3 and Git. Project worker rebuilds start from it and only
 apply the staged VIPC files, so changing a dependency set does not reinstall VIPM.
 
@@ -58,7 +60,100 @@ Compile, Unit Tests, Antidoc, VIDiff) then **wait** for that worker image rebuil
 to finish — via `.github/labview/wait-for-worker-images.sh` — before they pull the
 image and run, so they never execute against a worker that is missing a project
 dependency. The `ci-tooling.vipc` distributed by the tooling is the **base**
-configuration applied first; a project's own discovered VIPC files stack on top.
+configuration applied after required project dependencies.
+
+### Required Windows Dragon declarations
+
+The worker workflow discovers project `.dragon` files when there is no explicit
+monitor list, or selects only files monitored for Windows from
+`config.container.dragon`. An explicit empty list, `monitor: false`, or
+`monitorOn: linux` does not install those files into Windows.
+Both the GitHub push gate and staging use the same safe YAML parser
+(`PyYAML==6.0.3`, explicitly installed on the isolated Python host).
+Quoted scalar `monitorOn: "windows"`, flow lists `[windows, linux]`, block
+lists, quoted paths and inline comments retain their YAML meaning. `monitor`
+must be a YAML boolean; string booleans, malformed YAML and unsupported selection
+shapes stop the job rather than silently dropping a required file.
+
+The supported format is static TOML with exact VIPM versions:
+
+```toml
+[project]
+labview-version = 2026
+vipc = ""
+
+[vipm.dependencies]
+oglib_boolean = "6.0.0.9"
+oglib_array = { version = "6.0.1.20" }
+```
+
+The existing trusted `dragon_deps.py` parser runs on the workflow's supported
+Python host (`tomllib` on Python 3.11+, or `tomli` where installed). Python runs
+in isolated mode and loads the trusted parser explicitly, excluding client
+working-directory and `PYTHONPATH` import/startup overrides. It never executes
+the declaration file and never parses TOML using regular expressions.
+It generates `dragon-plan.json` next to the selected source files. The Docker
+COPY includes both, and the worker fingerprint includes source bytes, normalized
+plan bytes, parser bytes, and installer bytes. Selected sources must stay inside
+the repository without symlink/junction traversal. Unselected sources are removed
+from the Docker COPY directory without parsing. The container verifies the plan
+schema, Windows platform, requested LabVIEW year/bitness, and each source SHA256
+before the VIPM bootstrap. This hash binding checks integrity, not signing or
+provenance. Missing or changed
+sources and conflicting versions/years fail closed; duplicate staged basenames
+are rejected rather than overwriting one declaration with another.
+
+The composite worker-image action uses the same trusted plan/staging API for
+Dragon files in its explicit flat `deps-dir`; it does not discover unrelated
+project files or require a Dragon CLI in the base. Its isolated Python 3.13
+entry point includes the parser, plan, sources, installer and target inputs in
+the content fingerprint. The GitLab Windows source template preserves project
+discovery outside `.github`, stages the same plan with isolated host Python,
+hashes the staged inputs and target, and checks native staging/build/push exit
+codes. GitLab Windows runners need Python 3.11+ (`tomllib`) or a compatible
+Python with `tomli` installed in the isolated interpreter environment.
+Both callers use the shared installer exactly once for mixed and Dragon-only
+inputs. Missing plans still fail; no caller falls back to unverified Dragon CLI
+execution.
+
+Only exact numeric VIPM versions (including explicit packaging-release suffixes)
+are currently supported. Empty `[nipm]`/`[nipm.dependencies]`/`[nipm.feeds]` tables
+are harmless, but nonempty NIPM dependencies or feeds are explicitly unsupported
+and fail staging. Unknown project/VIPM settings, version ranges, unpinned/latest
+requests, nonempty `project.vipc`, and custom feed specifications also fail with
+an actionable error rather than being ignored. Select a VIPC separately instead
+of embedding its path in `project.vipc`.
+
+The Windows path no longer assumes a `dragon apply` executable exists. The old
+best-effort hook could log command-not-found and still publish an incomplete
+worker. The shared `install-vipc.ps1` now installs normalized Dragon requirements
+with the same signed VIPM 4056 bootstrap, resolver, download integrity checks,
+and bounded engine recovery used by VIPCs. A Dragon-only project follows this
+path even without a VIPC. Legacy `install-dragon.ps1` overrides are deliberately
+rejected before execution: migrate their supported dependency intent into exact
+`[vipm.dependencies]` declarations. Arbitrary custom-hook behavior is not
+silently treated as verified package installation.
+
+**Compatibility break / major-release candidate from 4.x:** the old custom
+Dragon-hook and independent Dragon-CLI paths are retired. Projects relying on
+custom hooks, NIPM/feed installation or other unsupported Dragon settings must
+migrate before updating; those requirements now fail explicitly instead of
+being delegated or ignored. This change must not be presented as a
+backward-compatible patch unless that compatibility is first restored.
+
+Dragon requirements install before later project/tooling VIPCs. Known conflicting
+VIPC pins are rejected, and **after all tooling installs**, the hook verifies
+every Dragon root/version against an inventory explicitly identifying the
+requested LabVIEW year and bitness. A later tooling upgrade of a required pin,
+missing package, dead engine, unreadable inventory, or wrong target fails the
+worker build. Reconcile conflicting declarations; the installer does not choose
+the newest version or rewrite project pins. `VIPM_ALLOW_MISSING_PACKAGES=1` does
+not bypass Dragon installation or final verification. Existing optional tooling
+policy is unchanged, except it cannot invalidate a required Dragon root.
+
+These are source and regression-test guarantees. A real Windows vendor bake and
+its final published inventory are still required before claiming that a specific
+worker contains the repaired dependencies.
 
 ### Required essentials vs. best-effort tooling
 
