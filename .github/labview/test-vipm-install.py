@@ -346,6 +346,22 @@ catch {{ if ($_.Exception.Message -notlike '*changed since trusted TOML parsing*
 """)
             self.assertIn('HASH-BOUND=True', output)
 
+    def test_dragon_plan_normalizes_directory_representations_before_source_checks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'Example.dragon'
+            source.write_text('[vipm.dependencies]\npkg="1.0"\n')
+            (root / 'dragon-plan.json').write_text(json.dumps(DRAGON.windows_install_plan([str(source)])))
+            for representation in (str(root), root.as_posix() + '/', root.as_posix() + '/.'):
+                with self.subTest(directory=representation):
+                    escaped = representation.replace("'", "''")
+                    output = self.run_script(f"""
+$plan = Get-WindowsDragonPlan -Directory '{escaped}' -TargetYear '2026'
+if (($plan.Specs -join ',') -ne 'pkg@1.0') {{ throw 'Directory normalization changed required roots' }}
+'NORMALIZED=True'
+""")
+                    self.assertIn('NORMALIZED=True', output)
+
     def test_dragon_plan_requires_matching_target_and_source_set(self):
         for scenario in ('missing-plan', 'wrong-year', 'missing-source', 'changed-specs', 'custom-hook',
                          'wrong-platform', 'wrong-bitness', 'unknown-setting', 'invalid-array',

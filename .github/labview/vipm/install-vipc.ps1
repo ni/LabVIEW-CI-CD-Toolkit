@@ -195,6 +195,7 @@ function Initialize-VipmRuntime {
 
 function Get-WindowsDragonPlan {
     param([string] $Directory, [string] $TargetYear, [string] $TargetBitness = '64')
+    $Directory = (Get-Item -LiteralPath (Join-Path $Directory '.') -ErrorAction Stop).FullName
     $sources = @(Get-ChildItem -LiteralPath $Directory -Filter '*.dragon' -Recurse -File -ErrorAction Stop)
     $planPath = Join-Path $Directory 'dragon-plan.json'
     if (-not (Test-Path -LiteralPath $planPath -PathType Leaf)) {
