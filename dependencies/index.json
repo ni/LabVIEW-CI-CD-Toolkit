@@ -1,8 +1,17 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "b38b1f023a2663b879f9da69f8c0706510f0d38a",
+  "sha": "f5514a43d6e222f8825cffba740c50f906b48476",
   "revisions": [
+    {
+      "sha": "f5514a43d6e222f8825cffba740c50f906b48476",
+      "short": "f5514a4",
+      "message": "Merge pull request #125 from ni/fix/linux-lvpm-visual-progress-20261103",
+      "author": "Elijah Kerry",
+      "date": "2026-11-04T01:52:47Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "b38b1f023a2663b879f9da69f8c0706510f0d38a",
       "short": "b38b1f0",
@@ -63,6 +72,15 @@
       "message": "vipm: resolve OpenG packaging releases and required roots",
       "author": "elijah286",
       "date": "2026-11-03T21:09:50Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "b9cd8e1aede791fd120aaa23919533d1b1a77e58",
+      "short": "b9cd8e1",
+      "message": "dashboard: show Linux workflow visual progress",
+      "author": "elijah286",
+      "date": "2026-11-03T21:07:52Z",
       "project": false,
       "dep_only": false
     },
@@ -882,24 +900,6 @@
       "message": "Prepare release 4.18.7",
       "author": "github-actions[bot]",
       "date": "2026-11-02T13:17:12Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "97733445462f2c49cdea2c4dcf5eb4564a01e324",
-      "short": "9773344",
-      "message": "Merge pull request #92 from ni/fix/preserve-reconfigure-settings-20261101",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T13:16:59Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "895416b96c86bc0134a51bf3b12f9a69527f0d2e",
-      "short": "895416b",
-      "message": "Merge branch 'fix/preserve-reconfigure-settings-20261101' into feat/linux-lvpm-candidates-20261101",
-      "author": "elijah286",
-      "date": "2026-11-02T00:14:54Z",
       "project": false,
       "dep_only": false
     },

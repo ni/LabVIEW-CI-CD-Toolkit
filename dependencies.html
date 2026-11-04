@@ -83,6 +83,13 @@
     .lvpm-next{border-left:3px solid var(--accent);padding:4px 12px;margin:12px 0}
     #lvpmStatus:empty{display:none}
     #lvpmStatus{padding:10px 0;font-weight:600;white-space:pre-line}
+    .lvpm-progress{margin-top:12px}
+    .lvpm-progress[hidden]{display:none}
+    .lvpm-progress.err{color:var(--bad)}
+    .lvpm-progress.warn{color:var(--warn)}
+    .lvpm-progress.warn .upd-prog-bar{background:var(--warn)}
+    .lvpm-progress.ok{color:var(--ok)}
+    @media(prefers-reduced-motion:reduce){.lvpm-progress .indeterminate{animation:none;left:32%}}
     #lvpmRunLink{display:inline-block;margin-bottom:8px}
     #lvpmRunLink[hidden]{display:none}
     .dep-global-tabs{margin:8px 0 12px}
@@ -730,6 +737,7 @@
         if (status) status.textContent = "Tracking stopped because the page context changed. Submitted workflows may continue on GitHub.";
         const link = $("lvpmRunLink");
         if (link) link.hidden = true;
+        renderLinuxProgress("stopped");
       }
       linuxOperation = null;
     }
@@ -745,9 +753,31 @@
         button.disabled = button.lvpmBlocked || monitorDirty || selectedRevision !== defaultRevision || linuxDispatchPending || !!(linuxOperation && linuxOperation.busy);
       }
     }
-    function linuxOperationStatus(operation, message, runId){
+    function renderLinuxProgress(phase){
+      const progress = $("lvpmProgress"), label = $("lvpmProgressPhase"), bar = $("lvpmProgressBar");
+      if (!progress || !label || !bar) return;
+      const states = {
+        checking:["Checking request", "", true], submitting:["Submitting request", "", true],
+        awaiting:["Awaiting identified run", "", true], queued:["Workflow queued", "", true],
+        running:["Workflow running", "", true], succeeded:["Workflow succeeded · review required", "ok", false],
+        failed:["Workflow failed · inspect logs", "err", false], cancelled:["Workflow cancelled", "err", false],
+        unsuccessful:["Workflow did not succeed · inspect logs", "err", false],
+        rejected:["Request not submitted or rejected", "err", false],
+        uncertain:["Outcome uncertain · check workflow runs before retrying", "warn", false],
+        stopped:["Tracking stopped · check workflow runs", "warn", false]
+      };
+      const [text, kind, moving] = states[phase] || states.stopped;
+      progress.hidden = false;
+      progress.className = "lvpm-progress " + kind;
+      label.textContent = text;
+      bar.className = "upd-prog-bar " + (moving ? "indeterminate" : kind === "err" ? "err" : kind === "ok" ? "ok" : "");
+      bar.style.width = moving ? "" : "100%";
+    }
+    function linuxOperationStatus(operation, message, runId, phase){
       if (!linuxOperationCurrent(operation)) return;
       operation.message = message;
+      operation.phase = phase || operation.phase;
+      renderLinuxProgress(operation.phase);
       const status = $("lvpmStatus");
       if (status) status.textContent = message;
       const link = $("lvpmRunLink");
@@ -774,7 +804,7 @@
         const response = await fetch(api("/actions/runs/" + operation.runId), { cache:"no-cache", headers:updHeaders() });
         if (!linuxOperationCurrent(operation)) return;
         if (response.status === 404 && ++operation.visibilityChecks <= 12) {
-          linuxOperationStatus(operation, "Dispatch accepted. Awaiting the identified run becoming visible…", operation.runId);
+          linuxOperationStatus(operation, "Dispatch accepted. Awaiting the identified run becoming visible…", operation.runId, "awaiting");
           return;
         }
         if (!response.ok) throw new Error("Run status unavailable (" + response.status + "). Check the run and logs; do not assume the build succeeded.");
@@ -782,7 +812,7 @@
         if (!linuxOperationCurrent(operation)) return;
         if (!validateLinuxRun(operation, run)) throw new Error("Run identity could not be verified against this request. Tracking stopped; inspect workflow runs before retrying.");
         if (run.status !== "completed") {
-          linuxOperationStatus(operation, run.status === "in_progress" ? "Workflow running. Active worker unchanged." : "Workflow " + String(run.status || "pending") + ". Active worker unchanged.", operation.runId);
+          linuxOperationStatus(operation, run.status === "in_progress" ? "Workflow running. Active worker unchanged." : "Workflow " + String(run.status || "pending") + ". Active worker unchanged.", operation.runId, run.status === "in_progress" ? "running" : run.status === "queued" ? "queued" : "awaiting");
           return;
         }
         operation.busy = false;
@@ -791,11 +821,11 @@
           ? operation.action === "build" ? "Build workflow succeeded. Refresh to check for a published candidate and review its package-file evidence before requesting activation. This does not prove CI activities passed; the active worker is unchanged."
             : "Reconfigure workflow succeeded. Review its pull request; only merging the proposal applies the change."
           : "Workflow " + String(run.conclusion || "finished without a success result") + ". Open the logs for the failing step. No successful candidate or configuration change is established.";
-        linuxOperationStatus(operation, message, operation.runId);
+        linuxOperationStatus(operation, message, operation.runId, run.conclusion === "success" ? "succeeded" : run.conclusion === "cancelled" ? "cancelled" : ["failure", "timed_out"].includes(run.conclusion) ? "failed" : "unsuccessful");
       } catch (error) {
         if (!linuxOperationCurrent(operation)) return;
         clearInterval(operation.timer);
-        linuxOperationStatus(operation, error.message, operation.runId);
+        linuxOperationStatus(operation, error.message, operation.runId, "stopped");
       } finally {
         operation.polling = false;
         if (linuxOperationCurrent(operation)) syncLinuxOperationButtons();
@@ -811,7 +841,7 @@
       linuxOperation = operation;
       linuxDispatchPending = true;
       syncLinuxOperationButtons();
-      linuxOperationStatus(operation, "Checking the current revision and workflow…");
+      linuxOperationStatus(operation, "Checking the current revision and workflow…", null, "checking");
       try {
         if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) throw new Error("Invalid repository identity; no workflow dispatched.");
         const payload = await linuxWorkflowPayload(action);
@@ -833,7 +863,7 @@
         if (!linuxOperationCurrent(operation)) return;
         if (head.sha !== operation.revision) throw new Error("The default branch changed. Refresh and review the current revision before dispatching.");
         operation.ref = payload.body.ref;
-        linuxOperationStatus(operation, "Submitting workflow request…");
+        linuxOperationStatus(operation, "Submitting workflow request…", null, "submitting");
         const response = await fetch(api("/actions/workflows/" + payload.file + "/dispatches"), {
           method:"POST", headers:Object.assign({}, updHeaders(), { "Content-Type":"application/json" }), body:JSON.stringify({ ...payload.body, return_run_details:true })
         });
@@ -846,9 +876,9 @@
           throw new Error("Workflow dispatch outcome is uncertain (HTTP " + response.status + "). The request may already have taken effect; check workflow runs before retrying.");
         }
         hideTokenPanel();
-        linuxOperationStatus(operation, "Dispatch accepted, not completed. Awaiting an identified run. Active worker unchanged.");
+        linuxOperationStatus(operation, "Dispatch accepted, not completed. Awaiting an identified run. Active worker unchanged.", null, "awaiting");
         if (response.status === 204) {
-          linuxOperationStatus(operation, "Dispatch accepted, but GitHub returned no run identity. Open workflow runs to check progress and failures before refreshing or retrying. No run has been guessed from timing or the latest build.");
+          linuxOperationStatus(operation, "Dispatch accepted, but GitHub returned no run identity. Open workflow runs to check progress and failures before refreshing or retrying. No run has been guessed from timing or the latest build.", null, "stopped");
           return;
         }
         const details = await response.json();
@@ -863,7 +893,7 @@
       } catch (error) {
         if (!linuxOperationCurrent(operation)) return;
         if (!operation.ref) operation.busy = false;
-        linuxOperationStatus(operation, (operation.busy ? "Dispatch outcome is uncertain. Do not retry yet; inspect workflow runs. " : "") + error.message);
+        linuxOperationStatus(operation, (operation.busy ? "Dispatch outcome is uncertain. Do not retry yet; inspect workflow runs. " : "") + error.message, null, operation.busy ? "uncertain" : "rejected");
       } finally {
         linuxDispatchPending = false;
         syncLinuxOperationButtons();
@@ -880,6 +910,7 @@
         + '<fieldset><legend>Preview an approach · Windows unchanged</legend><label><input type="radio" name="linuxInstaller" value="vipm"' + (selectedLvpm ? '' : ' checked') + '> VIPM</label> <label><input type="radio" name="linuxInstaller" value="lvpm"' + (selectedLvpm ? ' checked' : '') + '> LVPM (experimental)</label></fieldset>'
         + '<p id="linuxVipmView"' + (selectedLvpm ? ' hidden' : '') + '>' + (selectedLvpm ? 'The current worker still uses LVPM. To return to the existing default selection, use the reset PR in the details below. Reset does not guarantee VIPM.' : 'Review and build the Linux VIPM worker using the update panel below.') + '</p>'
         + '<div id="lvpmReview"' + (selectedLvpm ? '' : ' hidden') + '>Loading candidate evidence…</div>'
+        + '<div class="lvpm-progress" id="lvpmProgress" hidden><div class="upd-prog-head"><span class="upd-prog-phase" id="lvpmProgressPhase"></span></div><div class="upd-prog-track" aria-hidden="true"><div class="upd-prog-bar" id="lvpmProgressBar"></div></div></div>'
         + '<div role="status" aria-live="polite" id="lvpmStatus"></div><a id="lvpmRunLink" target="_blank" rel="noopener" hidden></a>'
         + '<details><summary>Current selection and rollback</summary><p>Switching these views does not change configuration or dispatch a workflow. Explicit per-action overrides win.</p><p><code>' + esc(configuredSelection) + '</code></p><p>Per-action overrides: ' + esc(Object.entries(selectedConfig.actions || {}).map(([activity, selection]) => activity + ': ' + selection).join('; ') || 'none') + '. These are preserved and may prevent the Linux default from applying to an activity.</p>'
         + (selectedLvpm ? '<p>Reset removes only <code>linuxUse</code>. The existing default selection remains <code>' + esc(selectedConfig.use || "latest") + '</code>; per-action overrides are retained. This may be a base or custom image, not VIPM.</p><button type="button" id="lvpmReset"' + (revision === defaultRevision && !monitorDirty ? '' : ' disabled') + '>Reset Linux to existing default selection via PR</button>' : '') + '</details>';

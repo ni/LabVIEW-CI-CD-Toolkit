@@ -1578,7 +1578,12 @@ docker run --rm `
       <p>Linux requests ask GitHub for dispatch run details. An accepted request is not a successful build.
         When GitHub returns a run identity, the page checks the exact repository, workflow ID and path,
         dispatch event, branch, reviewed HEAD, authenticated actor, and first run attempt before showing
-        queued/running/completed status with a direct log link. It never picks the latest run or infers ownership
+        queued/running/completed status with a direct log link. A Linux-only indeterminate progress bar appears
+        while checking, submitting, awaiting run visibility, queued, or running; it does not invent a completion
+        percentage or estimate package-install progress. Failure and cancellation stop the bar with a red label
+        and retain the exact run link. Uncertain outcomes or stopped tracking show a warning, not success.
+        Workflow success stops the bar with a review-required label, not a claim of candidate verification or
+        activation. Reduced-motion preferences disable the animation. It never picks the latest run or infers ownership
         from timing. Delayed run visibility is retried; permission/network errors or mismatched identities stop
         tracking without automatically retrying the dispatch. Legacy HTTP 204 responses establish only acceptance:
         open the workflow runs and inspect them before refreshing or retrying. Repeated clicks are blocked while
