@@ -1587,7 +1587,7 @@ docker run --rm `
       <p>For VIPM, choose <strong>Review Windows VIPM update</strong> or
         <strong>Review Linux VIPM update</strong>, inspect the selected platform&rsquo;s package changes, then
         approve the build. Advanced update options are collapsed by default. Saving monitoring choices preserves
-        the other platform&rsquo;s selections and opens a configuration pull request; merge it and refresh before
+        the other platform&rsquo;s selections and requests a configuration pull request; merge it and refresh before
         building committed dependencies. Tab or revision changes cancel outstanding approval/token prompts, and
         in-flight reads cannot retarget a dispatch. Late Linux responses do not dismiss a new token prompt or
         update status after the platform, revision, or monitoring selection changes. Switching away after a
@@ -1598,7 +1598,24 @@ docker run --rm `
         tabs, and label combined unresolved counts as aggregate rather than attributing them to both workers.
         Dependency banners render text and navigation with DOM nodes, not parsed HTML; review links allow only
         HTTP(S) destinations.</p>
-      <h3 id="linux-lvpm">Optional Linux LVPM environments (experimental)</h3>
+      <p>The Linux tooling card distinguishes <strong>unsaved monitoring changes</strong>, a
+        <strong>save request accepted but not applied</strong>, and <strong>committed monitoring loaded</strong>.
+        Checkbox changes immediately explain why both toolchains are blocked, including while switching views.
+        Save acceptance (HTTP 204) does not prove a proposal was created or merged; the proposal and workflow
+        links are explicitly unattributed lists, not evidence that a specific run belongs to the request.
+        Review and merge the intended configuration changes before building. <strong>Check current HEAD</strong>
+        performs reads only: it does not save, install, dispatch, or change the selected revision. Its link opens
+        the checked committed revision in a new tab, preserving local edits in the original tab. A historical
+        revision remains blocked. Uncertain save outcomes block repeat requests until reconciled rather than
+        risking duplicate dispatches.</p>
+      <p>Dragon rows distinguish <strong>file present and parsed</strong>, <strong>file absent</strong>,
+        <strong>parse error</strong>, and <strong>inspection unavailable</strong> from package status. Expand
+        <strong>Declared packages</strong> to see each manager, package name, exact declared version, and the
+        selected platform&rsquo;s measured worker version/status. An unresolved package does not mean its
+        declaration file is missing. Stale or unavailable evidence remains unverified; Windows-only evidence
+        cannot establish Linux installation. This reporting does not install missing packages or repair runtime
+        failures. LVPM satisfaction covers package files, not execution of CI activities.</p>
+      <h3 id="linux-lvpm">Optional Linux LVPM environments</h3>
       <p>The Dependencies page&rsquo;s <strong>Linux</strong> tab offers <strong>VIPM</strong> (the existing default) and <strong>LVPM</strong>
         as alternative installers for Linux. Windows behavior is unchanged. Switching tooling views in the page
         is exploratory, not a pipeline change: review the declarations, build a candidate, inspect its verification,
@@ -1610,7 +1627,7 @@ docker run --rm `
         so reset does not guarantee VIPM. The retained default ref is shown before requesting reset.
         Never apply the client installer to
         this tooling source repository or a fork to test this feature; use a separate scratch client repository.</p>
-      <p>The Linux tooling card shows one next action: build a separate candidate, or review activation of an
+      <p>After monitoring prerequisites are complete, the Linux tooling card shows one next action: build a separate candidate, or review activation of an
         available candidate. Candidate evidence, declarations, image identity, limitations, and rollback stay
         collapsed until needed. A candidate build never changes the active worker, and the separate VIPM update
         panel is hidden while previewing or using LVPM.</p>
