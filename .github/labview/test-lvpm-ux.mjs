@@ -36,6 +36,7 @@ let workflowMetadata = null;
 let workflowMetadataStatus = 200;
 let dispatchError = null;
 let commitResponses = [];
+let headJsonBarrier = null;
 const context = vm.createContext({
   window:{ LVCI:{ repo:'owner/project' } },
   location:{ hostname:'owner.github.io', pathname:'/project/dependencies.html', href:'https://owner.github.io/project/dependencies.html?sha=' + revision },
@@ -57,7 +58,7 @@ const context = vm.createContext({
       if (failMetadata) throw new Error('unavailable');
       return { ok:true, json:async () => ({ default_branch:'trunk' }) };
     }
-    if (url.includes('/commits/')) return { ok:true, json:async () => ({ sha:commitResponses.shift() || revision }) };
+    if (url.includes('/commits/')) return { ok:true, json:async () => { if (headJsonBarrier) await headJsonBarrier; return { sha:commitResponses.shift() || revision }; } };
     if (url.includes('/contents/.github/workflows?ref=')) {
       assert.equal(url, 'https://api.github.com/repos/owner/project/contents/.github/workflows?ref=trunk');
       assert.equal(options.cache, 'no-cache');
@@ -87,6 +88,7 @@ vm.runInContext(source.replace('    init();', `
       dragonFileState, updMissingList, renderDragonFiles, platformCoverage, visibleColumns, selectPlatform,
       renderUpdatePanel, renderVipc, encodeMonitorList, setFileMonitor, syncPlatformTabs, initPlatformTabs,
       monitorCounts, monitorInputs, dispatchMonitor, openUpdateApprovalDialog, loadRevision,
+      renderLinuxPrerequisites, checkLinuxMonitoringHead,
       isMonitorDirty:() => monitorDirty,
       setRevisionFiles:files => {
         listDependencyFiles = async () => files;
@@ -98,6 +100,8 @@ vm.runInContext(source.replace('    init();', `
       getColumnStates: () => currentColStates,
       setState: state => {
         invalidateLinuxOperation();
+        linuxMonitoringRequest = null;
+        linuxHeadCheck = null;
         activePlatform = state.platform || "linux";
         linuxToolingView = state.tooling || "vipm";
         if (state.vipcs) currentVipcs = state.vipcs;
@@ -238,7 +242,7 @@ assert.equal(selectedView.inputs.find(input => input.value === 'lvpm').checked, 
 assert.equal(selectedView.inputs.find(input => input.value === 'vipm').checked, false);
 assert.equal(selectedView.review.hidden, false);
 assert.match(selectedView.host.innerHTML, /Configured Linux default \(selected revision/);
-assert.match(selectedView.host.innerHTML, /<strong>LVPM Experimental<\/strong>/);
+assert.match(selectedView.host.innerHTML, /<strong>LVPM<\/strong>/);
 assert.match(selectedView.host.innerHTML, /Explicit per-action overrides win/);
 assert.match(selectedView.host.innerHTML, /Switching these views does not change configuration or dispatch a workflow/);
 await selectedRender;
@@ -247,7 +251,7 @@ assert.doesNotMatch(selectedView.review.innerHTML, /Alternative candidate/);
 const beforeViewSwitch = requests.length;
 selectedView.inputs.find(input => input.value === 'vipm').listener();
 assert.equal(selectedView.review.hidden, true);
-assert.match(selectedView.host.innerHTML, /<strong>LVPM Experimental<\/strong>/);
+assert.match(selectedView.host.innerHTML, /<strong>LVPM<\/strong>/);
 selectedView.inputs.find(input => input.value === 'lvpm').listener();
 assert.equal(selectedView.review.hidden, false);
 assert.equal(requests.length, beforeViewSwitch);
@@ -439,11 +443,11 @@ for (const testCase of [
   hooks.setState({ candidate, inventory:dragonInventory({ ...parsedDragon,
     dependencies:[{ status:'installed', platform_status:testCase.evidence }] }) });
   assert.match(hooks.dragonFileState({ ...monitoredDragon, monitorOn:testCase.platforms }),
-    new RegExp('>' + testCase.expected + '<'), JSON.stringify(testCase));
+    new RegExp('>' + (testCase.expected === 'missing' ? 'packages unresolved' : testCase.expected) + '<'), JSON.stringify(testCase));
 }
 for (const status of ['missing', 'wrong_version', 'conflict']) {
   hooks.setState({ candidate, inventory:dragonInventory({ ...parsedDragon, dependencies:[{ status }] }) });
-  assert.match(hooks.dragonFileState({...monitoredDragon, monitorOn:['windows']}), />missing</);
+  assert.match(hooks.dragonFileState({...monitoredDragon, monitorOn:['windows']}), />packages unresolved</);
 }
 for (const testCase of [
   { name:'missing parser', inventory:dragonInventory({}, false) },
@@ -481,7 +485,7 @@ assert.match(unknownPendingHtml, /unknown/);
 assert.doesNotMatch(unknownPendingHtml, /<parser unavailable>/);
 function uiElement(){
   const classes = new Set();
-  return { innerHTML:'', hidden:false, style:{},
+  return { innerHTML:'', textContent:'', hidden:false, style:{},
     classList:{ add:value => classes.add(value), remove:value => classes.delete(value), contains:value => classes.has(value) },
     addEventListener(){}, setAttribute(){}, querySelector:() => null, querySelectorAll:() => []
   };
@@ -621,7 +625,7 @@ assert.equal(hooks.monitorInputs().container_vipc, 'project.vipc::windows');
 assert.equal(hooks.monitorCounts().monitored, 0);
 await hooks.dispatchMonitor();
 await hooks.renderUpdatePanel();
-assert.match(elements.get('monitorStatus').innerHTML, /Review and merge its pull request/);
+assert.match(elements.get('monitorStatus').innerHTML, /Save request accepted, not applied/);
 assert.match(elements.get('updatePanel').innerHTML, /id="updRun" disabled/);
 for (const staleState of [{ revision:'historical' }, { dirty:true }]) {
   hooks.setState({ candidate, vipcs:[], dragons:[], ...staleState });
@@ -1196,4 +1200,249 @@ assert.equal(runPoll, replacementPoll);
 assert.equal(postCount(progressStart), 2);
 hooks.invalidateLinuxOperation();
 progressCases++;
+let prerequisiteCases = 0;
+function prerequisiteFixture(overrides = {}){
+  progressFixture();
+  dispatchStatus = 204;
+  failMetadata = false;
+  workflowResponse = 'available';
+  hooks.setState({ candidate, vipcs:[{ ...projectVipc, monitorOn:['windows'] }], dragons:[], columns:{}, ...overrides });
+  for (const id of ['linuxPrerequisites', 'linuxCheckHead', 'linuxHeadStatus', 'linuxHeadLink', 'lvpmNextHeading', 'lvpmNextDescription']) elements.set(id, uiElement());
+  elements.get('lvpmNextHeading').textContent = 'Next: build a separate candidate';
+  elements.get('lvpmNextDescription').textContent = 'Build from committed Linux declarations.';
+  installerView();
+  return requests.length;
+}
+const prerequisiteMarkup = () => elements.get('linuxPrerequisites').innerHTML;
+for (const tooling of ['vipm', 'lvpm']) {
+  const start = prerequisiteFixture();
+  await hooks.renderLinuxInstaller();
+  const preview = elements.get('linuxInstaller').querySelectorAll().find(input => input.value === tooling);
+  preview.listener();
+  hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
+  assert.match(prerequisiteMarkup(), /Next: save monitoring changes|Local checkbox changes/);
+  assert.equal(elements.get('lvpmNextHeading').textContent, 'Next: save monitoring changes');
+  assert.equal(elements.get('lvpmBuild').disabled, true);
+  await hooks.renderUpdatePanel();
+  if (tooling === 'vipm') assert.match(elements.get('updatePanel').innerHTML, /id="updRun" disabled/);
+  const secondPreview = elements.get('linuxInstaller').querySelectorAll().find(input => input.value !== tooling);
+  secondPreview.listener();
+  assert.match(prerequisiteMarkup(), /Next: save monitoring changes/);
+  assert.equal(postCount(start), 0);
+  prerequisiteCases++;
+}
+let prerequisiteStart = prerequisiteFixture({dirty:true});
+await hooks.dispatchMonitor();
+assert.match(prerequisiteMarkup(), /Next: review and merge monitoring/);
+assert.match(prerequisiteMarkup(), /does not prove a proposal was created or merged/);
+assert.match(prerequisiteMarkup(), /unattributed list/);
+assert.doesNotMatch(prerequisiteMarkup(), /\/pull\/\d+|\/actions\/runs\/\d+/);
+assert.equal(hooks.isMonitorDirty(), true);
+await hooks.dispatchMonitor();
+assert.equal(postCount(prerequisiteStart), 1);
+assert.equal(elements.get('saveMonitor').disabled, true);
+hooks.selectPlatform('windows');
+hooks.selectPlatform('linux');
+await new Promise(resolve => setImmediate(resolve));
+assert.match(prerequisiteMarkup(), /Next: review and merge monitoring/);
+await hooks.dispatchMonitor();
+assert.equal(postCount(prerequisiteStart), 1);
+prerequisiteCases++;
+for (const failure of [500, 502, 503, 504, 'transport']) {
+  prerequisiteStart = prerequisiteFixture({dirty:true});
+  if (failure === 'transport') dispatchError = new Error('network unavailable');
+  else dispatchStatus = failure;
+  await hooks.dispatchMonitor();
+  await hooks.dispatchMonitor();
+  assert.equal(postCount(prerequisiteStart), 1);
+  assert.equal(elements.get('saveMonitor').disabled, true);
+  assert.match(prerequisiteMarkup(), /outcome is uncertain/);
+  assert.doesNotMatch(prerequisiteMarkup(), /\/actions\/runs\/\d+/);
+  prerequisiteCases++;
+}
+prerequisiteStart = prerequisiteFixture({dirty:true});
+dispatchStatus = 422;
+await hooks.dispatchMonitor();
+assert.equal(elements.get('saveMonitor').disabled, false);
+await hooks.dispatchMonitor();
+assert.equal(postCount(prerequisiteStart), 2);
+prerequisiteCases++;
+prerequisiteStart = prerequisiteFixture({dirty:true});
+let releaseMonitoringPost;
+postBarrier = new Promise(resolve => { releaseMonitoringPost = resolve; });
+const monitoringPost = hooks.dispatchMonitor();
+await until(() => postCount(prerequisiteStart) === 1);
+await hooks.dispatchMonitor();
+assert.equal(postCount(prerequisiteStart), 1);
+assert.match(prerequisiteMarkup(), /wait for the monitoring request/);
+releaseMonitoringPost();
+await monitoringPost;
+postBarrier = null;
+assert.match(prerequisiteMarkup(), /review and merge monitoring/);
+prerequisiteCases++;
+for (const change of ['platform', 'revision', 'monitoring']) {
+  prerequisiteStart = prerequisiteFixture({dirty:true});
+  postBarrier = new Promise(resolve => { releaseMonitoringPost = resolve; });
+  const pending = hooks.dispatchMonitor();
+  await until(() => postCount(prerequisiteStart) === 1);
+  if (change === 'platform') hooks.selectPlatform('windows');
+  else if (change === 'revision') hooks.setState({candidate, revision:'e'.repeat(40), dirty:true});
+  else hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
+  elements.get('monitorStatus').innerHTML = 'New context unchanged';
+  releaseMonitoringPost();
+  await pending;
+  postBarrier = null;
+  assert.equal(elements.get('monitorStatus').innerHTML, 'New context unchanged');
+  assert.equal(postCount(prerequisiteStart), 1);
+  prerequisiteCases++;
+}
+prerequisiteStart = prerequisiteFixture({dirty:true});
+const beforeInputs = plain(hooks.monitorInputs());
+const beforeUrl = context.location.href;
+const newHead = 'f'.repeat(40);
+commitResponses = [newHead];
+await hooks.checkLinuxMonitoringHead();
+assert.equal(postCount(prerequisiteStart), 0);
+assert.equal(hooks.isMonitorDirty(), true);
+assert.deepEqual(plain(hooks.monitorInputs()), beforeInputs);
+assert.equal(context.location.href, beforeUrl);
+assert.match(elements.get('linuxHeadStatus').textContent, /does not prove a monitoring proposal was created or merged/);
+assert.equal(new URL(elements.get('linuxHeadLink').href).searchParams.get('sha'), newHead);
+assert.match(elements.get('linuxHeadLink').textContent, /local edits stay here/);
+assert.match(prerequisiteMarkup(), /target="_blank" rel="noopener" hidden/);
+await assert.rejects(hooks.linuxWorkflowPayload('build'), /Save and merge/);
+prerequisiteCases++;
+for (const failure of ['network', 'invalid-head']) {
+  prerequisiteStart = prerequisiteFixture({dirty:true});
+  if (failure === 'network') failMetadata = true;
+  else commitResponses = ['not-a-sha'];
+  await hooks.checkLinuxMonitoringHead();
+  assert.match(elements.get('linuxHeadStatus').textContent, /Could not check HEAD/);
+  assert.equal(hooks.isMonitorDirty(), true);
+  assert.equal(postCount(prerequisiteStart), 0);
+  assert.equal(elements.get('linuxHeadLink').href, undefined);
+  prerequisiteCases++;
+}
+for (const change of ['platform', 'revision', 'monitoring']) {
+  prerequisiteStart = prerequisiteFixture({dirty:true});
+  let releaseHead;
+  const promise = new Promise(resolve => { releaseHead = resolve; });
+  lookupBarrier = {match:url => url.includes('/commits/'), promise};
+  const pending = hooks.checkLinuxMonitoringHead();
+  await until(() => requests.slice(prerequisiteStart).some(request => request.url.includes('/commits/')));
+  await hooks.checkLinuxMonitoringHead();
+  assert.equal(requests.slice(prerequisiteStart).filter(request => request.url.includes('/commits/')).length, 1);
+  if (change === 'platform') hooks.selectPlatform('windows');
+  else if (change === 'revision') hooks.setState({candidate, revision:'e'.repeat(40), dirty:true});
+  else hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
+  elements.get('linuxHeadStatus').textContent = 'New context unchanged';
+  releaseHead();
+  await pending;
+  lookupBarrier = null;
+  assert.equal(elements.get('linuxHeadStatus').textContent, 'New context unchanged');
+  assert.equal(postCount(prerequisiteStart), 0);
+  prerequisiteCases++;
+}
+prerequisiteStart = prerequisiteFixture({revision:'e'.repeat(40)});
+hooks.renderLinuxPrerequisites();
+assert.match(prerequisiteMarkup(), /Next: open current committed settings/);
+await hooks.dispatchLinuxWorker('build');
+assert.equal(postCount(prerequisiteStart), 0);
+const committedInventory = {...inventoryFor(), config:{vipc:[{path:'project.vipc', monitor:true, monitorOn:'linux'}], hasVipcList:true},
+  vipc:[{path:'project.vipc', packages:['actual-1.2']}], platforms:[]};
+hooks.setState({candidate, inventory:committedInventory, dirty:true});
+hooks.renderGenerated(committedInventory);
+await new Promise(resolve => setImmediate(resolve));
+assert.equal(hooks.isMonitorDirty(), false);
+assert.match(prerequisiteMarkup(), /Committed monitoring loaded/);
+assert.equal(elements.get('saveMonitor').disabled, true);
+assert.equal(postCount(prerequisiteStart), 0);
+assert.equal(elements.get('lvpmBuild').disabled, false);
+await hooks.renderUpdatePanel();
+assert.match(elements.get('updatePanel').innerHTML, /id="updRun">Review Linux VIPM update/);
+prerequisiteCases++;
+prerequisiteStart = prerequisiteFixture({dirty:true});
+let releaseHeadJson;
+headJsonBarrier = new Promise(resolve => { releaseHeadJson = resolve; });
+const pendingHeadJson = hooks.checkLinuxMonitoringHead();
+await until(() => requests.slice(prerequisiteStart).some(request => request.url.includes('/commits/')));
+await Promise.resolve();
+hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
+elements.get('linuxHeadStatus').textContent = 'New context after JSON unchanged';
+releaseHeadJson();
+await pendingHeadJson;
+headJsonBarrier = null;
+assert.equal(elements.get('linuxHeadStatus').textContent, 'New context after JSON unchanged');
+assert.equal(postCount(prerequisiteStart), 0);
+prerequisiteCases++;
+let dragonDetailCases = 0;
+const actualDeclaration = fs.readFileSync(new URL('../example/Example.dragon', root), 'utf8');
+assert.match(actualDeclaration, /oglib_boolean\s*=\s*"6\.0\.0\.9"/);
+const detailedDragon = {inspection:{status:'parsed', reason:'Declarations parsed by trusted tooling.'}, dependencies:[{
+  manager:'vipm', package_id:'oglib_boolean', declared_version:'6.0.0.9',
+  platform_status:{windows:{status:'installed',installed_version:'6.0.0.9'},linux:{status:'missing',message:'Not present in the selected Linux worker.'}}
+}]};
+for (const platform of ['windows', 'linux']) {
+  hooks.setState({candidate, platform, inventory:dragonInventory(detailedDragon)});
+  hooks.renderDragonFiles([{...monitoredDragon, monitorOn:['windows','linux']}]);
+  const markup = elements.get('dragonWrap').innerHTML;
+  assert.match(markup, /File present · parsed/);
+  assert.match(markup, /oglib_boolean/);
+  assert.match(markup, /6\.0\.0\.9/);
+  assert.match(markup, new RegExp(platform + ' worker evidence'));
+  assert.match(markup, platform === 'windows' ? /Package satisfied/ : /Package missing/);
+  assert.doesNotMatch(markup, /File absent/);
+  dragonDetailCases++;
+}
+for (const testCase of [
+  {file:{inspection:{status:'unknown',reason:'Declared Dragon file is missing.'}}, expected:/File absent/},
+  {file:{error:'Bad TOML <script>',inspection:{status:'unknown'}}, expected:/File parse error/},
+  {file:{inspection:{status:'unknown',reason:'Backend unavailable'}}, available:false, expected:/File inspection unavailable/},
+  {file:detailedDragon, revision:'e'.repeat(40), expected:/File inspection unavailable/},
+  {file:{inspection:{status:'parsed'},dependencies:[]}, expected:/No package declarations/}
+]) {
+  hooks.setState({candidate, revision:testCase.revision, inventory:dragonInventory(testCase.file,testCase.available !== false)});
+  hooks.renderDragonFiles([monitoredDragon]);
+  const markup = elements.get('dragonWrap').innerHTML;
+  assert.match(markup, testCase.expected);
+  assert.doesNotMatch(markup, /<script>|Package satisfied/);
+  dragonDetailCases++;
+}
+for (const status of ['missing','wrong_version','unknown']) {
+  const evidence = {...detailedDragon, dependencies:[{...detailedDragon.dependencies[0], platform_status:{linux:{status,message:'stale or unsupported native dependency <script>'}}}]};
+  hooks.setState({candidate, inventory:dragonInventory(evidence), columns:{linux:{ready:true,packages:new Set(['oglib_boolean-6.0.0.9'])}}});
+  hooks.renderDragonFiles([monitoredDragon]);
+  assert.match(elements.get('dragonWrap').innerHTML, status === 'missing' ? /Package missing/ : status === 'wrong_version' ? /Version mismatch/ : /Package unverified/);
+  assert.doesNotMatch(elements.get('dragonWrap').innerHTML, /Package satisfied|<script>/);
+  dragonDetailCases++;
+}
+hooks.setState({candidate, inventory:dragonInventory(detailedDragon)});
+hooks.renderDragonFiles([{...monitoredDragon, monitored:false, monitorOn:[]}]);
+assert.match(elements.get('dragonWrap').innerHTML, /Not monitored on this platform/);
+assert.doesNotMatch(elements.get('dragonWrap').innerHTML, /Package satisfied/);
+dragonDetailCases++;
+if (process.env.LVCI_DRAGON_UI_FIXTURE) {
+  hooks.setState({candidate, inventory:{sha:revision, dragon:JSON.parse(process.env.LVCI_DRAGON_UI_FIXTURE)}});
+  hooks.renderDragonFiles([{path:'project.dragon',monitorOn:['linux'],monitored:true}]);
+  assert.match(elements.get('dragonWrap').innerHTML, /File present · parsed/);
+  assert.match(elements.get('dragonWrap').innerHTML, /oglib_boolean/);
+  assert.match(elements.get('dragonWrap').innerHTML, /6\.0\.0\.9/);
+  assert.doesNotMatch(elements.get('dragonWrap').innerHTML, /Package satisfied/);
+  dragonDetailCases++;
+}
+const integrate = fs.readFileSync(new URL('pages/integrate.html', root), 'utf8');
+const sourceBlock = integrate.slice(integrate.indexOf('async function toolingSourceBlock(repo)'), integrate.indexOf('function toolingSourceMessage(repo'));
+let sourceGuardReads = 0;
+const sourceGuard = vm.createContext({canonical:{repo:'ni/LabVIEW-CI-CD-Toolkit'}, SOURCE_FALLBACK:{repo:'ni/LabVIEW-CI-CD-Toolkit'},
+  gh:async () => { sourceGuardReads++; return {ok:true,json:async () => ({fork:true,parent:{full_name:'ni/LabVIEW-CI-CD-Toolkit'}})}; }});
+vm.runInContext(sourceBlock + '\nglobalThis.block = toolingSourceBlock;', sourceGuard);
+assert.match((await sourceGuard.block('ni/LabVIEW-CI-CD-Toolkit')).why, /tooling source repository/);
+assert.equal(sourceGuardReads, 0);
+assert.match((await sourceGuard.block('owner/toolkit-fork')).why, /fork of/);
+assert.equal(sourceGuardReads, 1);
+for (const functionName of ['installToRepo', 'proceedInstall']) {
+  const body = integrate.slice(integrate.indexOf('async function ' + functionName + '('));
+  assert.match(body.slice(0, 1000), /await toolingSourceBlock\(repo\)/);
+}
+console.log('Linux monitoring prerequisites: ' + prerequisiteCases + ' actual-function cases; Dragon file/package details: ' + dragonDetailCases + ' renderer cases passed.');
 console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety and monitoring regressions passed; ' + progressCases + ' dispatch identity/progress/error/duplicate/stale-context cases and ' + visualChecks + ' visual progress checks passed.');

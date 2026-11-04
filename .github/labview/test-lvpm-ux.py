@@ -87,6 +87,40 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
         self.assertIn('id="lvpmRunLink" target="_blank" rel="noopener" hidden', page)
         self.assertNotIn('<h3>1. Build a separate LVPM candidate</h3>', page)
 
+    def test_linux_monitoring_prerequisites_distinguish_acceptance_from_merge(self):
+        page = (ROOT / '.github/pages/dependencies.html').read_text()
+        self.assertIn('Next: save monitoring changes', page)
+        self.assertIn('Next: review and merge monitoring', page)
+        self.assertIn('Save request accepted, not applied', page)
+        self.assertIn('Acceptance does not prove a proposal was created or merged', page)
+        self.assertIn('Open proposals (unattributed list)', page)
+        self.assertNotIn('LVPM Experimental', page)
+        self.assertNotIn('Build experimental LVPM', page)
+        update = page.split('function updateMonitorUi(){', 1)[1].split('function token()', 1)[0]
+        self.assertIn('renderLinuxPrerequisites()', update)
+        self.assertIn('matchingLinuxMonitoringRequest()', update)
+
+    def test_head_check_is_read_only_and_preserves_page_context(self):
+        page = (ROOT / '.github/pages/dependencies.html').read_text()
+        check = page.split('async function checkLinuxMonitoringHead(){', 1)[1].split('function renderLinuxProgress', 1)[0]
+        for forbidden in ('method:"POST"', 'dispatchMonitor(', 'dispatchLinuxWorker(', 'loadRevision(',
+                          'location.href =', 'monitorDirty =', 'selectedRevision =', 'defaultRevision ='):
+            self.assertNotIn(forbidden, check)
+        self.assertGreaterEqual(check.count('linuxMonitoringContextCurrent(check)'), 6)
+        self.assertIn('linuxHeadCheck !== check', check)
+        self.assertIn('local edits stay here', page)
+
+    def test_dragon_details_separate_file_and_package_evidence(self):
+        page = (ROOT / '.github/pages/dependencies.html').read_text()
+        details = page.split('function dragonInspectionDetails(file){', 1)[1].split('function parseManifestYaml', 1)[0]
+        for label in ('File present · parsed', 'File absent', 'File parse error', 'File inspection unavailable',
+                      'Package missing', 'Version mismatch', 'Package unverified', 'Declared packages'):
+            self.assertIn(label, details)
+        self.assertIn('generatedInventory.sha === selectedRevision', details)
+        self.assertIn('section.available !== true', details)
+        self.assertIn('esc(dependency.declared_version', details)
+        self.assertIn('activePlatform === "windows" ? dependency : null', details)
+
     def test_linux_dispatch_feedback_documents_acceptance_not_verification(self):
         page = (ROOT / '.github/pages/dependencies.html').read_text()
         documentation = (ROOT / '.github/pages/documentation.html').read_text()
@@ -479,6 +513,18 @@ class DashboardLvpmTests(unittest.TestCase):
 
 
 class DashboardDragonInspectionTests(unittest.TestCase):
+    def test_actual_example_parser_output_reaches_actual_ui_renderer(self):
+        result = self.inspect(declarations=(ROOT / 'example/Example.dragon').read_text())
+        dependencies = result['dragon']['files'][0]['dependencies']
+        boolean = next(item for item in dependencies if item['package_id'] == 'oglib_boolean')
+        self.assertEqual(boolean['declared_version'], '6.0.0.9')
+        self.assertEqual(result['dragon']['files'][0]['inspection']['status'], 'parsed')
+        completed = subprocess.run(['node', str(ROOT / '.github/labview/test-lvpm-ux.mjs')],
+                                   env={**os.environ, 'LVCI_DRAGON_UI_FIXTURE': json.dumps(result['dragon'])},
+                                   capture_output=True, text=True)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn('renderer cases passed', completed.stdout)
+
     def inspect(self, declarations='[vipm.dependencies]\nactual = "1.2"\n', monitored=True,
                 trusted_parser=True, backend=True, manifest=None, configured=True, platforms=None,
                 linux_manifest=None, freshness=None, selection=SELECTION, other_files=None):
