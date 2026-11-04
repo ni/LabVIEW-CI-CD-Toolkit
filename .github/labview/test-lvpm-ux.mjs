@@ -1396,7 +1396,7 @@ for (const platform of ['windows', 'linux']) {
 }
 for (const testCase of [
   {file:{inspection:{status:'unknown',reason:'Declared Dragon file is missing.'}}, expected:/File absent/},
-  {file:{error:'Bad TOML <script>',inspection:{status:'unknown'}}, expected:/File parse error/},
+  {file:{error:'Bad TOML <ScRiPt>',inspection:{status:'unknown'}}, expected:/File parse error/},
   {file:{inspection:{status:'unknown',reason:'Backend unavailable'}}, available:false, expected:/File inspection unavailable/},
   {file:detailedDragon, revision:'e'.repeat(40), expected:/File inspection unavailable/},
   {file:{inspection:{status:'parsed'},dependencies:[]}, expected:/No package declarations/}
@@ -1405,15 +1405,15 @@ for (const testCase of [
   hooks.renderDragonFiles([monitoredDragon]);
   const markup = elements.get('dragonWrap').innerHTML;
   assert.match(markup, testCase.expected);
-  assert.doesNotMatch(markup, /<script>|Package satisfied/);
+  assert.doesNotMatch(markup, /<script>|Package satisfied/i);
   dragonDetailCases++;
 }
 for (const status of ['missing','wrong_version','unknown']) {
-  const evidence = {...detailedDragon, dependencies:[{...detailedDragon.dependencies[0], platform_status:{linux:{status,message:'stale or unsupported native dependency <script>'}}}]};
+  const evidence = {...detailedDragon, dependencies:[{...detailedDragon.dependencies[0], platform_status:{linux:{status,message:'stale or unsupported native dependency <SCRIPT>'}}}]};
   hooks.setState({candidate, inventory:dragonInventory(evidence), columns:{linux:{ready:true,packages:new Set(['oglib_boolean-6.0.0.9'])}}});
   hooks.renderDragonFiles([monitoredDragon]);
   assert.match(elements.get('dragonWrap').innerHTML, status === 'missing' ? /Package missing/ : status === 'wrong_version' ? /Version mismatch/ : /Package unverified/);
-  assert.doesNotMatch(elements.get('dragonWrap').innerHTML, /Package satisfied|<script>/);
+  assert.doesNotMatch(elements.get('dragonWrap').innerHTML, /Package satisfied|<script>/i);
   dragonDetailCases++;
 }
 hooks.setState({candidate, inventory:dragonInventory(detailedDragon)});
