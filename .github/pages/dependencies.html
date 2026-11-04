@@ -81,6 +81,9 @@
     #linuxInstaller fieldset{border:0;padding:0;margin:12px 0}
     #linuxInstaller legend{font-size:.84em;color:var(--fg-muted)}
     .lvpm-next{border-left:3px solid var(--accent);padding:4px 12px;margin:12px 0}
+    #linuxPrerequisites{border-left:3px solid var(--accent);padding:4px 12px;margin:12px 0}
+    #linuxPrerequisites.pending{border-left-color:var(--warn)}
+    #linuxPrerequisites a{overflow-wrap:anywhere}
     #lvpmStatus:empty{display:none}
     #lvpmStatus{padding:10px 0;font-weight:600;white-space:pre-line}
     .lvpm-progress{margin-top:12px}
@@ -139,10 +142,10 @@
         <button class="dep-tab" id="tab-system" type="button" role="tab" aria-selected="false" aria-controls="panel-system" data-key="system">System Components</button>
       </div>
     </div>
-    <div class="monitorbar">
+    <div class="monitorbar" id="dependencyMonitoring">
       <div>
         <strong>Monitor files for this platform</strong>
-        <div class="monitor-help">Only this platform&rsquo;s checkboxes are shown. Saving preserves monitoring choices for the other platform. A save opens a reviewable configuration pull request; it does not install packages.</div>
+        <div class="monitor-help">Only this platform&rsquo;s checkboxes are shown. Saving preserves monitoring choices for the other platform. Saving requests a reviewable configuration pull request; it does not install packages.</div>
       </div>
       <div class="monitor-actions">
         <button class="primary" id="saveMonitor" type="button" disabled>Save monitored files</button>
@@ -236,6 +239,8 @@
     let currentDragons = [];
     let currentColStates = {};
     let monitorDirty = false;
+    let linuxMonitoringRequest = null;
+    let linuxHeadCheck = null;
     let pendingTokenAction = null;
     let updTracker = null;
     let updModal = null;
@@ -406,9 +411,34 @@
       const platforms = Array.isArray(file.monitorOn) ? file.monitorOn : ["windows", "linux"];
       const statuses = dependencies.flatMap(item => platforms.map(platform => item.platform_status
         ? (item.platform_status[platform] || {}).status || "unknown" : platform === "windows" ? item.status : "unknown"));
-      if (statuses.some(status => ["missing", "wrong_version", "conflict"].includes(status))) return '<span class="dep-file-state missing" title="A declared dependency is unresolved on a monitored platform">missing</span>';
+      if (statuses.some(status => ["missing", "wrong_version", "conflict"].includes(status))) return '<span class="dep-file-state missing" title="A declared package is unresolved on a monitored platform; this does not mean the Dragon file is absent">packages unresolved</span>';
       if (!statuses.every(status => status === "installed")) return unknown('Current package evidence is unavailable for at least one monitored platform. Linux LVPM requires current exact-version evidence; rebuild, reverify, and re-activate stale candidates.');
       return '<span class="dep-file-state installed" title="Declared packages are satisfied on every monitored platform. Linux LVPM evidence covers package files, not runtime activities.">installed</span>';
+    }
+    function dragonInspectionDetails(file){
+      const section = generatedInventory && generatedInventory.sha === selectedRevision && generatedInventory.dragon;
+      const evidence = section && Array.isArray(section.files) && section.files.find(item => normPath(item.source_file || item.path) === normPath(file.path));
+      const inspection = evidence && evidence.inspection;
+      let label = "File inspection unavailable", reason = "File presence and declarations are unverified for this revision. Regenerate trusted dashboard evidence.";
+      if (evidence && section.available === true) {
+        reason = evidence.error || (inspection && inspection.reason) || reason;
+        if (evidence.error) label = "File parse error";
+        else if (inspection && inspection.status === "parsed") label = "File present · parsed";
+        else if (inspection && inspection.reason === "Declared Dragon file is missing.") label = "File absent";
+      }
+      let markup = '<p class="why">' + esc(label) + ': ' + esc(reason) + '</p>';
+      if (!evidence || section.available !== true || evidence.error || !inspection || inspection.status !== "parsed" || !Array.isArray(evidence.dependencies)) return markup;
+      if (!evidence.dependencies.length) return markup + '<p class="why">No package declarations.</p>';
+      const monitored = file.monitored !== false && (!Array.isArray(file.monitorOn) || file.monitorOn.includes(activePlatform));
+      const labels = { installed:'Package satisfied', missing:'Package missing', wrong_version:'Version mismatch', conflict:'Conflicting declarations' };
+      const rows = evidence.dependencies.map(dependency => {
+        const measured = dependency.platform_status ? dependency.platform_status[activePlatform] : activePlatform === "windows" ? dependency : null;
+        const status = monitored && measured ? labels[measured.status] || 'Package unverified' : monitored ? 'Package unverified' : 'Not monitored on this platform';
+        return '<tr><td>' + esc(dependency.manager || 'unknown') + '</td><td>' + esc(dependency.package_id || 'unknown') + '</td><td>' + esc(dependency.declared_version || 'unspecified') + '</td><td>' + esc(status)
+          + (monitored && measured && measured.installed_version ? '<br>Worker version: ' + esc(measured.installed_version) : '')
+          + (monitored && measured && measured.message ? '<br>' + esc(measured.message) : '') + '</td></tr>';
+      });
+      return markup + '<details><summary>Declared packages (' + evidence.dependencies.length + ') · ' + esc(activePlatform) + ' worker evidence</summary><table><thead><tr><th>Manager</th><th>Package</th><th>Declared version</th><th>' + esc(activePlatform) + ' worker</th></tr></thead><tbody>' + rows.join('') + '</tbody></table><p class="why">Package evidence is separate from file presence. LVPM evidence covers package files only; CI activities were not run. UI reporting does not install absent packages.</p></details>';
     }
 
     function parseManifestYaml(text){
@@ -753,6 +783,98 @@
         button.disabled = button.lvpmBlocked || monitorDirty || selectedRevision !== defaultRevision || linuxDispatchPending || !!(linuxOperation && linuxOperation.busy);
       }
     }
+    function linuxMonitoringContext(){
+      return { revision:selectedRevision, epoch:linuxContextEpoch, inputs:JSON.stringify(monitorInputs()), token:token() };
+    }
+    function linuxMonitoringContextCurrent(context){
+      return activePlatform === "linux" && context.revision === selectedRevision && context.epoch === linuxContextEpoch
+        && context.inputs === JSON.stringify(monitorInputs()) && context.token === token();
+    }
+    function matchingLinuxMonitoringRequest(){
+      return linuxMonitoringRequest && linuxMonitoringRequest.revision === selectedRevision
+        && linuxMonitoringRequest.inputs === JSON.stringify(monitorInputs()) && linuxMonitoringRequest.token === token()
+        ? linuxMonitoringRequest : null;
+    }
+    function renderLinuxPrerequisites(){
+      const host = $("linuxPrerequisites");
+      if (!host || activePlatform !== "linux") return;
+      const request = matchingLinuxMonitoringRequest();
+      const current = !!defaultRevision && selectedRevision === defaultRevision;
+      let next = "", message = "Committed monitoring loaded at " + short(selectedRevision) + ". Choose VIPM or LVPM.";
+      if (monitorDirty) {
+        next = "Next: save monitoring changes";
+        message = "Local checkbox changes are not committed. Save a review request, review and merge the configuration proposal, then open committed settings. Neither Linux toolchain installs unsaved choices.";
+        if (request && request.status === "accepted") {
+          next = "Next: review and merge monitoring";
+          message = "Save request accepted, not applied. Acceptance does not prove a proposal was created or merged. Inspect workflow runs and proposals, merge the intended changes, then open committed settings.";
+        } else if (request && request.status === "submitting") {
+          next = "Next: wait for the monitoring request";
+          message = "Monitoring request in flight or no longer tracked in this page context. Inspect workflow runs before submitting again. No install has started.";
+        } else if (request && request.status === "uncertain") {
+          next = "Next: check monitoring request outcome";
+          message = "Monitoring request outcome is uncertain. Check workflow runs and proposals before retrying. No successful save, merge, or install is established.";
+        }
+      } else if (!current) {
+        next = "Next: open current committed settings";
+        message = "This revision is historical, or the default-branch HEAD is unavailable. Check HEAD and open the checked committed revision before building. No revision is changed automatically.";
+      }
+      const validRepo = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo);
+      host.className = next ? "pending" : "";
+      host.innerHTML = '<strong>' + esc(next || 'Monitoring ready for review') + '</strong><p role="status" aria-live="polite">' + esc(message) + '</p>'
+        + (monitorDirty ? '<p><a href="#dependencyMonitoring">Go to monitored files</a></p>' : '')
+        + (validRepo && next ? '<p><a href="https://github.com/' + esc(repo) + '/pulls" target="_blank" rel="noopener">Open proposals (unattributed list)</a> · <a href="' + esc(workflowUrl()) + '" target="_blank" rel="noopener">Monitoring workflow runs (unattributed list)</a></p>' : '')
+        + '<button type="button" id="linuxCheckHead">Check current HEAD (read only)</button><p id="linuxHeadStatus" role="status" aria-live="polite"></p><a id="linuxHeadLink" target="_blank" rel="noopener" hidden></a>';
+      const button = $("linuxCheckHead");
+      if (button) button.addEventListener("click", checkLinuxMonitoringHead);
+      if (linuxHeadCheck && linuxMonitoringContextCurrent(linuxHeadCheck)) {
+        const status = $("linuxHeadStatus"), link = $("linuxHeadLink");
+        if (status) status.textContent = linuxHeadCheck.message;
+        if (button) button.disabled = linuxHeadCheck.status === "checking";
+        if (link && linuxHeadCheck.sha) {
+          const url = new URL(location.href);
+          url.searchParams.set("sha", linuxHeadCheck.sha);
+          url.searchParams.set("platform", "linux");
+          link.href = url.href;
+          link.textContent = "Open checked committed revision " + short(linuxHeadCheck.sha) + " in a new tab (local edits stay here)";
+          link.hidden = false;
+        }
+      }
+      for (const id of ["lvpmNextHeading", "lvpmNextDescription"]) {
+        const element = $(id);
+        if (!element) continue;
+        if (element.lvpmDefaultText === undefined) element.lvpmDefaultText = element.textContent;
+        element.textContent = next ? id === "lvpmNextHeading" ? next : "Complete the monitoring step above before building or changing the Linux worker. No install has started." : element.lvpmDefaultText;
+      }
+    }
+    async function checkLinuxMonitoringHead(){
+      if (activePlatform !== "linux" || (linuxHeadCheck && linuxHeadCheck.status === "checking" && linuxMonitoringContextCurrent(linuxHeadCheck))) return;
+      const check = { ...linuxMonitoringContext(), status:"checking", message:"Checking the default-branch HEAD. Your local edits and selected revision are unchanged." };
+      linuxHeadCheck = check;
+      renderLinuxPrerequisites();
+      try {
+        if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) throw new Error("Invalid repository identity.");
+        const metadata = await fetch(api(""), { cache:"no-cache", headers:updHeaders() });
+        if (!linuxMonitoringContextCurrent(check) || linuxHeadCheck !== check) return;
+        if (!metadata.ok) throw new Error("Repository lookup failed (" + metadata.status + ").");
+        const details = await metadata.json();
+        if (!linuxMonitoringContextCurrent(check) || linuxHeadCheck !== check) return;
+        if (!details.default_branch) throw new Error("Default branch is unavailable.");
+        const response = await fetch(api("/commits/" + encodeURIComponent(details.default_branch)), { cache:"no-cache", headers:updHeaders() });
+        if (!linuxMonitoringContextCurrent(check) || linuxHeadCheck !== check) return;
+        if (!response.ok) throw new Error("HEAD lookup failed (" + response.status + ").");
+        const head = await response.json();
+        if (!linuxMonitoringContextCurrent(check) || linuxHeadCheck !== check) return;
+        if (!/^[a-f0-9]{40}$/.test(head.sha || "")) throw new Error("HEAD identity is invalid.");
+        check.sha = head.sha;
+        check.status = "checked";
+        check.message = "Checked HEAD: " + short(head.sha) + ". This does not prove a monitoring proposal was created or merged. Opening it in a new tab preserves local edits here; that tab loads committed settings. No save or install was requested.";
+      } catch (error) {
+        if (!linuxMonitoringContextCurrent(check) || linuxHeadCheck !== check) return;
+        check.status = "error";
+        check.message = "Could not check HEAD. " + error.message + " Local edits and revision are unchanged; no save or install was requested.";
+      }
+      if (linuxMonitoringContextCurrent(check) && linuxHeadCheck === check) renderLinuxPrerequisites();
+    }
     function renderLinuxProgress(phase){
       const progress = $("lvpmProgress"), label = $("lvpmProgressPhase"), bar = $("lvpmProgressBar");
       if (!progress || !label || !bar) return;
@@ -906,8 +1028,9 @@
       const selectedLvpm = String(configuredSelection).startsWith("linux-lvpm-");
       linuxToolingView = selectedLvpm ? "lvpm" : "vipm";
       lvpmCandidate = null;
-      host.innerHTML = '<h2>Linux dependency tooling</h2><p>Configured Linux default (selected revision <code>' + esc(short(revision)) + '</code>): <strong>' + (selectedLvpm ? 'LVPM Experimental' : 'VIPM') + '</strong>.</p>'
-        + '<fieldset><legend>Preview an approach · Windows unchanged</legend><label><input type="radio" name="linuxInstaller" value="vipm"' + (selectedLvpm ? '' : ' checked') + '> VIPM</label> <label><input type="radio" name="linuxInstaller" value="lvpm"' + (selectedLvpm ? ' checked' : '') + '> LVPM (experimental)</label></fieldset>'
+      host.innerHTML = '<h2>Linux dependency tooling</h2><p>Configured Linux default (selected revision <code>' + esc(short(revision)) + '</code>): <strong>' + (selectedLvpm ? 'LVPM' : 'VIPM') + '</strong>.</p>'
+        + '<fieldset><legend>Preview an approach · Windows unchanged</legend><label><input type="radio" name="linuxInstaller" value="vipm"' + (selectedLvpm ? '' : ' checked') + '> VIPM</label> <label><input type="radio" name="linuxInstaller" value="lvpm"' + (selectedLvpm ? ' checked' : '') + '> LVPM</label></fieldset>'
+        + '<div id="linuxPrerequisites"></div>'
         + '<p id="linuxVipmView"' + (selectedLvpm ? ' hidden' : '') + '>' + (selectedLvpm ? 'The current worker still uses LVPM. To return to the existing default selection, use the reset PR in the details below. Reset does not guarantee VIPM.' : 'Review and build the Linux VIPM worker using the update panel below.') + '</p>'
         + '<div id="lvpmReview"' + (selectedLvpm ? '' : ' hidden') + '>Loading candidate evidence…</div>'
         + '<div class="lvpm-progress" id="lvpmProgress" hidden><div class="upd-prog-head"><span class="upd-prog-phase" id="lvpmProgressPhase"></span></div><div class="upd-prog-track" aria-hidden="true"><div class="upd-prog-bar" id="lvpmProgressBar"></div></div></div>'
@@ -918,10 +1041,12 @@
         linuxToolingView = input.value;
         $("lvpmReview").hidden = input.value !== "lvpm";
         $("linuxVipmView").hidden = input.value !== "vipm";
+        renderLinuxPrerequisites();
         renderUpdatePanel();
       }));
       if ($("lvpmReset")) $("lvpmReset").addEventListener("click", () => dispatchLinuxWorker("reset"));
       syncLinuxOperationButtons();
+      renderLinuxPrerequisites();
       let candidate = null;
       try { candidate = await loadLvpmCandidate(); } catch (_) {}
       const buildAvailability = await loadLinuxBuildAvailability();
@@ -934,13 +1059,13 @@
       const alreadySelected = candidateSelection(candidate) === configuredSelection;
       const canActivate = candidate && !alreadySelected;
       const freshness = lvpmFreshness(resolveColumn(COLS.find(col => col.key === "linux"), selectedConfig));
-      const buildButton = '<button type="button" id="lvpmBuild"' + (current && !monitorDirty && buildAvailability.state === "available" ? '' : ' disabled') + '>Build experimental LVPM candidate</button>';
+      const buildButton = '<button type="button" id="lvpmBuild"' + (current && !monitorDirty && buildAvailability.state === "available" ? '' : ' disabled') + '>Build LVPM candidate</button>';
       const candidateHeading = candidateSelection(candidate) === configuredSelection ? 'Currently selected Linux default' : 'Alternative candidate — not automatically used';
-      review.innerHTML = '<p class="ct-sub">Linux x86-64 · Experimental · Package-file verification only, not CI activity validation.</p>'
+      review.innerHTML = '<p class="ct-sub">Linux x86-64 · Package-file verification only, not CI activity validation.</p>'
         + (selectedLvpm && freshness.status !== "current" ? '<p><strong>Current Linux dependencies are ' + esc(freshness.status) + '.</strong> Build a new candidate, reverify it, then reactivate.</p>' : '')
-        + '<div class="lvpm-next"><h3>' + (canActivate ? 'Next: review candidate activation' : 'Next: build a separate candidate') + '</h3>'
-        + (canActivate ? '<p>Package files verified; CI activities not yet tested. Activation opens a reviewable PR; merge it to change the Linux default.</p><button type="button" id="lvpmActivate"' + (current && !monitorDirty ? '' : ' disabled') + '>Activate candidate via reviewable PR</button>'
-          : '<p>' + (alreadySelected ? 'The published candidate is already selected. Rebuild only when dependency inputs change.' : 'Build from committed Linux declarations. Your active worker stays unchanged.') + '</p>' + buildButton)
+        + '<div class="lvpm-next"><h3 id="lvpmNextHeading">' + (canActivate ? 'Next: review candidate activation' : 'Next: build a separate candidate') + '</h3>'
+        + (canActivate ? '<p id="lvpmNextDescription">Package files verified; CI activities not yet tested. Activation opens a reviewable PR; merge it to change the Linux default.</p><button type="button" id="lvpmActivate"' + (current && !monitorDirty ? '' : ' disabled') + '>Activate candidate via reviewable PR</button>'
+          : '<p id="lvpmNextDescription">' + (alreadySelected ? 'The published candidate is already selected. Rebuild only when dependency inputs change.' : 'Build from committed Linux declarations. Your active worker stays unchanged.') + '</p>' + buildButton)
         + (!current ? '<p>Select the current default-branch revision to build, activate, or reset.</p>' : monitorDirty ? '<p>Save and merge monitored declaration changes before building or changing the Linux worker.</p>' : '')
         + (buildAvailability.state !== "available" ? '<p>' + esc(buildAvailability.reason) + '</p>' : '') + '</div>'
         + '<details><summary>Candidate evidence and build inputs</summary>'
@@ -954,6 +1079,7 @@
       $("lvpmBuild").addEventListener("click", () => dispatchLinuxWorker("build"));
       if ($("lvpmActivate")) $("lvpmActivate").addEventListener("click", () => dispatchLinuxWorker("activate"));
       syncLinuxOperationButtons();
+      renderLinuxPrerequisites();
       if (linuxOperationCurrent(linuxOperation || {})) linuxOperationStatus(linuxOperation, linuxOperation.message || "Checking workflow…", linuxOperation.runId);
     }
     // Compose the dependency-warning note. Returns "" when there is nothing worth
@@ -995,11 +1121,16 @@
       st.className = "status" + (kind ? " " + kind : "");
     }
     function updateMonitorUi(){
+      renderLinuxPrerequisites();
       const btn = $("saveMonitor");
       const counts = monitorCounts();
       if (monitorDirty) ["lvpmBuild", "lvpmActivate", "lvpmReset"].forEach(id => { if ($(id)) $(id).disabled = true; });
       if (btn) btn.disabled = !monitorDirty || counts.total === 0;
+      const request = activePlatform === "linux" && matchingLinuxMonitoringRequest();
+      if (request && ["submitting", "accepted", "uncertain"].includes(request.status) && btn) btn.disabled = true;
       if (!counts.total) { setMonitorStatus("No dependency files found."); return; }
+      if (request && request.status === "accepted" && monitorDirty) { setMonitorStatus("Save request accepted, not applied. Review workflow runs and proposals, merge the intended changes, then open committed settings."); return; }
+      if (request && ["submitting", "uncertain"].includes(request.status) && monitorDirty) { setMonitorStatus("Monitoring request pending or uncertain. Check workflow runs before submitting again."); return; }
       if (monitorDirty) setMonitorStatus("Save to update monitored files (" + counts.monitored + " of " + counts.total + " checked).");
       else setMonitorStatus(counts.monitored + " of " + counts.total + " dependency files monitored.", "ok");
     }
@@ -1041,8 +1172,12 @@
     function hideTokenPanel(){ const p = $("tokPanel"); if (p) p.hidden = true; }
     function monitorInputs(){ return { container_vipc:encodeMonitorList(currentVipcs), container_dragon:encodeMonitorList(currentDragons) }; }
     async function dispatchMonitor(){
+      const previous = activePlatform === "linux" && matchingLinuxMonitoringRequest();
+      if (previous && ["submitting", "accepted", "uncertain"].includes(previous.status)) return;
       if (!repo.includes("/")) { setMonitorStatus("Could not determine repository.", "err"); return; }
       if (!token()) { pendingTokenAction = dispatchMonitor; showTokenPanel(); setMonitorStatus("Paste a token to queue Reconfigure."); return; }
+      const request = activePlatform === "linux" ? { ...linuxMonitoringContext(), status:"submitting" } : null;
+      if (request) { linuxMonitoringRequest = request; renderLinuxPrerequisites(); }
       const btn = $("saveMonitor");
       if (btn) { btn.disabled = true; btn.textContent = "Queuing..."; }
       setMonitorStatus("Queuing Reconfigure...");
@@ -1052,19 +1187,26 @@
           headers:{ "Authorization":"Bearer " + token(), "Accept":"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28", "Content-Type":"application/json" },
           body:JSON.stringify({ ref:workflowRef(), inputs:monitorInputs() })
         });
+        if (request && (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request)) return;
         if (btn) { btn.textContent = "Save monitored files"; }
         if (r.status === 204) {
+          if (request) request.status = "accepted";
           hideTokenPanel();
           updateMonitorUi();
           if (btn) btn.disabled = true;
-          setMonitorStatus("Queued Reconfigure. Review and merge its pull request, then refresh this revision before building dependencies. <a href=\"" + workflowUrl() + "\" target=\"_blank\" rel=\"noopener\">View runs</a>.", "ok");
+          setMonitorStatus(request ? "Save request accepted, not applied. Inspect monitoring workflow runs and proposals; review and merge the intended changes before opening committed settings." : "Queued Reconfigure. Review and merge its pull request, then refresh this revision before building dependencies. <a href=\"" + workflowUrl() + "\" target=\"_blank\" rel=\"noopener\">View runs</a>.", "ok");
           return;
+        }
+        if (request) {
+          request.status = [400, 401, 403, 404, 405, 410, 415, 422, 429].includes(r.status) ? "rejected" : "uncertain";
+          if (request.status === "uncertain") { if (btn) btn.disabled = true; setMonitorStatus("Monitoring request outcome uncertain (HTTP " + r.status + "). Inspect workflow runs before retrying.", "err"); return; }
         }
         if (btn) btn.disabled = false;
         if (r.status === 401) { try { localStorage.removeItem(TOK_KEY); } catch (_) {} showTokenPanel("That token was rejected. Paste a valid fine-grained token with <strong>Actions: Read and write</strong> for this repository."); setMonitorStatus("Token rejected (401).", "err"); return; }
         if (r.status === 403) { showTokenPanel("The saved token cannot dispatch workflows here. Grant <strong>Actions: Read and write</strong> for <code>" + esc(repo) + "</code>."); setMonitorStatus("Dispatch forbidden (403).", "err"); return; }
         if (r.status === 404) {
           const unregistered = await explainDispatch404("reconfigure.yml");
+          if (request && (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request)) return;
           if (unregistered) { hideTokenPanel(); setMonitorStatus(unregistered, "err"); return; }
           showTokenPanel("The saved token cannot see <code>" + esc(repo) + "</code>, or this repo does not have <code>reconfigure.yml</code> installed.");
           setMonitorStatus("Workflow not found or repo not accessible (404).", "err");
@@ -1072,8 +1214,17 @@
         }
         setMonitorStatus("Dispatch failed (HTTP " + r.status + ").", "err");
       } catch (e) {
+        if (request && (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request)) return;
+        if (request) {
+          request.status = "uncertain";
+          if (btn) { btn.disabled = true; btn.textContent = "Save monitored files"; }
+          setMonitorStatus("Monitoring request outcome uncertain after a network error. Inspect workflow runs before retrying.", "err");
+          return;
+        }
         if (btn) { btn.disabled = false; btn.textContent = "Save monitored files"; }
         setMonitorStatus("Network error: " + esc(String(e && e.message || e)), "err");
+      } finally {
+        if (request && linuxMonitoringContextCurrent(request) && linuxMonitoringRequest === request) renderLinuxPrerequisites();
       }
     }
     function setFileMonitor(kind, path, plat, checked){
@@ -1279,7 +1430,7 @@
         } catch (_) { if (platform === activePlatform && revision === selectedRevision) setUpdateStatus("Could not verify the active Linux selection; no rebuild was dispatched.", "err"); return; }
       }
       if (platform !== activePlatform || revision !== selectedRevision || monitorDirty) return;
-      if (activeLvpm() && updSelectedKeys().includes("linux")) { setUpdateStatus("Linux uses LVPM. Use Linux installer → LVPM Experimental to build a candidate, then explicitly re-activate it. VIPM was not dispatched.", "err"); return; }
+      if (activeLvpm() && updSelectedKeys().includes("linux")) { setUpdateStatus("Linux uses LVPM. Use Linux installer → LVPM to build a candidate, then explicitly re-activate it. VIPM was not dispatched.", "err"); return; }
       const mode = selectedUpdateMode();
       if (!token()) { pendingTokenAction = dispatchContainerUpdate; showTokenPanel("Running the container update needs a fine-grained token with <strong>Actions: Read and write</strong> for this repository."); setUpdateStatus("Paste a token to run the container update."); return; }
       const targets = updTargets();
@@ -1581,7 +1732,7 @@
     var __expPop = null;
     var COL_INFO = {
       linux: '<span class="exp-pop-h"><strong>Linux &mdash; dependency worker</strong></span>' +
-        'This column reads the selected Linux worker manifest, using <code>config.container.linuxUse</code> when set; explicit per-action overrides win. VIPM remains the default. Experimental LVPM inventory contains actual installed packages only: package files verified; CI activities not yet tested. LVPM updates require a new candidate build and explicit re-activation, not a VIPM rebuild.'
+        'This column reads the selected Linux worker manifest, using <code>config.container.linuxUse</code> when set; explicit per-action overrides win. VIPM remains the default. LVPM inventory contains actual installed packages only: package files verified; CI activities not yet tested. LVPM updates require a new candidate build and explicit re-activation, not a VIPM rebuild.'
     };
     function ensureExpPop(){
       if (__expPop) return __expPop;
@@ -1660,7 +1811,7 @@
       const rows = dragons.map(d => {
         const on = Array.isArray(d.monitorOn) ? d.monitorOn : (d.monitored !== false ? MONITOR_PLATFORMS.slice() : []);
         const scoped = { ...d, monitored:on.includes(activePlatform), monitorOn:on.filter(platform => platform === activePlatform) };
-        return '<tr><td class="pkg"><strong>' + esc(d.path) + '</strong>' + dragonFileState(scoped) + '<br><span class="why">Dragon dependency file</span></td>' + columns.map(c => monitorCell('dragon', d.path, on, false, c.key)).join('') + '</tr>';
+        return '<tr><td class="pkg"><strong>' + esc(d.path) + '</strong><br><span class="why">Package status: </span>' + dragonFileState(scoped) + dragonInspectionDetails(scoped) + '</td>' + columns.map(c => monitorCell('dragon', d.path, on, false, c.key)).join('') + '</tr>';
       });
       host.innerHTML = '<table><thead><tr><th>Dragon File</th>' + heads + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
       Array.from(document.querySelectorAll('input[data-monitor-kind="dragon"]')).forEach(cb => cb.addEventListener('change', () => setFileMonitor('dragon', cb.getAttribute('data-monitor-path'), cb.getAttribute('data-monitor-plat'), cb.checked)));
