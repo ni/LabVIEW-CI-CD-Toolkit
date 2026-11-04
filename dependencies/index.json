@@ -1,8 +1,35 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "0ac94820a9067731935f38e94143c4e79cb34ecc",
+  "sha": "5db8463afce09712f934959726a7fac3f8b71678",
   "revisions": [
+    {
+      "sha": "5db8463afce09712f934959726a7fac3f8b71678",
+      "short": "5db8463",
+      "message": "Merge pull request #135 from ni/fix/linux-monitoring-prerequisites-20261104",
+      "author": "Elijah Kerry",
+      "date": "2026-11-04T22:34:34Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "3169f9cad5848f23ad32bb7f17ccaf4754d8acde",
+      "short": "3169f9c",
+      "message": "test: check mixed-case script escaping in Dragon details",
+      "author": "elijah286",
+      "date": "2026-11-04T17:50:57Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "2205afcad4a0419240bd5acf878721a44291c939",
+      "short": "2205afc",
+      "message": "dashboard: clarify Linux monitoring and Dragon package evidence",
+      "author": "elijah286",
+      "date": "2026-11-04T17:45:27Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "0ac94820a9067731935f38e94143c4e79cb34ecc",
       "short": "0ac9482",
@@ -873,33 +900,6 @@
       "message": "Keep Reconfigure output readable by existing settings tools",
       "author": "elijah286",
       "date": "2026-11-02T13:47:03Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "8e8f736f207114d2e77b67c19d3e94e06ad70a9c",
-      "short": "8e8f736",
-      "message": "Distribute the Dragon dependency parser with shared client tooling",
-      "author": "elijah286",
-      "date": "2026-11-02T13:32:20Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "de4dd4d2314ecf672549bac2d7f8894ca7e96ab7",
-      "short": "de4dd4d",
-      "message": "Merge remote-tracking branch 'origin/main' into feat/linux-lvpm-candidates-20261101",
-      "author": "elijah286",
-      "date": "2026-11-02T13:26:08Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "e2b457e311196c645da1be563e690b48a3ad2e24",
-      "short": "e2b457e",
-      "message": "Merge pull request #94 from ni/lvci-release/release-4.18.7-7d5ee618b305a2736c2b9bc1369503c540202f2a",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T13:23:35Z",
       "project": false,
       "dep_only": false
     },
