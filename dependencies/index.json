@@ -1,14 +1,41 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "4eefd93ff154a66c52135ef27626918faf9530a5",
+  "sha": "9d4ec074bdc60a8212e156eac9896f4ddf951502",
   "revisions": [
+    {
+      "sha": "9d4ec074bdc60a8212e156eac9896f4ddf951502",
+      "short": "9d4ec07",
+      "message": "Merge pull request #136 from ni/fix/windows-dragon-required-dependencies-20261104",
+      "author": "Elijah Kerry",
+      "date": "2026-11-05T02:38:30Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "51f5305f7a838cd7444938c5f359f440bf170e1d",
+      "short": "51f5305",
+      "message": "Merge remote-tracking branch 'origin/main' into fix/windows-dragon-required-dependencies-20261104",
+      "author": "elijah286",
+      "date": "2026-11-05T01:43:15Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "4eefd93ff154a66c52135ef27626918faf9530a5",
       "short": "4eefd93",
       "message": "Merge pull request #140 from ni/lvci-release/release-4.20.3-cbf0fc7f6cb112c6fee4332680147e03b3750a4d",
       "author": "Elijah Kerry",
       "date": "2026-11-05T01:42:39Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "cad993268ebeec52435591e1145461c4a69c5236",
+      "short": "cad9932",
+      "message": "Merge remote-tracking branch 'origin/main' into fix/windows-dragon-required-dependencies-20261104",
+      "author": "elijah286",
+      "date": "2026-11-05T01:33:18Z",
       "project": false,
       "dep_only": false
     },
@@ -49,11 +76,47 @@
       "dep_only": false
     },
     {
+      "sha": "0e2062754f4472c424caaab15ecc84666c2dec2e",
+      "short": "0e20627",
+      "message": "Merge main to preserve monitoring UI alongside Dragon runtime fixes",
+      "author": "elijah286",
+      "date": "2026-11-04T22:37:57Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "238c63f37ecb7591c97a5b935539e754391cdaf8",
+      "short": "238c63f",
+      "message": "test: initialize installer phase cleanup state on Windows",
+      "author": "elijah286",
+      "date": "2026-11-04T22:35:14Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "5db8463afce09712f934959726a7fac3f8b71678",
       "short": "5db8463",
       "message": "Merge pull request #135 from ni/fix/linux-monitoring-prerequisites-20261104",
       "author": "Elijah Kerry",
       "date": "2026-11-04T22:34:34Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "db239679212be717abbcff2b17124f5e800330b1",
+      "short": "db23967",
+      "message": "vipm: normalize Dragon source directories before verification",
+      "author": "elijah286",
+      "date": "2026-11-04T22:32:27Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "c15293521d9c99e89560385e29a2da7bcac20d25",
+      "short": "c152935",
+      "message": "vipm: require verified Dragon dependencies in Windows workers",
+      "author": "elijah286",
+      "date": "2026-11-04T22:27:10Z",
       "project": false,
       "dep_only": false
     },
@@ -837,69 +900,6 @@
       "message": "Separate Windows and Linux dependency management views",
       "author": "elijah286",
       "date": "2026-11-02T18:34:19Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "dc4157385537074c6316abd70b8c9720a4329bce",
-      "short": "dc41573",
-      "message": "Describe generated PRs by features and changed settings",
-      "author": "elijah286",
-      "date": "2026-11-02T18:34:14Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "71e63576ae63678b23dd170f207a2a2b07a0edfc",
-      "short": "71e6357",
-      "message": "Merge pull request #96 from ni/lvci-release/release-4.19.0",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T15:18:43Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "d075ea237cb2a21da05c1f16836a483c4745ff83",
-      "short": "d075ea2",
-      "message": "Prepare release 4.19.0",
-      "author": "github-actions[bot]",
-      "date": "2026-11-02T14:59:24Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "c4165551094fae6d3d705a22b3c6ede4a2f48822",
-      "short": "c416555",
-      "message": "Merge pull request #93 from ni/feat/linux-lvpm-candidates-20261101",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T14:59:02Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "c54dec7b42840f6f05be1410b8c695092e339fb8",
-      "short": "c54dec7",
-      "message": "Merge remote-tracking branch 'origin/fix/reconfigure-yaml-reader-compatibility' into feat/linux-lvpm-candidates-20261101",
-      "author": "elijah286",
-      "date": "2026-11-02T14:06:30Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b0233c113f722e8c1d090f0430db3752f0517093",
-      "short": "b0233c1",
-      "message": "Preserve VI Analyzer rule visibility after Reconfigure updates",
-      "author": "elijah286",
-      "date": "2026-11-02T14:06:15Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "836bda00ddc0e9b87c3b1abd312601aa51e9902b",
-      "short": "836bda0",
-      "message": "Preserve empty dependency selections across LVPM configuration tools",
-      "author": "elijah286",
-      "date": "2026-11-02T13:54:58Z",
       "project": false,
       "dep_only": false
     },

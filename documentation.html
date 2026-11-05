@@ -1108,7 +1108,8 @@ mass-compile:
           (<code>build-labview-image.yml</code>, &ldquo;Build LabVIEW CI Image&rdquo;), which runs on a Windows runner and
           this time starts <code>FROM</code> the base and applies a thin dependency layer
           (<code>.github/docker/labview-ci.Dockerfile</code>) that bakes your monitored <code>.vipc</code> packages (and, when a
-          monitored <code>.dragon</code> file is selected, applies it through the JKI&nbsp;Dragon CLI the base image provides).
+          monitored <code>.dragon</code> file is selected, installs its supported exact VIPM requirements through the
+          shared verified installer, then checks the final requested LabVIEW inventory).
           Dependency monitoring is configured on the <strong>Dependencies</strong> page, not Configure. Every discovered
           project <code>.vipc</code> and <code>.dragon</code> is checked by default on a fresh repo, while
           <code>.github/labview/vipm/ci-tooling.vipc</code> is always checked and locked. Monitoring is
@@ -1364,6 +1365,37 @@ docker run --rm `
         non-interactively inside a <code>docker build</code> required solving several non-obvious problems,
         documented in <code>.github/labview/vipm/README.md</code> and implemented by
         <code>install-vipc.ps1</code>:</p>
+      <h3 id="windows-dragon">Required Windows Dragon dependencies</h3>
+      <p>The GitHub Windows push gate and staging share safe YAML monitoring semantics: quoted platform scalars,
+        flow/block lists, quoted paths and inline comments are supported; <code>monitor</code> must be a YAML boolean.
+        Invalid YAML or unsupported selection shapes fail explicitly. Explicit empty lists and platform opt-outs
+        exclude declarations without parsing them; no configured list retains legacy project discovery. The isolated
+        Python 3.13 workflow host installs <code>PyYAML==6.0.3</code> and loads the trusted static TOML parser by explicit
+        path, excluding client working-directory and <code>PYTHONPATH</code> import/startup overrides. Declaration
+        files are never executed.</p>
+      <p>Every Windows producer stages selected source bytes and a normalized schema/platform/year/bitness/exact-root
+        plan. The composite worker-image action keeps its explicit flat <code>deps-dir</code> contract; GitLab Windows
+        keeps project discovery outside <code>.github</code>, rather than applying GitHub monitoring flags. Worker
+        identities bind source, plan, helper and installer
+        bytes with target inputs. This hash binding provides integrity, not signing or provenance. Missing, changed,
+        escaping or linked sources, unsupported install-affecting settings and contradictory pins fail closed.
+        Dragon-only and mixed VIPC/Dragon builds invoke the shared installer once, without an assumed
+        <code>dragon apply</code> executable. The container validates source hashes and the requested target before
+        bootstrapping VIPM.</p>
+      <p>Required Dragon roots cannot be bypassed with optional VIPC policy or
+        <code>VIPM_ALLOW_MISSING_PACKAGES</code>. After all later project/tooling installations, final inventory must
+        explicitly identify the requested LabVIEW year/bitness and contain every exact root/version. Later upgrades,
+        missing packages, wrong targets, command failures and unreadable/dead-engine inventory fail the build; the
+        installer does not choose newest versions or rewrite pins. <code>-BootstrapOnly</code> retains its early
+        no-package behavior.</p>
+      <div class="note"><span class="lbl">Compatibility break / major-release candidate from 4.x</span>
+        Independent Dragon CLI execution and legacy <code>install-dragon.ps1</code> hooks are retired. Nonempty
+        NIPM/feed requests, nonempty <code>project.vipc</code>, unsupported project settings and unpinned/ranged versions
+        fail rather than being delegated or ignored. Migrate to supported exact numeric VIPM string or inline
+        <code>{ version = "..." }</code> declarations and select VIPCs separately before updating. This is not a
+        backward-compatible patch. Local or hosted mock contracts do not prove a vendor bake succeeded: a real
+        Windows bake and final inventory remain required before claiming a published worker contains the repaired
+        dependencies.</div>
       <div class="note"><span class="lbl">Linux bakes the same dependencies</span>
         The Linux worker (<code>labview-ci-linux.Dockerfile</code>) installs VIPM from the native Debian package and
         applies the same staged repository <code>.vipc</code> files during its build via
@@ -1387,7 +1419,12 @@ docker run --rm `
         same worker build context and use these Dockerfiles. The Linux Dockerfile declares its pinned NI base tag before
         every build stage, so Docker can resolve it in the final worker <code>FROM</code>; the provider does not yet expose
         the GitHub Dependencies page's interactive review/update policy. Dependency, catalog-release, and installed
-        custom-worker-template changes trigger the matching worker job; it can also be triggered or retried in GitLab.</p>
+        custom-worker-template changes trigger the matching worker job; it can also be triggered or retried in GitLab.
+        The Windows template invokes the shared trusted Dragon staging helper with isolated Python (3.11+ with
+        <code>tomllib</code>, or a compatible interpreter with <code>tomli</code> installed in its isolated environment),
+        validates its configured <code>LVCI_LABVIEW_VERSION</code> against the selected base, hashes staged inputs
+        and target, and checks native
+        staging/build/push exit codes. A required failure stops subsequent publication.</p>
       <ol>
         <li><strong>Use VIPM 2026 Q3</strong> from the JKI CDN — the older NI-feed CLI times out on
           <code>library_list</code> with no diagnostic.</li>
@@ -1432,7 +1469,9 @@ docker run --rm `
         <li><strong>Require final Windows runtime evidence</strong> — static payload inspection and
           AST/mock tests do not prove legacy OGP installation. A reviewed real bake must verify required
           Antidoc/palette and the final target inventory. Later best-effort tooling can upgrade earlier
-          project pins, so recovered-batch validation is not a final-image pin guarantee. Package
+          project pins, so recovered-batch validation is not a final-image pin guarantee. Required Dragon roots now
+          have a separate exact-version final target-inventory gate after those later installs; this does not extend
+          that guarantee to every VIPC root. Package
           archives, required/optional policy, integrity verification, target identity, and exact/minimum
           pin semantics are not relaxed.</li>
         <li><strong>Seed <code>Settings.ini</code></strong> before installing — a fresh image lacks
@@ -1803,9 +1842,12 @@ jobs:
         a VIP-only directory without a VIPC fails. Project VIPCs are required; bundled optional framework
         packages retain the source installer's best-effort behavior. Verify the framework in the finished
         image before relying on it. <code>include-ci-tooling: 'false'</code> omits the tooling VIPC and disables
-        default UTF/JUnit/early framework packages. Dragon files require a base with a working
-        <code>dragon</code> CLI supporting <code>dragon apply</code>; a missing CLI or failed apply fails the
-        build. The standard VIPM base alone does not provide that additional runtime.</p>
+        default UTF/JUnit/early framework packages. Supported exact Dragon VIPM declarations use the shared
+        host-generated target plan and verified VIPM installer, including Dragon-only builds; no separate Dragon CLI
+        is needed. The isolated action entry and content fingerprint include the trusted parser, normalized plan,
+        source bytes, installer and target inputs. Required Dragon versions are verified after later tooling.
+        NIPM/feed requests, unsupported settings and custom Dragon hooks fail explicitly; migrate before adopting
+        this incompatible change. A successful mock contract is not proof of a real Windows dependency bake.</p>
       <p>The unit-test composite requires <code>image</code> and <code>framework</code> (Caraya,
         <code>vi-tester</code>, <code>utf</code>, or <code>lunit</code>). Its optional <code>command</code>
         is an intentionally executable, trusted <code>cmd.exe</code> template with <code>{ver}</code>,
