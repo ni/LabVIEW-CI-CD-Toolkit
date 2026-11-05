@@ -79,8 +79,10 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
 
     def test_linux_next_action_details_and_live_feedback_contract(self):
         page = (ROOT / '.github/pages/dependencies.html').read_text()
-        self.assertIn('Next: review candidate activation', page)
-        self.assertIn('Next: build a separate candidate', page)
+        self.assertIn('Build Linux LVPM container', page)
+        self.assertIn('Review Linux VIPM build', page)
+        self.assertNotIn('Next:', page)
+        self.assertIn('id="linuxPrimary"', page)
         self.assertIn('<details><summary>Candidate evidence and build inputs</summary>', page)
         self.assertIn('<details><summary>Current selection and rollback</summary>', page)
         self.assertIn('role="status" aria-live="polite" id="lvpmStatus"', page)
@@ -89,11 +91,12 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
 
     def test_linux_monitoring_prerequisites_distinguish_acceptance_from_merge(self):
         page = (ROOT / '.github/pages/dependencies.html').read_text()
-        self.assertIn('Next: save monitoring changes', page)
-        self.assertIn('Next: review and merge monitoring', page)
+        self.assertIn('Save monitoring for review', page)
+        self.assertIn('Check committed monitoring', page)
+        self.assertIn('Open matching committed settings', page)
         self.assertIn('Save request accepted, not applied', page)
-        self.assertIn('Acceptance does not prove a proposal was created or merged', page)
-        self.assertIn('Open proposals (unattributed list)', page)
+        self.assertIn('not proof of a proposal or merge', page)
+        self.assertIn('Review proposals (unattributed list)', page)
         self.assertNotIn('LVPM Experimental', page)
         self.assertNotIn('Build experimental LVPM', page)
         update = page.split('function updateMonitorUi(){', 1)[1].split('function token()', 1)[0]
@@ -109,6 +112,21 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
         self.assertGreaterEqual(check.count('linuxMonitoringContextCurrent(check)'), 6)
         self.assertIn('linuxHeadCheck !== check', check)
         self.assertIn('local edits stay here', page)
+
+    def test_linux_primary_retains_source_and_full_settings_guards(self):
+        page = (ROOT / '.github/pages/dependencies.html').read_text()
+        save = page.split('async function dispatchMonitor(){', 1)[1].split('async function linuxSaveRestriction()', 1)[0]
+        self.assertLess(save.index('await linuxSaveRestriction()'), save.index('method:"POST"'))
+        self.assertIn('linuxMonitoringContextCurrent(request)', save)
+        compare = page.split('function committedMonitoringMatches(', 1)[1].split('async function checkLinuxMonitoringHead()', 1)[0]
+        for required in ('config.hasVipcList', 'config.hasDragonList', 'workerSelectionSettings(config)',
+                         'normalizedMonitorInputs(JSON.parse(context.inputs))', 'Duplicate declaration paths',
+                         'Explicit valid per-file monitor flags'):
+            self.assertIn(required, compare)
+        primary = page.split('async function runLinuxPrimaryAction()', 1)[1].split('function workerSelectionSettings', 1)[0]
+        self.assertIn('linuxDispatchPending', primary)
+        self.assertIn('linuxOperation.busy', primary)
+        self.assertIn('return openUpdateApprovalDialog()', primary)
 
     def test_dragon_details_separate_file_and_package_evidence(self):
         page = (ROOT / '.github/pages/dependencies.html').read_text()
@@ -151,6 +169,24 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
 
 
 class ReconfigureLvpmTests(unittest.TestCase):
+    def test_actual_monitoring_writer_output_matches_linux_readonly_check(self):
+        fixtures = []
+        for platforms in ('windows+linux', 'windows', 'linux', 'none'):
+            inputs = {'container_vipc': 'project.vipc::' + platforms,
+                      'container_dragon': 'project.dragon::' + platforms}
+            result, text = self.apply_settings(IN_CONTAINER_VIPC=inputs['container_vipc'],
+                                               IN_CONTAINER_DRAGON=inputs['container_dragon'])
+            self.assertEqual(result.returncode, 0, result.stderr)
+            if platforms in ('windows+linux', 'none'):
+                self.assertNotIn('monitorOn:', text)
+            fixtures.append({'yaml': text, 'inputs': inputs,
+                             'selection': yaml.safe_load(MANIFEST)['config']['container']})
+        environment = dict(os.environ, LVCI_MONITORING_WRITER_FIXTURE=json.dumps(fixtures))
+        result = subprocess.run(['node', str(ROOT / '.github/labview/test-lvpm-ux.mjs')],
+                                cwd=ROOT, env=environment, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Real Reconfigure writer comparison: 4 outputs passed', result.stdout)
+
     def preservation_fixture(self):
         document = yaml.safe_load(MANIFEST)
         document.update({'provider': 'github', 'installedVersion': 'scratch-unreleased-lvpm',

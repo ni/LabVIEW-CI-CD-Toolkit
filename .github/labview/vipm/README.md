@@ -60,6 +60,20 @@ image and run, so they never execute against a worker that is missing a project
 dependency. The `ci-tooling.vipc` distributed by the tooling is the **base**
 configuration applied first; a project's own discovered VIPC files stack on top.
 
+### Selecting Antidoc and experimental declarations together
+
+The experimental VIPC's Antidoc CLI root is aligned to `3.4.0.126`, the exact
+version already established in the authoritative Antidoc capability VIPC.
+Its package spec and BMP are copied byte-for-byte from that archive; no
+external resolver or newest-version selection is used. The informational
+Antidoc JSON agrees with the committed archive, which remains authoritative.
+
+This reconciles the stale experimental `3.3.0.117` declaration without dropping
+any selected source or package root. The offline Linux planner accepts all four
+committed VIPCs plus `example/Example.dragon` with 35 exact roots, and still
+rejects conflicting pins. This proves declaration consistency, not a successful
+package installation, Linux worker bake, runtime relinking or final inventory.
+
 ### Required essentials vs. best-effort tooling
 
 `install-vipc.ps1` does not treat all packages equally, because a single heavy
