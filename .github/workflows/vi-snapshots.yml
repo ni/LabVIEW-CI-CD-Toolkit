@@ -185,7 +185,7 @@ jobs:
           bash .github/labview/wait-for-worker-image.sh "${{ github.sha }}" "${{ github.event.before }}"
 
       - name: Set up the snapshot render toolchain
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: .github/labview/toimages/go.mod
 
