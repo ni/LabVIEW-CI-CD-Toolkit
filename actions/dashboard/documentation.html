@@ -2443,6 +2443,10 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         on the diagram without opening LabVIEW. The same viewer is used in the VI Browser, standalone links,
         and report previews. Snapshots and Diff are the only viewer choices.</p>
       <h4>Rendering and reuse</h4>
+      <p><strong>Snapshot Checks:</strong> Windows contract tests read repository text and scratch-client fixtures
+        as UTF-8, including Unicode release notes, rather than relying on the host's legacy code page.
+        A regression exercises catalog loading with a simulated Windows-1252 default. These checks validate
+        installer and viewer contracts; they do not establish successful LabVIEW rendering or a container bake.</p>
       <p>The <strong>VI Snapshots</strong> capability installs the browser, revision metadata, and frame renderers.
         Configure selects the Windows and/or Linux render platforms under <code>config.viBrowser.platforms</code>.
         Windows uses <code>vi-snapshots-json-windows.yml</code>; Linux uses <code>vi-snapshots-json.yml</code>

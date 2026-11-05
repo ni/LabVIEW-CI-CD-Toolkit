@@ -21,7 +21,28 @@ SPEC.loader.exec_module(INSTALLER)
 
 class SnapshotTests(unittest.TestCase):
     def setUp(self):
-        self.catalog = json.loads((ROOT / '.github/labview-ci/catalog.json').read_text())
+        self.catalog = json.loads((ROOT / '.github/labview-ci/catalog.json').read_text(encoding='utf-8'))
+
+    def test_catalog_uses_utf8_with_legacy_windows_default(self):
+        expected = {'notes': '“café” — 日本語'}
+        original_open = Path.open
+
+        def legacy_windows_open(path, mode='r', buffering=-1, encoding=None, errors=None, newline=None):
+            if 'b' not in mode and encoding in (None, 'locale'):
+                encoding = 'cp1252'
+            return original_open(path, mode, buffering, encoding, errors, newline)
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_root = Path(directory)
+            catalog_path = fixture_root / '.github/labview-ci/catalog.json'
+            catalog_path.parent.mkdir(parents=True)
+            catalog_path.write_bytes(json.dumps(expected, ensure_ascii=False).encode('utf-8'))
+            with patch.dict(globals(), {'ROOT': fixture_root}), patch.object(Path, 'open', legacy_windows_open):
+                with self.assertRaises(UnicodeDecodeError):
+                    catalog_path.read_text()
+                probe = SnapshotTests()
+                probe.setUp()
+            self.assertEqual(probe.catalog, expected)
 
     def test_one_capability_installs_rich_renderers(self):
         capabilities = {entry['id']: entry for entry in self.catalog['capabilities']}
@@ -73,19 +94,19 @@ class SnapshotTests(unittest.TestCase):
             target = root / rel
             target.parent.mkdir(parents=True)
             stats = {'planned': 0, 'pruned': 0}
-            target.write_text(known)
+            target.write_text(known, encoding='utf-8')
             INSTALLER.prune_retired_files(rules, root, True, stats)
             self.assertTrue(target.exists())
             self.assertEqual(stats, {'planned': 1, 'pruned': 0})
             INSTALLER.prune_retired_files(rules, root, False, stats)
             self.assertFalse(target.exists())
             self.assertEqual(stats['pruned'], 1)
-            target.write_text('name: My own image build')
+            target.write_text('name: My own image build', encoding='utf-8')
             INSTALLER.prune_retired_files(rules, root, False, stats)
             self.assertTrue(target.exists())
             target.unlink()
             outside = root / 'outside.yml'
-            outside.write_text(known)
+            outside.write_text(known, encoding='utf-8')
             try:
                 target.symlink_to(outside)
             except OSError:
@@ -96,9 +117,9 @@ class SnapshotTests(unittest.TestCase):
             target.parent.rmdir()
             target.parent.symlink_to(root, target_is_directory=True)
             victim = root / target.name
-            victim.write_text(known)
+            victim.write_text(known, encoding='utf-8')
             INSTALLER.prune_retired_files(rules, root, False, stats)
-            self.assertEqual(victim.read_text(), known)
+            self.assertEqual(victim.read_text(encoding='utf-8'), known)
             target.parent.unlink()
             target.mkdir(parents=True)
             INSTALLER.prune_retired_files(rules, root, False, stats)
@@ -111,32 +132,32 @@ class SnapshotTests(unittest.TestCase):
             target = Path(directory)
             retired = target / rel
             retired.parent.mkdir(parents=True)
-            retired.write_text('\n'.join(rules[rel]))
+            retired.write_text('\n'.join(rules[rel]), encoding='utf-8')
             command = [sys.executable, str(ROOT / '.github/labview-ci/install.py'),
                        '--source', str(ROOT), '--target', directory, '--activities', 'dashboard',
                        '--repo', 'scratch/client', '--no-vars']
-            dry = subprocess.run(command + ['--dry-run'], capture_output=True, text=True)
+            dry = subprocess.run(command + ['--dry-run'], capture_output=True, text=True, encoding='utf-8')
             self.assertEqual(dry.returncode, 0, dry.stderr)
             self.assertTrue(retired.exists())
             for options in ([], ['--update'], ['--thin']):
-                retired.write_text('\n'.join(rules[rel]))
-                result = subprocess.run(command + options, capture_output=True, text=True)
+                retired.write_text('\n'.join(rules[rel]), encoding='utf-8')
+                result = subprocess.run(command + options, capture_output=True, text=True, encoding='utf-8')
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertFalse(retired.exists())
                 self.assertNotIn('snapshots', INSTALLER.read_manifest(target)['activities'])
-            (target / '.github/workflows/release.yml').write_text('name: Client release')
-            result = subprocess.run(command + ['--update'], capture_output=True, text=True)
+            (target / '.github/workflows/release.yml').write_text('name: Client release', encoding='utf-8')
+            result = subprocess.run(command + ['--update'], capture_output=True, text=True, encoding='utf-8')
             self.assertEqual(result.returncode, 0, result.stderr)
             sentinel = target / '.github/labview-ci/source.json'
-            sentinel.write_text('source-only fixture')
+            sentinel.write_text('source-only fixture', encoding='utf-8')
             before = (target / '.github/labview-ci.yml').read_bytes()
-            result = subprocess.run(command + ['--update'], capture_output=True, text=True)
+            result = subprocess.run(command + ['--update'], capture_output=True, text=True, encoding='utf-8')
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('refusing to install', result.stderr)
             self.assertEqual((target / '.github/labview-ci.yml').read_bytes(), before)
 
     def test_browser_keep_settings_and_retired_inventory(self):
-        source = (ROOT / '.github/pages/integrate.html').read_text()
+        source = (ROOT / '.github/pages/integrate.html').read_text(encoding='utf-8')
         names = ['resolveActivities', 'resolveFiles', 'effectiveValues', 'userConfigPaths', 'isUserConfig',
                  'managedUniverse', 'retiredWorkflowSignatures', 'inventoryManagedFiles', 'staleFor']
         functions = []
@@ -174,21 +195,21 @@ const gh = async url => ({ok:true,json:async () => ({content:textFor[decodeURICo
   assert.equal(retiredWorkflowSignatures(retired), null);
 })().catch(error => {console.error(error);process.exitCode=1;});
 '''
-        result = subprocess.run(['node', '-'], input=script, text=True, capture_output=True, timeout=15)
+        result = subprocess.run(['node', '-'], input=script, text=True, encoding='utf-8', capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for name in ['integrate.html', 'documentation.html', 'configure.html']:
             self.assertEqual((ROOT / '.github/pages' / name).read_bytes(),
                              (ROOT / 'actions/dashboard' / name).read_bytes())
 
     def test_gitlab_installs_snapshot_jobs_for_both_platforms(self):
-        provider = json.loads((ROOT / '.github/labview-ci/providers/gitlab/files.json').read_text())
+        provider = json.loads((ROOT / '.github/labview-ci/providers/gitlab/files.json').read_text(encoding='utf-8'))
         pipeline = INSTALLER.gitlab_pipeline_yml(['snapshots'], ['windows', 'linux'], '2026', provider)
         for template in ['snapshots-windows.yml', 'snapshots-linux.yml']:
             self.assertIn(template, pipeline)
         self.assertNotIn('snapshots-2', pipeline)
 
     def test_coverage_counts_frames_not_html_exports(self):
-        source = ast.parse((ROOT / 'actions/dashboard/dashboard.py').read_text())
+        source = ast.parse((ROOT / 'actions/dashboard/dashboard.py').read_text(encoding='utf-8'))
         function = next(node for node in source.body if isinstance(node, ast.FunctionDef) and node.name == 'snapshot_coverage')
         namespace = {
             '_snap_cov_cache': {},
@@ -199,8 +220,8 @@ const gh = async url => ({ok:true,json:async () => ({content:textFor[decodeURICo
         self.assertEqual(namespace['snapshot_coverage']('commit'), (2, 3))
 
     def test_generation_scripts_only_render_frames(self):
-        builder = (ROOT / '.github/labview/build-snapshots.ps1').read_text()
-        renderer = (ROOT / '.github/labview/render-snapshots.ps1').read_text()
+        builder = (ROOT / '.github/labview/build-snapshots.ps1').read_text(encoding='utf-8')
+        renderer = (ROOT / '.github/labview/render-snapshots.ps1').read_text(encoding='utf-8')
         self.assertIn("-Filter '*.windows.json'", builder)
         self.assertIn("'json-blobs.windows.json'", builder)
         self.assertIn('toimages\\windows-render.ps1', renderer)
@@ -214,13 +235,13 @@ const gh = async url => ({ok:true,json:async () => ({content:textFor[decodeURICo
                 self.assertEqual(expected, (ROOT / directory / name).read_bytes())
 
     def test_reconfigure_embedded_python_parses(self):
-        source = (ROOT / '.github/workflows/reconfigure.yml').read_text()
+        source = (ROOT / '.github/workflows/reconfigure.yml').read_text(encoding='utf-8')
         for match in re.finditer(r"python3 - <<'PY'\n(.*?)\n\s+PY", source, re.S):
             ast.parse(textwrap.dedent(match.group(1)))
 
     def test_report_previews_use_interactive_viewer(self):
         for path in ['.github/labview/build-analyzer-report.py', '.github/labview/build-masscompile-report.py', '.github/labview/build-unittest-report.py', 'actions/vi-analyzer/build-analyzer-report.py', 'actions/masscompile/build-masscompile-report.py']:
-            source = (ROOT / path).read_text()
+            source = (ROOT / path).read_text(encoding='utf-8')
             self.assertIn('vi-interactive.html?file=', source, path)
             self.assertNotIn('frame.src = SNAP_BASE+html;', source, path)
 
