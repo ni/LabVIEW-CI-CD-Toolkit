@@ -1,8 +1,35 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "5db8463afce09712f934959726a7fac3f8b71678",
+  "sha": "5d4458c3cb1c3f65165e7e1fca93f37ff9d4b69c",
   "revisions": [
+    {
+      "sha": "5d4458c3cb1c3f65165e7e1fca93f37ff9d4b69c",
+      "short": "5d4458c",
+      "message": "Merge pull request #139 from ni/fix/linux-build-path-and-antidoc-pins-20261104",
+      "author": "Elijah Kerry",
+      "date": "2026-11-05T01:32:47Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "13ace3f59ce9ea0692651ff87b510fd72e0d119c",
+      "short": "13ace3f",
+      "message": "test: match exact hosts in Linux monitoring wait fixtures",
+      "author": "elijah286",
+      "date": "2026-11-05T01:29:07Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "a8e3f77f0b5bb3465ce1f87eb9cb930fadba348f",
+      "short": "a8e3f77",
+      "message": "dependencies: simplify Linux builds and align Antidoc pins",
+      "author": "elijah286",
+      "date": "2026-11-05T00:46:19Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "5db8463afce09712f934959726a7fac3f8b71678",
       "short": "5db8463",
@@ -877,33 +904,6 @@
       "dep_only": false
     },
     {
-      "sha": "9fbcd3a77562839bfe3a134c68e6ac15c44e6fa5",
-      "short": "9fbcd3a",
-      "message": "Integrate settings-reader compatibility into LVPM validation",
-      "author": "elijah286",
-      "date": "2026-11-02T13:48:19Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "631f142b4878d8ba38b4be34e2da2fdeeaa85dcc",
-      "short": "631f142",
-      "message": "Use trusted per-platform Dragon dependency evidence",
-      "author": "elijah286",
-      "date": "2026-11-02T13:47:39Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "4ee584e9b2e1c6b68f9f985b019da761b782857a",
-      "short": "4ee584e",
-      "message": "Keep Reconfigure output readable by existing settings tools",
-      "author": "elijah286",
-      "date": "2026-11-02T13:47:03Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
       "sha": "d0e080c128589707c82a13a45d842952fb3a5fc8",
       "short": "d0e080c",
       "message": "Merge remote-tracking branch 'origin/main' into via-debug",
@@ -1175,7 +1175,7 @@
       ],
       "locked": false,
       "packages": [
-        "wovalab_lib_antidoc_cli-3.3.0.117"
+        "wovalab_lib_antidoc_cli-3.4.0.126"
       ],
       "error": ""
     },
