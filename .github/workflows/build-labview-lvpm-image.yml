@@ -3,6 +3,12 @@ run-name: Build opt-in LVPM Linux candidate (package-file verification only)
 
 on:
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: 'Reviewed default-branch commit; reject a changed dispatch target'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -18,6 +24,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
+      - name: Verify reviewed commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if [ -n "$EXPECTED_SHA" ]; then
+            if ! [[ "$EXPECTED_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              echo "::error::Invalid reviewed commit SHA; expected exactly 40 hexadecimal characters."
+              exit 1
+            fi
+            reviewed_sha=$(printf '%s' "$EXPECTED_SHA" | tr '[:upper:]' '[:lower:]')
+            if [ "$GITHUB_SHA" != "$reviewed_sha" ]; then
+              echo "::error::Reviewed HEAD moved. Click Update container image again to review the new target."
+              exit 1
+            fi
+          fi
+
       - name: Require the canonical default branch
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -25,6 +47,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
 
       - name: Install planning dependencies
         run: python3 -m pip install PyYAML==6.0.3 tomli==2.4.0

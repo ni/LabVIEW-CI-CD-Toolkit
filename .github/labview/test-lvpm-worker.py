@@ -4,6 +4,7 @@
 import ast
 import base64
 import copy
+import fnmatch
 import importlib.util
 import io
 import json
@@ -460,6 +461,71 @@ class NetworkAndWorkflowTests(unittest.TestCase):
         self.assertIn('worker.verify_image_platform(image[0], inventory)', text)
         self.assertLess(text.index('worker.verify_image_platform(image[0], inventory)'),
                         text.index("manifest = {**inventory"))
+
+    def test_linux_update_guards_precede_checkout_and_pin_all_checkouts(self):
+        for filename, first_job in (("build-labview-lvpm-image.yml", "candidate"),
+                                    ("build-labview-linux-image.yml", "gate")):
+            with self.subTest(workflow=filename):
+                workflow = yaml.load((ROOT / '.github/workflows' / filename).read_text(), Loader=yaml.BaseLoader)
+                self.assertIn('expected_sha', workflow['on']['workflow_dispatch']['inputs'])
+                reviewed_input = workflow['on']['workflow_dispatch']['inputs']['expected_sha']
+                self.assertEqual(reviewed_input['type'], 'string')
+                self.assertEqual(reviewed_input['required'], 'false')
+                self.assertEqual(reviewed_input['default'], '')
+                steps = workflow['jobs'][first_job]['steps']
+                self.assertEqual(steps[0]['name'], 'Verify reviewed commit')
+                self.assertEqual(steps[0]['env']['EXPECTED_SHA'], '${{ inputs.expected_sha }}')
+                self.assertNotIn('if', steps[0])
+                for job in workflow['jobs'].values():
+                    for step in job['steps']:
+                        if step.get('uses', '').startswith('actions/checkout@'):
+                            self.assertEqual(step['with']['ref'], '${{ github.sha }}')
+                if first_job == 'gate':
+                    self.assertEqual(workflow['jobs']['build-and-push']['needs'], 'gate')
+                    self.assertEqual(workflow['jobs']['build-and-push']['if'], "needs.gate.outputs.build == 'true'")
+
+    def test_actual_linux_sha_guard_accepts_matching_and_legacy_empty_inputs(self):
+        for filename, job in (("build-labview-lvpm-image.yml", "candidate"),
+                              ("build-labview-linux-image.yml", "gate")):
+            workflow = yaml.safe_load((ROOT / '.github/workflows' / filename).read_text())
+            script = workflow['jobs'][job]['steps'][0]['run']
+            for expected in ('', 'a' * 40, 'A' * 40, 'aA' * 20):
+                with self.subTest(workflow=filename, expected=expected):
+                    result = subprocess.run(['bash', '-e', '-c', script],
+                                            env={**os.environ, 'EXPECTED_SHA': expected, 'GITHUB_SHA': 'a' * 40},
+                                            capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_actual_linux_sha_guard_rejects_race_invalid_and_shell_text(self):
+        for filename, job in (("build-labview-lvpm-image.yml", "candidate"),
+                              ("build-labview-linux-image.yml", "gate")):
+            workflow = yaml.safe_load((ROOT / '.github/workflows' / filename).read_text())
+            script = workflow['jobs'][job]['steps'][0]['run']
+            for expected in ('b' * 40, 'B' * 40, 'G' * 40, 'a' * 39, 'a' * 41, '$(echo injected)', 'a' * 40 + '\n'):
+                with self.subTest(workflow=filename, expected=expected):
+                    result = subprocess.run(['bash', '-e', '-c', script],
+                                            env={**os.environ, 'EXPECTED_SHA': expected, 'GITHUB_SHA': 'a' * 40},
+                                            capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertNotIn('injected', result.stdout)
+                    if expected.lower() == 'b' * 40:
+                        self.assertIn('Reviewed HEAD moved', result.stdout)
+                        self.assertIn('Click Update container image again', result.stdout)
+                    else:
+                        self.assertIn('Invalid reviewed commit SHA', result.stdout)
+
+    def test_production_checks_trigger_for_reviewed_sha_workflows_and_worker_tests(self):
+        workflow = yaml.load((ROOT / '.github/workflows/lvpm-checks.yml').read_text(), Loader=yaml.BaseLoader)
+        for event in ('pull_request', 'push'):
+            for path in ('.github/workflows/build-labview-lvpm-image.yml',
+                         '.github/workflows/build-labview-linux-image.yml',
+                         '.github/labview/test-lvpm-worker.py'):
+                with self.subTest(event=event, path=path):
+                    self.assertTrue(any(fnmatch.fnmatchcase(path, pattern)
+                                        for pattern in workflow['on'][event]['paths']))
+        commands = '\n'.join(step.get('run', '') for step in workflow['jobs']['offline-contracts']['steps'])
+        self.assertIn('python .github/labview/test-lvpm-worker.py', commands)
+        self.assertIn('node .github/labview/test-lvpm-ux.mjs', commands)
 
     def test_all_owned_workflows_parse_and_embedded_scripts_compile(self):
         for name in ("build-labview-lvpm-image.yml", "masscompile-linux-container.yml", "run-vi-analyzer-linux-container.yml",

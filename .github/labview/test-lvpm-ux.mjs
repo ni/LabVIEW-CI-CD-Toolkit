@@ -39,6 +39,7 @@ let commitResponses = [];
 let headJsonBarrier = null;
 let rawConfigStatus = 200;
 let rawTextBarrier = null;
+let reviewedWorkflowOverride = null;
 let repoMetadata = {full_name:'owner/project', default_branch:'trunk', fork:false};
 const context = vm.createContext({
   window:{ LVCI:{ repo:'owner/project' } },
@@ -57,7 +58,7 @@ const context = vm.createContext({
       if (runResponse instanceof Error) throw runResponse;
       return { ok:true, json:async () => { if (runJsonBarrier) await runJsonBarrier; return runResponse; }, ...runResponse?.response };
     }
-    if (url === 'https://api.github.com/repos/owner/project') {
+    if (url === 'https://api.github.com/repos/' + repoMetadata.full_name) {
       if (failMetadata) throw new Error('unavailable');
       return { ok:true, json:async () => repoMetadata };
     }
@@ -74,7 +75,7 @@ const context = vm.createContext({
     }
     if (url.includes('latest.json')) return { ok:true, json:async () => ({ tag, manifest_path:candidate.manifest_path, image_digest:digest }) };
     if (url.includes('manifest.json')) return { ok:true, json:async () => responseCandidate };
-    if (new URL(url).hostname === 'raw.githubusercontent.com') return { ok:rawConfigStatus === 200, status:rawConfigStatus, text:async () => { if (rawTextBarrier) await rawTextBarrier; return activeConfig; } };
+    if (new URL(url).hostname === 'raw.githubusercontent.com') return { ok:rawConfigStatus === 200, status:rawConfigStatus, text:async () => { if (rawTextBarrier) await rawTextBarrier; return url.includes('/.github/workflows/') ? reviewedWorkflowOverride ?? fs.readFileSync(new URL('workflows/' + url.split('/').at(-1),root),'utf8') : activeConfig; } };
     if (options.method === 'POST') {
       if (postBarrier) await postBarrier;
       if (dispatchError) throw dispatchError;
@@ -83,7 +84,7 @@ const context = vm.createContext({
     throw new Error('Unexpected request: ' + url);
   }
 });
-vm.runInContext(source.replace('    init();', `
+const fixtureSource = source.replace('    init();', `
     globalThis.hooks = { parseManifestYaml, resolveColumn, packagesInManifest, pkgCellState,
       candidateSelection, loadLinuxBuildAvailability, linuxWorkflowPayload, dispatchLinuxWorker, dispatchContainerUpdate, loadManifestFor, updTargets, renderLinuxInstaller, nipmCell, enrichPlatformState,
       pollLinuxOperation, validateLinuxRun, invalidateLinuxOperation, getLinuxOperation:() => linuxOperation,
@@ -93,12 +94,22 @@ vm.runInContext(source.replace('    init();', `
       monitorCounts, monitorInputs, dispatchMonitor, openUpdateApprovalDialog, loadRevision,
       renderLinuxPrerequisites, checkLinuxMonitoringHead,
       runLinuxPrimaryAction, committedMonitoringMatches, linuxMonitoringContext, linuxSaveRestriction,
+      verifiedLinuxUpdateTarget, linuxReviewedWorkflow, updateIntent:() => linuxUpdateIntent,
+      cancelLinuxUpdateApproval,
+      acceptedMonitoring:() => { linuxMonitoringRequest = {...linuxMonitoringContext(),status:'accepted'}; },
       headCheck:() => linuxHeadCheck,
+      loadedInputs:() => linuxLoadedInputs,
       isMonitorDirty:() => monitorDirty,
       setRevisionFiles:files => {
         listDependencyFiles = async () => files;
         vipcPackages = async () => ['actual-1.2'];
         systemForRevision = async () => [];
+      },
+      setRevisionReaders:readers => {
+        if (readers.files) listDependencyFiles = readers.files;
+        if (readers.packages) vipcPackages = readers.packages;
+        if (readers.system) systemForRevision = readers.system;
+        if (readers.platforms) loadPlatformStates = readers.platforms;
       },
       pendingAction:() => pendingTokenAction,
       setModal:modal => { updModal = modal; },
@@ -107,6 +118,8 @@ vm.runInContext(source.replace('    init();', `
         invalidateLinuxOperation();
         linuxMonitoringRequest = null;
         linuxHeadCheck = null;
+        linuxUpdateIntent = null;
+        linuxLoadedInputs = null;
         activePlatform = state.platform || "linux";
         linuxToolingView = state.tooling || "vipm";
         if (state.vipcs) currentVipcs = state.vipcs;
@@ -120,7 +133,8 @@ vm.runInContext(source.replace('    init();', `
         defaultRevision = state.defaultRevision || "${revision}";
         monitorDirty = !!state.dirty;
       }
-    };`), context);
+    };`);
+vm.runInContext(fixtureSource, context);
 const hooks = context.hooks;
 const plain = value => JSON.parse(JSON.stringify(value));
 hooks.setState({ candidate });
@@ -301,7 +315,7 @@ hooks.setState({ candidate });
 const availableView = installerView();
 await hooks.renderLinuxInstaller();
 availableView.inputs.find(input => input.value === 'lvpm').listener();
-assert.match(elements.get('linuxPrerequisites').innerHTML, /id="linuxPrimary">Build Linux LVPM container/);
+assert.match(elements.get('linuxPrerequisites').innerHTML, /id="linuxPrimary">Update container image/);
 assert.match(availableView.review.innerHTML, /Candidate build workflow is installed on the default branch/);
 workflowResponse = 'missing';
 const beforeRemovedBuild = requests.length;
@@ -313,7 +327,7 @@ assert.equal((await hooks.loadLinuxBuildAvailability()).state, 'missing');
 const missingView = installerView();
 await hooks.renderLinuxInstaller();
 missingView.inputs.find(input => input.value === 'lvpm').listener();
-assert.match(elements.get('linuxPrerequisites').innerHTML, /id="linuxPrimary" disabled/);
+assert.match(elements.get('linuxPrerequisites').innerHTML, /id="linuxPrimary">Update container image/);
 assert.match(missingView.review.innerHTML, /Install the Linux custom-image capability on the default branch/);
 assert.match(missingView.review.innerHTML, /id="lvpmActivate">/);
 assert.doesNotMatch(missingView.host.innerHTML, /id="lvpmReset"/);
@@ -325,7 +339,7 @@ for (const failure of [401, 403, 404, 500, 'network', 'malformed']) {
   const unavailableView = installerView();
   await hooks.renderLinuxInstaller();
   unavailableView.inputs.find(input => input.value === 'lvpm').listener();
-  assert.match(elements.get('linuxPrerequisites').innerHTML, /id="linuxPrimary" disabled/);
+  assert.match(elements.get('linuxPrerequisites').innerHTML, /id="linuxPrimary">Update container image/);
   assert.match(unavailableView.review.innerHTML, /Candidate build availability is unknown/);
   assert.doesNotMatch(unavailableView.review.innerHTML, /Install the Linux custom-image capability/);
   assert.match(unavailableView.review.innerHTML, /id="lvpmActivate">/);
@@ -340,7 +354,7 @@ assert.equal((await hooks.loadLinuxBuildAvailability()).state, 'unknown');
 const metadataFailureView = installerView();
 await hooks.renderLinuxInstaller();
 metadataFailureView.inputs.find(input => input.value === 'lvpm').listener();
-assert.match(elements.get('linuxPrerequisites').innerHTML, /id="linuxPrimary" disabled/);
+assert.match(elements.get('linuxPrerequisites').innerHTML, /id="linuxPrimary">Update container image/);
 assert.match(metadataFailureView.review.innerHTML, /Candidate build availability is unknown/);
 failMetadata = false;
 workflowResponse = 'available';
@@ -672,6 +686,7 @@ modal.querySelector = selector => modalFields.get(selector);
 hooks.setModal(modal);
 platformFixture('windows', ['actual-1.2'], []);
 hooks.openUpdateApprovalDialog();
+hooks.openUpdateApprovalDialog({type:'click',target:elements.get('updRun')});
 assert.match(modalFields.get('#updConfirmBody').innerHTML, /Windows preview/);
 assert.doesNotMatch(modalFields.get('#updConfirmBody').innerHTML, /Linux preview/);
 const approvedBeforeSwitch = modalFields.get('#updConfirmApprove').onclick;
@@ -1211,415 +1226,528 @@ assert.equal(postCount(progressStart), 2);
 hooks.invalidateLinuxOperation();
 progressCases++;
 let prerequisiteCases = 0;
+function explicitMonitoring(vipcs = [{path:'project.vipc',monitorOn:['windows','linux']}], dragons = []){
+  const list = (name,files) => '    ' + name + ':' + (files.length ? '\n' + files.map(file =>
+    '      - path: "' + file.path + '"\n        monitor: ' + (file.monitored !== false && file.monitor !== false) + '\n'
+    + (file.monitorOn?.length ? '        monitorOn: ' + file.monitorOn.join('+') + '\n' : '')).join('') : ' []\n');
+  return 'config:\n  container:\n' + list('vipc',vipcs) + list('dragon',dragons);
+}
 function prerequisiteFixture(overrides = {}){
   progressFixture();
-  dispatchStatus = 204;
-  failMetadata = false;
-  repoMetadata = {full_name:'owner/project', default_branch:'trunk', fork:false};
-  workflowResponse = 'available';
-  rawConfigStatus = 200;
-  hooks.setState({ candidate, vipcs:[{ ...projectVipc, monitorOn:['windows'] }], dragons:[], columns:{}, ...overrides });
-  installerView();
-  hooks.renderLinuxPrerequisites();
+  dispatchStatus = 200; dispatchDetails = {...acceptedDetails}; runResponse = {...identifiedRun};
+  failMetadata = false; repoMetadata = {full_name:'owner/project',default_branch:'trunk',fork:false};
+  rawConfigStatus = 200; rawTextBarrier = null; reviewedWorkflowOverride = null; workflowResponse = 'available';
+  activeConfig = explicitMonitoring();
+  hooks.setState({candidate,tooling:'lvpm',vipcs:[{...projectVipc}],dragons:[],columns:{},...overrides});
+  installerView(); hooks.renderLinuxPrerequisites();
   return requests.length;
 }
 const prerequisiteMarkup = () => elements.get('linuxPrerequisites').innerHTML;
-function explicitMonitoring(vipcs = [{path:'project.vipc', monitorOn:['windows']}], dragons = []){
-  const list = (name, files) => '    ' + name + ':' + (files.length ? '\n' + files.map(file =>
-    '      - path: "' + file.path + '"\n        monitor: ' + (file.monitor !== false) + '\n        monitorOn: ' + ((file.monitorOn || []).join('+') || 'none') + '\n').join('') : ' []\n');
-  return 'config:\n  container:\n' + list('vipc', vipcs) + list('dragon', dragons);
-}
-for (const tooling of ['vipm', 'lvpm']) {
-  const start = prerequisiteFixture();
-  await hooks.renderLinuxInstaller();
-  elements.get('linuxInstaller').querySelectorAll().find(input => input.value === tooling).listener();
-  hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
-  assert.match(prerequisiteMarkup(), /Save monitoring for review/);
-  assert.doesNotMatch(prerequisiteMarkup(), /Next:|Build Linux LVPM container/);
-  await hooks.renderUpdatePanel();
-  assert.doesNotMatch(elements.get('updatePanel').innerHTML, /id="updRun"/);
-  assert.equal((prerequisiteMarkup().match(/id="linuxPrimary"/g) || []).length, 1);
-  assert.equal(postCount(start), 0);
-  prerequisiteCases++;
-}
-let prerequisiteStart = prerequisiteFixture({dirty:true});
-await hooks.runLinuxPrimaryAction();
-assert.match(prerequisiteMarkup(), /Check committed monitoring/);
-assert.match(prerequisiteMarkup(), /not proof of a proposal or merge/);
-assert.match(prerequisiteMarkup(), /unattributed list/);
-assert.doesNotMatch(prerequisiteMarkup(), /\/pull\/\d+|\/actions\/runs\/\d+/);
-assert.equal(hooks.isMonitorDirty(), true);
-await hooks.dispatchMonitor();
-assert.equal(postCount(prerequisiteStart), 1);
-assert.equal(elements.get('saveMonitor').disabled, true);
-hooks.selectPlatform('windows');
-hooks.selectPlatform('linux');
-await new Promise(resolve => setImmediate(resolve));
-assert.match(prerequisiteMarkup(), /Check committed monitoring/);
-await hooks.dispatchMonitor();
-assert.equal(postCount(prerequisiteStart), 1);
-prerequisiteCases++;
-for (const failure of [500, 502, 503, 504, 'transport']) {
-  prerequisiteStart = prerequisiteFixture({dirty:true});
-  if (failure === 'transport') dispatchError = new Error('network unavailable');
-  else dispatchStatus = failure;
-  await hooks.runLinuxPrimaryAction();
-  await hooks.dispatchMonitor();
-  assert.equal(postCount(prerequisiteStart), 1);
-  assert.equal(elements.get('saveMonitor').disabled, true);
-  assert.match(prerequisiteMarkup(), /pending or uncertain/);
-  assert.doesNotMatch(prerequisiteMarkup(), /\/actions\/runs\/\d+/);
-  prerequisiteCases++;
-}
-prerequisiteStart = prerequisiteFixture({dirty:true});
-dispatchStatus = 422;
-await hooks.runLinuxPrimaryAction();
-assert.equal(elements.get('saveMonitor').disabled, false);
-await hooks.runLinuxPrimaryAction();
-assert.equal(postCount(prerequisiteStart), 2);
-prerequisiteCases++;
-let releaseMonitoringPost;
-prerequisiteStart = prerequisiteFixture({dirty:true});
-postBarrier = new Promise(resolve => { releaseMonitoringPost = resolve; });
-const monitoringPost = hooks.runLinuxPrimaryAction();
-await until(() => postCount(prerequisiteStart) === 1);
-await hooks.dispatchMonitor();
-assert.equal(postCount(prerequisiteStart), 1);
-assert.equal(elements.get('linuxPrimary').disabled, true);
-releaseMonitoringPost();
-await monitoringPost;
-postBarrier = null;
-prerequisiteCases++;
-for (const change of ['platform', 'revision', 'monitoring']) {
-  prerequisiteStart = prerequisiteFixture({dirty:true});
-  postBarrier = new Promise(resolve => { releaseMonitoringPost = resolve; });
-  const pending = hooks.runLinuxPrimaryAction();
-  await until(() => postCount(prerequisiteStart) === 1);
-  if (change === 'platform') hooks.selectPlatform('windows');
-  else if (change === 'revision') hooks.setState({candidate, revision:'e'.repeat(40), dirty:true});
-  else hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
-  elements.get('monitorStatus').innerHTML = 'New context unchanged';
-  releaseMonitoringPost();
-  await pending;
-  postBarrier = null;
-  assert.equal(elements.get('monitorStatus').innerHTML, 'New context unchanged');
-  assert.equal(postCount(prerequisiteStart), 1);
-  prerequisiteCases++;
-}
-prerequisiteStart = prerequisiteFixture({dirty:true, revision:'e'.repeat(40)});
-await hooks.runLinuxPrimaryAction();
-assert.match(prerequisiteMarkup(), /also historical/);
-activeConfig = explicitMonitoring();
-const beforeInputs = plain(hooks.monitorInputs());
-const beforeUrl = context.location.href;
 const newHead = 'f'.repeat(40);
-commitResponses = [newHead];
-await hooks.runLinuxPrimaryAction();
-assert.equal(postCount(prerequisiteStart), 1);
-assert.equal(hooks.isMonitorDirty(), true);
-assert.deepEqual(plain(hooks.monitorInputs()), beforeInputs);
-assert.equal(context.location.href, beforeUrl);
-assert.match(prerequisiteMarkup(), /Open matching committed settings/);
-assert.match(prerequisiteMarkup(), /local edits stay here/);
-assert.match(prerequisiteMarkup(), /target="_blank" rel="noopener"/);
-assert.equal(hooks.headCheck().sha, newHead);
-await hooks.runLinuxPrimaryAction();
-assert.equal(postCount(prerequisiteStart), 1);
-await assert.rejects(hooks.linuxWorkflowPayload('build'), /current default-branch revision/);
-prerequisiteCases++;
-for (const failure of ['network', 'invalid-head', 'mismatch', 'partial', 'malformed', 'duplicate', 'other-platform', 'worker-selection', 'permission', 'incomplete-file', 'duplicate-root', 'wrong-repository', 'wrong-root', 'inline-root']) {
-  prerequisiteStart = prerequisiteFixture({dirty:true});
-  await hooks.runLinuxPrimaryAction();
-  activeConfig = explicitMonitoring();
-  if (failure === 'network') failMetadata = true;
-  if (failure === 'invalid-head') commitResponses = ['not-a-sha'];
-  if (failure === 'mismatch') activeConfig = explicitMonitoring([{path:'different.vipc',monitorOn:['windows']}]);
-  if (failure === 'other-platform') activeConfig = explicitMonitoring([{path:'project.vipc',monitorOn:['linux']}]);
-  if (failure === 'partial') activeConfig = 'config:\n  container:\n    use: base\n';
-  if (failure === 'malformed') activeConfig += '        monitor: maybe\n';
-  if (failure === 'duplicate') activeConfig += '    vipc: []\n';
-  if (failure === 'worker-selection') activeConfig += '    linuxUse: custom-worker\n';
-  if (failure === 'permission') rawConfigStatus = 403;
-  if (failure === 'incomplete-file') activeConfig = activeConfig.replace('        monitor: true\n', '');
-  if (failure === 'duplicate-root') activeConfig += 'config:\n';
-  if (failure === 'wrong-root') activeConfig = activeConfig.replace('config:', 'unrelated:') + 'config:\n  labviewVersion: "2026"\n';
-  if (failure === 'inline-root') activeConfig += 'config: {}\n';
-  if (failure === 'wrong-repository') repoMetadata.full_name = 'other/project';
-  await hooks.runLinuxPrimaryAction();
-  assert.equal(hooks.headCheck().sha, undefined, failure);
-  assert.ok(['error','mismatch'].includes(hooks.headCheck().status), failure);
-  assert.doesNotMatch(prerequisiteMarkup(), /Open matching committed settings/, failure);
-  assert.equal(hooks.isMonitorDirty(), true);
-  assert.equal(postCount(prerequisiteStart), 1);
-  await hooks.dispatchMonitor();
-  assert.equal(postCount(prerequisiteStart), 1);
-  prerequisiteCases++;
+let start;
+const actualImplicitManifest = fs.readFileSync(new URL('labview-ci.yml',root),'utf8');
+const implicitConfig = hooks.parseManifestYaml(actualImplicitManifest);
+assert.equal(implicitConfig.hasVipcList,false);
+assert.equal(implicitConfig.hasDragonList,false);
+function loaderPlatforms(){
+  return {windows:{tag:'base',ready:true,packages:new Set()},linux:{tag:'base',ready:true,packages:new Set()}};
 }
-for (const change of ['platform', 'revision', 'monitoring', 'tooling']) {
-  prerequisiteStart = prerequisiteFixture({dirty:true});
-  await hooks.renderLinuxInstaller();
-  await hooks.runLinuxPrimaryAction();
-  activeConfig = explicitMonitoring();
-  let releaseHead;
-  const promise = new Promise(resolve => { releaseHead = resolve; });
-  lookupBarrier = {match:url => url.includes('/commits/'), promise};
-  const pending = hooks.runLinuxPrimaryAction();
-  await until(() => requests.slice(prerequisiteStart).some(request => request.url.includes('/commits/')));
-  if (change === 'platform') hooks.selectPlatform('windows');
-  else if (change === 'revision') hooks.setState({candidate, revision:'e'.repeat(40), dirty:true});
-  else if (change === 'tooling') elements.get('linuxInstaller').querySelectorAll().find(input => input.value === 'lvpm').listener();
-  else hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
-  const markup = prerequisiteMarkup();
-  releaseHead();
-  await pending;
-  lookupBarrier = null;
-  assert.equal(prerequisiteMarkup(), markup);
-  assert.equal(postCount(prerequisiteStart), 1);
-  prerequisiteCases++;
-}
-prerequisiteStart = prerequisiteFixture({revision:'e'.repeat(40)});
-await hooks.runLinuxPrimaryAction();
-assert.match(prerequisiteMarkup(), /Open current Linux settings/);
-assert.equal(hooks.isMonitorDirty(), false);
-assert.equal(postCount(prerequisiteStart), 0);
-prerequisiteCases++;
-const completeVipcs = [
-  {path:'.github/labview/vipm/ci-tooling.vipc',monitorOn:['windows','linux'],monitored:true,role:'core',locked:true},
-  {path:'project.vipc',monitorOn:['linux'],monitored:true},
-  {path:'optout.vipc',monitorOn:[],monitored:false,monitor:false}
-];
-const completeDragons = [{path:'project.dragon',monitorOn:['windows'],monitored:true}];
-prerequisiteStart = prerequisiteFixture({dirty:true, vipcs:completeVipcs, dragons:completeDragons,
-  config:{use:'base',linuxUse:selection,actions:{masscompile:'custom/image:retained'}}});
-const completeContext = hooks.linuxMonitoringContext();
-const completeSelection = '  container:\n    use: base\n    linuxUse: "' + selection + '"\n    actions:\n      masscompile: custom/image:retained\n';
-const completeYaml = explicitMonitoring(completeVipcs,completeDragons).replace('  container:\n',completeSelection);
-assert.equal(hooks.committedMonitoringMatches(completeYaml,completeContext), true);
-assert.equal(hooks.committedMonitoringMatches(explicitMonitoring(completeVipcs.toReversed(),completeDragons).replace('  container:\n',completeSelection),completeContext), true);
-for (const changed of [
-  completeYaml.replace('monitor: false', 'monitor: true').replace('monitorOn: none','monitorOn: linux'),
-  completeYaml.replace('monitorOn: windows+linux','monitorOn: windows'),
-  completeYaml.replace('monitorOn: windows\n','monitorOn: linux\n'),
-  completeYaml.replace('custom/image:retained','base'),
-  completeYaml.replace('    use: base','    use: custom'),
-  completeYaml.replace('    linuxUse: "' + selection + '"','    linuxUse: base')
-]) assert.equal(hooks.committedMonitoringMatches(changed,completeContext), false);
-await hooks.runLinuxPrimaryAction();
-activeConfig = completeYaml;
-await hooks.runLinuxPrimaryAction();
-assert.match(prerequisiteMarkup(), /Open matching committed settings/);
-assert.deepEqual(plain(hooks.monitorInputs()), JSON.parse(completeContext.inputs));
-assert.equal(postCount(prerequisiteStart), 1);
-prerequisiteCases++;
-for (const platforms of [['windows'],['windows','linux'],['linux'],[]]) {
-  const file = {path:'.github/labview/antidoc/antidoc.vipc', monitorOn:platforms, monitor:platforms.length > 0, monitored:platforms.length > 0};
-  prerequisiteStart = prerequisiteFixture({dirty:true,vipcs:[file]});
-  await hooks.runLinuxPrimaryAction();
-  const intended = plain(hooks.monitorInputs());
-  activeConfig = explicitMonitoring([file]);
-  await hooks.runLinuxPrimaryAction();
-  if (platforms.join('+') === 'windows') assert.match(prerequisiteMarkup(), /Open matching committed settings/);
-  else {
-    assert.match(prerequisiteMarkup(), /Cannot verify the intended platform selection/);
-    assert.doesNotMatch(prerequisiteMarkup(), /Open matching committed settings/);
-    await hooks.dispatchMonitor();
-  }
-  assert.equal(hooks.isMonitorDirty(),true);
-  assert.deepEqual(plain(hooks.monitorInputs()),intended);
-  assert.equal(postCount(prerequisiteStart),1);
-  prerequisiteCases++;
-}
-if (process.env.LVCI_MONITORING_WRITER_FIXTURE) {
-  const fixtures = JSON.parse(process.env.LVCI_MONITORING_WRITER_FIXTURE);
-  for (const fixture of fixtures) {
-    const files = kind => fixture.inputs['container_' + kind].split(';').map(entry => {
-      const [path, platforms] = entry.split('::');
-      const monitorOn = platforms === 'none' ? [] : platforms.split('+');
-      return {path,monitorOn,monitored:monitorOn.length > 0};
-    });
-    prerequisiteStart = prerequisiteFixture({dirty:true,vipcs:files('vipc'),dragons:files('dragon'),config:fixture.selection});
-    const intended = hooks.linuxMonitoringContext();
-    assert.equal(hooks.committedMonitoringMatches(fixture.yaml,intended),true);
-    if (fixture.inputs.container_vipc.endsWith('::windows+linux')) {
-      const explicit = fixture.yaml.replaceAll('        monitor: true\n','        monitor: true\n        monitorOn: windows+linux\n');
-      assert.equal(hooks.committedMonitoringMatches(explicit,intended),true);
-      assert.equal(hooks.committedMonitoringMatches(explicit.replaceAll('monitorOn: windows+linux','monitorOn: linux'),intended),false);
+for (const sameRevision of [false,true]) {
+  start = prerequisiteFixture();
+  elements.set('status',uiElement());
+  const oldSha = sameRevision ? revision : 'e'.repeat(40);
+  let releaseOldManifest;
+  let releaseCurrentSystem;
+  let oldManifestWaiting = false;
+  let currentSystemWaiting = false;
+  let manifestReads = 0;
+  const oldBarrier = new Promise(resolve => {releaseOldManifest = resolve;});
+  const currentBarrier = new Promise(resolve => {releaseCurrentSystem = resolve;});
+  const raceContext = vm.createContext({...context,fetch:async (url,options) => {
+    if (url.includes('/.github/labview-ci.yml')) {
+      const old = manifestReads++ === 0;
+      return {ok:true,text:async () => {
+        if (old) {oldManifestWaiting = true; await oldBarrier;}
+        return actualImplicitManifest;
+      }};
     }
-    const mismatch = {...intended,inputs:JSON.stringify({...fixture.inputs,container_dragon:'project.dragon::' + (fixture.inputs.container_dragon.endsWith('::linux') ? 'windows' : 'linux')})};
-    assert.equal(hooks.committedMonitoringMatches(fixture.yaml,mismatch),false);
-    await hooks.runLinuxPrimaryAction();
-    activeConfig = fixture.yaml;
-    await hooks.runLinuxPrimaryAction();
-    assert.match(prerequisiteMarkup(), /Open matching committed settings/);
-    assert.equal(hooks.isMonitorDirty(),true);
-    assert.equal(postCount(prerequisiteStart),1);
-  }
-  console.log('Real Reconfigure writer comparison: ' + fixtures.length + ' outputs passed');
+    return context.fetch(url,options);
+  }});
+  vm.runInContext(fixtureSource,raceContext);
+  const race = raceContext.hooks;
+  race.setState({candidate,tooling:'lvpm',vipcs:[{...projectVipc,monitorOn:['windows','linux']}],dragons:[]});
+  race.setRevisionReaders({
+    files:async sha => ({vipc:[sha === oldSha && !sameRevision ? 'old-only.vipc' : 'current-only.vipc'],dragon:[]}),
+    packages:async () => [],
+    platforms:async () => loaderPlatforms(),
+    system:async sha => {
+      if (sha === revision) {currentSystemWaiting = true; await currentBarrier;}
+      return [];
+    }
+  });
+  const oldLoad = race.loadRevision(oldSha);
+  await until(() => oldManifestWaiting);
+  const currentLoad = race.loadRevision(revision);
+  await until(() => currentSystemWaiting);
+  releaseOldManifest();
+  await oldLoad;
+  assert.equal(race.loadedInputs(),null);
+  releaseCurrentSystem();
+  await currentLoad;
+  assert.equal(race.loadedInputs().revision,revision);
+  assert.equal(race.loadedInputs().text,actualImplicitManifest);
+  assert.match(race.monitorInputs().container_vipc,/current-only.vipc/);
+  assert.doesNotMatch(race.monitorInputs().container_vipc,/old-only.vipc/);
+  assert.equal(race.loadedInputs().inputs,JSON.stringify(race.monitorInputs()));
+  race.setModal(modal);
+  await race.runLinuxPrimaryAction();
+  if (race.updateIntent().phase === 'approval') await modalFields.get('#updConfirmApprove').onclick();
+  assert.equal(postCount(start),1,race.updateIntent().message);
+  race.invalidateLinuxOperation();
+  prerequisiteCases++;
 }
-for (const stage of ['head-json','settings-text']) {
-  for (const change of ['token','monitoring','tooling']) {
-    prerequisiteStart = prerequisiteFixture({dirty:true});
-    await hooks.renderLinuxInstaller();
-    await hooks.runLinuxPrimaryAction();
-    activeConfig = explicitMonitoring();
-    let releaseRead;
-    const barrier = new Promise(resolve => { releaseRead = resolve; });
-    if (stage === 'head-json') headJsonBarrier = barrier;
-    else rawTextBarrier = barrier;
-    const pending = hooks.runLinuxPrimaryAction();
-    await until(() => requests.slice(prerequisiteStart).some(request => {
-      const url = new URL(request.url, 'https://dashboard.invalid/');
-      return stage === 'head-json' ? url.hostname === 'api.github.com' && url.pathname.includes('/commits/') : url.hostname === 'raw.githubusercontent.com';
-    }));
-    const oldToken = context.localStorage.getItem;
-    if (change === 'token') context.localStorage.getItem = () => 'changed-token';
-    else if (change === 'monitoring') hooks.setFileMonitor('vipc','project.vipc','linux',true);
-    else elements.get('linuxInstaller').querySelectorAll().find(input => input.value === 'lvpm').listener();
-    const markup = prerequisiteMarkup();
-    releaseRead();
-    await pending;
-    headJsonBarrier = null;
-    rawTextBarrier = null;
-    assert.equal(prerequisiteMarkup(),markup);
-    assert.equal(postCount(prerequisiteStart),1);
-    context.localStorage.getItem = oldToken;
+for (const stage of ['manifest','files','packages','platforms','system']) {
+  for (const cancellation of ['monitor','generated']) {
+    start = prerequisiteFixture();
+    elements.set('status',uiElement());
+    let release;
+    let waiting = false;
+    const barrier = new Promise(resolve => {release = resolve;});
+    const hold = async boundary => {if (stage === boundary) {waiting = true; await barrier;}};
+    const loaderContext = vm.createContext({...context,fetch:async (url,options) => {
+      if (url.includes('/.github/labview-ci.yml')) return {ok:true,text:async () => {await hold('manifest'); return actualImplicitManifest;}};
+      return context.fetch(url,options);
+    }});
+    vm.runInContext(fixtureSource,loaderContext);
+    const loader = loaderContext.hooks;
+    loader.setState({candidate,tooling:'lvpm',vipcs:[{...projectVipc,monitorOn:['windows','linux']}],dragons:[]});
+    loader.setRevisionReaders({
+      files:async () => {await hold('files'); return {vipc:['obsolete.vipc'],dragon:[]};},
+      packages:async () => {await hold('packages'); return [];},
+      platforms:async () => {await hold('platforms'); return loaderPlatforms();},
+      system:async () => {await hold('system'); return [];}
+    });
+    const loading = loader.loadRevision(revision);
+    await until(() => waiting);
+    if (cancellation === 'monitor') loader.setFileMonitor('vipc','project.vipc','linux',false);
+    else loader.renderGenerated({schema:1,repo:'owner/project',sha:revision,config:implicitConfig,
+      vipc:[{path:'generated-only.vipc',packages:[]}],dragon:{files:[]},columns:[],system:[]});
+    const intended = JSON.stringify(loader.monitorInputs());
+    const provenance = loader.loadedInputs();
+    const statusBefore = elements.get('status').textContent;
+    release();
+    await loading;
+    assert.equal(JSON.stringify(loader.monitorInputs()),intended,stage + '/' + cancellation);
+    assert.equal(loader.loadedInputs(),provenance);
+    assert.equal(elements.get('status').textContent,statusBefore);
+    assert.equal(loader.isMonitorDirty(),cancellation === 'monitor');
+    assert.equal(postCount(start),0);
     prerequisiteCases++;
   }
 }
-for (const metadata of [
-  {default_branch:'trunk',fork:true,parent:{full_name:'NI/LabVIEW-CI-CD-Toolkit'},source:{full_name:'ni/LabVIEW-CI-CD-Toolkit'}},
-  {default_branch:'trunk'},
-  {default_branch:'trunk',fork:true}
-]) {
-  prerequisiteStart = prerequisiteFixture({dirty:true});
-  repoMetadata = {full_name:'owner/project', ...metadata};
+for (const path of ['generated','live']) {
+  for (const negative of ['none','historical','dirty','pending','empty','changed-worker','malformed','duplicate-analyzer','duplicate-os','classification','missing-provenance','changed-input']) {
+    start = prerequisiteFixture();
+    activeConfig = actualImplicitManifest;
+    hooks.setModal(modal);
+    const loadedSha = negative === 'historical' ? 'e'.repeat(40) : revision;
+    if (path === 'live') {
+      elements.set('status',uiElement());
+      hooks.setRevisionFiles({vipc:['project.vipc'],dragon:['project.dragon']});
+      await hooks.loadRevision(loadedSha);
+    } else hooks.renderGenerated({schema:negative === 'missing-provenance' ? undefined : 1,repo:'owner/project',sha:loadedSha,config:implicitConfig,
+      vipc:[{path:'project.vipc',packages:[]}],dragon:{files:[{source_file:'project.dragon'}]},columns:[],system:[]});
+    if (negative === 'none') {
+      await hooks.runLinuxPrimaryAction();
+      if (hooks.updateIntent().phase === 'approval') await modalFields.get('#updConfirmApprove').onclick();
+      assert.equal(postCount(start),1,path + ': ' + hooks.updateIntent().message);
+    } else {
+      if (negative === 'dirty' || negative === 'changed-input') hooks.setFileMonitor('vipc','project.vipc','linux',false);
+      if (negative === 'pending') hooks.acceptedMonitoring();
+      if (negative === 'empty') activeConfig = actualImplicitManifest.replace('  os:','  container:\n    vipc: []\n    dragon: []\n  os:');
+      if (negative === 'changed-worker') activeConfig = actualImplicitManifest.replace('  os:','  container:\n    use: base\n  os:');
+      if (negative === 'malformed') activeConfig = actualImplicitManifest.replace('labviewVersion: "2026"','labviewVersion: [broken');
+      if (negative === 'duplicate-analyzer') activeConfig = actualImplicitManifest.replace('    default: builtin','    default: builtin\n  viAnalyzer:\n    default: none');
+      if (negative === 'duplicate-os') activeConfig = actualImplicitManifest.replace('[windows, linux]','[windows, windows]');
+      if (negative === 'classification') {
+        hooks.renderGenerated({schema:1,repo:'owner/project',sha:loadedSha,config:implicitConfig,
+          vipc:[{path:'.github/labview/antidoc/antidoc.vipc',role:'capability',monitorOn:['windows','linux']}],dragon:{files:[]},columns:[],system:[]});
+      }
+      if (negative === 'missing-provenance' && path === 'live') hooks.setState({candidate,tooling:'lvpm',vipcs:[projectVipc],dragons:[],config:implicitConfig});
+      await hooks.runLinuxPrimaryAction();
+      if (hooks.updateIntent().phase === 'approval') await modalFields.get('#updConfirmApprove').onclick();
+      assert.equal(postCount(start),0,path + '/' + negative);
+    }
+    hooks.invalidateLinuxOperation();
+    prerequisiteCases++;
+  }
+}
+const actualSourceFiles = fs.readdirSync(new URL('../',root),{recursive:true}).filter(path => /\.(?:vipc|dragon)$/i.test(path));
+for (const tooling of ['vipm','lvpm']) {
+  start = prerequisiteFixture();
+  activeConfig = actualImplicitManifest;
+  const sourceContext = vm.createContext({...context,window:{LVCI:{repo:'ni/LabVIEW-CI-CD-Toolkit'}}});
+  vm.runInContext(fixtureSource,sourceContext);
+  sourceContext.hooks.setState({candidate,tooling:'vipm',vipcs:[],dragons:[]});
+  sourceContext.hooks.setModal(modal);
+  const view = installerView();
+  sourceContext.hooks.renderGenerated({schema:1,repo:'ni/LabVIEW-CI-CD-Toolkit',sha:revision,config:implicitConfig,
+    vipc:actualSourceFiles.filter(path => path.endsWith('.vipc')).map(path => ({path,packages:[]})),
+    dragon:{files:actualSourceFiles.filter(path => path.endsWith('.dragon')).map(source_file => ({source_file}))},columns:[],system:[]});
+  if (tooling === 'lvpm') view.inputs.find(input => input.value === 'lvpm').listener();
+  const before = plain(sourceContext.hooks.monitorInputs());
+  assert.match(before.container_vipc,/antidoc.vipc::windows/);
+  repoMetadata = {full_name:'ni/LabVIEW-CI-CD-Toolkit',default_branch:'trunk',fork:false};
+  dispatchStatus = 204;
+  await sourceContext.hooks.runLinuxPrimaryAction();
+  if (tooling === 'vipm') await modalFields.get('#updConfirmApprove').onclick();
+  assert.equal(postCount(start),1,tooling + ': ' + sourceContext.hooks.updateIntent().message);
+  const request = requests.slice(start).find(request => request.options.method === 'POST');
+  assert.equal(request.url.endsWith(tooling === 'lvpm' ? '/build-labview-lvpm-image.yml/dispatches' : '/build-labview-linux-image.yml/dispatches'),true);
+  assert.equal(JSON.parse(request.options.body).inputs.expected_sha,revision);
+  assert.deepEqual(plain(sourceContext.hooks.monitorInputs()),before);
+  prerequisiteCases++;
+}
+for (const historical of [false,true]){
+  const start = prerequisiteFixture({revision:historical ? 'e'.repeat(40) : revision});
+  commitResponses = [newHead,newHead]; runResponse = {...identifiedRun,head_sha:newHead};
+  const beforeUrl = context.location.href;
+  const inputs = plain(hooks.monitorInputs());
+  assert.match(prerequisiteMarkup(), /Update container image/);
   await hooks.runLinuxPrimaryAction();
-  assert.equal(postCount(prerequisiteStart), 0);
-  assert.match(prerequisiteMarkup(), /ancestry|fork of the tooling source/);
+  assert.equal(postCount(start),1);
+  const post = requests.slice(start).find(request => request.options.method === 'POST');
+  assert.deepEqual(JSON.parse(post.options.body).inputs,{expected_sha:newHead});
+  assert.equal(JSON.parse(post.options.body).ref,'trunk');
+  assert.equal(context.location.href,beforeUrl);
+  assert.deepEqual(plain(hooks.monitorInputs()),inputs);
+  assert.equal(hooks.updateIntent().context.revision,historical ? 'e'.repeat(40) : revision);
+  assert.equal(hooks.getLinuxOperation().revision,newHead);
+  await hooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start),1);
+  hooks.invalidateLinuxOperation();
   prerequisiteCases++;
 }
-prerequisiteStart = prerequisiteFixture({dirty:true});
-failMetadata = true;
-await hooks.runLinuxPrimaryAction();
-assert.equal(postCount(prerequisiteStart), 0);
-prerequisiteCases++;
-const sourceSource = source.replace("const repo = repoFromUrl();", "const repo = 'ni/LabVIEW-CI-CD-Toolkit';");
-const sourceSandbox = vm.createContext({ ...context, fetch:async () => {throw new Error('Source Save must not perform network requests');} });
-vm.runInContext(sourceSource.replace('    init();', 'globalThis.sourceSaveBlock = linuxSaveRestriction;'), sourceSandbox);
-assert.match(await sourceSandbox.sourceSaveBlock(), /tooling source cannot/);
-vm.runInContext(sourceSource.replace('    init();', `globalThis.sourceSave = () => {
-  activePlatform = 'linux'; monitorDirty = true; currentVipcs = [{path:'project.vipc',monitorOn:['linux']}];
-  selectedRevision = '${revision}'; defaultRevision = '${revision}';
-  return runLinuxPrimaryAction();
-};`), sourceSandbox);
-await sourceSandbox.sourceSave();
-assert.match(prerequisiteMarkup(), /tooling source repository/);
-assert.equal(elements.get('linuxPrimary').disabled,true);
-prerequisiteCases++;
-const sourceReads = [];
-let sourceHeadBarrier = null;
-const sourceReadSandbox = vm.createContext({...context,fetch:async (url,options = {}) => {
-  sourceReads.push({url,method:options.method || 'GET'});
-  assert.notEqual(options.method,'POST');
-  if (url.endsWith('/repos/ni/LabVIEW-CI-CD-Toolkit')) return {ok:true,json:async () => ({full_name:'ni/LabVIEW-CI-CD-Toolkit',default_branch:'main',fork:false})};
-  if (url.includes('/commits/')) { if (sourceHeadBarrier) await sourceHeadBarrier; return {ok:true,json:async () => ({sha:newHead})}; }
-  if (url.includes('raw.githubusercontent.com/ni/LabVIEW-CI-CD-Toolkit/')) return {ok:true,text:async () => explicitMonitoring()};
-  throw new Error('Unexpected source read: ' + url);
-}});
-vm.runInContext(sourceSource.replace('    init();', `globalThis.sourceUi = {
-  setup: status => {
-    activePlatform = 'linux'; linuxToolingView = 'lvpm'; monitorDirty = true;
-    selectedRevision = '${'e'.repeat(40)}'; defaultRevision = '${revision}'; selectedConfig = {};
-    currentVipcs = [{path:'project.vipc',monitorOn:['windows'],packages:[]}]; currentDragons = [];
-    linuxHeadCheck = null;
-    linuxMonitoringRequest = status ? {...linuxMonitoringContext(),status} : null;
-    renderLinuxPrerequisites();
-  },
-  run:runLinuxPrimaryAction,
-  change:() => setFileMonitor('vipc','project.vipc','linux',true),
-  dirty:() => monitorDirty,
-  revision:() => selectedRevision
-};`),sourceReadSandbox);
-sourceReadSandbox.sourceUi.setup(null);
-assert.equal(elements.get('linuxPrimary').disabled,true);
-await sourceReadSandbox.sourceUi.run();
-assert.equal(sourceReads.length,0);
-prerequisiteCases++;
-for (const status of ['accepted','uncertain']) {
-  sourceReadSandbox.sourceUi.setup(status);
-  assert.equal(elements.get('linuxPrimary').disabled,false);
-  assert.match(prerequisiteMarkup(), /Check committed monitoring/);
-  assert.match(prerequisiteMarkup(), /also historical/);
-  await sourceReadSandbox.sourceUi.run();
-  assert.match(prerequisiteMarkup(), /Open matching committed settings/);
-  assert.match(prerequisiteMarkup(), new RegExp('sha=' + newHead));
-  assert.equal(sourceReadSandbox.sourceUi.dirty(),true);
-  assert.equal(sourceReadSandbox.sourceUi.revision(),'e'.repeat(40));
-  assert.ok(sourceReads.every(request => request.method === 'GET'));
+for (const failure of ['dirty','mismatch','other-platform','worker-selection','partial','malformed','incomplete-file','invalid-head','network','permission','old-workflow','escaped-workflow','head-moved']){
+  const start = prerequisiteFixture({dirty:failure === 'dirty'});
+  if (failure === 'mismatch') activeConfig = explicitMonitoring([{path:'different.vipc',monitorOn:['windows','linux']}]);
+  if (failure === 'other-platform') activeConfig = explicitMonitoring([{path:'project.vipc',monitorOn:['linux']}]);
+  if (failure === 'worker-selection') activeConfig += '    linuxUse: different\n';
+  if (failure === 'partial') activeConfig = 'config:\n  container:\n    use: base\n';
+  if (failure === 'malformed') activeConfig += '        monitor: maybe\n';
+  if (failure === 'incomplete-file') activeConfig = activeConfig.replace('        monitor: true\n','');
+  if (failure === 'invalid-head') commitResponses = ['invalid'];
+  if (failure === 'network') failMetadata = true;
+  if (failure === 'permission') rawConfigStatus = 403;
+  if (failure === 'old-workflow') reviewedWorkflowOverride = 'name: old workflow\non:\n  workflow_dispatch:\n';
+  if (failure === 'escaped-workflow') reviewedWorkflowOverride = fs.readFileSync(new URL('workflows/build-labview-lvpm-image.yml',root),'utf8').replace('if [ "$GITHUB_SHA" != "$reviewed_sha" ]; then','if false; then');
+  if (failure === 'head-moved') commitResponses = [revision,newHead];
+  const before = plain(hooks.monitorInputs());
+  await hooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start),0,failure);
+  assert.ok(['blocked','rejected'].includes(hooks.updateIntent().phase),failure);
+  assert.deepEqual(plain(hooks.monitorInputs()),before,failure);
+  assert.doesNotMatch(prerequisiteMarkup(), /Find current|Open matching/,failure);
   prerequisiteCases++;
 }
-sourceReadSandbox.sourceUi.setup('accepted');
-let releaseSourceHead;
-sourceHeadBarrier = new Promise(resolve => { releaseSourceHead = resolve; });
-const oldSourceReads = sourceReads.length;
-const sourceCheck = sourceReadSandbox.sourceUi.run();
-await until(() => sourceReads.length >= oldSourceReads + 2);
-sourceReadSandbox.sourceUi.change();
-const sourceStaleMarkup = prerequisiteMarkup();
-releaseSourceHead();
-await sourceCheck;
-sourceHeadBarrier = null;
-assert.equal(prerequisiteMarkup(),sourceStaleMarkup);
-assert.doesNotMatch(prerequisiteMarkup(), /Open matching committed settings/);
-assert.ok(sourceReads.every(request => request.method === 'GET'));
+for (const tooling of ['lvpm','vipm']) {
+  const file = tooling === 'lvpm' ? 'build-labview-lvpm-image.yml' : 'build-labview-linux-image.yml';
+  const original = fs.readFileSync(new URL('workflows/' + file,root),'utf8');
+  assert.equal(!!hooks.linuxReviewedWorkflow(original,file),true);
+  for (const mutation of [
+    text => text.replace('        env:\n          EXPECTED_SHA:', '        continue-on-error: true\n        env:\n          EXPECTED_SHA:'),
+    text => text.replace('    steps:\n', '    steps:\n      - uses: actions/setup-python@v6\n'),
+    text => text.replace('        env:\n          EXPECTED_SHA:', '        if: false\n        env:\n          EXPECTED_SHA:'),
+    text => text.replace('          fi\n', '          fi\n        continue-on-error: true\n'),
+    text => text.replace('          fi\n\n      - name:', '          fi\n        continue-on-error: true\n\n      - name:'),
+    text => text.replace('          fi\n\n      - name:', '          fi\n        continue-on-error: ${{ true }}\n\n      - name:'),
+    text => text.replace('    steps:\n', '    steps:\n      - uses: actions/checkout@v7\n        with:\n          ref: ${{ github.sha }}\n'),
+    text => text.replace('    steps:\n', '    steps:\n      - run: ./unreviewed-local-helper.sh\n'),
+    text => text.replace('      - name: Verify reviewed commit', '      # - name: Verify reviewed commit'),
+    text => text.replace('      - name: Verify reviewed commit', '      - name: "Verify reviewed commit"'),
+    text => text.replace('          EXPECTED_SHA: ${{ inputs.expected_sha }}', '          EXPECTED_SHA: ${{ github.sha }}'),
+    text => text.replace('        run: |\n          if [ -n "$EXPECTED_SHA" ]; then', '        shell: bash {0}\n        run: |\n          if [ -n "$EXPECTED_SHA" ]; then'),
+    text => text.replace('            if [ "$GITHUB_SHA" != "$reviewed_sha" ]; then', '            if false; then'),
+    text => text.replace('            reviewed_sha=$(printf', '            reviewed_sha=unchecked\n            ignored_sha=$(printf'),
+    text => text.replace('      - name: Checkout repository\n', '      - name: Checkout repository\n        if: always()\n        continue-on-error: true\n'),
+    text => text.replace('    runs-on: ubuntu-latest\n', '    continue-on-error: true\n    runs-on: ubuntu-latest\n'),
+    text => text.replace('    steps:\n', '    env:\n      GITHUB_SHA: invalid\n    steps:\n'),
+    text => text.replace('jobs:\n', 'defaults:\n  run:\n    shell: bash {0}\njobs:\n'),
+    text => text.replace('          fi\n', '          fi\n\n    steps:\n'),
+    text => text + '\n  bypass:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo bypass\n',
+    text => text + '\njobs: {bypass: {runs-on: ubuntu-latest, steps: [{run: echo bypass}]}}\n'
+  ]) {
+    start = prerequisiteFixture({tooling});
+    reviewedWorkflowOverride = mutation(original);
+    assert.notEqual(reviewedWorkflowOverride,original);
+    assert.equal(!!hooks.linuxReviewedWorkflow(reviewedWorkflowOverride,file),false);
+    await hooks.runLinuxPrimaryAction();
+    assert.equal(postCount(start),0);
+    assert.match(prerequisiteMarkup(),/lacks reviewed-SHA protection/);
+    prerequisiteCases++;
+  }
+  if (tooling === 'vipm') {
+    for (const mutation of [
+      text => text.replace("    if: needs.gate.outputs.build == 'true'", "    if: always() && needs.gate.outputs.build == 'true'"),
+      text => text.replace('    needs: gate\n', ''),
+      text => text.replace('        id: decide\n', '        id: decide\n        if: always()\n        continue-on-error: true\n')
+    ]) {
+      start = prerequisiteFixture({tooling});
+      reviewedWorkflowOverride = mutation(original);
+      assert.notEqual(reviewedWorkflowOverride,original);
+      assert.equal(!!hooks.linuxReviewedWorkflow(reviewedWorkflowOverride,file),false);
+      await hooks.runLinuxPrimaryAction();
+      assert.equal(postCount(start),0);
+      prerequisiteCases++;
+    }
+  }
+}
+for (const sourceRepo of ['ni/LabVIEW-CI-CD-Toolkit','owner/toolkit-fork']) {
+  start = prerequisiteFixture({dirty:true});
+  const sourceContext = vm.createContext({...context,window:{LVCI:{repo:sourceRepo}}});
+  vm.runInContext(fixtureSource,sourceContext);
+  const sourceHooks = sourceContext.hooks;
+  sourceHooks.setState({candidate,dirty:true,tooling:'lvpm',vipcs:[{...projectVipc}],dragons:[]});
+  repoMetadata = {full_name:sourceRepo,default_branch:'trunk',fork:sourceRepo.startsWith('owner/'),
+    parent:{full_name:'ni/LabVIEW-CI-CD-Toolkit'},source:{full_name:'ni/LabVIEW-CI-CD-Toolkit'}};
+  await sourceHooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start),0);
+  await sourceHooks.dispatchMonitor();
+  assert.equal(postCount(start),0);
+  assert.match(elements.get('monitorStatus').innerHTML,/tooling source|fork of/);
+  prerequisiteCases++;
+}
+start = prerequisiteFixture({dirty:true,revision:'e'.repeat(40)});
+const committedSourceContext = vm.createContext({...context,window:{LVCI:{repo:'ni/LabVIEW-CI-CD-Toolkit'}}});
+vm.runInContext(fixtureSource,committedSourceContext);
+committedSourceContext.hooks.setState({candidate,dirty:true,tooling:'lvpm',revision:'e'.repeat(40),vipcs:[{...projectVipc}],dragons:[]});
+repoMetadata = {full_name:'ni/LabVIEW-CI-CD-Toolkit',default_branch:'main',fork:false};
+committedSourceContext.hooks.acceptedMonitoring();
+dispatchStatus = 204;
+await committedSourceContext.hooks.runLinuxPrimaryAction();
+assert.equal(postCount(start),1);
+assert.equal(JSON.parse(requests.slice(start).find(request => request.options.method === 'POST').options.body).inputs.expected_sha,revision);
+assert.ok(requests.slice(start).filter(request => request.options.method === 'POST').every(request => !request.url.includes('reconfigure')));
 prerequisiteCases++;
-prerequisiteStart = prerequisiteFixture({config:{linuxUse:selection}});
-await hooks.renderLinuxInstaller();
+start = prerequisiteFixture({dirty:true});
+dispatchStatus = 204;
+await hooks.dispatchMonitor();
+assert.equal(postCount(start),1);
+hooks.renderLinuxPrerequisites();
+await hooks.checkLinuxMonitoringHead();
+assert.equal(postCount(start),1);
+dispatchStatus = 200; dispatchDetails = {...acceptedDetails};
 await hooks.runLinuxPrimaryAction();
-assert.equal(postCount(prerequisiteStart), 1);
-assert.ok(requests.at(-1).url.endsWith('build-labview-lvpm-image.yml/dispatches'));
-assert.match(prerequisiteMarkup(), /Build Linux LVPM container/);
-assert.doesNotMatch(elements.get('lvpmReview').innerHTML, /Next:|id="lvpmBuild"/);
-prerequisiteCases++;
-prerequisiteStart = prerequisiteFixture({tooling:'lvpm'});
-dispatchStatus = 200;
-dispatchDetails = {...acceptedDetails};
-runResponse = {...identifiedRun};
-await hooks.renderLinuxInstaller();
-elements.get('linuxInstaller').querySelectorAll().find(input => input.value === 'lvpm').listener();
-await hooks.runLinuxPrimaryAction();
-await hooks.runLinuxPrimaryAction();
-assert.equal(postCount(prerequisiteStart),1);
-assert.equal(elements.get('lvpmRunLink').href,'https://github.com/owner/project/actions/runs/' + identifiedRun.id);
-assert.equal(hooks.getLinuxOperation().runId,identifiedRun.id);
-assert.equal(elements.get('linuxPrimary').disabled,true);
+assert.equal(postCount(start),2);
+assert.equal(hooks.isMonitorDirty(),true);
+await hooks.dispatchMonitor();
+assert.equal(postCount(start),2);
 hooks.invalidateLinuxOperation();
 prerequisiteCases++;
-let approved = 0;
-prerequisiteStart = prerequisiteFixture();
-hooks.setModal({querySelector:selector => modalFields.get(selector),classList:{remove(){approved++;},add(){}}});
-await hooks.renderUpdatePanel();
+for (const error of [500,502,503,504,'transport',204]){
+  start = prerequisiteFixture();
+  if (error === 'transport') dispatchError = new Error('transport uncertain');
+  else dispatchStatus = error;
+  await hooks.runLinuxPrimaryAction();
+  await hooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start),1);
+  assert.equal(elements.get('linuxPrimary').disabled,true);
+  assert.match(elements.get('lvpmStatus').textContent,/uncertain|no run identity/i);
+  prerequisiteCases++;
+}
+for (const stage of ['repository','head','settings','workflow','actor','workflow-metadata','revalidate-head','post','post-json','run-json']){
+  start = prerequisiteFixture();
+  let release;
+  let reached = false;
+  const barrier = new Promise(resolve => {release = resolve;});
+  let headReads = 0;
+  const match = url => {
+    if (stage === 'repository') return url === 'https://api.github.com/repos/owner/project';
+    if (stage === 'head' || stage === 'revalidate-head') return url.includes('/commits/') && ++headReads === (stage === 'head' ? 1 : 2);
+    if (stage === 'settings') return url.includes('/.github/labview-ci.yml');
+    if (stage === 'workflow') return url.includes('raw.githubusercontent.com') && url.endsWith('/build-labview-lvpm-image.yml');
+    if (stage === 'actor') return url.endsWith('/user');
+    if (stage === 'workflow-metadata') return url === 'https://api.github.com/repos/owner/project/actions/workflows/build-labview-lvpm-image.yml';
+    return false;
+  };
+  if (stage === 'post') postBarrier = barrier;
+  else if (stage === 'post-json') dispatchJsonBarrier = barrier;
+  else if (stage === 'run-json') runJsonBarrier = barrier;
+  else lookupBarrier = {match:url => {if (match(url)){reached = true;return true;}return false;},promise:barrier};
+  const pending = hooks.runLinuxPrimaryAction();
+  await until(() => ['post','post-json','run-json'].includes(stage) ? postCount(start) === 1 && (stage !== 'run-json' || requests.at(-1).url.includes('/actions/runs/')) : reached);
+  await hooks.runLinuxPrimaryAction();
+  assert.ok(postCount(start) <= 1);
+  hooks.setFileMonitor('vipc','project.vipc','linux',false);
+  const markup = prerequisiteMarkup();
+  release(); await pending;
+  lookupBarrier = null; postBarrier = null; dispatchJsonBarrier = null; runJsonBarrier = null;
+  assert.equal(prerequisiteMarkup().replace(' disabled',''),markup.replace(' disabled',''),stage);
+  assert.equal(postCount(start),['post','post-json','run-json'].includes(stage) ? 1 : 0,stage);
+  prerequisiteCases++;
+}
+for (const change of ['platform','revision','tooling','token']){
+  start = prerequisiteFixture();
+  let release;
+  const barrier = new Promise(resolve => {release = resolve;});
+  lookupBarrier = {match:url => url.includes('/commits/'),promise:barrier};
+  const pending = hooks.runLinuxPrimaryAction();
+  await until(() => requests.slice(start).some(request => request.url.includes('/commits/')));
+  const oldToken = context.localStorage.getItem;
+  if (change === 'platform') hooks.selectPlatform('windows');
+  if (change === 'revision') hooks.setState({candidate,revision:'e'.repeat(40)});
+  if (change === 'tooling') hooks.setState({candidate,tooling:'vipm'});
+  if (change === 'token') context.localStorage.getItem = () => 'changed';
+  release(); await pending; lookupBarrier = null;
+  assert.equal(postCount(start),0,change);
+  context.localStorage.getItem = oldToken;
+  prerequisiteCases++;
+}
+for (const bodyStage of ['repository','HEAD','settings','workflow','actor','workflow-metadata','revalidated-settings']) {
+  start = prerequisiteFixture();
+  const originalFetch = context.fetch;
+  let reached = false, release;
+  const barrier = new Promise(resolve => { release = resolve; });
+  let settingsBodies = 0;
+  context.fetch = async (url,options) => {
+    const response = await originalFetch(url,options);
+    const settings = url.includes('/.github/labview-ci.yml');
+    if (settings) settingsBodies++;
+    const selected = bodyStage === 'repository' ? url.endsWith('/repos/owner/project')
+      : bodyStage === 'HEAD' ? url.includes('/commits/')
+      : bodyStage === 'settings' ? settings && settingsBodies === 1
+      : bodyStage === 'revalidated-settings' ? settings && settingsBodies === 2
+      : bodyStage === 'workflow' ? url.includes('raw.githubusercontent.com') && url.endsWith('.yml') && !settings
+      : bodyStage === 'actor' ? url.endsWith('/user') : url.endsWith('/actions/workflows/build-labview-lvpm-image.yml');
+    if (!selected) return response;
+    const kind = response.text ? 'text' : 'json';
+    return {...response,[kind]:async () => { reached = true; await barrier; return response[kind](); }};
+  };
+  const pending = hooks.runLinuxPrimaryAction();
+  await until(() => reached);
+  hooks.setFileMonitor('vipc','project.vipc','windows',false);
+  release(); await pending;
+  context.fetch = originalFetch;
+  assert.equal(postCount(start),0,bodyStage);
+  prerequisiteCases++;
+}
+const mixedFiles = [projectVipc,{path:'optout.vipc',monitored:false,monitorOn:[]}];
+const mixedDragons = [{path:'windows.dragon',monitored:true,monitorOn:['windows']}];
+for (const mismatch of ['none','optout','dragon','action','use']) {
+  const selection = {use:'base',actions:{masscompile:'ghcr.io/owner/custom:linux-fixed',snapshot:'windows-custom'}};
+  start = prerequisiteFixture({vipcs:mixedFiles.map(file => ({...file})),dragons:mixedDragons,config:selection});
+  activeConfig = explicitMonitoring(mixedFiles,mixedDragons).replace('  container:\n','  container:\n    use: base\n') + '    actions:\n      masscompile: ghcr.io/owner/custom:linux-fixed\n      snapshot: windows-custom\n';
+  if (mismatch === 'optout') activeConfig = activeConfig.replace('        monitor: false','        monitor: true');
+  if (mismatch === 'dragon') activeConfig = activeConfig.replace('monitorOn: windows\n','monitorOn: linux\n');
+  if (mismatch === 'action') activeConfig = activeConfig.replace('snapshot: windows-custom','snapshot: windows-changed');
+  if (mismatch === 'use') activeConfig = activeConfig.replace('use: base','use: custom');
+  const before = plain(hooks.monitorInputs());
+  await hooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start),mismatch === 'none' ? 1 : 0,mismatch + ': ' + hooks.updateIntent().message);
+  assert.deepEqual(plain(hooks.monitorInputs()),before);
+  hooks.invalidateLinuxOperation();
+  prerequisiteCases++;
+}
+start = prerequisiteFixture();
+const authenticatedGet = context.localStorage.getItem;
+context.localStorage.getItem = () => '';
 await hooks.runLinuxPrimaryAction();
-assert.equal(postCount(prerequisiteStart), 0);
-assert.ok(approved > 0);
-assert.doesNotMatch(elements.get('updatePanel').innerHTML, /id="updRun"/);
+assert.equal(requests.length,start);
+context.localStorage.getItem = authenticatedGet;
+hooks.pendingAction()();
+assert.equal(requests.length,start);
+assert.equal(postCount(start),0);
 prerequisiteCases++;
-let releaseVipmPost;
-activeConfig = 'config:\n  container:\n    use: vipm-default\n';
-postBarrier = new Promise(resolve => { releaseVipmPost = resolve; });
-modalFields.get('#updConfirmApprove').onclick();
-await until(() => postCount(prerequisiteStart) === 1);
-assert.equal(elements.get('linuxPrimary').disabled,true);
-hooks.renderLinuxPrerequisites();
-assert.equal(elements.get('linuxPrimary').disabled,true);
+const cancelField = uiElement();
+modalFields.set('#updConfirmCancel',cancelField);
+hooks.setModal({querySelector:selector => modalFields.get(selector),classList:{remove(){},add(){}}});
+for (const cancel of [false,true]){
+  start = prerequisiteFixture({tooling:'vipm',revision:'e'.repeat(40)});
+  commitResponses = [newHead,newHead];
+  runResponse = {...identifiedRun,path:'.github/workflows/build-labview-linux-image.yml',head_sha:newHead};
+  await hooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start),0);
+  assert.match(modalFields.get('#updConfirmSub').textContent,new RegExp(newHead));
+  assert.equal(elements.get('linuxPrimary').disabled,true);
+  await hooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start),0);
+  if (cancel) cancelField.onclick();
+  else await modalFields.get('#updConfirmApprove').onclick();
+  assert.equal(postCount(start),cancel ? 0 : 1);
+  if (!cancel) assert.deepEqual(JSON.parse(requests.slice(start).find(request => request.options.method === 'POST').options.body).inputs,{expected_sha:newHead,update_mode:'replace'});
+  hooks.invalidateLinuxOperation();
+  prerequisiteCases++;
+}
+for (const close of ['escape','backdrop','mode']) {
+  start = prerequisiteFixture({tooling:'vipm'});
+  const modalListeners = new Map();
+  const documentListeners = new Map();
+  const host = uiElement();
+  host.querySelector = selector => modalFields.get(selector);
+  host.addEventListener = (event,callback) => modalListeners.set(event,callback);
+  context.document.createElement = () => host;
+  context.document.body = {appendChild(){}};
+  context.document.addEventListener = (event,callback) => documentListeners.set(event,callback);
+  hooks.setModal(null);
+  await hooks.runLinuxPrimaryAction();
+  await hooks.dispatchLinuxWorker('reset');
+  assert.equal(postCount(start),0);
+  if (close === 'escape') documentListeners.get('keydown')({key:'Escape'});
+  if (close === 'backdrop') modalListeners.get('click')({target:host});
+  if (close === 'mode') {
+    elements.get('updatePanel').querySelector = () => ({value:'new'});
+    hooks.renderLinuxPrerequisites();
+    await modalFields.get('#updConfirmApprove').onclick();
+    elements.get('updatePanel').querySelector = () => null;
+  }
+  assert.equal(postCount(start),0);
+  assert.equal(hooks.updateIntent().busy,false);
+  prerequisiteCases++;
+}
+start = prerequisiteFixture({tooling:'vipm'});
 await hooks.runLinuxPrimaryAction();
-await hooks.dispatchContainerUpdate();
-assert.equal(postCount(prerequisiteStart),1);
-releaseVipmPost();
-await until(() => elements.get('linuxPrimary').disabled === false);
-postBarrier = null;
-assert.match(prerequisiteMarkup(), /Review Linux VIPM build/);
+hooks.setFileMonitor('vipc','project.vipc','linux',false);
+await modalFields.get('#updConfirmApprove').onclick();
+assert.equal(postCount(start),0);
 prerequisiteCases++;
+start = prerequisiteFixture({tooling:'vipm'});
+await hooks.runLinuxPrimaryAction();
+commitResponses = [newHead];
+await modalFields.get('#updConfirmApprove').onclick();
+assert.equal(postCount(start),0);
+prerequisiteCases++;
+for (const platforms of [['windows'],['windows','linux'],['linux'],[]]){
+  const file = {path:'.github/labview/antidoc/antidoc.vipc',monitorOn:platforms,monitored:platforms.length > 0};
+  start = prerequisiteFixture({vipcs:[file]});
+  activeConfig = explicitMonitoring([file]);
+  await hooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start),platforms.join('+') === 'windows' ? 1 : 0);
+  if (platforms.join('+') !== 'windows') assert.match(prerequisiteMarkup(),/Cannot verify/);
+  hooks.invalidateLinuxOperation();
+  prerequisiteCases++;
+}
+if (process.env.LVCI_MONITORING_WRITER_FIXTURE){
+  const fixtures = JSON.parse(process.env.LVCI_MONITORING_WRITER_FIXTURE);
+  for (const fixture of fixtures){
+    const files = kind => fixture.inputs['container_' + kind].split(';').map(entry => {
+      const [path,platforms] = entry.split('::');
+      return {path,monitorOn:platforms === 'none' ? [] : platforms.split('+'),monitored:platforms !== 'none'};
+    });
+    start = prerequisiteFixture({vipcs:files('vipc'),dragons:files('dragon'),config:fixture.selection});
+    activeConfig = fixture.yaml;
+    const captured = hooks.linuxMonitoringContext();
+    assert.equal(hooks.committedMonitoringMatches(fixture.yaml,captured),true);
+    if (fixture.inputs.container_vipc.endsWith('::windows+linux')){
+      const explicit = fixture.yaml.replaceAll('        monitor: true\n','        monitor: true\n        monitorOn: windows+linux\n');
+      assert.equal(hooks.committedMonitoringMatches(explicit,captured),true);
+      assert.equal(hooks.committedMonitoringMatches(explicit.replaceAll('monitorOn: windows+linux','monitorOn: linux'),captured),false);
+    }
+    await hooks.runLinuxPrimaryAction();
+    assert.equal(postCount(start),1);
+    hooks.invalidateLinuxOperation();
+  }
+  console.log('Real Reconfigure writer comparison: ' + fixtures.length + ' outputs passed');
+}
 let dragonDetailCases = 0;
 const actualDeclaration = fs.readFileSync(new URL('../example/Example.dragon', root), 'utf8');
 assert.match(actualDeclaration, /oglib_boolean\s*=\s*"6\.0\.0\.9"/);
