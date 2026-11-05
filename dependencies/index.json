@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "f12591267bd379961d02c966fae047e0067ba10c",
+  "sha": "5a6a722b4bcac36c50f134e80eed50dda2b153a0",
   "revisions": [
+    {
+      "sha": "5a6a722b4bcac36c50f134e80eed50dda2b153a0",
+      "short": "5a6a722",
+      "message": "Merge pull request #144 from ni/lvci-release/release-5.0.0-b896a1f7b680d4835283048117e55c1d905aae5c",
+      "author": "Elijah Kerry",
+      "date": "2026-11-05T15:22:05Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "b896a1f7b680d4835283048117e55c1d905aae5c",
+      "short": "b896a1f",
+      "message": "Prepare release 5.0.0",
+      "author": "github-actions[bot]",
+      "date": "2026-11-05T12:20:53Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "f12591267bd379961d02c966fae047e0067ba10c",
       "short": "f125912",
@@ -882,24 +900,6 @@
       "message": "Merge branch 'main' into MIpetrov-NI-enable-dependabot",
       "author": "Elijah Kerry",
       "date": "2026-11-02T21:14:46Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "025f3ef3a54d38b34429a77e9b876bb88e327c71",
-      "short": "025f3ef",
-      "message": "Prepare release 4.19.1",
-      "author": "github-actions[bot]",
-      "date": "2026-11-02T20:56:58Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "8f7cb5b94bdc57baf05d8ed822db5f3f297a0cea",
-      "short": "8f7cb5b",
-      "message": "Merge pull request #97 from ni/fix/descriptive-generated-prs-20261102",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T20:56:42Z",
       "project": false,
       "dep_only": false
     },
