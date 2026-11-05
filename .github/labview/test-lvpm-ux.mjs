@@ -1467,7 +1467,10 @@ for (const stage of ['head-json','settings-text']) {
     if (stage === 'head-json') headJsonBarrier = barrier;
     else rawTextBarrier = barrier;
     const pending = hooks.runLinuxPrimaryAction();
-    await until(() => requests.slice(prerequisiteStart).some(request => stage === 'head-json' ? request.url.includes('/commits/') : request.url.includes('raw.githubusercontent.com')));
+    await until(() => requests.slice(prerequisiteStart).some(request => {
+      const url = new URL(request.url, 'https://dashboard.invalid/');
+      return stage === 'head-json' ? url.hostname === 'api.github.com' && url.pathname.includes('/commits/') : url.hostname === 'raw.githubusercontent.com';
+    }));
     const oldToken = context.localStorage.getItem;
     if (change === 'token') context.localStorage.getItem = () => 'changed-token';
     else if (change === 'monitoring') hooks.setFileMonitor('vipc','project.vipc','linux',true);
