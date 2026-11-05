@@ -14,7 +14,7 @@
     "packages": [
       {
         "name": "wovalab_lib_antidoc_cli",
-        "version": "3.3.0.117",
+        "version": "3.4.0.126",
         "include": true,
         "summary": "Antidoc CLI by Wovalab - generate LabVIEW project documentation headlessly (the supported CI/CD path).",
         "dependenciesAutoResolved": [

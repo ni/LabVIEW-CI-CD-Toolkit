@@ -1561,6 +1561,16 @@ docker run --rm `
         seed copies use a fast registry copy and do not pull the multi-GB image back just to inspect it; seed manifests
         without a captured VIPM list are treated conservatively by the dashboard, with only the known
         Windows core tooling VIPC inferred as installed.</p>
+      <p>When all four committed VIPCs are selected together with <code>example/Example.dragon</code>,
+        <code>experimental.vipc</code> uses Antidoc CLI <code>3.4.0.126</code>, already established by
+        the authoritative Antidoc capability archive. The experimental configuration retains its ID,
+        selection, flags and unrelated metadata, and embeds byte-identical CLI spec/icon metadata from
+        that archive; the informational Antidoc JSON agrees. This explicitly reconciles a stale
+        <code>3.3.0.117</code> declaration, not a newest-wins resolver policy. Offline planning retains
+        all five sources and 35 exact roots, and rejects divergent pins without emitting a plan.
+        Archive identity and source-membership tests guard the alignment. Planning success is not
+        qualification of package installation, post-install hooks, a Linux worker bake, runtime
+        relinking or final inventory.</p>
       <div class="note"><span class="lbl">Required essentials vs. best-effort tooling</span>
         <code>install-vipc.ps1</code> installs Caraya <code>1.4.4.148</code> and the UTF JUnit essentials
         (<code>ni_lib_utf_junit_report</code> + its <code>ni_lib_junit_results_api</code> /
@@ -1574,7 +1584,7 @@ docker run --rm `
       <h3 id="dependencies-platforms">Manage dependencies one platform at a time</h3>
       <p>The Dependencies page has separate <strong>Windows</strong> and <strong>Linux</strong> tabs.
         Windows keeps its VIPM workflow and never offers an LVPM installer choice. Linux offers VIPM or
-        experimental LVPM. Links can select a tab with <code>?platform=windows</code> or
+        LVPM. Links can select a tab with <code>?platform=windows</code> or
         <code>?platform=linux</code>; switching tabs preserves the inspected revision. Keyboard users can move
         between platform tabs with the arrow, Home, and End keys.</p>
       <p>Each tab shows only that platform&rsquo;s default worker, package coverage, monitoring checkboxes,
@@ -1585,7 +1595,7 @@ docker run --rm `
         status cannot establish Linux satisfaction. Explicit per-action overrides may select a different worker
         from the default shown here.</p>
       <p>For VIPM, choose <strong>Review Windows VIPM update</strong> or
-        <strong>Review Linux VIPM update</strong>, inspect the selected platform&rsquo;s package changes, then
+        <strong>Review Linux VIPM build</strong>, inspect the selected platform&rsquo;s package changes, then
         approve the build. Advanced update options are collapsed by default. Saving monitoring choices preserves
         the other platform&rsquo;s selections and requests a configuration pull request; merge it and refresh before
         building committed dependencies. Tab or revision changes cancel outstanding approval/token prompts, and
@@ -1598,16 +1608,23 @@ docker run --rm `
         tabs, and label combined unresolved counts as aggregate rather than attributing them to both workers.
         Dependency banners render text and navigation with DOM nodes, not parsed HTML; review links allow only
         HTTP(S) destinations.</p>
-      <p>The Linux tooling card distinguishes <strong>unsaved monitoring changes</strong>, a
-        <strong>save request accepted but not applied</strong>, and <strong>committed monitoring loaded</strong>.
-        Checkbox changes immediately explain why both toolchains are blocked, including while switching views.
-        Save acceptance (HTTP 204) does not prove a proposal was created or merged; the proposal and workflow
-        links are explicitly unattributed lists, not evidence that a specific run belongs to the request.
-        Review and merge the intended configuration changes before building. <strong>Check current HEAD</strong>
-        performs reads only: it does not save, install, dispatch, or change the selected revision. Its link opens
-        the checked committed revision in a new tab, preserving local edits in the original tab. A historical
-        revision remains blocked. Uncertain save outcomes block repeat requests until reconciled rather than
-        risking duplicate dispatches.</p>
+      <p>The Linux tooling card has one primary action for the next safe step. Unsaved choices offer
+        <strong>Save monitoring for review</strong>; accepted or uncertain requests offer
+        <strong>Check committed monitoring</strong>. Save acceptance (HTTP 204) is not proof of a proposal or
+        merge. Proposal and workflow links are explicitly unattributed lists. The read-only check compares
+        the complete monitoring choices, including opt-outs and the other platform, plus worker defaults and
+        action overrides against the exact current HEAD configuration. Unknown, incomplete, or mismatching
+        settings do not unlock a build or another Save. A match offers <strong>Open matching committed
+        settings</strong> in a new tab, preserving all edits in the original tab; it does not attribute a Save
+        or proposal. If effective capability monitoring contradicts the intended platform choices, the check
+        reports that it cannot verify them and retains the choices and request lock rather than claiming a match.
+        A historical revision independently blocks building and offers a read-only current-revision
+        lookup. No check saves, installs, dispatches, navigates automatically, or silently discards choices.
+        An omitted per-file <code>monitorOn</code> with <code>monitor: true</code> means both platforms,
+        matching Reconfigure output; an explicit false flag remains an opt-out. This tooling source repository
+        and its forks must change monitoring through reviewed source PRs, never the client Save or installer.
+        That restriction does not block read-only committed-settings checks or explicit exact-revision navigation.
+        A separate scratch client is required for client testing.</p>
       <p>Dragon rows distinguish <strong>file present and parsed</strong>, <strong>file absent</strong>,
         <strong>parse error</strong>, and <strong>inspection unavailable</strong> from package status. Expand
         <strong>Declared packages</strong> to see each manager, package name, exact declared version, and the
@@ -1627,10 +1644,13 @@ docker run --rm `
         so reset does not guarantee VIPM. The retained default ref is shown before requesting reset.
         Never apply the client installer to
         this tooling source repository or a fork to test this feature; use a separate scratch client repository.</p>
-      <p>After monitoring prerequisites are complete, the Linux tooling card shows one next action: build a separate candidate, or review activation of an
-        available candidate. Candidate evidence, declarations, image identity, limitations, and rollback stay
-        collapsed until needed. A candidate build never changes the active worker, and the separate VIPM update
-        panel is hidden while previewing or using LVPM.</p>
+      <p>With committed settings at current HEAD, the primary action is <strong>Build Linux LVPM container</strong>
+        or <strong>Review Linux VIPM build</strong>. VIPM still requires review and approval before dispatch.
+        Candidate activation is a separate guarded action inside the collapsed candidate evidence section;
+        rollback is available under Current selection and rollback. Building never changes the active worker.
+        The single action clarifies submission and navigation, not package compatibility: conflicting pins or
+        runtime installation failures can still stop the build. No successful image bake or CI activity run
+        is established by enabling or submitting the button.</p>
       <p>Linux requests ask GitHub for dispatch run details. An accepted request is not a successful build.
         When GitHub returns a run identity, the page checks the exact repository, workflow ID and path,
         dispatch event, branch, reviewed HEAD, authenticated actor, and first run attempt before showing
