@@ -2,12 +2,15 @@
 """Offline regression tests for the toolkit's external LVPM adapter."""
 
 import configparser
+import hashlib
 import importlib.util
 import io
 import json
 from pathlib import Path
+import shutil
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -156,6 +159,106 @@ class LvpmAdapterTests(unittest.TestCase):
     def test_same_version_retains_both_sources(self):
         self.write_vipc("Dependencies.vipc", ["core_lib-1.0.0"])
         self.assertEqual(len(ADAPTER.make_plan(self.root)["requirements"][0]["source_files"]), 2)
+
+    def selected_repository_sources(self):
+        sources = [
+            ".github/labview/antidoc/antidoc.vipc",
+            ".github/labview/experimental.vipc",
+            ADAPTER.CORE,
+            "example/Dependencies.vipc",
+            "example/Example.dragon",
+        ]
+        for source in sources:
+            target = self.root / source
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(REPOSITORY / source, target)
+        self.config(
+            "    vipc:\n" + "".join(f"      - path: {source}\n        monitor: true\n"
+                                   for source in sources[:-1]) +
+            f"    dragon:\n      - path: {sources[-1]}\n        monitor: true\n")
+        return sources
+
+    def test_actual_all_selected_repository_cli_retains_35_exact_roots_and_sources(self):
+        sources = self.selected_repository_sources()
+        output = self.root / "plan"
+        result = subprocess.run(
+            [sys.executable, "-I", str(ROOT / "lvpm/adapter.py"), "plan",
+             "--repo", str(self.root), "--out", str(output)],
+            capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        plan = json.loads((output / "requirements.json").read_text())
+        self.assertEqual({entry["path"] for entry in plan["files"]}, set(sources))
+        expected = {}
+        for source in sources:
+            for package in ADAPTER.declarations(REPOSITORY / source, source):
+                if package["name"] in expected:
+                    self.assertEqual(expected[package["name"]]["version"], package["version"])
+                    expected[package["name"]]["source_files"].append(source)
+                else:
+                    expected[package["name"]] = package
+        self.assertEqual(len(expected), 35)
+        requirements = {package["name"]: package for package in plan["requirements"]}
+        self.assertEqual(requirements.keys(), expected.keys())
+        for name, package in expected.items():
+            self.assertEqual(requirements[name]["version"], package["version"])
+            self.assertCountEqual(requirements[name]["source_files"], package["source_files"])
+        self.assertEqual(requirements["wovalab_lib_antidoc_cli"]["version"], "3.4.0.126")
+        self.assertEqual(requirements["oglib_boolean"]["version"], "6.0.0.9")
+        self.assertEqual(requirements["oglib_array"]["version"], "6.0.1.20")
+        self.assertEqual((output / "lvpm.toml").read_text(),
+                         ADAPTER.manifest_text(plan["requirements"]))
+
+    def test_actual_all_selected_cli_rejects_divergent_experimental_pin_without_output(self):
+        self.selected_repository_sources()
+        path = self.root / ".github/labview/experimental.vipc"
+        with zipfile.ZipFile(path) as archive:
+            entries = [(entry, archive.read(entry.filename)) for entry in archive.infolist()]
+        with zipfile.ZipFile(path, "w") as archive:
+            for entry, content in entries:
+                if entry.filename == "config.xml":
+                    content = content.replace(b"3.4.0.126", b"3.3.0.117")
+                archive.writestr(entry, content)
+        output = self.root / "rejected"
+        result = subprocess.run(
+            [sys.executable, "-I", str(ROOT / "lvpm/adapter.py"), "plan",
+             "--repo", str(self.root), "--out", str(output)],
+            capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Conflicting versions of wovalab_lib_antidoc_cli", result.stderr)
+        self.assertIn("3.4.0.126", result.stderr)
+        self.assertIn("3.3.0.117", result.stderr)
+        self.assertFalse(output.exists())
+
+    def test_experimental_vipc_preserves_config_and_authentic_antidoc_metadata(self):
+        package = "wovalab_lib_antidoc_cli-3.4.0.126"
+        with zipfile.ZipFile(REPOSITORY / ".github/labview/experimental.vipc") as archive, \
+                zipfile.ZipFile(REPOSITORY / ".github/labview/antidoc/antidoc.vipc") as authoritative:
+            self.assertIsNone(archive.testzip())
+            self.assertEqual(len(archive.namelist()), len(set(archive.namelist())))
+            self.assertCountEqual(archive.namelist(), ["config.xml", f"{package}.spec", f"{package}.bmp"])
+            config = archive.read("config.xml")
+            self.assertEqual(config.count(package.encode()), 1)
+            original_config = config.replace(package.encode(), b"wovalab_lib_antidoc_cli-3.3.0.117")
+            self.assertEqual(hashlib.sha256(original_config).hexdigest(),
+                             "94042d01de16eca063b4d626b538568bac2e16dcdb09f5755dd19ba2aac2ecb8")
+            for suffix in ("spec", "bmp"):
+                name = f"{package}.{suffix}"
+                self.assertEqual(archive.read(name), authoritative.read(name))
+            spec = configparser.ConfigParser(interpolation=None, strict=False)
+            spec.read_string(archive.read(f"{package}.spec").decode("utf-8-sig"))
+            self.assertEqual(ADAPTER.archive_identity(spec), ("wovalab_lib_antidoc_cli", "3.4.0.126"))
+            metadata = json.loads((REPOSITORY / ".github/labview/antidoc/antidoc.packages.json").read_text())
+            cli = next(entry for entry in metadata["vipmPackages"]["packages"]
+                       if entry["name"] == "wovalab_lib_antidoc_cli")
+            self.assertEqual(cli["version"], "3.4.0.126")
+
+    def test_lvpm_checks_cover_antidoc_and_experimental_declaration_changes(self):
+        workflow = ADAPTER.yaml.load((REPOSITORY / ".github/workflows/lvpm-checks.yml").read_text(),
+                                     Loader=ADAPTER.yaml.BaseLoader)
+        for event in ("pull_request", "push"):
+            for source in (".github/labview/experimental.vipc", ".github/labview/antidoc/antidoc.vipc",
+                           ".github/labview/antidoc/antidoc.packages.json"):
+                self.assertIn(source, workflow["on"][event]["paths"])
 
     def test_unchanged_pins_still_invalidate_fingerprint_when_declaration_bytes_change(self):
         path = self.write_vipc("Dependencies.vipc", ["other_lib-1.0.0"])

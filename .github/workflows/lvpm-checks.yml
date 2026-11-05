@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/labview/lvpm/**'
       - '.github/labview/vipm/ci-tooling.vipc'
+      - '.github/labview/experimental.vipc'
+      - '.github/labview/antidoc/antidoc.vipc'
+      - '.github/labview/antidoc/antidoc.packages.json'
       - '.github/labview/test-lvpm*'
       - 'example/Dependencies.vipc'
       - 'example/Example.dragon'
@@ -25,6 +28,9 @@ on:
     paths:
       - '.github/labview/lvpm/**'
       - '.github/labview/vipm/ci-tooling.vipc'
+      - '.github/labview/experimental.vipc'
+      - '.github/labview/antidoc/antidoc.vipc'
+      - '.github/labview/antidoc/antidoc.packages.json'
       - '.github/labview/test-lvpm*'
       - 'example/Dependencies.vipc'
       - 'example/Example.dragon'
