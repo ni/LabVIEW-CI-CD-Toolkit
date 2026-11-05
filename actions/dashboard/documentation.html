@@ -1595,7 +1595,7 @@ docker run --rm `
         status cannot establish Linux satisfaction. Explicit per-action overrides may select a different worker
         from the default shown here.</p>
       <p>For VIPM, choose <strong>Review Windows VIPM update</strong> or
-        <strong>Review Linux VIPM build</strong>, inspect the selected platform&rsquo;s package changes, then
+        Linux <strong>Update container image</strong>, inspect the selected platform&rsquo;s package changes, then
         approve the build. Advanced update options are collapsed by default. Saving monitoring choices preserves
         the other platform&rsquo;s selections and requests a configuration pull request; merge it and refresh before
         building committed dependencies. Tab or revision changes cancel outstanding approval/token prompts, and
@@ -1608,23 +1608,34 @@ docker run --rm `
         tabs, and label combined unresolved counts as aggregate rather than attributing them to both workers.
         Dependency banners render text and navigation with DOM nodes, not parsed HTML; review links allow only
         HTTP(S) destinations.</p>
-      <p>The Linux tooling card has one primary action for the next safe step. Unsaved choices offer
-        <strong>Save monitoring for review</strong>; accepted or uncertain requests offer
-        <strong>Check committed monitoring</strong>. Save acceptance (HTTP 204) is not proof of a proposal or
-        merge. Proposal and workflow links are explicitly unattributed lists. The read-only check compares
-        the complete monitoring choices, including opt-outs and the other platform, plus worker defaults and
-        action overrides against the exact current HEAD configuration. Unknown, incomplete, or mismatching
-        settings do not unlock a build or another Save. A match offers <strong>Open matching committed
-        settings</strong> in a new tab, preserving all edits in the original tab; it does not attribute a Save
-        or proposal. If effective capability monitoring contradicts the intended platform choices, the check
-        reports that it cannot verify them and retains the choices and request lock rather than claiming a match.
-        A historical revision independently blocks building and offers a read-only current-revision
-        lookup. No check saves, installs, dispatches, navigates automatically, or silently discards choices.
-        An omitted per-file <code>monitorOn</code> with <code>monitor: true</code> means both platforms,
-        matching Reconfigure output; an explicit false flag remains an opt-out. This tooling source repository
-        and its forks must change monitoring through reviewed source PRs, never the client Save or installer.
-        That restriction does not block read-only committed-settings checks or explicit exact-revision navigation.
-        A separate scratch client is required for client testing.</p>
+      <p>The Linux tooling card has one primary action: <strong>Update container image</strong>. Clicking it
+        checks authenticated current-HEAD configuration and the installed workflow, comparing complete
+        monitoring choices (including opt-outs and the other platform), defaults, and activity overrides.
+        A historical view with equivalent committed settings can update the current committed SHA without
+        changing the inspected revision, URL, or choices. Unmerged choices, mismatches, unknown evidence,
+        or contradictory capability platform classification stop with a specific inline prerequisite and no
+        build request. An accepted Save is not proof of a proposal or merge; only demonstrably committed
+        matching settings can proceed. Reconfigure&rsquo;s omitted <code>monitorOn</code> with
+        <code>monitor: true</code> means both platforms; false remains an opt-out. There are no Find/Open
+        navigation stages, automatic updates on page load, or background retries. Source repositories and
+        their forks must change monitoring through reviewed source PRs, not client Save or the installer.</p>
+      <p>Legacy implicit monitoring (omitted lists, not explicit empty lists) retains a clean-current path:
+        authenticated HEAD must equal the fully loaded revision, with unchanged complete discovery inputs,
+        worker settings, and no pending Save. Generated inventory requires exact repository/revision provenance;
+        live loading requires successful manifest and file discovery. Overlapping revision loads publish
+        inventory and provenance only from the still-current load; stale responses cannot replace newer choices.
+        Historical or edited implicit settings
+        cannot use this path. Unsupported or malformed configuration shapes remain unverified and do not dispatch.</p>
+      <p>The explicit update intent retains its page context across authentication, reads, VIPM approval,
+        and submission. Changes to platform, inspected revision, monitoring, or tooling invalidate it.
+        VIPM approval names the exact committed target and revalidates it before dispatch; LVPM builds
+        a candidate only. The request uses the default branch and <code>expected_sha</code>, not an
+        undocumented commit-SHA dispatch ref. This optional input accepts exactly 40 hexadecimal characters,
+        normalizes their case, and leaves existing manual/push/schedule behavior unchanged when empty.
+        Both Linux workflows reject an unexpected event SHA before checkout/setup/build, and checkout
+        is pinned to the run SHA. Older installed workflows lacking this
+        safeguard require a tooling update and are not dispatched. A moved HEAD is rejected without retry.
+        Windows behavior and separately reviewed activation/rollback are unchanged.</p>
       <p>Dragon rows distinguish <strong>file present and parsed</strong>, <strong>file absent</strong>,
         <strong>parse error</strong>, and <strong>inspection unavailable</strong> from package status. Expand
         <strong>Declared packages</strong> to see each manager, package name, exact declared version, and the
@@ -1644,10 +1655,10 @@ docker run --rm `
         so reset does not guarantee VIPM. The retained default ref is shown before requesting reset.
         Never apply the client installer to
         this tooling source repository or a fork to test this feature; use a separate scratch client repository.</p>
-      <p>With committed settings at current HEAD, the primary action is <strong>Build Linux LVPM container</strong>
-        or <strong>Review Linux VIPM build</strong>. VIPM still requires review and approval before dispatch.
+      <p><strong>Update container image</strong> uses the selected Linux tooling. VIPM still requires
+        review and approval before dispatch.
         Candidate activation is a separate guarded action inside the collapsed candidate evidence section;
-        rollback is available under Current selection and rollback. Building never changes the active worker.
+        rollback is available under Current selection and rollback. Building an LVPM candidate never changes the active worker.
         The single action clarifies submission and navigation, not package compatibility: conflicting pins or
         runtime installation failures can still stop the build. No successful image bake or CI activity run
         is established by enabling or submitting the button.</p>

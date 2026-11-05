@@ -79,8 +79,7 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
 
     def test_linux_next_action_details_and_live_feedback_contract(self):
         page = (ROOT / '.github/pages/dependencies.html').read_text()
-        self.assertIn('Build Linux LVPM container', page)
-        self.assertIn('Review Linux VIPM build', page)
+        self.assertIn('Update container image', page)
         self.assertNotIn('Next:', page)
         self.assertIn('id="linuxPrimary"', page)
         self.assertIn('<details><summary>Candidate evidence and build inputs</summary>', page)
@@ -91,11 +90,10 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
 
     def test_linux_monitoring_prerequisites_distinguish_acceptance_from_merge(self):
         page = (ROOT / '.github/pages/dependencies.html').read_text()
-        self.assertIn('Save monitoring for review', page)
-        self.assertIn('Check committed monitoring', page)
-        self.assertIn('Open matching committed settings', page)
+        self.assertNotIn('Find current Linux settings', page)
+        self.assertNotIn('Open matching committed settings', page)
         self.assertIn('Save request accepted, not applied', page)
-        self.assertIn('not proof of a proposal or merge', page)
+        self.assertIn('committedMonitoringMatches(settings, intent.context)', page)
         self.assertIn('Review proposals (unattributed list)', page)
         self.assertNotIn('LVPM Experimental', page)
         self.assertNotIn('Build experimental LVPM', page)
@@ -126,7 +124,9 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
         primary = page.split('async function runLinuxPrimaryAction()', 1)[1].split('function workerSelectionSettings', 1)[0]
         self.assertIn('linuxDispatchPending', primary)
         self.assertIn('linuxOperation.busy', primary)
-        self.assertIn('return openUpdateApprovalDialog()', primary)
+        self.assertIn('openUpdateApprovalDialog(intent)', primary)
+        self.assertIn('Object.freeze({...linuxMonitoringContext()', primary)
+        self.assertNotIn('dispatchMonitor()', primary)
 
     def test_dragon_details_separate_file_and_package_evidence(self):
         page = (ROOT / '.github/pages/dependencies.html').read_text()
