@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "9d4ec074bdc60a8212e156eac9896f4ddf951502",
+  "sha": "f12591267bd379961d02c966fae047e0067ba10c",
   "revisions": [
+    {
+      "sha": "f12591267bd379961d02c966fae047e0067ba10c",
+      "short": "f125912",
+      "message": "Merge pull request #142 from ni/fix/linux-container-update-intent-20261105",
+      "author": "Elijah Kerry",
+      "date": "2026-11-05T12:17:50Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "43a189188faa2f347a0fa15ea1ca0527622ef041",
+      "short": "43a1891",
+      "message": "dependencies: update Linux containers from reviewed settings",
+      "author": "elijah286",
+      "date": "2026-11-05T04:31:48Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "9d4ec074bdc60a8212e156eac9896f4ddf951502",
       "short": "9d4ec07",
@@ -882,24 +900,6 @@
       "message": "Merge pull request #97 from ni/fix/descriptive-generated-prs-20261102",
       "author": "Elijah Kerry",
       "date": "2026-11-02T20:56:42Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "69175eca5c4146893620ff8d31d9bfd0ffa6e598",
-      "short": "69175ec",
-      "message": "Render dependency notices without interpreting text as HTML",
-      "author": "elijah286",
-      "date": "2026-11-02T20:48:58Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "bf169ad2cce5421f023728ceecf094bead893a9f",
-      "short": "bf169ad",
-      "message": "Separate Windows and Linux dependency management views",
-      "author": "elijah286",
-      "date": "2026-11-02T18:34:19Z",
       "project": false,
       "dep_only": false
     },
