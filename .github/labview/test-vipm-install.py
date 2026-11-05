@@ -2,17 +2,293 @@
 """Exercise Windows VIPM bootstrap and fallback accounting without LabVIEW/VIPM."""
 
 import json
+import importlib.util
 import os
 import re
 import shutil
 import subprocess
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 
 INSTALLER = Path(__file__).parent / 'vipm' / 'install-vipc.ps1'
 POWERSHELL = shutil.which('powershell.exe') or shutil.which('pwsh')
+PARSER_PATH = Path(__file__).parent / 'dragon_deps.py'
+PARSER_SPEC = importlib.util.spec_from_file_location('dragon_deps', PARSER_PATH)
+DRAGON = importlib.util.module_from_spec(PARSER_SPEC)
+PARSER_SPEC.loader.exec_module(DRAGON)
+
+
+class WindowsDragonPlanTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+
+    def source(self, text, name='Example.dragon'):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding='utf-8')
+        return str(path)
+
+    def test_string_and_inline_versions_create_hash_bound_exact_plan(self):
+        import hashlib
+        path = self.source('[project]\nlabview-version=2026\nvipc=""\n[vipm.dependencies]\n'
+                           'oglib_boolean="6.0.0.9"\noglib_array={version="6.0.1.20"}\n')
+        plan = DRAGON.windows_install_plan([path])
+        self.assertEqual(plan['specs'], ['oglib_array@6.0.1.20', 'oglib_boolean@6.0.0.9'])
+        self.assertEqual(plan['files'][0]['labview_version'], '2026')
+        self.assertEqual(plan['files'][0]['sha256'], hashlib.sha256(Path(path).read_bytes()).hexdigest())
+
+    def test_malformed_and_unsupported_declarations_are_not_silently_dropped(self):
+        for text in ('[vipm.dependencies\nbad="1.0"',
+                     '[other.dependencies]\npackage="1.0"',
+                     '[project]\nactivity="run-code"',
+                     '[project]\nvipc="other.vipc"',
+                     '[project]\nlabview-version=2026\nlabview_version=2025',
+                     '[nipm.dependencies]\nni_driver="1.0"',
+                     '[nipm.feeds]\nfeed="https://example.test"',
+                     '[vipm.feeds]\nfeed="https://example.test"',
+                     '[vipm.dependencies]\npackage={version="1.0",feed="private"}',
+                     '[vipm.dependencies]\npackage={version="1.0", extra=true}',
+                     '[vipm.dependencies]\npackage=true',
+                     '[vipm.dependencies]\npackage=">=1.0"',
+                     '[vipm.dependencies]\npackage="latest"',
+                     '[vipm.dependencies]\npackage=""',
+                     '[vipm.dependencies]\n"--argument"="1.0"'):
+            with self.subTest(text=text):
+                with self.assertRaises(DRAGON.DragonParseError):
+                    DRAGON.windows_install_plan([self.source(text)])
+
+    def test_missing_selected_source_fails(self):
+        with self.assertRaisesRegex(DRAGON.DragonParseError, 'regular file'):
+            DRAGON.windows_install_plan([str(self.root / 'Missing.dragon')])
+
+    def test_selected_source_cannot_escape_repository(self):
+        source = self.source('[vipm.dependencies]\npkg="1.0"\n')
+        (self.root / 'repository').mkdir()
+        with self.assertRaisesRegex(DRAGON.DragonParseError, 'outside the repository'):
+            DRAGON.windows_install_plan([source], repository_root=str(self.root / 'repository'))
+
+    def test_conflicting_versions_or_target_years_fail(self):
+        first = self.source('[project]\nlabview-version=2026\n[vipm.dependencies]\npkg="1.0"\n')
+        for text in ('[vipm.dependencies]\npkg="2.0"\n',
+                     '[project]\nlabview-version=2025\n[vipm.dependencies]\nother="1.0"\n'):
+            with self.subTest(text=text):
+                with self.assertRaisesRegex(DRAGON.DragonParseError, 'conflicting|differs from Windows target'):
+                    DRAGON.windows_install_plan([first, self.source(text, 'Other.dragon')])
+
+    def test_same_basename_sources_cannot_overwrite_each_other(self):
+        first = self.source('[vipm.dependencies]\npkg="1.0"\n', 'one/Same.dragon')
+        second = self.source('[vipm.dependencies]\nother="1.0"\n', 'two/Same.dragon')
+        with self.assertRaisesRegex(DRAGON.DragonParseError, 'duplicate'):
+            DRAGON.windows_install_plan([first, second])
+
+    def test_empty_and_duplicate_compatible_declarations(self):
+        self.assertEqual(DRAGON.windows_install_plan([]), {
+            'schema': 1, 'platform': 'windows', 'labview_version': '2026',
+            'labview_bitness': '64', 'files': [], 'specs': [],
+        })
+        first = self.source('[nipm]\n[vipm.dependencies]\npkg="1.0-1"\n')
+        second = self.source('[vipm.dependencies]\npkg={version="1.0-1"}\n', 'Other.dragon')
+        self.assertEqual(DRAGON.windows_install_plan([first, second])['specs'], ['pkg@1.0-1'])
+
+    def stage(self, dragon_text, config='', vipc=False, expected_exit=0):
+        root = INSTALLER.parents[3]
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        stage = workflow.split('- name: Stage repo VIPC and Dragon files', 1)[1]
+        stage = stage.split("          python -I - <<'PY'\n", 1)[1]
+        stage = stage.split('\n          PY', 1)[0]
+        code = '\n'.join(line[10:] for line in stage.splitlines())
+        parser_dest = self.root / '.github/labview/dragon_deps.py'
+        parser_dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(PARSER_PATH, parser_dest)
+        self.source(dragon_text, 'example/Example.dragon')
+        config_path = self.root / '.github/labview-ci.yml'
+        if config:
+            config_path.write_text(config)
+        elif config_path.exists():
+            config_path.unlink()
+        if vipc:
+            with zipfile.ZipFile(self.root / 'Dependencies.vipc', 'w') as archive:
+                archive.writestr('config.xml', '<VI_Package_Configuration/>')
+        environment = dict(os.environ, GITHUB_OUTPUT=str(self.root / 'outputs'))
+        environment['PYTHONPATH'] = str(self.root / 'shadow')
+        result = subprocess.run([os.sys.executable, '-I', '-c', code], cwd=self.root, env=environment,
+                                text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, expected_exit, result.stdout + result.stderr)
+        return self.root / '.github/labview/vipm'
+
+    def push_gate(self, config, expected_exit=0, changed_path='example/Example.dragon'):
+        root = INSTALLER.parents[3]
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        gate = workflow.split('- name: Decide whether to rebuild', 1)[1]
+        gate = gate.split("          python -I - <<'PY'\n", 1)[1].split('\n          PY', 1)[0]
+        code = '\n'.join(line[10:] for line in gate.splitlines())
+        parser_dest = self.root / '.github/labview/dragon_deps.py'
+        parser_dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(PARSER_PATH, parser_dest)
+        (self.root / '.github/labview-ci.yml').write_text(config)
+        code = (
+            "import subprocess\nfrom unittest.mock import patch\n"
+            "patch('subprocess.run', return_value=subprocess.CompletedProcess("
+            "[], 0, " + repr(changed_path + '\n') + ", '')).start()\n"
+        ) + code
+        output = self.root / 'gate-output'
+        output.unlink(missing_ok=True)
+        result = subprocess.run(
+            [os.sys.executable, '-I', '-c', code], cwd=self.root,
+            env=dict(os.environ, GITHUB_OUTPUT=str(output), EVENT_NAME='push', BEFORE='abc', SHA='def'),
+            text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, expected_exit, result.stdout + result.stderr)
+        return output.read_text()
+
+    def test_actual_stage_and_push_gate_share_yaml_scalar_flow_and_block_semantics(self):
+        for platforms in ('windows', '"windows"', "'windows'", '[windows]', '[windows, linux]',
+                          'windows+linux', '\n          - windows\n          - linux',
+                          '"windows" # selected Windows'):
+            with self.subTest(platforms=platforms):
+                config = ('config:\n  container:\n    dragon:\n'
+                          '      - path: "example/Example.dragon" # source\n'
+                          '        monitor: true # enable\n'
+                          f'        monitorOn: {platforms}\n')
+                staged = self.stage('[vipm.dependencies]\npkg="1.0"\n', config=config)
+                self.assertEqual(json.loads((staged / 'dragon-plan.json').read_text())['specs'], ['pkg@1.0'])
+                self.assertEqual(self.push_gate(config), 'build=true\n')
+
+    def test_actual_stage_and_push_gate_reject_bad_monitor_shapes_and_yaml(self):
+        for setting in ('monitor: "true"', 'monitor: "false"', 'monitor: 1', 'monitor: null',
+                        'monitor: true\n        monitorOn: {windows: true}',
+                        'monitor: true\n        monitorOn: [windows, 1]',
+                        'monitor: true\n        monitorOn: null',
+                        'monitor: true\n        monitorOn: macos',
+                        'monitor: true\n        monitorOn: [windows'):
+            with self.subTest(setting=setting):
+                config = ('config:\n  container:\n    dragon:\n'
+                          f"      - path: 'example/Example.dragon'\n        {setting}\n")
+                self.stage('[vipm.dependencies]\npkg="1.0"\n', config=config, expected_exit=1)
+                self.assertEqual(self.push_gate(config, expected_exit=1), 'build=false\n')
+
+    def test_actual_stage_and_push_gate_preserve_quoted_paths_with_spaces_and_hash(self):
+        path = 'example/My # deps.dragon'
+        self.source('[vipm.dependencies]\npkg="1.0"\n', path)
+        config = ('config:\n  container:\n    dragon:\n'
+                  f"      - path: '{path}' # quoted path\n"
+                  '        monitor: true\n        monitorOn: [windows]\n')
+        staged = self.stage('[invalid TOML', config=config)
+        plan = json.loads((staged / 'dragon-plan.json').read_text())
+        self.assertEqual(plan['specs'], ['pkg@1.0'])
+        self.assertEqual(plan['files'][0]['source_file'], path)
+        self.assertEqual(self.push_gate(config, changed_path=path), 'build=true\n')
+
+    def test_actual_stage_and_push_gate_reject_invalid_list_and_path_shapes(self):
+        for entries in ('null', '{}', 'true', '"example/Example.dragon"',
+                        '[{path: true, monitor: true}]', '[{monitor: true}]'):
+            with self.subTest(entries=entries):
+                config = f'config:\n  container:\n    dragon: {entries}\n'
+                self.stage('[vipm.dependencies]\npkg="1.0"\n', config=config, expected_exit=1)
+                self.assertEqual(self.push_gate(config, expected_exit=1), 'build=false\n')
+
+    def test_actual_stage_and_push_gate_preserve_linux_and_empty_list_optouts(self):
+        for entry in ('    dragon: [] # opt out\n',
+                      '    dragon:\n      - path: "example/Example.dragon"\n'
+                      '        monitor: true\n        monitorOn: [linux]\n',
+                      '    dragon:\n      - path: "example/Example.dragon"\n        monitor: false\n'):
+            config = 'config:\n  container:\n' + entry
+            with self.subTest(entry=entry):
+                staged = self.stage('[invalid TOML', config=config)
+                self.assertEqual(json.loads((staged / 'dragon-plan.json').read_text())['files'], [])
+                self.assertEqual(self.push_gate(config), 'build=false\n')
+
+    def test_actual_workflow_stages_dragon_only_and_vipc_plus_dragon(self):
+        for vipc in (False, True):
+            with self.subTest(vipc=vipc):
+                staged = self.stage('[vipm.dependencies]\noglib_boolean="6.0.0.9"\n', vipc=vipc)
+                plan = json.loads((staged / 'dragon-plan.json').read_text())
+                self.assertEqual(plan['specs'], ['oglib_boolean@6.0.0.9'])
+                self.assertTrue((staged / 'Example.dragon').is_file())
+                self.assertEqual((staged / 'Dependencies.vipc').is_file(), vipc)
+
+    def test_actual_workflow_respects_empty_and_other_platform_monitoring(self):
+        for entry in ('    dragon: []\n',
+                      '    dragon:\n      - path: example/Example.dragon\n        monitor: false\n',
+                      '    dragon:\n      - path: example/Example.dragon\n        monitor: true\n        monitorOn: linux\n'):
+            with self.subTest(entry=entry):
+                staged = self.stage('[vipm.dependencies]\noglib_boolean="6.0.0.9"\n',
+                                    config='config:\n  container:\n' + entry)
+                self.assertEqual(json.loads((staged / 'dragon-plan.json').read_text())['specs'], [])
+                self.assertFalse((staged / 'Example.dragon').exists())
+
+    def test_isolated_staging_ignores_client_imports_and_startup_hooks(self):
+        shadow = self.root / 'shadow'
+        shadow.mkdir()
+        tooling = self.root / '.github/labview'
+        tooling.mkdir(parents=True)
+        poison = "raise RuntimeError('Client-controlled Python import executed')\n"
+        for directory in (self.root, shadow, tooling):
+            for module in ('json.py', 'hashlib.py', 'sitecustomize.py', 'yaml.py'):
+                (directory / module).write_text(poison)
+        (self.root / 'dragon_deps.py').write_text(poison)
+        staged = self.stage('[vipm.dependencies]\noglib_boolean="6.0.0.9"\n')
+        self.assertEqual(json.loads((staged / 'dragon-plan.json').read_text())['specs'],
+                         ['oglib_boolean@6.0.0.9'])
+        config = ('config:\n  container:\n    dragon:\n'
+                  '      - path: "example/Example.dragon"\n'
+                  '        monitor: true\n        monitorOn: "windows"\n')
+        self.assertEqual(self.push_gate(config), 'build=true\n')
+
+    def test_opted_out_malformed_dragon_is_not_parsed(self):
+        self.source('[invalid TOML', '.github/labview/vipm/Unmonitored.dragon')
+        self.source('[invalid TOML', '.github/labview/vipm/Unmonitored.DRAGON')
+        staged = self.stage('[broken TOML', config='config:\n  container:\n    dragon: [] # deliberately opt out\n')
+        self.assertEqual(json.loads((staged / 'dragon-plan.json').read_text())['files'], [])
+        self.assertFalse((staged / 'Unmonitored.dragon').exists())
+        self.assertFalse((staged / 'Unmonitored.DRAGON').exists())
+
+    def test_selected_dragon_can_already_live_inside_copy_directory(self):
+        self.source('[vipm.dependencies]\npkg="1.0"\n', '.github/labview/vipm/Local.dragon')
+        staged = self.stage('[broken TOML', config=(
+            'config:\n  container:\n    dragon:\n'
+            '      - path: .github/labview/vipm/Local.dragon\n        monitor: true\n        monitorOn: windows\n'
+        ))
+        self.assertEqual(json.loads((staged / 'dragon-plan.json').read_text())['specs'], ['pkg@1.0'])
+        self.assertTrue((staged / 'Local.dragon').is_file())
+        self.assertFalse((staged / 'Example.dragon').exists())
+
+    def test_target_identity_is_validated_when_creating_plan(self):
+        source = self.source('[project]\nlabview-version=2025\n[vipm.dependencies]\npkg="1.0"\n')
+        with self.assertRaisesRegex(DRAGON.DragonParseError, 'differs from Windows target'):
+            DRAGON.windows_install_plan([source])
+        plan = DRAGON.windows_install_plan([source], target_year='2025', target_bitness='32')
+        self.assertEqual((plan['platform'], plan['labview_version'], plan['labview_bitness']),
+                         ('windows', '2025', '32'))
+        for year, bitness in (('latest', '64'), ('2026', '128')):
+            with self.subTest(year=year, bitness=bitness):
+                with self.assertRaisesRegex(DRAGON.DragonParseError, 'invalid Windows Dragon target'):
+                    DRAGON.windows_install_plan([], target_year=year, target_bitness=bitness)
+
+    def test_selected_symlinks_are_rejected(self):
+        source = Path(self.source('[vipm.dependencies]\npkg="1.0"\n'))
+        link = self.root / 'Link.dragon'
+        try:
+            link.symlink_to(source)
+        except OSError as exc:
+            self.skipTest(f'Symlink creation unavailable: {exc}')
+        with self.assertRaisesRegex(DRAGON.DragonParseError, 'symlink|regular file'):
+            DRAGON.windows_install_plan([str(link)], repository_root=str(self.root))
+
+    def test_workflow_fingerprint_and_docker_closure_include_dragon_plan(self):
+        root = INSTALLER.parents[3]
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        self.assertIn("$files += '.github/labview/vipm/dragon-plan.json'", workflow)
+        self.assertIn("$files += '.github/labview/dragon_deps.py'", workflow)
+        docker = (root / '.github/docker/labview-ci.Dockerfile').read_text()
+        self.assertIn('COPY .github/labview/vipm/ C:/vipm/', docker)
+        self.assertIn('if ($vipcFiles -or $dragonFiles)', docker)
+        self.assertNotIn('dragon apply', docker)
+        self.assertIn("if ($LASTEXITCODE -ne 0) { throw", docker)
 
 
 @unittest.skipUnless(POWERSHELL, 'PowerShell is required')
@@ -31,6 +307,8 @@ $ast.FindAll({{
     $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
 }}, $true) | ForEach-Object {{ . ([scriptblock]::Create($_.Extent.Text)) }}
 $VipmExe = 'Mock-Vipm'
+$LabVIEWVersion = '2026'
+$LabVIEWBitness = '64'
 $GlobalFlags = @('--labview-version', '2026', '--labview-bitness', '64')
 $script:VipmEngineDead = $false
 function Mock-Vipm {{
@@ -50,6 +328,309 @@ function Mock-Vipm {{
             capture_output=True, text=True, timeout=30, cwd=INSTALLER.parents[3], env=environment)
         self.assertEqual(result.returncode, expected_exit, result.stdout + result.stderr)
         return result.stdout
+
+    def test_hash_bound_dragon_plan_is_read_and_rejects_tampered_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'Example.dragon'
+            source.write_text('[project]\nlabview-version=2026\n[vipm.dependencies]\noglib_boolean="6.0.0.9"\n')
+            (root / 'dragon-plan.json').write_text(json.dumps(DRAGON.windows_install_plan([str(source)])))
+            escaped = str(root).replace("'", "''")
+            output = self.run_script(f"""
+$plan = Get-WindowsDragonPlan -Directory '{escaped}' -TargetYear '2026'
+if (($plan.Specs -join ',') -ne 'oglib_boolean@6.0.0.9') {{ throw 'Wrong required specs' }}
+Add-Content -LiteralPath (Join-Path '{escaped}' 'Example.dragon') -Value 'changed'
+try {{ Get-WindowsDragonPlan -Directory '{escaped}' -TargetYear '2026'; throw 'Tampered source accepted' }}
+catch {{ if ($_.Exception.Message -notlike '*changed since trusted TOML parsing*') {{ throw }} }}
+'HASH-BOUND=True'
+""")
+            self.assertIn('HASH-BOUND=True', output)
+
+    def test_dragon_plan_normalizes_directory_representations_before_source_checks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'Example.dragon'
+            source.write_text('[vipm.dependencies]\npkg="1.0"\n')
+            (root / 'dragon-plan.json').write_text(json.dumps(DRAGON.windows_install_plan([str(source)])))
+            for representation in (str(root), root.as_posix() + '/', root.as_posix() + '/.'):
+                with self.subTest(directory=representation):
+                    escaped = representation.replace("'", "''")
+                    output = self.run_script(f"""
+$plan = Get-WindowsDragonPlan -Directory '{escaped}' -TargetYear '2026'
+if (($plan.Specs -join ',') -ne 'pkg@1.0') {{ throw 'Directory normalization changed required roots' }}
+'NORMALIZED=True'
+""")
+                    self.assertIn('NORMALIZED=True', output)
+
+    def test_dragon_plan_requires_matching_target_and_source_set(self):
+        for scenario in ('missing-plan', 'wrong-year', 'missing-source', 'changed-specs', 'custom-hook',
+                         'wrong-platform', 'wrong-bitness', 'unknown-setting', 'invalid-array',
+                         'string-schema', 'array-schema', 'missing-source-year', 'invalid-source-type'):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = root / 'Example.dragon'
+                source.write_text('[project]\nlabview-version=2026\n[vipm.dependencies]\npkg="1.0"\n')
+                plan = DRAGON.windows_install_plan([str(source)])
+                if scenario != 'missing-plan':
+                    if scenario == 'changed-specs':
+                        plan['specs'] = ['unrelated@1.0']
+                    elif scenario == 'wrong-platform':
+                        plan['platform'] = 'linux'
+                    elif scenario == 'wrong-bitness':
+                        plan['labview_bitness'] = '32'
+                    elif scenario == 'unknown-setting':
+                        plan['execute'] = 'arbitrary-code'
+                    elif scenario == 'invalid-array':
+                        plan['files'][0]['specs'] = 'pkg@1.0'
+                    elif scenario == 'string-schema':
+                        plan['schema'] = '1'
+                    elif scenario == 'array-schema':
+                        plan['schema'] = []
+                    elif scenario == 'missing-source-year':
+                        del plan['files'][0]['labview_version']
+                    elif scenario == 'invalid-source-type':
+                        plan['files'][0]['source_file'] = ['Example.dragon']
+                    (root / 'dragon-plan.json').write_text(json.dumps(plan))
+                if scenario == 'missing-source':
+                    source.unlink()
+                if scenario == 'custom-hook':
+                    (root / 'install-dragon.ps1').write_text("throw 'must not execute'\n")
+                escaped = str(root).replace("'", "''")
+                year = '2025' if scenario == 'wrong-year' else '2026'
+                output = self.run_script(f"""
+try {{ Get-WindowsDragonPlan -Directory '{escaped}' -TargetYear '{year}'; 'ACCEPTED'; exit 2 }}
+catch {{ Write-Output "REJECTED=$($_.Exception.Message)" }}
+""")
+                self.assertIn('REJECTED=', output)
+                self.assertNotIn('ACCEPTED', output)
+
+    def test_dragon_empty_plan_is_valid_without_vipc_or_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'dragon-plan.json').write_text(json.dumps(DRAGON.windows_install_plan([])))
+            escaped = str(root).replace("'", "''")
+            output = self.run_script(f"""
+$plan = Get-WindowsDragonPlan -Directory '{escaped}' -TargetYear '2026'
+if ($plan.Specs.Count) {{ throw 'Unexpected packages' }}
+'EMPTY=True'
+""")
+            self.assertIn('EMPTY=True', output)
+
+    def test_dragon_required_install_cannot_be_bypassed_by_allow_missing(self):
+        for mode in ('nonzero', 'missing-command', 'dead-engine'):
+            with self.subTest(mode=mode):
+                output = self.run_script(f"""
+$Env:VIPM_ALLOW_MISSING_PACKAGES = '1'
+$script:VipmEngineDead = {'$true' if mode == 'dead-engine' else '$false'}
+function Install-VipmSpecs {{
+    if ('{mode}' -eq 'dead-engine') {{ throw 'Must not install against dead engine' }}
+    if ('{mode}' -eq 'missing-command') {{ throw [System.Management.Automation.CommandNotFoundException]::new('VIPM command unavailable') }}
+    return $false
+}}
+try {{ Install-RequiredWindowsDragon @('oglib_boolean@6.0.0.9'); 'ACCEPTED'; exit 2 }}
+catch {{ Write-Output "REQUIRED-FAILED=$($_.Exception.Message)" }}
+""")
+                self.assertIn('REQUIRED-FAILED=', output)
+                self.assertNotIn('ACCEPTED', output)
+
+    def test_dragon_install_uses_shared_specs_helper(self):
+        output = self.run_script("""
+function Install-VipmSpecs {
+    param($Specs)
+    if (($Specs -join ',') -ne 'oglib_boolean@6.0.0.9') { throw 'Wrong install request' }
+    return $true
+}
+Install-RequiredWindowsDragon @('oglib_boolean@6.0.0.9')
+'REQUIRED=True'
+""")
+        self.assertIn('REQUIRED=True', output)
+
+    def test_final_dragon_inventory_is_target_specific_and_fails_closed(self):
+        good = 'Using LabVIEW 2026 (64-bit)'
+        for banner, package, exit_code, success in (
+                (good, 'oglib_boolean 6.0.0.9', 0, True),
+                (good, '', 0, False),
+                (good, 'oglib_boolean 6.0.0.10', 0, False),
+                ('Using LabVIEW 2025 (64-bit)', 'oglib_boolean 6.0.0.9', 0, False),
+                ('Using LabVIEW 2026 (32-bit)', 'oglib_boolean 6.0.0.9', 0, False),
+                ('', 'oglib_boolean 6.0.0.9', 0, False),
+                (good, 'oglib_boolean 6.0.0.9', 8, False)):
+            with self.subTest(banner=banner, package=package, exit_code=exit_code):
+                output = self.run_script(f"""
+$Env:VIPM_ALLOW_MISSING_PACKAGES = '1'
+$script:InventoryExit = {exit_code}
+$script:Inventory = @('{banner}', '{package}')
+try {{ Assert-FinalWindowsDragonInventory @('oglib_boolean@6.0.0.9'); 'VERIFIED=True' }}
+catch {{ "VERIFIED=False $($_.Exception.Message)" }}
+""")
+                self.assertIn(f'VERIFIED={success}', output)
+
+    def test_dragon_cannot_be_verified_against_dead_engine(self):
+        output = self.run_script("""
+$script:VipmEngineDead = $true
+function Test-VipmSpecsInstalled { throw 'Must not query dead engine' }
+try { Assert-FinalWindowsDragonInventory @('oglib_boolean@6.0.0.9'); exit 2 }
+catch { $_.Exception.Message }
+""")
+        self.assertIn('FINAL required Windows Dragon target inventory', output)
+
+    def test_dragon_and_vipc_conflicting_pins_rejected_before_installs(self):
+        for vipc_spec, accepted in (('oglib_boolean@6.0.0.9', True),
+                                    ('oglib_boolean@6.0.0.10', False),
+                                    ('oglib_boolean', True),
+                                    ('oglib_boolean>=6.0.0.9', True),
+                                    ('oglib_boolean>=7.0.0.0', False)):
+            with self.subTest(spec=vipc_spec):
+                output = self.run_script(f"""
+function Get-VipcPackageSpecs {{ '{vipc_spec}' }}
+$files = @([pscustomobject]@{{ FullName = 'core.vipc'; Name = 'ci-tooling.vipc' }})
+try {{ Assert-WindowsDragonVipcPins @('oglib_boolean@6.0.0.9') $files; 'ACCEPTED=True' }}
+catch {{ 'ACCEPTED=False'; $_.Exception.Message }}
+""")
+                self.assertIn(f'ACCEPTED={accepted}', output)
+
+    def test_dragon_required_install_and_final_gate_surround_all_tooling(self):
+        output = self.run_script("""
+$statements = $ast.EndBlock.Statements
+$main = $statements | Where-Object { $_ -is [System.Management.Automation.Language.TryStatementAst] -and
+    $_.Extent.Text.Contains('$installWorkdir = New-PublicRepoWorkdir') }
+if (-not $main) { throw 'Installer main block not found' }
+$text = $main.Body.Extent.Text
+$required = $text.IndexOf('Install-RequiredWindowsDragon -Specs $dragonPlan.Specs')
+$optional = $text.IndexOf('$earlyRaw = ')
+$vipcs = $text.IndexOf('foreach ($vipc in $vipcFiles)')
+$final = $text.IndexOf('Assert-FinalWindowsDragonInventory -Specs $dragonPlan.Specs')
+if ($required -lt 0 -or $required -ge $optional -or $optional -ge $vipcs -or $vipcs -ge $final) {
+    throw 'Required Dragon install/final gate ordering is incorrect'
+}
+'ORDER=True'
+""")
+        self.assertIn('ORDER=True', output)
+
+    def test_dragon_only_does_not_take_no_vipc_early_exit(self):
+        output = self.run_script("""
+$vipcFiles = @()
+$dragonPlan = [pscustomobject]@{ Specs = @('oglib_boolean@6.0.0.9') }
+$guard = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.IfStatementAst] -and
+    $node.Extent.Text.StartsWith('if ($vipcFiles.Count -eq 0 -and')
+}, $true)
+if (-not $guard) { throw 'No-input guard not found' }
+. ([scriptblock]::Create($guard.Extent.Text))
+'DRAGON-ONLY=True'
+""")
+        self.assertIn('DRAGON-ONLY=True', output)
+
+    def test_actual_docker_hook_runs_for_dragon_only_and_propagates_failures(self):
+        docker = (INSTALLER.parents[3] / '.github/docker/labview-ci.Dockerfile').read_text()
+        hook = docker.split('RUN $vipcFiles = ', 1)[1].split('\n\n# Stamp', 1)[0]
+        hook = '$vipcFiles = ' + hook.replace('`\n', '\n')
+        for mode, failed in (('dragon-only', False), ('mixed', False),
+                             ('nonzero', True), ('missing-command', True)):
+            with self.subTest(mode=mode):
+                output = self.run_script(f"""
+$script:Calls = 0
+function Get-ChildItem {{
+    param($Path, $Filter, [switch]$Recurse, $ErrorAction)
+    if ($Filter -eq '*.dragon') {{ return [pscustomobject]@{{ Name = 'Example.dragon' }} }}
+    if ('{mode}' -eq 'mixed') {{ return [pscustomobject]@{{ Name = 'Project.vipc' }} }}
+}}
+function Test-Path {{ return $true }}
+function powershell {{
+    param([Parameter(ValueFromRemainingArguments = $true)] $Arguments)
+    $script:Calls++
+    if (($Arguments -join ' ') -ne '-NoLogo -NoProfile -ExecutionPolicy Bypass -File C:\\vipm\\install-vipc.ps1') {{
+        throw 'Docker invoked the wrong dependency hook'
+    }}
+    if ('{mode}' -eq 'missing-command') {{ throw [System.Management.Automation.CommandNotFoundException]::new('installer unavailable') }}
+    $global:LASTEXITCODE = $(if ('{mode}' -eq 'nonzero') {{ 8 }} else {{ 0 }})
+}}
+$failed = $false
+try {{ {hook} }} catch {{ $failed = $true; $_.Exception.Message }}
+if ($script:Calls -ne 1) {{ throw 'Dependency hook did not execute exactly once' }}
+Write-Output "HOOK-FAILED=$failed"
+""")
+                self.assertIn(f'HOOK-FAILED={failed}', output)
+
+    def test_actual_install_phase_rejects_later_tooling_upgrade_of_dragon_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            escaped = directory.replace("'", "''")
+            output = self.run_script(f"""
+$PublicRepoUrl = 'https://example.test/public.git'
+$prevLocation = Get-Location
+$Env:VIPM_REQUIRED_PACKAGES = '-'
+$Env:VIPM_EARLY_PACKAGES = '-'
+$dragonPlan = [pscustomobject]@{{ Specs = @('oglib_boolean@6.0.0.9') }}
+$vipcFiles = @([pscustomobject]@{{ Name = 'ci-tooling.vipc'; FullName = 'ci-tooling.vipc' }})
+$script:InventoryExit = 0
+$script:LastVipmOutput = ''
+function New-PublicRepoWorkdir {{ return '{escaped}' }}
+function Get-Command {{ return $null }}
+function Install-VipmSpecs {{
+    param($Specs)
+    $script:Inventory = @('Using LabVIEW 2026 (64-bit)', 'oglib_boolean 6.0.0.9')
+    return $true
+}}
+function Invoke-VipmInstall {{
+    param([Parameter(ValueFromRemainingArguments = $true)] $Targets)
+    $script:Inventory = @('Using LabVIEW 2026 (64-bit)', 'oglib_boolean 6.0.0.10')
+    return 0
+}}
+function Invoke-VipmRefresh {{ return 0 }}
+$main = $ast.EndBlock.Statements | Where-Object {{
+    $_ -is [System.Management.Automation.Language.TryStatementAst] -and
+    $_.Extent.Text.Contains('$installWorkdir = New-PublicRepoWorkdir')
+}}
+try {{
+    . ([scriptblock]::Create($main.Extent.Text))
+    throw 'Later tooling upgrade was accepted'
+}} catch {{
+    if ($_.Exception.Message -notlike 'FINAL required Windows Dragon*') {{ throw }}
+    'LATER-UPGRADE-REJECTED=True'
+}}
+""")
+            self.assertIn('LATER-UPGRADE-REJECTED=True', output)
+
+    def test_worker_identity_changes_with_effective_dragon_inputs(self):
+        repository = INSTALLER.parents[3]
+        workflow = (repository / '.github/workflows/build-labview-image.yml').read_text()
+        start = workflow.index("          $vipcFiles = @(Get-ChildItem", workflow.index('- name: Compute worker version'))
+        end = workflow.index('          "version=$version"', start)
+        code = '\n'.join(line[10:] for line in workflow[start:end].splitlines())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ('.github/docker/labview-ci.Dockerfile',
+                         '.github/labview/vipm/install-vipc.ps1',
+                         '.github/labview/dragon_deps.py'):
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(repository / name, target)
+            source = root / '.github/labview/vipm/Example.dragon'
+            source.write_text('[vipm.dependencies]\noglib_boolean="6.0.0.9"\n')
+            plan = source.parent / 'dragon-plan.json'
+            plan.write_text(json.dumps(DRAGON.windows_install_plan([str(source)])))
+            escaped = str(root).replace("'", "''")
+            output = self.run_script(f"""
+Set-Location '{escaped}'
+$seen = @()
+$first = & {{ {code}; $version }}
+if ($first -cnotmatch '^win-[0-9a-f]{{12}}$') {{ throw 'Invalid worker identity' }}
+$seen += $first
+foreach ($file in @(
+    '.github/labview/vipm/Example.dragon',
+    '.github/labview/vipm/dragon-plan.json',
+    '.github/labview/dragon_deps.py',
+    '.github/labview/vipm/install-vipc.ps1'
+)) {{
+    Add-Content -LiteralPath $file -Value ''
+    $changed = & {{ {code}; $version }}
+    if ($seen -contains $changed) {{ throw "Effective Dragon input reused worker identity: $file" }}
+    $seen += $changed
+}}
+'WORKER-HASH=True'
+""")
+            self.assertIn('WORKER-HASH=True', output)
 
     def bootstrap(self, cli='26.3.0', desktop='2026.3.0.3954', after_cli='26.3.2',
                   after_desktop='2026.3.2.4056', installer='26.3.4056',

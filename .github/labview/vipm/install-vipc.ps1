@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Installs VIPM and applies all .vipc dependency files found in C:\vipm.
+    Installs VIPM and applies required VIPC/normalized Dragon dependencies in C:\vipm.
     This script runs INSIDE the Docker build container (Windows Server Core).
 
     Used to bake third-party VIPM add-ons into the CI image -- e.g. Antidoc
@@ -193,6 +193,70 @@ function Initialize-VipmRuntime {
     }
 }
 
+function Get-WindowsDragonPlan {
+    param([string] $Directory, [string] $TargetYear, [string] $TargetBitness = '64')
+    $Directory = (Get-Item -LiteralPath (Join-Path $Directory '.') -ErrorAction Stop).FullName
+    $sources = @(Get-ChildItem -LiteralPath $Directory -Filter '*.dragon' -Recurse -File -ErrorAction Stop)
+    $planPath = Join-Path $Directory 'dragon-plan.json'
+    if (-not (Test-Path -LiteralPath $planPath -PathType Leaf)) {
+        if ($sources.Count) { throw 'Required Dragon declarations have no trusted dragon-plan.json. Stage them with the current Windows worker workflow before building.' }
+        return [pscustomobject]@{ Specs = @() }
+    }
+    $plan = Get-Content -LiteralPath $planPath -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    if (($plan.schema -isnot [int] -and $plan.schema -isnot [long]) -or
+        $plan.schema -ne 1 -or $plan.platform -cne 'windows' -or
+        $plan.labview_version -cne $TargetYear -or $plan.labview_bitness -cne $TargetBitness -or
+        $plan.files -isnot [array] -or $plan.specs -isnot [array] -or
+        @($plan.PSObject.Properties.Name | Where-Object { $_ -notin @(
+            'schema', 'platform', 'labview_version', 'labview_bitness', 'files', 'specs'
+        ) }).Count -or
+        @($plan.files).Count -ne $sources.Count) {
+        throw 'Invalid required Windows Dragon plan schema, target year/bitness/platform, or source count.'
+    }
+    if ($sources.Count -and (Test-Path -LiteralPath (Join-Path $Directory 'install-dragon.ps1'))) {
+        throw 'Legacy install-dragon.ps1 overrides are not supported by the verified Windows Dragon path. Migrate to exact [vipm.dependencies] declarations; the custom hook was not executed.'
+    }
+    $seen = @{}
+    $expectedSpecs = @()
+    foreach ($file in $plan.files) {
+        if ($file.source_file -isnot [string] -or -not $file.source_file -or
+            $file.path -isnot [string] -or $file.path -notmatch '^[^/\\:]+\.dragon$' -or
+            $file.sha256 -isnot [string] -or $file.labview_version -isnot [string] -or
+            $seen.ContainsKey([string]$file.path) -or $file.sha256 -notmatch '^[a-f0-9]{64}$' -or
+            $file.specs -isnot [array] -or @($file.PSObject.Properties.Name | Where-Object {
+                $_ -notin @('path', 'source_file', 'sha256', 'labview_version', 'specs')
+            }).Count) {
+            throw 'Invalid/duplicate source identity in required Windows Dragon plan.'
+        }
+        $seen[[string]$file.path] = $true
+        $source = @($sources | Where-Object { $_.Name -eq $file.path -and $_.DirectoryName -eq $Directory })
+        if ($source.Count -ne 1 -or
+            ($source[0].Attributes -band [System.IO.FileAttributes]::ReparsePoint) -or
+            (Get-FileHash -LiteralPath $source[0].FullName -Algorithm SHA256 -ErrorAction Stop).Hash -ne $file.sha256) {
+            throw "Required Dragon source '$($file.path)' is missing, relocated, or changed since trusted TOML parsing."
+        }
+        if ($file.labview_version -and $file.labview_version -ne $TargetYear) {
+            throw "Required Dragon '$($file.path)' targets LabVIEW $($file.labview_version), not worker LabVIEW $TargetYear."
+        }
+        foreach ($spec in $file.specs) {
+            if ($spec -isnot [string] -or $spec -notmatch '^[A-Za-z0-9_][A-Za-z0-9_.-]*@\d+(?:\.\d+)+(?:-\d+)?$') {
+                throw "Unsupported required Dragon VIPM spec '$spec'. Re-stage with the trusted parser."
+            }
+            $expectedSpecs += [string]$spec
+        }
+        Write-Host "Required Dragon source verified: $($file.source_file) [$($file.sha256)]."
+    }
+    $expectedSpecs = @($expectedSpecs | Sort-Object -Unique)
+    if ((@($plan.specs | Sort-Object -Unique) -join "`n") -cne ($expectedSpecs -join "`n")) {
+        throw 'Required Dragon plan package set does not match its source declarations.'
+    }
+    return [pscustomobject]@{ Specs = $expectedSpecs }
+}
+
+$dragonPlan = $null
+if (-not $BootstrapOnly) {
+    $dragonPlan = Get-WindowsDragonPlan -Directory $VipcDir -TargetYear $LabVIEWVersion -TargetBitness $LabVIEWBitness
+}
 $vipmRuntime = Initialize-VipmRuntime -InstallerUrl $VipmInstallerUrl
 $VipmExe = $vipmRuntime.CliPath
 $script:VipmEngineExe = $vipmRuntime.DesktopPath
@@ -318,8 +382,8 @@ try {
 
 # -- 2. Apply each .vipc file -------------------------------------------------
 $vipcFiles = @(Get-ChildItem $VipcDir -Filter '*.vipc')
-if ($vipcFiles.Count -eq 0) {
-    Write-Host 'No .vipc files found - nothing to apply.'
+if ($vipcFiles.Count -eq 0 -and $dragonPlan.Specs.Count -eq 0) {
+    Write-Host 'No VIPC or required Dragon package declarations found - nothing to apply.'
     exit 0
 }
 
@@ -573,6 +637,27 @@ function Test-VipmPackageVersion($Request, [string] $Version) {
     }
     return $Version -eq $Request.Version -or
         ($Request.Version -notmatch '-' -and ($Version -replace '-\d+$', '') -eq $Request.Version)
+}
+
+function Assert-WindowsDragonVipcPins {
+    param([string[]] $Specs, [object[]] $VipcFiles)
+    $requests = @{}
+    foreach ($spec in $Specs) {
+        $request = Split-VipmPackageSpec $spec
+        if ($requests.ContainsKey($request.Name) -and $requests[$request.Name].Version -ne $request.Version) {
+            throw "Conflicting required Dragon pins for '$($request.Name)'."
+        }
+        $requests[$request.Name] = $request
+    }
+    foreach ($vipc in $VipcFiles) {
+        foreach ($spec in (Get-VipcPackageSpecs $vipc.FullName)) {
+            $request = Split-VipmPackageSpec $spec
+            if ($request.Version -and $requests.ContainsKey($request.Name) -and
+                -not (Test-VipmPackageVersion $request $requests[$request.Name].Version)) {
+                throw "Required Dragon pin '$($requests[$request.Name].Name)@$($requests[$request.Name].Version)' conflicts with '$spec' in '$($vipc.Name)'. Reconcile the declarations; no implicit newest-version selection is allowed."
+            }
+        }
+    }
 }
 
 function ConvertFrom-VipmRepositoryIndex([string] $IndexPath, [string] $BaseUrl, [string] $Name) {
@@ -959,7 +1044,7 @@ function Invoke-VipmInstall {
 # not prove the requested packages failed: later per-file installs can recover.
 # Only the target's installed inventory can confirm that recovery.
 function Test-VipmSpecsInstalled {
-    param([string[]] $Specs)
+    param([string[]] $Specs, [switch] $RequireTarget)
     Write-Host '  Verifying requested packages against the target LabVIEW installed inventory ...'
     $previousPreference = $ErrorActionPreference
     try {
@@ -978,6 +1063,15 @@ function Test-VipmSpecsInstalled {
     if ($inventoryExit -ne 0) {
         Write-Warning "  Cannot verify installed packages: vipm list --installed failed (exit $inventoryExit)."
         return $false
+    }
+    if ($RequireTarget) {
+        $targets = [regex]::Matches(($out | Out-String -Width 8192), 'Using LabVIEW\s+(\d{4})\s+\((32|64)-bit\)')
+        if (-not $targets.Count -or @($targets | Where-Object {
+            $_.Groups[1].Value -ne $LabVIEWVersion -or $_.Groups[2].Value -ne $LabVIEWBitness
+        }).Count) {
+            Write-Warning "Cannot verify required Dragon packages: installed inventory does not identify only requested LabVIEW $LabVIEWVersion ($LabVIEWBitness-bit)."
+            return $false
+        }
     }
 
     $installed = @{}
@@ -1041,6 +1135,24 @@ function Install-VipmSpecs {
     } catch {
         Write-Warning ("  local VIP file fallback failed: " + $_.Exception.Message)
         return $false
+    }
+}
+
+function Install-RequiredWindowsDragon {
+    param([string[]] $Specs)
+    if (-not $Specs.Count) { return }
+    Write-Host ("Installing REQUIRED Dragon VIPM declarations: " + ($Specs -join ', '))
+    if ($script:VipmEngineDead -or -not (Install-VipmSpecs $Specs)) {
+        throw 'Required Windows Dragon dependencies did not install. The worker must not be published; VIPM_ALLOW_MISSING_PACKAGES does not bypass Dragon requirements.'
+    }
+}
+
+function Assert-FinalWindowsDragonInventory {
+    param([string[]] $Specs)
+    if (-not $Specs.Count) { return }
+    Write-Host 'Verifying FINAL required Dragon inventory after project and best-effort tooling installs.'
+    if ($script:VipmEngineDead -or -not (Test-VipmSpecsInstalled -Specs $Specs -RequireTarget)) {
+        throw 'FINAL required Windows Dragon target inventory is missing, unreadable, wrong-target, or has missing/wrong-version packages. Reconcile conflicting project/tooling pins; the worker must not be published.'
     }
 }
 
@@ -1126,6 +1238,7 @@ function New-PublicRepoWorkdir {
 
 $prevLocation   = Get-Location
 $installWorkdir = $null
+Assert-WindowsDragonVipcPins -Specs $dragonPlan.Specs -VipcFiles $vipcFiles
 try {
     $installWorkdir = New-PublicRepoWorkdir $PublicRepoUrl
     Write-Host "Running VIPM installs from a public-repo context (origin=$PublicRepoUrl) to satisfy Community Edition."
@@ -1181,6 +1294,8 @@ try {
             $applyFailed = $true
         }
     }
+
+    Install-RequiredWindowsDragon -Specs $dragonPlan.Specs
 
     # Phase A2 (EARLY, BEST-EFFORT): unit-test framework packages that only resolve
     # through the public-index local-file fallback (the container's by-name resolver
@@ -1272,6 +1387,7 @@ try {
             }
         }
     }
+    Assert-FinalWindowsDragonInventory -Specs $dragonPlan.Specs
 }
 finally {
     Set-Location $prevLocation

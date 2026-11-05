@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,6 +28,7 @@ WORKER = load('composite_worker', 'actions/worker-image/worker.py')
 UNIT = load('composite_unit', 'actions/unit-tests/run.py')
 D1 = 'sha256:' + 'a' * 64
 D2 = 'sha256:' + 'b' * 64
+POWERSHELL = shutil.which('powershell.exe') or shutil.which('pwsh')
 
 
 class CompositeTests(unittest.TestCase):
@@ -62,9 +64,240 @@ class CompositeTests(unittest.TestCase):
                              (ROOT / '.github/labview/vipm' / name).read_bytes())
         dockerfile = (self.context / 'Dockerfile').read_text()
         self.assertIn('COPY .github/labview/vipm/ C:/vipm/', dockerfile)
-        self.assertIn('Get-Command dragon -ErrorAction Stop', dockerfile)
-        self.assertIn('Required Dragon bake failed', dockerfile)
+        self.assertNotIn('Get-Command dragon', dockerfile)
+        self.assertNotIn(' apply ', dockerfile)
+        self.assertIn('$vipcs.Count -gt 0 -or $dragons.Count -gt 0', dockerfile)
         self.assertIn("$env:VIPM_REQUIRED_PACKAGES = '-'", dockerfile)
+
+    def test_composite_stages_closed_target_plan_for_dragon_only_and_mixed_tooling(self):
+        (self.deps / 'Example.dragon').write_text('[project]\nlabview-version=2026\n[vipm.dependencies]\npkg="1.0"\n')
+        for tooling in (False, True):
+            for mixed in (False, True):
+                with self.subTest(tooling=tooling, mixed=mixed), tempfile.TemporaryDirectory() as context:
+                    vipc = self.deps / 'Project.vipc'
+                    if mixed:
+                        vipc.write_bytes(b'project')
+                    else:
+                        vipc.unlink(missing_ok=True)
+                    self.assertTrue(WORKER.stage(Path(context), self.workspace, 'deps', tooling))
+                    staged = Path(context) / '.github/labview/vipm'
+                    plan = json.loads((staged / 'dragon-plan.json').read_text())
+                    self.assertEqual(plan['specs'], ['pkg@1.0'])
+                    self.assertEqual(plan['files'][0]['source_file'], 'deps/Example.dragon')
+                    self.assertEqual(plan['labview_version'], '2026')
+                    self.assertEqual(plan['labview_bitness'], '64')
+                    identity = WORKER.fingerprint(Path(context), self.inputs)
+                    for target in (staged / 'Example.dragon', staged / 'dragon-plan.json',
+                                   Path(context) / '.github/labview/dragon_deps.py'):
+                        original = target.read_bytes()
+                        target.write_bytes(original + b'\n')
+                        self.assertNotEqual(identity, WORKER.fingerprint(Path(context), self.inputs))
+                        target.write_bytes(original)
+        with tempfile.TemporaryDirectory() as context, self.assertRaisesRegex(Exception, 'differs from Windows target'):
+            WORKER.stage(Path(context), self.workspace, 'deps', False, target_year='2025')
+
+    def test_composite_isolated_entry_ignores_client_python_imports(self):
+        action = yaml.safe_load((ROOT / 'actions/worker-image/action.yml').read_text())
+        self.assertIn('python -I ', action['runs']['steps'][-1]['run'])
+        for name in ('json.py', 'hashlib.py', 'dragon_deps.py', 'sitecustomize.py'):
+            (self.workspace / name).write_text("raise RuntimeError('client import executed')\n")
+        (self.deps / 'Example.dragon').write_text('[vipm.dependencies]\npkg="1.0"\n')
+        code = f"""
+import importlib.util
+from pathlib import Path
+spec = importlib.util.spec_from_file_location('trusted_worker', {str(ROOT / 'actions/worker-image/worker.py')!r})
+worker = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(worker)
+worker.stage(Path({str(self.context)!r}), Path({str(self.workspace)!r}), 'deps', False)
+"""
+        result = subprocess.run([sys.executable, '-I', '-c', code], cwd=self.workspace,
+                                env=dict(os.environ, PYTHONPATH=str(self.workspace)),
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def native_contract(self, body):
+        installer = str(ROOT / '.github/labview/vipm/install-vipc.ps1').replace("'", "''")
+        code = f"""
+$ErrorActionPreference = 'Stop'
+$ast = [System.Management.Automation.Language.Parser]::ParseFile('{installer}', [ref]$null, [ref]$null)
+$definition = $ast.Find({{ param($n)
+    $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-WindowsDragonPlan'
+}}, $true)
+. ([scriptblock]::Create($definition.Extent.Text))
+{body}
+"""
+        env = {key: value for key, value in os.environ.items() if key.lower() != 'psmodulepath'}
+        result = subprocess.run([POWERSHELL, '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', code],
+                                cwd=self.workspace, env=env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout
+
+    @unittest.skipUnless(POWERSHELL, 'PowerShell is required for actual caller contracts')
+    def test_actual_gitlab_windows_script_stages_plan_and_checks_native_failures(self):
+        template_path = ROOT / '.github/labview-ci/providers/gitlab/templates/custom-image-windows.yml'
+        template = yaml.safe_load(template_path.read_text())['lvci:worker-windows']
+        script = template['script'][0]
+        for relative in ('.github/labview/dragon_deps.py', '.github/labview/vipm/install-vipc.ps1',
+                         '.github/docker/labview-ci.Dockerfile'):
+            destination = self.workspace / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative, destination)
+        catalog = self.workspace / '.github/labview-ci/catalog.json'
+        catalog.parent.mkdir(parents=True)
+        catalog_data = {
+            'defaults': {'labviewVersion': '2026'},
+            'containers': {'default': 'test', 'supported': [{
+                'id': 'test', 'windowsTag': 'vendor:2026q3-windows',
+                'nipmFeedUrl': 'https://example.test', 'vipmInstallerUrl': 'https://example.test/vipm.exe'
+            }]}
+        }
+        for module in ('sitecustomize.py', 'json.py', 'hashlib.py', 'dragon_deps.py', 'yaml.py'):
+            (self.workspace / module).write_text("raise RuntimeError('client import/startup ran')\n")
+        python = sys.executable.replace("'", "''")
+        workspace = str(self.workspace).replace("'", "''")
+        cases = [(mixed, failure, '', '2026', '2026', '2026')
+                 for mixed, failure in ((False, ''), (True, ''), (True, 'login'), (True, 'base'),
+                                        (True, 'worker'), (True, 'stage'), (True, 'missing-python'),
+                                        (True, 'push'))]
+        cases += [
+            (False, '', '2025', '', '2025', '2025'),
+            (True, '', '2025', '2026', '2025', '2025'),
+            (True, '', '', '2025', '2025', '2025'),
+            (False, '', '', '', '2026', '2026'),
+            (True, 'target', '2025', '', '2026', '2025'),
+            (True, 'target', 'not-a-year', '2026', '2026', '2026'),
+            (True, 'target', '', 'invalid', '2026', '2026'),
+        ]
+        fingerprints = {}
+        for mixed, failure, canonical, legacy, base_year, target_year in cases:
+            with self.subTest(mixed=mixed, failure=failure, canonical=canonical, legacy=legacy, base=base_year):
+                catalog_data['containers']['supported'][0]['windowsTag'] = f'vendor:{base_year}q1-windows'
+                catalog.write_text(json.dumps(catalog_data))
+                (self.workspace / 'Example.dragon').write_text(
+                    f'[project]\nlabview-version={target_year}\n[vipm.dependencies]\npkg="1.0"\n')
+                expected_error = {
+                    '': '', 'login': 'Registry login failed:*', 'base': 'Windows base build failed:*',
+                    'worker': 'Required Windows worker build failed:*', 'stage': 'Required Dragon staging failed:*',
+                    'missing-python': 'python unavailable', 'push': 'Windows base push failed:*',
+                    'target': 'Requested LabVIEW year*'
+                }[failure]
+                vipc = self.workspace / 'Project.vipc'
+                if mixed:
+                    vipc.write_bytes(b'project')
+                else:
+                    vipc.unlink(missing_ok=True)
+                output = self.native_contract(f"""
+$env:CI_PROJECT_DIR = '{workspace}'
+$env:CI_REGISTRY = 'registry.example.test'
+$env:CI_REGISTRY_IMAGE = 'registry.example.test/project'
+$env:CI_REGISTRY_PASSWORD = 'fixture-password'
+$env:CI_REGISTRY_USER = 'fixture-user'
+$env:CI_COMMIT_SHA = 'abc123'
+$env:LVCI_CONTAINER_RELEASE = ''
+$env:LVCI_LABVIEW_VERSION = '{canonical}'
+$env:LABVIEW_VERSION = '{legacy}'
+$env:PYTHONPATH = '{workspace}'
+$script:DockerCalls = [System.Collections.Generic.List[string]]::new()
+$script:WorkerVerified = 0
+function python {{
+    $Arguments = $args
+    if ('{failure}' -eq 'missing-python') {{ throw [System.Management.Automation.CommandNotFoundException]::new('python unavailable') }}
+    if ('{failure}' -eq 'stage') {{ $global:LASTEXITCODE = 17; return }}
+    & '{python}' @Arguments
+    $global:LASTEXITCODE = $LASTEXITCODE
+}}
+function docker {{
+    [CmdletBinding(PositionalBinding = $false)]
+    param([Parameter(Position = 0, ValueFromRemainingArguments = $true)] $Arguments,
+          [Parameter(ValueFromPipeline = $true)] $InputObject)
+    $call = $Arguments -join ' '
+    $script:DockerCalls.Add($call)
+    $global:LASTEXITCODE = 0
+    if ($Arguments[0] -eq 'build' -and $call -notlike '*labview-ci-base.Dockerfile*') {{
+        $plan = Get-WindowsDragonPlan -Directory (Join-Path $env:CI_PROJECT_DIR '.github/labview/vipm') -TargetYear '{target_year}'
+        if (($plan.Specs -join ',') -ne 'pkg@1.0') {{ throw 'GitLab dropped the required Dragon root' }}
+        if ($call -notlike '*LABVIEW_VERSION={target_year}*' -or $call -notlike '*CI_WORKER_VERSION=win-*') {{ throw 'GitLab omitted target/fingerprint' }}
+        if ($inputHashes[0] -ne 'year={target_year}') {{ throw 'GitLab fingerprint omitted configured target' }}
+        $script:WorkerVerified++
+    }}
+    if (('{failure}' -eq 'login' -and $Arguments[0] -eq 'login') -or
+        ('{failure}' -eq 'base' -and $call -like '*labview-ci-base.Dockerfile*') -or
+        ('{failure}' -eq 'worker' -and $Arguments[0] -eq 'build' -and $call -notlike '*labview-ci-base.Dockerfile*') -or
+        ('{failure}' -eq 'push' -and $Arguments[0] -eq 'push')) {{ $global:LASTEXITCODE = 23 }}
+}}
+$failed = $false
+try {{
+{script}
+}} catch {{
+    if ($_.Exception.Message -notlike '{expected_error}') {{ throw }}
+    $failed = $true
+    Write-Output $_.Exception.Message
+}}
+if ($failed -ne [bool]'{failure}') {{ throw 'GitLab script returned the wrong failure status' }}
+$pushes = @($script:DockerCalls | Where-Object {{ $_ -like 'push *' }})
+if ('{failure}' -eq '') {{
+    if ($script:WorkerVerified -ne 1 -or $pushes.Count -ne 3) {{ throw 'GitLab did not validate before publication' }}
+    Write-Output "TARGET-FINGERPRINT=$workerVersion"
+}} elseif ('{failure}' -eq 'push') {{
+    if ($pushes.Count -ne 1) {{ throw 'GitLab continued after a failed push' }}
+}} elseif ($pushes.Count) {{ throw 'GitLab pushed after a required staging/build failure' }}
+'GITLAB-CLOSURE=True'
+""")
+                self.assertIn('GITLAB-CLOSURE=True', output)
+                if not failure:
+                    fingerprint = next(line.split('=', 1)[1] for line in output.splitlines()
+                                       if line.startswith('TARGET-FINGERPRINT='))
+                    self.assertRegex(fingerprint, r'^win-[a-f0-9]{24}$')
+                    fingerprints[(mixed, target_year)] = fingerprint
+        self.assertNotEqual(fingerprints[(False, '2025')], fingerprints[(False, '2026')])
+
+    @unittest.skipUnless(POWERSHELL, 'PowerShell is required for actual caller contracts')
+    def test_actual_composite_stage_plan_and_docker_hook_native_contract(self):
+        (self.deps / 'Example.dragon').write_text('[project]\nlabview-version=2026\n[vipm.dependencies]\npkg="1.0"\n')
+        hook = (ROOT / 'actions/worker-image/Dockerfile').read_text().split('RUN ', 1)[1]
+        hook = hook.split('\nENV CI_WORKER_VERSION', 1)[0].replace('`\n', '\n')
+        for tooling in (False, True):
+            for mixed in (False, True):
+                with self.subTest(tooling=tooling, mixed=mixed), tempfile.TemporaryDirectory() as context:
+                    vipc = self.deps / 'Project.vipc'
+                    if mixed:
+                        vipc.write_bytes(b'project')
+                    else:
+                        vipc.unlink(missing_ok=True)
+                    WORKER.stage(Path(context), self.workspace, 'deps', tooling)
+                    directory = str(Path(context) / '.github/labview/vipm').replace("'", "''")
+                    output = self.native_contract(f"""
+$directory = '{directory}'
+$script:Calls = 0
+function Get-ChildItem {{
+    param($LiteralPath, $Filter, [switch]$Recurse, [switch]$File, $ErrorAction)
+    if ($LiteralPath -eq 'C:\\vipm') {{ $LiteralPath = $directory }}
+    Microsoft.PowerShell.Management\\Get-ChildItem -LiteralPath $LiteralPath -Filter $Filter -Recurse:$Recurse -File:$File -ErrorAction Stop
+}}
+function powershell {{
+    param([Parameter(ValueFromRemainingArguments = $true)] $Arguments)
+    if ($Arguments[-1] -ne 'C:\\vipm\\install-vipc.ps1') {{ throw 'Wrong shared hook' }}
+    $plan = Get-WindowsDragonPlan -Directory $directory -TargetYear '2026'
+    if (($plan.Specs -join ',') -ne 'pkg@1.0') {{ throw 'Missing required Dragon root' }}
+    $script:Calls++
+    $global:LASTEXITCODE = 0
+}}
+{hook}
+if ($script:Calls -ne 1) {{ throw 'Dragon was not applied exactly once through the shared hook' }}
+function powershell {{ $global:LASTEXITCODE = 8 }}
+try {{ {hook}; throw 'Nonzero shared hook accepted' }}
+catch {{ if ($_.Exception.Message -notlike 'Required VIPM bake failed:*') {{ throw }} }}
+function powershell {{ throw [System.Management.Automation.CommandNotFoundException]::new('shared hook unavailable') }}
+try {{ {hook}; throw 'Missing shared hook accepted' }}
+catch {{ if ($_.Exception.Message -ne 'shared hook unavailable') {{ throw }} }}
+try {{ Get-WindowsDragonPlan -Directory $directory -TargetYear '2025'; throw 'Wrong target accepted' }}
+catch {{ if ($_.Exception.Message -eq 'Wrong target accepted') {{ throw }} }}
+Add-Content -LiteralPath (Join-Path $directory 'Example.dragon') -Value '# stale plan'
+try {{ Get-WindowsDragonPlan -Directory $directory -TargetYear '2026'; throw 'Stale hash accepted' }}
+catch {{ if ($_.Exception.Message -eq 'Stale hash accepted') {{ throw }} }}
+'COMPOSITE-CLOSURE=True'
+""")
+                    self.assertIn('COMPOSITE-CLOSURE=True', output)
 
     def test_hash_covers_payload_paths_bytes_build_args_and_base(self):
         (self.deps / 'project.vipc').write_bytes(b'vipc')
