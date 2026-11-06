@@ -2750,6 +2750,11 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       <!-- 21 ──────────────────────────────────────────────────────────────── -->
       <h2 id="security">21. Security model <a class="anchor" href="#security">#</a></h2>
       <ul>
+        <li><strong>Context-aware HTML escaping.</strong> Repository values from URL parameters or form inputs
+          are escaped with the existing <code>esc()</code> helpers before insertion into installation guidance
+          text or the shared header's pending-dependencies link attribute. Input cannot create markup or extra
+          attributes in these renderers; normal repository names, links, and provider behavior are unchanged.
+          HTML escaping protects rendering and does not replace URL destination validation.</li>
         <li><strong>Least-privilege tokens.</strong> Each job declares the minimal permissions it needs
           (<code>contents: write</code> for report deploys, <code>statuses: write</code> to post results,
           <code>packages: read</code> only where a custom GHCR image is pulled). The built-in
