@@ -10,9 +10,9 @@ installed into any LabVIEW repository — from the command line or from the
 | **Mass Compile** | Compiles every VI to catch broken/mutated code; reports % compiled | Windows |
 | **VI Analyzer** | Runs the VI Analyzer test suite; native + friendly report | Windows |
 | **VIDiff** | Side-by-side visual diff reports per changed VI; PR comments | Windows / Linux |
-| **VI Snapshots** | Browseable gallery of every VI's block diagram (the VI Browser) | Windows |
+| **VI Snapshots** | Interactive front panels and block diagrams across history in the VI Browser | Windows / Linux |
 | **Shared image** | Builds the LabVIEW CI container image in the provider's project registry | Windows / Linux |
-| **Unit Tests** | *Planned* — placeholder showing how new capabilities slot in | Windows / Linux |
+| **Unit Tests** | Runs configured frameworks on Windows and LUnit on Linux, with JUnit-based reports (`CI / Unit Tests`, `CI / Unit Tests (Linux)`) | Windows / Linux |
 
 Everything is driven by [`catalog.json`](catalog.json) — a single capability
 registry that **both** the configurator UI and the installer read. Adding a new

@@ -1,0 +1,66 @@
+name: Unit Test Runner Checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/labview-ci/install.py'
+      - '.github/labview-ci/catalog.json'
+      - '.github/labview-ci/providers/gitlab/files.json'
+      - '.github/workflows/reconfigure.yml'
+      - '.github/labview/run-unit-tests.ps1'
+      - '.github/labview/run-unit-tests.sh'
+      - '.github/labview/test-linux-unit-tests.py'
+      - '.github/workflows/unit-tests-linux-container.yml'
+      - '.github/labview-ci/providers/gitlab/templates/unit-tests-linux.yml'
+      - '.github/labview/vipm/install-vipc-linux.sh'
+      - '.github/labview/vipm/ci-tooling.vipc'
+      - '.github/labview/build-unittest-report.py'
+      - '.github/labview/test-unit-tests.py'
+      - '.github/labview/vipm/install-vipc.ps1'
+      - '.github/docker/labview-ci.Dockerfile'
+      - '.github/workflows/unit-test-runner-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/labview-ci/install.py'
+      - '.github/labview-ci/catalog.json'
+      - '.github/labview-ci/providers/gitlab/files.json'
+      - '.github/workflows/reconfigure.yml'
+      - '.github/labview/run-unit-tests.ps1'
+      - '.github/labview/run-unit-tests.sh'
+      - '.github/labview/test-linux-unit-tests.py'
+      - '.github/workflows/unit-tests-linux-container.yml'
+      - '.github/labview-ci/providers/gitlab/templates/unit-tests-linux.yml'
+      - '.github/labview/vipm/install-vipc-linux.sh'
+      - '.github/labview/vipm/ci-tooling.vipc'
+      - '.github/labview/build-unittest-report.py'
+      - '.github/labview/test-unit-tests.py'
+      - '.github/labview/vipm/install-vipc.ps1'
+      - '.github/docker/labview-ci.Dockerfile'
+      - '.github/workflows/unit-test-runner-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-checks:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Check runner and JUnit report contracts without LabVIEW
+        run: python .github/labview/test-unit-tests.py
+  linux-runner-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Check Linux runner, install selection and VIPM revision contracts without LabVIEW
+        run: |
+          python .github/labview/test-linux-unit-tests.py
+          python .github/labview/test-unit-tests.py

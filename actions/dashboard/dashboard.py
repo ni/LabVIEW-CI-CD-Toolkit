@@ -140,11 +140,11 @@ def snapshot_coverage(sha):
     # have = those whose content blob is in the rendered set.
     if sha in _snap_cov_cache:
         return _snap_cov_cache[sha]
-    vis = vi_tree(sha)
+    vis = [entry for entry in vi_tree(sha) if str(entry.get('vi_rel', '')).lower().endswith('.vi')]
     total = len(vis)
     have = 0
     if total:
-        rb = rendered_blobs()
+        rb = rendered_json_blobs('windows') | rendered_json_blobs('linux')
         if rb:
             have = sum(1 for v in vis if v.get('blob') in rb)
     res = (have, total)
@@ -532,23 +532,14 @@ RUN_TARGETS = {
         'windows': {'wf': 'vidiff-windows-container.yml', 'inputs': {'head_sha': '{sha}', 'base_sha': '{parent}'}},
         'linux':   {'wf': 'vidiff-linux-container.yml',   'inputs': {'head_sha': '{sha}', 'base_sha': '{parent}'}}}},
     'snapshots': {'label': 'VI Snapshots', 'platforms': {
-        # Snapshots are content-addressed and deduped, so a single backfill renders
-        # exactly the MISSING VIs across all history (already-rendered blobs are
-        # skipped instantly). Dispatching backfill — not head — means clicking Run
-        # on an empty snapshot cell actually fills that revision (head would only
-        # ever re-render the current HEAD). 'backfill' is a long-standing input on
-        # every consumer's vi-snapshots.yml (the "Populate history" card uses it),
-        # so this needs no workflow-file change to reach existing installs.
-        'all': {'wf': 'vi-snapshots.yml', 'inputs': {'mode': 'backfill'}}}},
-      'snapshots2': {'label': 'VI Browser 2.0 Snapshots', 'platforms': {
+        'all': {'wf': 'vi-snapshots.yml', 'inputs': {'mode': 'backfill', 'shas': '{sha}'}}}},
+      'snapshots2': {'label': 'VI Snapshots', 'platforms': {
         'windows': {'wf': 'vi-snapshots-json-windows.yml', 'inputs': {'target_sha': '{sha}'}},
         'linux':   {'wf': 'vi-snapshots-json.yml',         'inputs': {'mode': 'head', 'target_sha': '{sha}'}}}},
-    # Unit tests run in the Windows worker only: Caraya, VI Tester and LUnit are
-    # VIPM packages (Windows-only) and NI UTF runs via the native LabVIEW CLI. The
-    # runner emits JUnit that build-unittest-report.py normalises into one report.
     'unit-tests': {'label': 'Unit Tests', 'platforms': {
         'windows': {'wf': 'unit-tests-windows-container.yml', 'inputs': {'commit_sha': '{sha}'},
-                    'batch': {'wf': 'unit-tests-backfill-windows.yml', 'shas_input': 'shas'}}}},
+                    'batch': {'wf': 'unit-tests-backfill-windows.yml', 'shas_input': 'shas'}},
+        'linux':   {'wf': 'unit-tests-linux-container.yml', 'inputs': {'commit_sha': '{sha}'}}}},
     # Antidoc (Wovalab) documentation generation runs in the Windows worker only
     # (the Antidoc CLI is a VIPM package baked into the custom image). Doc-gen is
     # heavier than the per-VI checks, so it is on-demand / push-to-default-branch.
@@ -686,22 +677,20 @@ for _cap, _d in RUN_TARGETS.items():
         if _p.get('batch') and _p['batch'].get('wf'):
             _WF_TO_CAP[_p['batch']['wf']] = _cap
 _CAP_RUN_LABEL = {'masscompile': 'compile', 'vi-analyzer': 'analyze', 'vidiff': 'diff',
-                  'snapshots': 'snapshots', 'snapshots2': '2.0 snapshots',
+                  'snapshots': 'snapshots', 'snapshots2': 'snapshots',
                   'unit-tests': 'tests', 'antidoc': 'docs',
                   'sbom-generation': 'SBOM'}
 _WAITING_RUN_STATUSES = {'queued', 'requested', 'waiting', 'pending'}
 
 def _target_shas_for_run(run, cap):
-    # Which revision row(s) a run belongs to. A snapshots-gallery dispatch covers
-    # every row ('*'). Any other workflow_dispatch run is matched by the full
-    # 40-hex SHA(s) embedded in its run-name — a warm-container backfill lists
-    # several, so it maps onto every revision it walks. Push/PR runs key off
-    # head_sha. An unattributable run maps to no row (empty list).
-    if cap == 'snapshots' and run.get('event') == 'workflow_dispatch':
-        return ['*']
     if run.get('event') == 'workflow_dispatch':
         text = ' '.join(str(run.get(k) or '') for k in ('display_title', 'name'))
-        return [s.lower() for s in re.findall(r'\b[0-9a-f]{40}\b', text, re.I)]
+        shas = [s.lower() for s in re.findall(r'\b[0-9a-f]{40}\b', text, re.I)]
+        if shas:
+            return shas
+        if cap == 'snapshots' and re.search(r'\bbackfill\b', text, re.I):
+            return ['*']
+        return []
     return [run['head_sha']] if run.get('head_sha') else []
 
 def fetch_active_runs():
@@ -1310,22 +1299,19 @@ for c in commits_data:
     # Snapshots column: how many of this revision's VIs have a rendered snapshot
     # (content-addressed by git blob), linking into the VI Browser for the commit.
     # Snapshots are a single content-addressed gallery (not per-platform) and are
-    # independent of VIDiff. None yet -> one-click run; partial coverage is flagged
-    # amber so the missing VIs are visible (fill them by running this revision, or
-    # via "Populate history" — a backfill renders all history oldest -> newest).
     if not is_project:
         snap_badge = '<td style="text-align:center;color:var(--fg-muted);font-size:.75em">—</td>'
     else:
         _snap_run = fresh_pending('CI / VI Snapshots')
         _have, _total = snapshot_coverage(sha)
-        _snap_live = active_run_cell('snapshots', 'snapshots')
+        _snap_live = active_run_cell('snapshots2', 'snapshots')
         if _snap_run is not None:
             caps_ran.add('snapshots')
             snap_badge = running_cell('snapshots', _snap_run.get('target_url', ''), cap='snapshots')
         elif _snap_live is not None:
             snap_badge = _snap_live
         elif _have <= 0:
-            snap_badge = run_cell('snapshots')
+            snap_badge = run_cell('snapshots2')
         else:
             any_output['on'] = True
             caps_ran.add('snapshots')
@@ -1339,7 +1325,7 @@ for c in commits_data:
                         f'- run this revision or use Populate history to backfill')
             _snap_ts = (pick_status('CI / VI Snapshots') or {}).get('created_at', '')
             _snap_done = 'true' if _have >= _total else 'false'
-            snap_badge = (f'<td style="text-align:center" class="cidash-cap-cell" data-cap="snapshots" '
+            snap_badge = (f'<td style="text-align:center" class="cidash-cap-cell" data-cap="snapshots2" '
                     f'data-sha="{sha}" data-parent="{parent}" data-short="{short}" data-ts="{_snap_ts}" data-done="{_snap_done}">'
                           f'{_chip(_kind, _txt, _href, _tip)}</td>')
 
@@ -1789,6 +1775,11 @@ run_dialog_css = (
     # Intro line + the Activities header row (label on the left, quick-preset chips
     # on the right).
     '.cidash-hist-intro{margin:0 0 16px;color:var(--fg-muted);font-size:.86em;line-height:1.55}'
+    '.cidash-hist-snapshot-advice{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-start;padding:12px 14px;margin:0 0 16px;border:1px solid rgba(56,139,253,.4);border-left:3px solid var(--link);border-radius:8px;background:rgba(56,139,253,.08);font-size:.83em;line-height:1.5}'
+    '.cidash-hist-snapshot-advice[hidden]{display:none}'
+    '.cidash-hist-snapshot-advice-copy{flex:1 1 270px;min-width:0}'
+    '.cidash-hist-snapshot-advice p{margin:5px 0 0;color:var(--fg-muted)}'
+    '.cidash-hist-snapshot-advice .cidash-btn{font-size:.9em;padding:5px 9px}'
     '.cidash-hist-actshead{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 10px;margin:0 0 9px}'
     '.cidash-hist-quick{display:flex;flex-wrap:wrap;gap:6px}'
     '.cidash-hist-chip{border:1px solid var(--border);background:var(--bg);color:var(--fg);border-radius:999px;padding:4px 11px;font-size:.76em;font-weight:600;cursor:pointer;font-family:inherit}'
@@ -2175,10 +2166,6 @@ run_dialog = (r"""
       });
     }
     function captureSnapshotRun(t0, attempt){
-      // The "Populate history" backfill is ONE snapshots run that walks the whole
-      // history, so every "snapshots|<sha>" entry shares it. captureRuns' per-cell
-      // claim would hand the single run to just the first sha, so look it up once
-      // and write it into EVERY snapshot entry still missing a run id.
       var tok = getTok(); if(!tok) return;
       t0 = t0 || Date.now(); attempt = attempt || 1;
       fetch('https://api.github.com/repos/'+REPO+'/actions/workflows/'+encodeURIComponent('vi-snapshots.yml')+'/runs?event=workflow_dispatch&per_page=20',
@@ -2186,18 +2173,27 @@ run_dialog = (r"""
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(j){
           var runs = (j && j.workflow_runs) || [];
-          var run = runs.filter(function(rn){
+          runs = runs.filter(function(rn){
             return Date.parse(rn.created_at || rn.run_started_at || 0) >= (t0 - 12000);
-          }).sort(function(a,b){ return Date.parse(b.created_at) - Date.parse(a.created_at); })[0];
-          if(!run){ if(attempt < 4){ setTimeout(function(){ captureSnapshotRun(t0, attempt+1); }, 2500); } return; }
+          }).sort(function(a,b){ return Date.parse(b.created_at) - Date.parse(a.created_at); });
           var o = qLoad(); var changed = false;
+          var missing = false;
           Object.keys(o).forEach(function(key){
             if(key.indexOf('snapshots|') !== 0) return;
             var e = o[key]; if(!e || (e.runs||[]).length) return;
+            var sha = key.slice('snapshots|'.length).toLowerCase();
+            var run = runs.filter(function(rn){
+              var title = String(rn.display_title||'')+' '+String(rn.name||'');
+              var shas = title.toLowerCase().match(/\b[0-9a-f]{40}\b/g) || [];
+              return Date.parse(rn.created_at || rn.run_started_at || 0) >= ((e.ts||t0) - 12000)
+                && (shas.indexOf(sha)>=0 || (!shas.length && /\bbackfill\b/i.test(title)));
+            })[0];
+            if(!run){ missing = true; return; }
             e.runs = [{ wf:'vi-snapshots.yml', plat:'all', id:run.id, url:run.html_url, status:run.status }];
             changed = true;
           });
           if(changed) qSave(o);
+          if(missing && attempt < 4){ setTimeout(function(){ captureSnapshotRun(t0, attempt+1); }, 2500); }
         }).catch(function(){});
     }
     function captureBatchRun(wf, t0, attempt){
@@ -2631,15 +2627,6 @@ run_dialog = (r"""
     });
     document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ if(qModalOpen()) cidashQClose(); else cidashRunClose(); } });
     // ── "Run all history" backfill card ──────────────────────────────
-    // On a fresh dashboard (gated server-side: no results, nothing running) the
-    // card offers to queue CI for the WHOLE history in one click, oldest commit
-    // first. Snapshots are not per-commit (every snapshot cell dispatches the same
-    // gallery workflow), so instead of one run per row we fire a SINGLE run in the
-    // workflow's "backfill" mode — it walks history oldest→newest and seeds from
-    // the already-deployed gallery, so nothing is rendered twice. Mass Compile /
-    // VI Analyzer / VIDiff are per-revision, so those are dispatched once each,
-    // oldest first and gently throttled. The card self-hides once anything is
-    // queued and can be dismissed (remembered per repo).
     var BF_DISMISS_KEY = "lvci_backfill_dismissed";
     function bfCard(){ return document.getElementById('lvci-backfill'); }
     function bfDismissed(){ try{ return localStorage.getItem(BF_DISMISS_KEY) === REPO; }catch(e){ return false; } }
@@ -2678,12 +2665,6 @@ run_dialog = (r"""
     }
     function bfFill(t, sha, parent){ return String(t).replace(/\{sha\}/g, sha).replace(/\{parent\}/g, parent||''); }
     function bfInputs(p, sha, parent){ var o={}; Object.keys(p.inputs).forEach(function(k){ o[k]=bfFill(p.inputs[k], sha, parent); }); return o; }
-    // Shared dispatch engine for BOTH the fresh-install backfill card and the
-    // Populate-history dialog: queue a set of empty run-cells, snapshots as ONE
-    // backfill run (the workflow walks the whole history oldest->newest and dedupes)
-    // and the per-revision activities oldest-first, gently throttled so a long
-    // history doesn't trip GitHub's secondary rate limits. Resolves with an
-    // {ok, err, total} tally; the caller owns its own status line + buttons.
     // Turn collected dispatch failures into an accurate message. A 404 means the
     // targeted workflow is not RUNNABLE on this repo -- the file is not installed
     // (tooling out of date), or it exists but GitHub never registered it as a
@@ -2738,9 +2719,9 @@ run_dialog = (r"""
     function dispatchCells(cells, statusFn, opts){
       opts = opts || {}; var reuse = !!opts.reuse;
       var perRev=[]; var snapShas=[]; var sawSnap=false; var snapForce=false;
-      cells.forEach(function(x){
+      cells.slice().sort(function(a,b){ return b.order - a.order; }).forEach(function(x){
         if(x.cap==='snapshots'){
-          sawSnap=true; snapShas.push(x.sha);
+          sawSnap=true; if(snapShas.indexOf(x.sha)<0) snapShas.push(x.sha);
           if(x.mode==='rerun' || x.done) snapForce=true;
         }
         else if(!(x.cap==='vidiff' && !x.parent)){ perRev.push(x); }   // a root commit has no base to diff
@@ -2795,10 +2776,9 @@ run_dialog = (r"""
       }
       statusFn('Queuing '+total+' workflow'+(total>1?'s':'')+'\u2026', null);
       var chain=Promise.resolve();
-      // 1) Snapshots — one backfill run for the whole history (oldest→newest, deduped).
       if(sawSnap){
         chain=chain.then(function(){
-          var inputs={ mode:'backfill' }; if(snapForce) inputs.force='true';
+          var inputs={ mode:'backfill', shas:snapShas.join(' ') }; if(snapForce) inputs.force='true';
           return dispatchOne('vi-snapshots.yml', inputs).then(function(r){
             done++;
             if(r.ok){ ok++; captureSnapshotRun(t0); }
@@ -2894,8 +2874,7 @@ run_dialog = (r"""
     var HIST = __HIST__;                        // [{sha, short, msg}] newest-first (project revisions)
     var RAN = __CAPS_RAN__;                     // {cap:1} caps with a result/active run somewhere in history
     var CAP_META = {                            // label + sub for each known capability
-      'snapshots':   ['VI Snapshots', 'Renders every changed VI (classic HTML snapshots)'],
-      'snapshots2':  ['VI Browser 2.0 Snapshots', 'Renders position-aware snapshots for the VI Browser 2.0 view'],
+      'snapshots2':  ['VI Snapshots', 'Renders interactive front panels and block diagrams'],
       'vidiff':      ['VIDiff',       'Visual diff of the VIs each revision changed'],
       'masscompile': ['Mass Compile', 'Compiles the whole project, each revision'],
       'vi-analyzer': ['VI Analyzer',  'Runs the VI Analyzer suite, each revision'],
@@ -2904,7 +2883,7 @@ run_dialog = (r"""
       'builds':      ['Builds',       'Runs the project build specifications (EXE, PPL, ...), each revision'],
       'sbom-generation': ['SBOM Generation', 'Generates a CycloneDX dependency report, each revision']
     };
-    var CAP_ORDER = ['snapshots','snapshots2','vidiff','masscompile','vi-analyzer','unit-tests','antidoc','builds','sbom-generation'];
+    var CAP_ORDER = ['snapshots2','vidiff','masscompile','vi-analyzer','unit-tests','antidoc','builds','sbom-generation'];
     var DIFF_CAPS = { snapshots:1, snapshots2:1, vidiff:1 };  // the lean "diff-based" subset
     var PLATFORM_CAPS = { snapshots2:1, vidiff:1, masscompile:1, 'vi-analyzer':1, builds:1 };
     var platState = {};                         // cap id -> selected platform keys for history rows
@@ -2947,6 +2926,7 @@ run_dialog = (r"""
     }
     function histTokPanel(show){ var p=document.getElementById('cidash-hist-tok'); if(p) p.style.display = show ? 'block' : 'none'; }
     var actMode = {};                           // cap -> 'off' | 'fill' | 'rerun' (per-activity choice)
+    var snapshotAdviceDismissed = false;
     var reuseWarm = false;                       // opt-in: keep ONE container warm across the queued revisions
     // ── Warm-container reuse + time estimate ───────────────────────────────
     // A (cap, platform) is "batch-capable" when its run target carries a 'batch'
@@ -3178,6 +3158,40 @@ run_dialog = (r"""
       if(mode==='rerun')    return (c.done>0 || c.fill>0) ? 'rerun' : 'off';
       return c.fill>0 ? 'fill' : 'off';
     }
+    function histSnapshotAdviceCount(){
+      if(snapshotAdviceDismissed) return 0;
+      var included=histIncludedShas(); var newestSelected=-1; var older={};
+      HIST.forEach(function(revision, index){
+        if(included[revision.sha] && newestSelected<0) newestSelected=index;
+        older[revision.sha]={index:index, depOnly:!!revision.dep_only};
+      });
+      if(newestSelected<0) return 0;
+      var enabled={};
+      histInstalledCaps().forEach(function(capId){
+        if((capId==='snapshots' || capId==='snapshots2') && (actMode[capId]||'off')!=='off') enabled[capId]=1;
+      });
+      var missing={}; var queued=qLoad();
+      histAllCells().forEach(function(cell){
+        var revision=older[cell.sha];
+        if(!enabled[cell.cap] || cell.done || included[cell.sha] || !revision || revision.index<=newestSelected) return;
+        if(revision.depOnly && !histInclDep) return;
+        if(cell.platform && histSelectedPlatforms(cell.cap).indexOf(cell.platform)<0) return;
+        var entry=queued[cell.cap+'|'+cell.sha];
+        if(entry && !entry.failed && !entry.done) return;
+        missing[cell.sha]=1;
+      });
+      return Object.keys(missing).length;
+    }
+    function histSnapshotAdviceRefresh(){
+      var banner=document.getElementById('cidash-hist-snapshot-advice'); if(!banner) return;
+      var count=histSnapshotAdviceCount(); banner.hidden=!count;
+      var title=document.getElementById('cidash-hist-snapshot-advice-title');
+      if(title && count) title.textContent=count+' older revision'+(count===1?' still needs':'s still need')+' snapshots';
+    }
+    function histSnapshotAdviceDismiss(){
+      snapshotAdviceDismissed=true;
+      histSnapshotAdviceRefresh();
+    }
     function histRefresh(){
       // Recompute everything that depends on the current selection: each row's count
       // hint + segment availability + active state, then the summary and Queue button.
@@ -3248,6 +3262,7 @@ run_dialog = (r"""
         }
       }
       var go=document.getElementById('cidash-hist-go'); if(go) go.disabled = !runs;
+      histSnapshotAdviceRefresh();
     }
     function histSetMode(cap, mode){
       actMode[cap]=mode; histRefresh();
@@ -3267,6 +3282,7 @@ run_dialog = (r"""
     }
     function histRender(){
       var body=document.getElementById('cidash-hist-body'); if(!body) return;
+      snapshotAdviceDismissed=false;
       var h='';
       h += '<p class="cidash-hist-intro">Queue CI for revisions that already exist so the dashboard fills in. Runs <strong>oldest \u2192 newest</strong>. For each activity, choose to <b>Fill</b> only the missing results or <b>Re-run</b> every selected revision.</p>';
       var anyDep = HIST.some(function(r){ return r.dep_only; });
@@ -3298,7 +3314,14 @@ run_dialog = (r"""
           + '<button type="button" class="cidash-hist-chip" data-preset="clear" title="Set every activity to Skip">Clear</button>'
           + '</div>';
       }
-      h += '</div><div class="cidash-hist-acts">';
+      h += '</div>';
+      h += '<aside id="cidash-hist-snapshot-advice" class="cidash-hist-snapshot-advice" role="status" aria-live="polite" hidden>'
+        + '<div class="cidash-hist-snapshot-advice-copy"><strong id="cidash-hist-snapshot-advice-title"></strong>'
+        + '<p>Filling snapshot history can be efficient: <b>Fill</b> reuses snapshots for unchanged VI files and renders only missing file content. More revisions can still mean more workflow runs.</p>'
+        + '<p>To cover history, clear any revision search, choose <b>All revisions</b> and <b>Fill</b> for snapshots. Other enabled activities will use that wider scope too.</p>'
+        + '<p>Your current selection is unchanged &mdash; you can still queue only these revisions.</p></div>'
+        + '<button type="button" class="cidash-btn cidash-ghost" id="cidash-hist-snapshot-advice-dismiss">Keep selected revisions</button></aside>';
+      h += '<div class="cidash-hist-acts">';
       if(!instCaps.length){
         h += '<div class="cidash-hist-actsempty">No runnable activities found for this repository.</div>';
       } else instCaps.forEach(function(cap){
@@ -3341,6 +3364,8 @@ run_dialog = (r"""
       h += '<button class="cidash-btn cidash-go" id="cidash-hist-go">\u25B6 Queue runs</button>';
       h += '<button class="cidash-btn cidash-ghost" id="cidash-hist-cancel">Cancel</button></div>';
       body.innerHTML=h;
+      var adviceDismiss=document.getElementById('cidash-hist-snapshot-advice-dismiss');
+      if(adviceDismiss) adviceDismiss.addEventListener('click', histSnapshotAdviceDismiss);
       // Mirror the dashboard's current dependency-only filter so the dialog shows
       // the same revisions the table does; populate the pickers from the visible set.
       var _dd=document.getElementById('show-deponly'); histInclDep=!!(_dd && _dd.checked);
@@ -3515,7 +3540,7 @@ debug_dialog = (r"""
     var BRANCH = "__BRANCH__";
     var TOK_KEY = "lvci_dispatch_token";
     var WF = "debug-session.yml";
-    var CAP_LABEL = { masscompile:'Mass Compile', vidiff:'VIDiff', snapshots2:'VI Browser 2.0 Snapshots', builds:'Builds' };
+    var CAP_LABEL = { masscompile:'Mass Compile', vidiff:'VIDiff', snapshots2:'VI Snapshots', builds:'Builds' };
     function $(id){ return document.getElementById(id); }
     function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
     function getTok(){ try{ return localStorage.getItem(TOK_KEY)||localStorage.getItem("lvci_install_token")||''; }catch(e){ return ''; } }
@@ -4260,7 +4285,7 @@ def _parse_vipc_packages(vipc_path):
   return sorted(set(names)), ''
 
 def _parse_container_config(path='.github/labview-ci.yml'):
-  cfg = {'use': '', 'actions': {}, 'vipc': [], 'dragon': [], 'hasVipcList': False, 'hasDragonList': False}
+  cfg = {'use': '', 'linuxUse': '', 'actions': {}, 'vipc': [], 'dragon': [], 'hasVipcList': False, 'hasDragonList': False}
   if not os.path.isfile(path):
     return cfg
   section = ''
@@ -4273,6 +4298,19 @@ def _parse_container_config(path='.github/labview-ci.yml'):
           section = 'container'; current = None; continue
         if re.match(r'^\S', line):
           section = ''; current = None
+        if section in ('container', 'vipc', 'dragon', 'actions'):
+          selected = re.match(r'^\s{4}linuxUse:\s*["\']?([^"\'\s]+)', line)
+          if selected:
+            cfg['linuxUse'] = selected.group(1)
+            section = 'container'; current = None
+          header = re.match(r'^\s{4}(vipc|dragon|actions):\s*(\[\]|\{\})?\s*$', line)
+          if header:
+            name, empty = header.groups()
+            if name == 'vipc': cfg['hasVipcList'] = True
+            if name == 'dragon': cfg['hasDragonList'] = True
+            section = 'container' if empty else name
+            current = None
+            continue
         if section == 'container':
           m = re.match(r'^\s{4}use:\s*"?([^"#]+)"?', line)
           if m:
@@ -4344,6 +4382,14 @@ def _repo_dragons():
 def _worker_manifest(platform, tag):
   if not tag or tag in ('base', 'none'):
     return None
+  if platform == 'linux' and tag.startswith('linux-lvpm-'):
+    selected = re.fullmatch(r'(linux-lvpm-[a-f0-9]{64})@(sha256:[a-f0-9]{64})', tag)
+    if not selected:
+      return None
+    man = http_json(f"{pages_url}/workers/linux-lvpm/{selected.group(1)}/manifest.json")
+    if not isinstance(man, dict) or man.get('installer') != 'lvpm' or man.get('tag') != selected.group(1) or man.get('image_digest') != selected.group(2) or man.get('manifest_path') != f'workers/linux-lvpm/{selected.group(1)}/manifest.json':
+      return None
+    return man
   resolved = tag
   if tag == 'latest':
     latest = http_json(f"{pages_url}/workers/{platform}/latest.json")
@@ -4354,6 +4400,17 @@ def _worker_manifest(platform, tag):
 
 def _manifest_packages(man):
   packages = set()
+  if isinstance(man, dict) and man.get('installer') == 'lvpm':
+    for package in man.get('packages') or []:
+      if not isinstance(package, dict):
+        continue
+      name = str(package.get('name') or '').strip()
+      version = str(package.get('version') or '').strip()
+      if name:
+        packages.add(name)
+        if version:
+          packages.add(f'{name}-{version.lstrip("vV")}')
+    return sorted(packages, key=str.lower)
   if isinstance(man, dict):
     for pkg in man.get('vipm_packages') or []:
       if isinstance(pkg, dict):
@@ -4509,15 +4566,12 @@ def _known_nipm_dependencies():
 _DRAGON_MOD = None
 
 def _load_dragon_module():
-  """Import the shared .dragon TOML parser (.github/labview/dragon_deps.py).
-
-  Returns the module, or False when it (or a TOML backend) is unavailable so the
-  dashboard still builds. A repo without the parser simply shows no Dragon
-  items."""
+  """Load only the parser shipped beside this action in the trusted tooling repo."""
   global _DRAGON_MOD
   if _DRAGON_MOD is not None:
     return _DRAGON_MOD
-  path = '.github/labview/dragon_deps.py'
+  from pathlib import Path
+  path = Path(__file__).resolve().parents[2] / '.github/labview/dragon_deps.py'
   if not os.path.isfile(path):
     _DRAGON_MOD = False
     return _DRAGON_MOD
@@ -4538,15 +4592,17 @@ def _dragon_inventory():
   Returns {'available', 'files', 'install_set', 'conflicts'}. Degrades to an empty
   inventory (available False) when the parser or a TOML backend is missing."""
   mod = _load_dragon_module()
-  if not mod or not mod.toml_available():
-    return {'available': False, 'files': [], 'install_set': [], 'conflicts': []}
   try:
+    if not mod or not mod.toml_available():
+      reason = 'Trusted Dragon parser unavailable.' if not mod else 'Dragon TOML backend unavailable.'
+      return {'available': False, 'error': reason, 'files': [], 'install_set': [], 'conflicts': []}
     inv = mod.build_inventory('.')
     inv['available'] = True
     return inv
   except Exception as exc:
     print(f"WARN: could not build dragon inventory: {exc}", file=sys.stderr)
-    return {'available': False, 'files': [], 'install_set': [], 'conflicts': []}
+    return {'available': False, 'error': 'Dragon declarations could not be inspected: ' + str(exc),
+            'files': [], 'install_set': [], 'conflicts': []}
 
 def _dragon_status_index(man):
   """Map (manager, package_id_lower) -> the worker manifest's Dragon status item."""
@@ -4683,8 +4739,48 @@ def _annotate_dragon_status(dep, status_index, have_manifest, baked_packages, vi
       dep.setdefault('installed_version', '')
       dep.setdefault('message', '')
 
+def _linux_dragon_status(dep, selection, manifest, freshness):
+  unknown = {'status': 'unknown', 'installed_version': '', 'scope': 'package-files',
+             'message': 'Current digest-bound Linux LVPM package-file evidence is unavailable. Rebuild, reverify, and explicitly re-activate the candidate.'}
+  if str(dep.get('manager') or 'vipm').lower() != 'vipm':
+    return {**unknown, 'message': 'Native/NIPM dependencies are not inventoried by this LVPM worker.'}
+  if (not re.fullmatch(r'linux-lvpm-[a-f0-9]{64}@sha256:[a-f0-9]{64}', selection or '')
+      or not isinstance(manifest, dict) or manifest.get('installer') != 'lvpm'
+      or manifest.get('platform') != 'linux' or manifest.get('architecture') != 'amd64'
+      or freshness.get('status') != 'current' or freshness.get('selection') != selection
+      or not os.environ.get('GITHUB_SHA') or freshness.get('revision') != os.environ.get('GITHUB_SHA')):
+    return unknown
+  name = str(dep.get('package_id') or '').lower()
+  declared = str(dep.get('declared_version') or '')
+  if not name or not declared:
+    return {**unknown, 'message': 'An exact VIPM name/version declaration is required.'}
+  versions = sorted({str(package.get('version') or '') for package in manifest.get('packages') or []
+                     if isinstance(package, dict) and str(package.get('name') or '').lower() == name})
+  if declared in versions:
+    return {'status': 'installed', 'installed_version': declared, 'scope': 'package-files',
+            'message': 'Exact version in a locally current Linux LVPM inventory; runtime activities are not verified.'}
+  return {'status': 'wrong_version' if versions else 'missing',
+          'installed_version': versions[0] if versions else '', 'scope': 'package-files',
+          'message': 'The exact declared version is absent from the Linux LVPM package-file inventory.'}
+
+
+def _aggregate_dragon_status(evidence):
+  if not evidence:
+    return {'status': 'unknown', 'installed_version': '', 'message': 'No monitored package evidence is available.'}
+  if len(evidence) == 1:
+    return dict(evidence[0])
+  statuses = [item.get('status') or 'unknown' for item in evidence]
+  status = next((value for value in ('conflict', 'missing', 'wrong_version', 'unknown', 'pending', 'not_attempted')
+                 if value in statuses), 'installed' if all(value == 'installed' for value in statuses) else 'unknown')
+  versions = {item.get('installed_version') or '' for item in evidence}
+  scopes = {item.get('scope') for item in evidence}
+  return {'status': status, 'installed_version': next(iter(versions)) if len(versions) == 1 else '',
+          'message': 'Aggregate monitored package evidence: ' + ', '.join(statuses) + '.',
+          **({'scope': next(iter(scopes))} if len(scopes) == 1 and None not in scopes else {})}
+
+
 def _build_dragon_section(config=None):
-  """Build the Dragon dependency block for the Dependencies index (Windows).
+  """Build monitored Dragon declaration and per-platform package-file evidence.
 
   Declared dependencies come from repository .dragon files. Each file carries its
   monitor flag so the Dependencies page can suppress warnings and auto-update
@@ -4706,6 +4802,14 @@ def _build_dragon_section(config=None):
   for f in files:
     entry = configured.get(f.get('source_file') or '')
     f['monitored'] = bool(entry and entry.get('monitor') is True) if has_config_list else True
+    f['monitorOn'] = _monitor_on(entry, has_config_list, False)
+    error = f.get('error') or inv.get('error') or ''
+    if not os.path.isfile(f.get('source_file') or ''):
+      error = 'Declared Dragon file is missing.'
+    if not inv.get('available') and not error:
+      error = 'Dragon declarations could not be inspected.'
+    f['inspection'] = {'status': 'unknown' if error else 'parsed',
+                       'reason': str(error) if error else 'Declarations parsed by trusted tooling.'}
   if not files:
     # No .dragon files in this revision: skip the worker-manifest fetch.
     return {
@@ -4718,23 +4822,55 @@ def _build_dragon_section(config=None):
       'install_set': [],
       'conflicts': inv.get('conflicts') or [],
     }
-  win_man = _worker_manifest('windows', 'latest')
+  platforms = sorted({platform for file in files if file['monitored'] for platform in file['monitorOn']})
+  win_man = _worker_manifest('windows', 'latest') if 'windows' in platforms else None
   have_manifest = isinstance(win_man, dict)
   status_index = _dragon_status_index(win_man)
   win_dragon = win_man.get('dragon') if have_manifest else None
   baked_packages = {str(p).lower() for p in _manifest_packages(win_man)} if have_manifest else set()
   vipm_index = _vipm_version_index(win_man) if have_manifest else {}
   nipkg_index = _nipkg_version_index(win_man) if have_manifest else {}
-  for item in inv.get('install_set') or []:
-    _annotate_dragon_status(item, status_index, have_manifest, baked_packages, vipm_index, nipkg_index)
+  selection = config.get('linuxUse') or config.get('use') or ''
+  canonical = re.fullmatch(r'linux-lvpm-[a-f0-9]{64}@sha256:[a-f0-9]{64}', selection)
+  linux_man = _worker_manifest('linux', selection) if 'linux' in platforms and canonical else None
+  freshness = _lvpm_local_freshness(selection, linux_man) if isinstance(linux_man, dict) else {}
   for f in files:
     for dep in f.get('dependencies') or []:
-      _annotate_dragon_status(dep, status_index, have_manifest, baked_packages, vipm_index, nipkg_index)
+      evidence = {}
+      if 'windows' in f['monitorOn']:
+        measured = dict(dep)
+        _annotate_dragon_status(measured, status_index, have_manifest, baked_packages, vipm_index, nipkg_index)
+        evidence['windows'] = {key: measured[key] for key in ('status', 'installed_version', 'message')}
+      if 'linux' in f['monitorOn']:
+        evidence['linux'] = _linux_dragon_status(dep, selection, linux_man, freshness)
+      dep['platform_status'] = evidence
+      dep.update(_aggregate_dragon_status(list(evidence.values())))
+  for item in inv.get('install_set') or []:
+    key = (item['manager'], item['package_id'].lower())
+    records = [dep for file in files if file['monitored'] for dep in file.get('dependencies') or []
+               if (dep['manager'], dep['package_id'].lower()) == key]
+    evidence = {platform: _aggregate_dragon_status([dep['platform_status'][platform] for dep in records
+                if platform in dep['platform_status']]) for platform in platforms}
+    evidence = {platform: record for platform, record in evidence.items()
+                if any(platform in dep['platform_status'] for dep in records)}
+    for platform, record in evidence.items():
+      versions = {dep.get('declared_version') for dep in records if platform in dep['platform_status']}
+      if len(versions) > 1:
+        record.update({'status': 'conflict', 'message': 'Declared with different versions across monitored files.'})
+    item['platform_status'] = evidence
+    item.update(_aggregate_dragon_status(list(evidence.values())))
+  inspected = all(not f['monitored'] or f['inspection']['status'] == 'parsed' for f in files)
+  health = win_dragon.get('health', '') if isinstance(win_dragon, dict) else ''
+  measured = ('windows' not in platforms or have_manifest) and (
+      'linux' not in platforms or (isinstance(linux_man, dict) and linux_man.get('installer') == 'lvpm'
+      and linux_man.get('platform') == 'linux' and linux_man.get('architecture') == 'amd64'
+      and freshness.get('status') == 'current' and freshness.get('selection') == selection
+      and bool(os.environ.get('GITHUB_SHA')) and freshness.get('revision') == os.environ.get('GITHUB_SHA')))
   return {
-    'available': inv.get('available', False) or bool(files),
+    'available': inv.get('available', False),
     'column': 'windows',
-    'ready': have_manifest,
-    'health': (win_dragon or {}).get('health', '') if isinstance(win_dragon, dict) else '',
+    'ready': measured and inspected,
+    'health': health if inspected and measured else 'unknown',
     'manifest_version': win_man.get('version', '') if have_manifest else '',
     'files': files,
     'install_set': inv.get('install_set') or [],
@@ -4749,7 +4885,7 @@ def _system_dependencies():
   has_linux = os.path.isfile('.github/workflows/vi-snapshots-json.yml')
   return [
     {
-      'name': 'VI Browser 2.0 toimages runner',
+      'name': 'VI Browser toimages runner',
       'source': 'Repository Go code',
       'path': '.github/labview/toimages/main.go',
       'details': 'Batch runner compiled from repo Go source; Linux uses the toimages GHCR image and Windows builds runner.exe in the workflow.',
@@ -4762,13 +4898,40 @@ def _system_dependencies():
       'name': 'lvctl render engine',
       'source': 'Repository Go code + embedded VIs',
       'path': '.github/labview/toimages/_ni/labview/lvctl',
-      'details': 'Renderer used by VI Browser 2.0 to drive LabVIEW and emit position-aware frame JSON.',
+      'details': 'Renderer used by VI Browser to drive LabVIEW and emit position-aware frame JSON.',
       'platforms': {
         'windows': {'present': has_windows, 'label': 'workflow-built' if has_windows else ''},
         'linux': {'present': has_linux, 'label': 'toimages image' if has_linux else ''},
       },
     },
   ]
+
+def _lvpm_local_freshness(selection, manifest):
+  import subprocess
+  unknown = {'status': 'unknown', 'revision': os.environ.get('GITHUB_SHA', ''), 'selection': selection,
+             'reason': 'Local LVPM freshness is unavailable. Rebuild, reverify, and explicitly re-activate the candidate.'}
+  try:
+    revision = subprocess.check_output(['git', 'rev-parse', '--verify', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
+    unknown['revision'] = revision
+    if not re.fullmatch(r'[0-9a-f]{40}', revision) or revision != os.environ.get('GITHUB_SHA', ''):
+      return unknown
+    interpreter = os.environ.get('LVCI_LVPM_PYTHON', '')
+    helper = os.environ.get('LVCI_LVPM_HELPER', '')
+    if not interpreter or not helper or not os.path.isfile(interpreter) or not os.path.isfile(helper) or not isinstance(manifest, dict):
+      return unknown
+    result = subprocess.run([interpreter, '-I', helper, 'freshness', '--repo', os.getcwd(),
+                             '--candidate', selection, '--revision', revision],
+                            input=json.dumps(manifest), capture_output=True, text=True, timeout=120)
+    if result.returncode:
+      return unknown
+    freshness = json.loads(result.stdout)
+    if (not isinstance(freshness, dict) or freshness.get('status') not in ('current', 'stale', 'unknown')
+        or freshness.get('revision') != revision or freshness.get('selection') != selection):
+      return unknown
+    return freshness
+  except Exception:
+    return unknown
+
 
 def _compute_deps_pending(data):
   """Decide whether the repo declares project dependencies that are NOT yet baked
@@ -4789,7 +4952,7 @@ def _compute_deps_pending(data):
   def baked(key):
     c = cols.get(key) or {}
     pkgs = c.get('packages') or []
-    return {str(p).lower() for p in pkgs}, {_pkg_base(p) for p in pkgs}
+    return {str(p).lower() for p in pkgs}, (set() if c.get('installer') == 'lvpm' else {_pkg_base(p) for p in pkgs})
 
   def _missing(pkgs, baked_pair):
     exact, bases = baked_pair
@@ -4802,6 +4965,10 @@ def _compute_deps_pending(data):
   # Otherwise (Linux unused / base image) there is no worker to bake into and we do
   # not surface a spurious Linux update prompt.
   lin_col = cols.get('linux') or {}
+  freshness = lin_col.get('freshness') or {}
+  lvpm_pending = lin_col.get('installer') == 'lvpm' and (
+    freshness.get('status') != 'current' or freshness.get('revision') != data.get('sha')
+    or freshness.get('selection') != lin_col.get('tag'))
   lin_active = bool(lin_col.get('ready')) and str(lin_col.get('tag') or 'base') not in ('base', 'none')
   lin_baked = baked('linux') if lin_active else set()
   pending_pkgs = set()
@@ -4831,26 +4998,37 @@ def _compute_deps_pending(data):
       if lin_missing_pkgs:
         lin_pending_files.append(v.get('path'))
         pending_pkgs.update(lin_missing_pkgs)
-  lin_missing = bool(lin_pending_files)
+  lin_missing = bool(lin_pending_files) or lvpm_pending
 
   dragon = data.get('dragon') or {}
   monitored_dragon_keys = set()
+  dragon_pending = []
+  dragon_unknown_platforms = set()
   for f in dragon.get('files') or []:
-    if f.get('monitored') is False:
+    if f.get('monitored') is False or f.get('monitorOn') == []:
       continue
+    inspection = f.get('inspection') or {}
+    if inspection.get('status') == 'unknown' or f.get('error') or dragon.get('available') is False:
+      source = f.get('source_file') or ''
+      dragon_pending.append({'name': source, 'source_file': source, 'status': 'unknown',
+                             'message': inspection.get('reason') or f.get('error') or 'Dragon inspection unavailable.'})
+      dragon_unknown_platforms.update(f.get('monitorOn') or ['windows', 'linux'])
     for dep in f.get('dependencies') or []:
       if dep.get('package_id'):
         monitored_dragon_keys.add((str(dep.get('manager') or 'vipm'), str(dep.get('package_id')).lower()))
-  dragon_pending = []
   for item in dragon.get('install_set') or []:
     key = (str(item.get('manager') or 'vipm'), str(item.get('package_id') or '').lower())
     if key not in monitored_dragon_keys:
       continue
     st = str(item.get('status') or '')
-    if st in ('pending', 'not_attempted', 'missing', 'wrong_version', 'conflict'):
-      dragon_pending.append({'name': item.get('name') or item.get('package_id') or '', 'status': st})
+    if st in ('unknown', 'pending', 'not_attempted', 'missing', 'wrong_version', 'conflict'):
+      evidence = item.get('platform_status') or {}
+      dragon_pending.append({'name': item.get('name') or item.get('package_id') or '', 'status': st,
+                             'message': item.get('message') or '', 'platform_status': evidence})
+      dragon_unknown_platforms.update(platform for platform, record in evidence.items()
+                                     if record.get('status') != 'installed')
 
-  containers = []
+  containers = list(dragon_unknown_platforms)
   if pending_files:
     containers.append('windows')
   if lin_missing:
@@ -4866,6 +5044,7 @@ def _compute_deps_pending(data):
     'vipcs': all_files,
     'dragon': dragon_pending,
     'containers': sorted(set(containers)),
+    **({'linux_lvpm': freshness} if lin_col.get('installer') == 'lvpm' else {}),
     'generated': __import__('datetime').datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
   }
 
@@ -4913,7 +5092,8 @@ def _build_dependencies_index():
   manifest_cache = {}
   for col in columns:
     action_tag = config.get('actions', {}).get(col.get('action')) if col.get('action') else ''
-    tag = col.get('tag') or action_tag or config.get('use') or col.get('defaultTag') or 'base'
+    linux_tag = config.get('linuxUse') if col['platform'] == 'linux' else ''
+    tag = col.get('tag') or action_tag or linux_tag or config.get('use') or col.get('defaultTag') or 'base'
     col['tag'] = tag
     if tag not in ('base', 'none'):
       cache_key = f"{col['platform']}:{tag}"
@@ -4921,12 +5101,17 @@ def _build_dependencies_index():
         manifest_cache[cache_key] = _worker_manifest(col['platform'], tag)
       man = manifest_cache[cache_key]
       col['ready'] = isinstance(man, dict)
+      col['installer'] = man.get('installer', 'vipm') if isinstance(man, dict) else ('lvpm' if tag.startswith('linux-lvpm-') else 'vipm')
+      col['verification'] = man.get('verification', {}) if isinstance(man, dict) else {}
+      if col['installer'] == 'lvpm':
+        col['freshness'] = _lvpm_local_freshness(tag, man)
+        col['ready'] = col['ready'] and col['freshness'].get('status') == 'current'
       col['packages'] = _manifest_packages(man)
       col['failed_packages'] = _manifest_failed_packages(man)
-      col['nipkg_ready'] = isinstance(man, dict)
+      col['nipkg_ready'] = isinstance(man, dict) and isinstance(man.get('nipkg_packages'), list)
       col['nipkg_packages'] = _manifest_nipkg_packages(man)
       col['labview_version'] = man.get('labview_version', '') if isinstance(man, dict) else ''
-      col['version'] = man.get('version', tag) if isinstance(man, dict) else tag
+      col['version'] = (man.get('tag') or man.get('version', tag)) if isinstance(man, dict) else tag
     else:
       col['ready'] = True
       col['packages'] = []
@@ -4935,6 +5120,10 @@ def _build_dependencies_index():
       col['nipkg_packages'] = []
       col['labview_version'] = ''
       col['version'] = tag
+  candidate_pointer = http_json(f'{pages_url}/workers/linux-lvpm/latest.json')
+  candidate_tag = candidate_pointer.get('tag', '') if isinstance(candidate_pointer, dict) else ''
+  candidate_path = f'workers/linux-lvpm/{candidate_tag}/manifest.json'
+  candidate = http_json(f'{pages_url}/{candidate_path}') if re.fullmatch(r'linux-lvpm-[a-f0-9]{64}', candidate_tag) and candidate_pointer.get('manifest_path') == candidate_path else None
   data = {
     'schema': 1,
     'repo': repo,
@@ -4954,6 +5143,7 @@ def _build_dependencies_index():
     'dragon': _build_dragon_section(config),
     'system': _system_dependencies(),
     'columns': columns,
+    'linux_lvpm_candidate': candidate,
   }
   with open('ci-out/dashboard/dependencies/index.json', 'w', encoding='utf-8') as fh:
     json.dump(data, fh, indent=2, ensure_ascii=True)

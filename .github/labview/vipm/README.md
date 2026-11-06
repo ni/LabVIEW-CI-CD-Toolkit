@@ -1,8 +1,9 @@
-# Baking VIPM (VIPC) dependencies into the CI workers
+# Baking VIPM (VIPC and Dragon) dependencies into the CI workers
 
 This folder holds everything the Windows CI worker needs to install **VIPM**
 (JKI VI Package Manager) packages into the LabVIEW container image at build time,
-so that a project's custom dependencies — declared in a `.vipc` configuration —
+so that a project's custom dependencies — declared in a `.vipc` configuration
+or the supported VIPM subset of a `.dragon` file —
 are already present when CI jobs (unit tests, VI Analyzer, documentation, …) run.
 
 It exists because some CI operations link against VIPM-distributed libraries that
@@ -18,7 +19,8 @@ false "no unit tests found".
 
 | File | Role |
 | --- | --- |
-| `install-vipc.ps1` | Build-time hook. Uses the VIPM CLI already present in the shared VIPM base image, launches headless LabVIEW, then installs the packages listed in every staged `*.vipc`. A failed bake fails the image build unless `VIPM_ALLOW_MISSING_PACKAGES=1` is explicitly set. |
+| `install-vipc.ps1` | Shared Windows build-time hook. Verifies the selected VIPM CLI/Desktop, starts headless LabVIEW, and installs staged VIPC packages plus required normalized Dragon VIPM declarations. Dragon requirements and their final target inventory cannot be bypassed with `VIPM_ALLOW_MISSING_PACKAGES`. |
+| `dragon-plan.json` (generated, not committed) | Host-parsed exact VIPM specifications, source filenames/SHA256s, and requested LabVIEW year for selected Windows Dragon files. The container verifies the source binding before installing anything. |
 | `install-vipc-linux.sh` | Linux build-time hook. Starts Xvfb and headless LabVIEW, clears the runtime-only `LV_RTE_HEADLESS` default while the VIPM engine starts, extracts each VIPC's `config.xml`, installs the resulting `name@version` specs with the VIPM 26.3 CLI, forces phase progress in CI logs, and prints focused process/display diagnostics when a package action fails. |
 | `ci-tooling.vipc` | The default CI-tooling configuration (Caraya, VI Tester, LUnit base + CLI, UTF JUnit Report, G Image). This committed file is the **source of truth** and must remain VIPM-openable. Edit it in VIPM when changing dependency intent. |
 | `ci-tooling.packages.json` / `ci-tooling.defaults.json` | Optional metadata and automation inputs used by dashboards/config tools and by ad-hoc regeneration. They are **not authoritative** for what gets installed at build time. |
@@ -31,14 +33,14 @@ false "no unit tests found".
 ```mermaid
 flowchart LR
   A[".vipc anywhere in the repo<br/>(discovered recursively, outside .github/)"] --> B["build-labview-image.yml<br/>copies project *.vipc into .github/labview/vipm/"]
-  B --> C["labview-vipm-base.Dockerfile<br/>builds/pulls LabVIEW + VIPM + Git base"]
-  C --> D["labview-vipc-layer.Dockerfile<br/>COPY .github/labview/vipm/ -> C:/vipm/"]
-  D --> E["Dockerfile runs install-vipc.ps1<br/>when any *.vipc is present"]
+  B --> C["labview-ci-base.Dockerfile<br/>builds/pulls LabVIEW + VIPM + Git base"]
+  C --> D["labview-ci.Dockerfile<br/>COPY .github/labview/vipm/ -> C:/vipm/"]
+  D --> E["Dockerfile runs install-vipc.ps1<br/>when VIPC or Dragon files are present"]
   E --> F["packages baked into vi.lib /<br/>user.lib of the image"]
 ```
 
 The expensive, slow-moving tooling layer is published separately as
-`ghcr.io/<owner>/<repo>-labview-vipm-base:<labview-year>`. That image already
+`ghcr.io/<owner>/<repo>-labview-base:<container-release>`. That image already
 contains VIPM 2026 Q3 and Git. Project worker rebuilds start from it and only
 apply the staged VIPC files, so changing a dependency set does not reinstall VIPM.
 
@@ -58,27 +60,138 @@ Compile, Unit Tests, Antidoc, VIDiff) then **wait** for that worker image rebuil
 to finish — via `.github/labview/wait-for-worker-images.sh` — before they pull the
 image and run, so they never execute against a worker that is missing a project
 dependency. The `ci-tooling.vipc` distributed by the tooling is the **base**
-configuration applied first; a project's own discovered VIPC files stack on top.
+configuration applied after required project dependencies.
+
+### Required Windows Dragon declarations
+
+The worker workflow discovers project `.dragon` files when there is no explicit
+monitor list, or selects only files monitored for Windows from
+`config.container.dragon`. An explicit empty list, `monitor: false`, or
+`monitorOn: linux` does not install those files into Windows.
+Both the GitHub push gate and staging use the same safe YAML parser
+(`PyYAML==6.0.3`, explicitly installed on the isolated Python host).
+Quoted scalar `monitorOn: "windows"`, flow lists `[windows, linux]`, block
+lists, quoted paths and inline comments retain their YAML meaning. `monitor`
+must be a YAML boolean; string booleans, malformed YAML and unsupported selection
+shapes stop the job rather than silently dropping a required file.
+
+The supported format is static TOML with exact VIPM versions:
+
+```toml
+[project]
+labview-version = 2026
+vipc = ""
+
+[vipm.dependencies]
+oglib_boolean = "6.0.0.9"
+oglib_array = { version = "6.0.1.20" }
+```
+
+The existing trusted `dragon_deps.py` parser runs on the workflow's supported
+Python host (`tomllib` on Python 3.11+, or `tomli` where installed). Python runs
+in isolated mode and loads the trusted parser explicitly, excluding client
+working-directory and `PYTHONPATH` import/startup overrides. It never executes
+the declaration file and never parses TOML using regular expressions.
+It generates `dragon-plan.json` next to the selected source files. The Docker
+COPY includes both, and the worker fingerprint includes source bytes, normalized
+plan bytes, parser bytes, and installer bytes. Selected sources must stay inside
+the repository without symlink/junction traversal. Unselected sources are removed
+from the Docker COPY directory without parsing. The container verifies the plan
+schema, Windows platform, requested LabVIEW year/bitness, and each source SHA256
+before the VIPM bootstrap. This hash binding checks integrity, not signing or
+provenance. Missing or changed
+sources and conflicting versions/years fail closed; duplicate staged basenames
+are rejected rather than overwriting one declaration with another.
+
+The composite worker-image action uses the same trusted plan/staging API for
+Dragon files in its explicit flat `deps-dir`; it does not discover unrelated
+project files or require a Dragon CLI in the base. Its isolated Python 3.13
+entry point includes the parser, plan, sources, installer and target inputs in
+the content fingerprint. The GitLab Windows source template preserves project
+discovery outside `.github`, stages the same plan with isolated host Python,
+hashes the staged inputs and target, and checks native staging/build/push exit
+codes. GitLab Windows runners need Python 3.11+ (`tomllib`) or a compatible
+Python with `tomli` installed in the isolated interpreter environment.
+Both callers use the shared installer exactly once for mixed and Dragon-only
+inputs. Missing plans still fail; no caller falls back to unverified Dragon CLI
+execution.
+
+Only exact numeric VIPM versions (including explicit packaging-release suffixes)
+are currently supported. Empty `[nipm]`/`[nipm.dependencies]`/`[nipm.feeds]` tables
+are harmless, but nonempty NIPM dependencies or feeds are explicitly unsupported
+and fail staging. Unknown project/VIPM settings, version ranges, unpinned/latest
+requests, nonempty `project.vipc`, and custom feed specifications also fail with
+an actionable error rather than being ignored. Select a VIPC separately instead
+of embedding its path in `project.vipc`.
+
+The Windows path no longer assumes a `dragon apply` executable exists. The old
+best-effort hook could log command-not-found and still publish an incomplete
+worker. The shared `install-vipc.ps1` now installs normalized Dragon requirements
+with the same signed VIPM 4056 bootstrap, resolver, download integrity checks,
+and bounded engine recovery used by VIPCs. A Dragon-only project follows this
+path even without a VIPC. Legacy `install-dragon.ps1` overrides are deliberately
+rejected before execution: migrate their supported dependency intent into exact
+`[vipm.dependencies]` declarations. Arbitrary custom-hook behavior is not
+silently treated as verified package installation.
+
+**Compatibility break / major-release candidate from 4.x:** the old custom
+Dragon-hook and independent Dragon-CLI paths are retired. Projects relying on
+custom hooks, NIPM/feed installation or other unsupported Dragon settings must
+migrate before updating; those requirements now fail explicitly instead of
+being delegated or ignored. This change must not be presented as a
+backward-compatible patch unless that compatibility is first restored.
+
+Dragon requirements install before later project/tooling VIPCs. Known conflicting
+VIPC pins are rejected, and **after all tooling installs**, the hook verifies
+every Dragon root/version against an inventory explicitly identifying the
+requested LabVIEW year and bitness. A later tooling upgrade of a required pin,
+missing package, dead engine, unreadable inventory, or wrong target fails the
+worker build. Reconcile conflicting declarations; the installer does not choose
+the newest version or rewrite project pins. `VIPM_ALLOW_MISSING_PACKAGES=1` does
+not bypass Dragon installation or final verification. Existing optional tooling
+policy is unchanged, except it cannot invalidate a required Dragon root.
+
+These are source and regression-test guarantees. A real Windows vendor bake and
+its final published inventory are still required before claiming that a specific
+worker contains the repaired dependencies.
+
+### Selecting Antidoc and experimental declarations together
+
+The experimental VIPC's Antidoc CLI root is aligned to `3.4.0.126`, the exact
+version already established in the authoritative Antidoc capability VIPC.
+Its package spec and BMP are copied byte-for-byte from that archive; no
+external resolver or newest-version selection is used. The informational
+Antidoc JSON agrees with the committed archive, which remains authoritative.
+
+This reconciles the stale experimental `3.3.0.117` declaration without dropping
+any selected source or package root. The offline Linux planner accepts all four
+committed VIPCs plus `example/Example.dragon` with 35 exact roots, and still
+rejects conflicting pins. This proves declaration consistency, not a successful
+package installation, Linux worker bake, runtime relinking or final inventory.
 
 ### Required essentials vs. best-effort tooling
 
 `install-vipc.ps1` does not treat all packages equally, because a single heavy
 add-on must never be able to break the whole worker:
 
-1. **Required UTF essentials, installed FIRST.** Before any VIPC is applied, the
-   script installs the UTF JUnit reporter set (`ni_lib_utf_junit_report`,
+1. **Required unit-test essentials, installed FIRST.** Before any VIPC is applied, the
+   script installs Caraya (`jki_lib_caraya@1.4.4.148`) and the UTF JUnit reporter set (`ni_lib_utf_junit_report`,
    `ni_lib_junit_results_api`, `ni_lib_simple_xml`) while the engine is fresh.
    These are what the built-in `RunUnitTests` CLI links against; without them
-   headless UTF fails with `-350053`. A failure here **fails the build**. Override
+   headless UTF fails with `-350053`; a Caraya runner with missing framework VIs
+   can fail to open with error `1003`. A failure here **fails the build**, and the
+   final worker Docker hook propagates the installer's nonzero exit. Override
    the list with the `VIPM_REQUIRED_PACKAGES` env var (set it to `-` to disable).
 2. **Project VIPCs are required.** Any discovered project `*.vipc` (the OpenG /
    domain dependencies the project's VIs load against) must install or the build
    fails.
 3. **Tooling VIPCs (`ci-tooling*.vipc`) are best-effort.** Their add-ons
-   (Antidoc, Caraya, LUnit base + CLI, VI Tester) are opportunistic: if one wedges
+   (Antidoc, LUnit base + CLI, VI Tester) are opportunistic: if one wedges
    the headless VIPM engine — Antidoc's large dependency tree is the known offender
    — the script warns and continues, and the image is still published. The required
-   essentials above are already installed, so UTF still works. Bake a wedge-prone
+   essentials above are already installed. A seed-only worker copy does not apply
+   this install hook; rebuild the project worker to bake Caraya and its required
+   project dependencies. Bake a wedge-prone
    add-on from its own dedicated VIPC if you need it guaranteed in the worker.
 
 This ordering is why the main `build-labview-image.yml` produces a working,
@@ -115,24 +228,67 @@ its own.
 These are the non-obvious requirements. Each one was a distinct failure mode we
 hit and fixed; keep them in mind when changing the install path.
 
-### 1. Use VIPM 2026 Q3 (26.3) or newer — not the NI-feed `ni-vipm`
+### 1. Verify both VIPM executables at the 2026 Q3 f2 floor
 
 The NI Package Manager feed ships an **older** VIPM (`2026.1.0`) whose CLI cannot
 complete a headless package install in a Windows container: its `library_list`
 call into LabVIEW times out (~330 s) and the old CLI does **not** surface the
-underlying error. The **2026 Q3** build (`26.3.3954`) surfaces underlying install
-errors and improves headless/container support.
+underlying error. Build `3954` improves diagnostics but rejects intact legacy
+OpenG package files with `Missing Name in Package section`. The vendor's
+[2026 Q3 f2 release notes](https://docs.vipm.io/latest/release-notes/2026.3.2/)
+identify that package-file fix in build **4056**.
 
-The Dockerfile now downloads the official installer from the JKI CDN and runs it
-silently:
+The Windows base and dependency hook share the same fail-closed bootstrap. The
+official [Windows installer](https://docs.vipm.io/latest/installation/) is:
 
 ```
-https://traffic.libsyn.com/secure/jkinc/vipm-26.3.3954-windows-setup.exe
+https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe
 ```
 
-It is a standard InstallShield setup — `/exenoui /qn` runs it fully silent
-(per <https://docs.vipm.io/latest/installation/>). Override the URL with the
-`VIPM_INSTALLER_URL` build-arg / env var to pin a different version.
+Installer identity is **not** executable identity: the unmodified official payload
+contains a CLI with embedded version `26.3.2` (no PE version resource) and Desktop
+with PE file version `2026.3.2.4056`. Before any required installs, the hook logs
+the actual selected paths, checks the CLI's `--version` with a 30-second bound,
+and reads Desktop's product name/file version. Both binaries must have a
+Windows-trusted Authenticode signature from **James Kring, Inc.** and meet those
+respective minimum versions. Desktop is launched from the verified path; an
+already-running engine at another path fails closed.
+
+A missing or old executable triggers one upgrade, including on reused older
+bases, followed by full rediscovery and verification of both selected paths.
+A stale higher-priority CLI is not silently bypassed. A supported newer pair is
+reused without downloading or downgrading. A mixed installation with one
+executable newer than the floor and the other old/missing fails before installation:
+the installer-to-CLI version mapping is not sufficient to guarantee no downgrade
+of the newer half; explicitly upgrade both before rebuilding.
+
+`VIPM_INSTALLER_URL` is authoritative **when an upgrade is needed**: it must be
+HTTPS without embedded credentials. Custom mirrors/versions must still provide
+a Windows-trusted, vendor-signed VIPM installer with file version at least
+`26.3.4056`, and the installed pair must satisfy the measured floors. There is no
+silent replacement URL or fallback on unreachable, old, untrusted, or unverifiable
+installers. Supported preinstalled pairs leave the URL unused. Signature and
+Windows trust validation, not an invented vendor hash, enforce installer integrity.
+
+Downloads have a 300-second timeout; installation has a 1200-second process bound
+and uses `/exenoui /qn /norestart REBOOT=ReallySuppress`. Nonzero exits, including
+reboot-required `1641`/`3010`, fail the layer. Timeouts terminate only that process
+tree; temporary installer/output files are cleaned up. `-BootstrapOnly` performs
+only this bootstrap, exiting before environment/headless changes, memory checks,
+Git/settings setup, LabVIEW/Desktop launches, VIPC discovery, or package operations.
+The base Dockerfile calls this mode, and both base-build workflows include the
+bootstrap's file-byte SHA256 in their immutable cache key. The catalog's
+`2026q3.vipmInstallerUrl` is updated because workflow/GitLab catalog overrides
+otherwise defeat the Docker default. Other release records are unchanged; an
+old explicitly configured URL fails the floor if an upgrade is necessary.
+
+These are bootstrap and vendor-provenance guarantees, **not** Windows container
+qualification. AST/mock tests and static payload inspection do not prove that the
+legacy OGP installs successfully. A reviewed real Windows bake must still verify
+required Antidoc/palette and the final target inventory. Later best-effort tooling
+can change earlier project pins; recovered-batch verification is not a final-image
+pin guarantee. No package archive is rewritten and required/optional accounting,
+target selection, integrity checks, and exact/minimum pin semantics are unchanged.
 
 ### 2. No VIPM Pro license is required — but the current container resolver has a bug
 
@@ -309,7 +465,7 @@ changed shape vs. the older `2026.1.0` build — mind the differences:**
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `VIPM_INSTALLER_URL` | `…/vipm-26.3.3954-windows-setup.exe` | VIPM installer to download if the CLI isn't already present. |
+| `VIPM_INSTALLER_URL` | `…/vipm-26.3.4056-windows-setup.exe` | Authoritative HTTPS vendor-signed installer when either selected executable is old/missing; minimum installer `26.3.4056`, CLI `26.3.2`, Desktop `2026.3.2.4056`. Supported preinstalled pairs do not use the URL. |
 | `VIPM_COMMUNITY_EDITION` | _(unset)_ | Optional override. Do not force it unless you specifically need to exercise the Community public-repo entitlement gate. |
 | `VIPM_NONINTERACTIVE` | `1` | Never block on prompts. |
 | `VIPM_ASSUME_YES` | `1` | Auto-confirm. |
@@ -319,7 +475,7 @@ changed shape vs. the older `2026.1.0` build — mind the differences:**
 | `VIPM_MAX_REFRESH_RESTARTS` | `1` | Number of clean LabVIEW/VIPM restarts after a refresh startup-handshake timeout. Set to `0` to fail immediately. |
 | `VIPM_ALLOW_LOW_MEMORY` | _(unset)_ | Set to `1` to attempt the install even when the container shows <~2.5 GB of memory (the preflight otherwise fails fast, since the VIPM engine cannot start under the Windows `docker build` default memory cap). |
 | `VIPM_DESKTOP_LIVELINESS_TIMEOUT` | `= VIPM_TIMEOUT` (900) | Seconds of Desktop silence the CLI tolerates before declaring `made no progress ... VIPM Desktop may be stuck` (its default is 60s). Large packages (e.g. `wovalab_lib_asciidoc_for_labview`) run post-install actions that are silently busy for minutes; the script raises this to the per-operation timeout so a healthy install is not aborted. |
-| `VIPM_REQUIRED_PACKAGES` | UTF JUnit essentials | Comma/semicolon list of `name@version` installed FIRST as required (build fails if they fail). Default: `ni_lib_utf_junit_report@1.0.1.43,ni_lib_junit_results_api@1.0.1.6,ni_lib_simple_xml@1.0.0.4`. Set to `-` to disable the required pre-install. |
+| `VIPM_REQUIRED_PACKAGES` | Caraya + UTF JUnit essentials | Comma/semicolon list of `name@version` installed FIRST as required (build fails if they fail). Default: `ni_lib_utf_junit_report@1.0.1.43,ni_lib_junit_results_api@1.0.1.6,ni_lib_simple_xml@1.0.0.4,jki_lib_caraya@1.4.4.148`. Set to `-` to disable the required pre-install. |
 | `VIPM_PUBLIC_REPO_URL` | this repo's clone URL | Public Git repo `origin` used to satisfy Community Edition's public-repo requirement. |
 | `VIPM_ALLOW_MISSING_PACKAGES` | _(unset)_ | Set to `1` only for emergency best-effort builds; otherwise a failed REQUIRED package fails the image build. (Best-effort `ci-tooling*.vipc` add-ons never fail the build regardless.) |
 | `GIT_INSTALLER_URL` | Git for Windows 2.54.0 installer | Full Git for Windows installer used before the MinGit fallback. |

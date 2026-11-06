@@ -205,6 +205,56 @@ def build_substitutions(catalog: dict, owner: str | None, name: str | None,
     return subs
 
 
+def retired_file_rules(catalog: dict, source_root: Path) -> dict[str, list[str]]:
+    """Validate the bounded retirement contract before any installation writes."""
+    retired = catalog.get("retiredFiles", {})
+    rules = {}
+    entries = list(catalog.get("base", {}).get("files", []))
+    entries += list(catalog.get("userConfig", {}).get("files", []))
+    for cap in catalog.get("capabilities", []):
+        for files in cap.get("files", {}).values():
+            entries.extend(files)
+    for rel in retired.get("files", []):
+        if not isinstance(rel, str) or not re.fullmatch(r"\.github/workflows/[A-Za-z0-9_-]+\.ya?ml", rel):
+            raise ValueError(f"unsafe retired workflow path: {rel!r}")
+        if (source_root / rel).exists() or (source_root / rel).is_symlink():
+            raise ValueError(f"retired workflow still exists in source: {rel}")
+        if any(rel == entry or (entry.endswith("/") and rel.startswith(entry)) for entry in entries):
+            raise ValueError(f"retired workflow is still installed or preserved: {rel}")
+        signatures = retired.get("signatures", {}).get(rel)
+        if not isinstance(signatures, list) or not signatures or not all(isinstance(s, str) and s.strip() for s in signatures):
+            raise ValueError(f"retired workflow needs nonempty ownership signatures: {rel}")
+        rules[rel] = signatures
+    return rules
+
+
+def prune_retired_files(rules: dict[str, list[str]], target_root: Path,
+                        dry_run: bool, stats: dict) -> None:
+    """Remove recognized retired workflows, never directories or symlink paths."""
+    target_root = target_root.resolve()
+    for rel, signatures in rules.items():
+        target = target_root / rel
+        if any(part.is_symlink() for part in (target, target.parent, target.parent.parent)):
+            warn(f"skipping symlinked retired workflow: {rel}")
+            continue
+        if not target.is_file():
+            continue
+        try:
+            text = target.read_text(encoding="utf-8")
+            if not all(marker in text for marker in signatures):
+                warn(f"retired workflow has unrecognized content; preserving {rel}")
+                continue
+            if dry_run:
+                stats["planned"] += 1
+                log(f"  would prune     {rel} (retired)")
+            else:
+                target.unlink()
+                stats["pruned"] += 1
+                log(f"  prune (retired) {rel}")
+        except (OSError, UnicodeError) as exc:
+            warn(f"could not prune {rel}: {exc}")
+
+
 def default_activities(catalog: dict) -> list[str]:
     return [
         c["id"] for c in catalog.get("capabilities", [])
@@ -216,7 +266,7 @@ def resolve_activities(catalog: dict, activities: list[str]) -> list[str]:
     """Expand hard capability dependencies, preserving the requested order."""
     by_id = {c["id"]: c for c in catalog.get("capabilities", [])}
     selected: list[str] = []
-    stack = list(activities)
+    stack = ['snapshots' if activity == 'snapshots-2' else activity for activity in activities]
     while stack:
         cid = stack.pop(0)
         if cid in selected:
@@ -336,7 +386,7 @@ def copy_entry(entry: str, source_root: Path, target_root: Path,
         # REMOVED so a vendored directory matches the source exactly. Without this,
         # a file the tooling deletes (e.g. an obsolete Go source) lingers on the
         # consumer and can break the build - duplicate Go declarations broke the
-        # Windows VI Browser 2.0 render after viserver_windows.go was removed. Only
+        # Windows VI Browser render after viserver_windows.go was removed. Only
         # prune real orphans (never a file still in source) and never the consumer's
         # own preserved config files.
         if update:
@@ -406,11 +456,39 @@ def write_manifest(target_root: Path, catalog: dict, activities: list[str], os_l
     ]
     if image_name:
         lines.append(f"  imageName: {image_name}")
+    dst = target_root / ".github" / "labview-ci.yml"
+    previous = dst.read_text(encoding="utf-8").splitlines() if dst.is_file() else []
+    if previous:
+        managed = {"labviewVersion", "branch", "os"}
+        if image_name:
+            managed.add("imageName")
+        in_config = False
+        preserve = False
+        for line in previous:
+            if re.match(r"^config:\s*$", line):
+                in_config = True
+                continue
+            if not in_config:
+                continue
+            if line and not line[0].isspace() and not line.startswith("#"):
+                break
+            key = re.match(r"^  ([A-Za-z0-9_-]+):", line)
+            if key:
+                preserve = key.group(1) not in managed
+            if preserve:
+                lines.append(line)
     lines.append("activities:")
     for a in activities:
         lines.append(f"  - {a}")
+    in_tests = False
+    for line in previous:
+        if re.match(r"^unitTests:\s*$", line):
+            in_tests = True
+        elif in_tests and line and not line[0].isspace() and not line.startswith("#"):
+            in_tests = False
+        if in_tests:
+            lines.append(line)
     content = "\n".join(lines) + "\n"
-    dst = target_root / ".github" / "labview-ci.yml"
     if dry_run:
         log(f"  would write     .github/labview-ci.yml")
         return
@@ -1067,6 +1145,14 @@ def main() -> int:
             log("")
         return 0
 
+    source_markers = (".github/labview-ci/source.json", ".github/labview/promote-release.py")
+    if source_root == target_root or any((target_root / marker).exists() for marker in source_markers):
+        die("refusing to install into the tooling source repository or a source checkout/fork; use a separate client repository")
+    try:
+        retired_rules = retired_file_rules(catalog, source_root)
+    except ValueError as exc:
+        die(str(exc))
+
     defaults = catalog.get("defaults", {})
 
     # In --update mode, recover the previous selection from the target's manifest so
@@ -1125,9 +1211,6 @@ def main() -> int:
     else:
         write_root_ci = False
 
-    if source_root == target_root:
-        warn("source and target are the same directory (installing into the tooling repo itself).")
-
     owner, name = detect_target_repo(target_root, args.repo)
     subs = build_substitutions(catalog, owner, name, provider)
     # Vendored workflows carry a static `branches: [main]` push-trigger filter that
@@ -1152,8 +1235,11 @@ def main() -> int:
     log("")
 
     if args.thin:
-        return thin_install(catalog, target_root, owner, name, activities, os_list,
-                            labview_version, branch, args.dry_run)
+        result = thin_install(catalog, target_root, owner, name, activities, os_list,
+                              labview_version, branch, args.dry_run)
+        if result == 0:
+            prune_retired_files(retired_rules, target_root, args.dry_run, {"planned": 0, "pruned": 0})
+        return result
 
     file_list = resolve_file_list(catalog, activities, os_list)
     if provider == "gitlab":
@@ -1163,6 +1249,8 @@ def main() -> int:
     for entry in file_list:
         copy_entry(entry, source_root, target_root, subs, force, args.dry_run, stats,
                    preserve, update, stamp_version)
+
+    prune_retired_files(retired_rules, target_root, args.dry_run, stats)
 
     # The dashboard generator (actions/dashboard) is a local path that only exists
     # in the tooling repo and can't be rebranded into a consumer, so the vendored
@@ -1201,7 +1289,8 @@ def main() -> int:
         add_paths = ".github .gitlab .gitlab-ci.yml" if provider == "gitlab" else ".github"
         log(f"  2. Commit the update:    git add {add_paths} && git commit -m \"Update LabVIEW CI\" && git push")
         return 0
-    log(f"Installed {stats['installed']} file(s); {stats['skipped']} skipped (already present).")
+    pruned = f"; {stats['pruned']} retired file(s) removed" if stats["pruned"] else ""
+    log(f"Installed {stats['installed']} file(s); {stats['skipped']} skipped (already present){pruned}.")
     if stats["skipped"]:
         log("Use --force to overwrite skipped files.")
     if provider == "gitlab":

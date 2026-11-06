@@ -85,6 +85,19 @@ activities:
   - masscompile
   - vi-analyzer
   - vidiff
+  # - unit-tests
+
+# Unit tests (read when the unit-tests activity is installed). The Unit Testing
+# page writes this block. LUnit runs on Windows and Linux.
+# unitTests:
+#   tools:
+#     lunit:
+#       enabled: true
+#       locations:
+#         - "tests/"     # a directory, a glob, or a file extension; empty = whole repo
+#       # Optional override, same tokens on both platforms ({cli} {lv} {dir} {out} {ver}).
+#       # Keep -Headless last: on Linux, LabVIEWCLI ignores any argument after it.
+#       # command: '"{cli}" -LogToConsole TRUE -OperationName LUnit -Path "{dir}" -ReportPath "{out}" -LabVIEWPath "{lv}" -Headless'
 
 # ----------------------------------------------------------------------------
 # GitHub Actions variables the GitHub workflows honor at runtime (set with

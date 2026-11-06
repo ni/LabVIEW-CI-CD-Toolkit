@@ -1,5 +1,5 @@
 name: VI Snapshots and VI Browser
-run-name: VI Snapshots and Browser - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'backfill' && 'backfill' || github.sha }}
+run-name: VI Snapshots and Browser - ${{ inputs.shas || (github.event_name == 'workflow_dispatch' && inputs.mode == 'backfill' && 'backfill') || github.sha }}
 
 on:
   # Auto-runs only on real LabVIEW source changes — never on the tooling files an
@@ -29,6 +29,10 @@ on:
         description: "backfill: cap to most recent N VI-touching commits (0 = all)"
         required: false
         default: '0'
+      shas:
+        description: "Exact space-separated revision SHAs to render; blank uses mode/max_commits"
+        required: false
+        default: ''
       max_vis:
         description: "smoke test: cap NEW VIs rendered per commit (0 = all)"
         required: false
@@ -64,7 +68,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0   # full history: backfill + per-commit worktrees
 
@@ -72,7 +76,7 @@ jobs:
       # whose content (git blob) has already been captured. Sparse-checkout keeps
       # this cheap — we only need the by-blob file listing.
       - name: Checkout deployed gallery (gh-pages) for incremental seeding
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         continue-on-error: true
         with:
           ref: gh-pages
@@ -141,31 +145,37 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNAPSHOT_SHAS: ${{ inputs.shas || github.sha }}
         run: |
-          curl -s -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"VI Snapshots in progress\",\"context\":\"CI / VI Snapshots\"}"
+          for sha in $SNAPSHOT_SHAS; do
+            curl -s -X POST \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/statuses/$sha" \
+              -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"VI Snapshots in progress\",\"context\":\"CI / VI Snapshots\"}"
+          done
 
-      - name: Resolve VI Browser 2.0 (Windows) setting from config
+      - name: Resolve VI Snapshots (Windows) setting from config
         id: vbcfg
         shell: bash
         run: |
-          # config.viBrowser.positionAware in .github/labview-ci.yml decides whether
-          # this Windows run also emits the position-aware VI Browser 2.0 frames JSON
+          # config.viBrowser.platforms in .github/labview-ci.yml decides whether
+          # this Windows run also emits the position-aware VI Snapshots frames JSON
           # (the PrintToImagesJson op). Default (no config) = emit, preserving prior
           # behaviour. The VI Browser tab on the Configure page writes this setting.
           emit=true
           cfg=.github/labview-ci.yml
           if [ -f "$cfg" ]; then
-            pa=$(sed -n 's/^[[:space:]]*positionAware:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+            pa=$(sed -n 's/^[[:space:]]*platforms:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+            [ -n "$pa" ] || pa=$(sed -n 's/^[[:space:]]*positionAware:[[:space:]]*//p' "$cfg" | head -1 | tr -d '[:space:]')
+            [ "$pa" != "none" ] || pa=""
+            [ -n "$pa" ] || pa=$(sed -n 's/^[[:space:]]*os:[[:space:]]*\[\([^]]*\)\].*/\1/p' "$cfg" | head -1 | tr -d '[:space:]' | tr \, +)
             if [ -n "$pa" ]; then
               if printf '%s' "$pa" | tr '+' '\n' | grep -qx 'windows'; then emit=true; else emit=false; fi
             fi
           fi
           echo "emit_frames_json=$emit" >> "$GITHUB_OUTPUT"
-          echo "VI Browser 2.0 frames JSON on Windows: $emit"
+          echo "VI Snapshots frames JSON on Windows: $emit"
 
       - name: Wait for worker image build
         shell: bash
@@ -174,14 +184,22 @@ jobs:
         run: |
           bash .github/labview/wait-for-worker-image.sh "${{ github.sha }}" "${{ github.event.before }}"
 
+      - name: Set up the snapshot render toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .github/labview/toimages/go.mod
+
       - name: Build VI snapshots (incremental, content-addressed)
         id: snapshots
         shell: powershell
+        env:
+          SNAPSHOT_SHAS: ${{ inputs.shas }}
         run: |
           & .github\labview\build-snapshots.ps1 `
             -Mode              '${{ github.event.inputs.mode || 'head' }}' `
             -WorkspaceRoot     '${{ github.workspace }}' `
             -TargetSha         '${{ github.sha }}' `
+            -Shas              "$Env:SNAPSHOT_SHAS" `
             -OutDir            '${{ github.workspace }}\ci-out\vi-snapshots' `
             -ExistingByBlobDir '${{ github.workspace }}\_pages\vi-snapshots\by-blob' `
             -Image             "$Env:LABVIEW_CONTAINER_IMAGE" `
@@ -214,6 +232,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNAPSHOT_SHAS: ${{ inputs.shas || github.sha }}
         run: |
           REPORT_URL="${{ env.PAGES_URL }}/vi-snapshots/index.html"
           if [ "${{ steps.snapshots.outcome }}" = "success" ] && [ "${{ steps.verify.outputs.ok }}" = "true" ]; then
@@ -221,14 +240,14 @@ jobs:
           else
             STATE="failure"
           fi
-          curl -s -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -d "{\"state\":\"$STATE\",\"target_url\":\"$REPORT_URL\",\"description\":\"VI Snapshots $STATE\",\"context\":\"CI / VI Snapshots\"}"
+          for sha in $SNAPSHOT_SHAS; do
+            curl -s -X POST \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/statuses/$sha" \
+              -d "{\"state\":\"$STATE\",\"target_url\":\"$REPORT_URL\",\"description\":\"VI Snapshots $STATE\",\"context\":\"CI / VI Snapshots\"}"
+          done
 
       - name: Fail job if snapshots failed
         if: steps.snapshots.outcome != 'success' || steps.verify.outputs.ok != 'true'
         run: exit 1
-
-

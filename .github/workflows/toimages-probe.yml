@@ -4,7 +4,7 @@ run-name: toimages COM probe - ${{ github.event_name == 'workflow_dispatch' && '
 # Diagnostic ONLY (workflow_dispatch). Confirms whether the vendored
 # toimages\Convert.vi can be driven via LabVIEW's ActiveX/COM server inside the
 # stock NI LabVIEW Windows container to emit the position-aware frames JSON that
-# powers VI Browser 2.0. Touches nothing in production: it renders a few example
+# powers VI Browser. Touches nothing in production: it renders a few example
 # VIs to JSON and prints the result to the log (and uploads it as an artifact).
 
 on:
@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Ensure Docker daemon is running
         shell: powershell
@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload probe JSON
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: toimages-probe-out
           path: _probe-out/

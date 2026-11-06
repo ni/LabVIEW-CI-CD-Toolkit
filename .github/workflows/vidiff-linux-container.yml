@@ -77,14 +77,14 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"VIDiff in progress\",\"context\":\"CI / VIDiff (linux)\"}"
 
       - name: Checkout head commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.shas.outputs.head }}
           fetch-depth: 0
           path: head
 
       - name: Checkout base commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.shas.outputs.base }}
           path: base
@@ -99,41 +99,27 @@ jobs:
       - name: Resolve Linux container image name
         working-directory: head
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_OVERRIDE: ${{ vars.LABVIEW_IMAGE_NAME }}
           ACTION_ID: vidiff
         run: |
-          selected=$(python3 - <<'PY'
-          import os, pathlib, re
-          action_id = os.environ.get('ACTION_ID', '')
-          cfg = pathlib.Path('.github/labview-ci.yml')
-          use = ''
-          actions = {}
-          if cfg.exists():
-              section = ''
-              for line in cfg.read_text(encoding='utf-8').splitlines():
-                  if re.match(r'^\s*container:\s*$', line): section = 'container'; continue
-                  if section == 'container':
-                      match = re.match(r'^\s{4}use:\s*"?([^"#]+)"?', line)
-                      if match: use = match.group(1).strip()
-                      if re.match(r'^\s{4}actions:\s*$', line): section = 'actions'; continue
-                  elif section == 'actions':
-                      match = re.match(r'^\s{6}([A-Za-z0-9_.-]+):\s*"?([^"#]+)"?', line)
-                      if match: actions[match.group(1)] = match.group(2).strip()
-                      if re.match(r'^\s{0,4}\S', line): section = 'container'
-          print(actions.get(action_id) or use or '')
-          PY
-          )
+          python3 -m pip install --quiet PyYAML==6.0.3 tomli==2.4.0
+          selected=$(python3 .github/labview/lvpm/worker.py resolve \
+            --repo . --action "$ACTION_ID" --repository "$GITHUB_REPOSITORY" --image-name "$IMAGE_OVERRIDE")
           owner=$(printf '%s' "${GITHUB_REPOSITORY%%/*}" | tr '[:upper:]' '[:lower:]')
           name="${IMAGE_OVERRIDE:-${GITHUB_REPOSITORY##*/}-labview}"
           name=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
+          verified_lvpm=false
           case "$selected" in
             ''|latest) image="ghcr.io/${owner}/${name}:linux-latest"; worker_workflow="Build LabVIEW CI Image - Linux" ;;
             base|none) image="nationalinstruments/labview:latest-linux"; worker_workflow="" ;;
+            linux-lvpm-*@sha256:*) image="ghcr.io/${owner}/${name}:${selected}"; worker_workflow=""; verified_lvpm=true ;;
             linux-*) image="ghcr.io/${owner}/${name}:${selected}"; worker_workflow="Build LabVIEW CI Image - Linux" ;;
             *) image="ghcr.io/${owner}/${name}:linux-${selected}"; worker_workflow="Build LabVIEW CI Image - Linux" ;;
           esac
           echo "LABVIEW_CONTAINER_IMAGE=$image" >> "$GITHUB_ENV"
           echo "LINUX_WORKER_WORKFLOW=$worker_workflow" >> "$GITHUB_ENV"
+          echo "LVCI_VERIFIED_LVPM=$verified_lvpm" >> "$GITHUB_ENV"
           echo "Using Linux container image: $image"
 
       - name: Wait for Linux worker image build
@@ -143,6 +129,10 @@ jobs:
         run: |
           if [ "$LABVIEW_CONTAINER_IMAGE" = "nationalinstruments/labview:latest-linux" ]; then
             echo "Using the NI Linux base image; no Linux worker build to wait for."
+            exit 0
+          fi
+          if [ "$LVCI_VERIFIED_LVPM" = "true" ]; then
+            echo "Using a verified immutable LVPM candidate; no VIPM build to wait for."
             exit 0
           fi
           bash .github/labview/wait-for-worker-image.sh "${{ steps.shas.outputs.head }}" "${{ github.event.before }}" "$LINUX_WORKER_WORKFLOW"
@@ -207,7 +197,7 @@ jobs:
           JSON
 
       - name: Upload VIDiff report artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: vidiff-linux-${{ steps.shas.outputs.head }}
           path: |

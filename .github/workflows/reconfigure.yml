@@ -35,6 +35,10 @@ on:
         description: 'Container image tag CI activities use (e.g. latest, win-<hash>, 2026; blank = keep current)'
         required: false
         default: ''
+      linux_worker:
+        description: 'Linux LVPM worker tag@sha256:digest (blank = keep; reset = remove Linux default only)'
+        required: false
+        default: ''
       container_vipc:
         description: 'Monitored VIPC files as path::platforms pairs separated by ; (platforms joined by +, e.g. windows+linux, or "none"; legacy true/false accepted; blank = keep current)'
         required: false
@@ -52,7 +56,7 @@ on:
         required: false
         default: ''
       vi_browser:
-        description: 'VI Browser render matrix as classic::<oses>;positionAware::<oses> (oses joined by +, e.g. positionAware::windows+linux; "none" to disable a generation; blank = keep current)'
+        description: 'Snapshot render platforms, e.g. platforms::windows+linux (blank = keep current)'
         required: false
         default: ''
       action_os:
@@ -87,8 +91,10 @@ on:
         default: ''
 
 permissions:
+  actions: read
   contents: write
   pull-requests: write
+  packages: read
 
 concurrency:
   group: labview-ci-reconfigure
@@ -99,12 +105,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.linux_worker != '' && github.event.repository.default_branch || github.ref }}
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
+
+      - name: Install configuration parser
+        run: python3 -m pip install PyYAML==6.0.3
+
+      - name: Verify Linux LVPM candidate before changing configuration
+        if: inputs.linux_worker != '' && inputs.linux_worker != 'reset'
+        env:
+          IN_LINUX_WORKER: ${{ inputs.linux_worker }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LABVIEW_IMAGE_NAME: ${{ vars.LABVIEW_IMAGE_NAME }}
+        run: |
+          if [ -f .github/workflows/release.yml ] && [ -f .github/labview-ci/catalog.json ]; then
+            echo 'LVPM client activation is blocked in the tooling source repository and its forks.' >&2
+            exit 1
+          fi
+          python3 .github/labview/lvpm/worker.py verify --repo . --candidate "$IN_LINUX_WORKER" --repository "$GITHUB_REPOSITORY" --image-name "${LABVIEW_IMAGE_NAME:-}"
 
       - name: Apply settings to config files
         env:
@@ -114,6 +138,7 @@ jobs:
           IN_RUNNERS: ${{ inputs.concurrent_runners }}
           IN_ACTS: ${{ inputs.activities }}
           IN_CONTAINER_USE: ${{ inputs.container_use }}
+          IN_LINUX_WORKER: ${{ inputs.linux_worker }}
           IN_CONTAINER_VIPC: ${{ inputs.container_vipc }}
           IN_CONTAINER_DRAGON: ${{ inputs.container_dragon }}
           IN_CONTAINER_ACTIONS: ${{ inputs.container_actions }}
@@ -128,7 +153,74 @@ jobs:
           IN_UNIT_TESTS: ${{ inputs.unit_tests }}
         run: |
           python3 - <<'PY'
-          import os, re, json, datetime, pathlib
+          import copy, os, re, json, datetime, pathlib, yaml
+
+          class ManifestDumper(yaml.SafeDumper):
+              def increase_indent(self, flow=False, indentless=False):
+                  return super().increase_indent(flow, False)
+
+              def choose_scalar_style(self):
+                  style = super().choose_scalar_style()
+                  return '"' if style == "'" else style
+
+              def represent_mapping(self, tag, mapping, flow_style=None):
+                  order = ()
+                  if isinstance(mapping, dict):
+                      if 'path' in mapping:
+                          order = ('path', 'monitor', 'monitorOn')
+                      elif 'config' in mapping and 'paths' in mapping:
+                          order = ('config', 'paths')
+                      elif any(key in mapping for key in ('use', 'linuxUse', 'vipc', 'dragon', 'actions')):
+                          order = ('use', 'linuxUse', 'vipc', 'dragon', 'actions')
+                      elif 'container' in mapping or 'labviewVersion' in mapping:
+                          order = ('labviewVersion', 'os', 'concurrency', 'container')
+                  if order:
+                      mapping = {**{key: mapping[key] for key in order if key in mapping},
+                                 **{key: value for key, value in mapping.items() if key not in order}}
+                  node = super().represent_mapping(tag, mapping, flow_style)
+                  for key_node, value_node in node.value:
+                      if key_node.value == 'os' and isinstance(value_node, yaml.SequenceNode):
+                          value_node.flow_style = True
+                  return node
+
+          def reconfigure_pr_title(before, after):
+              def value(document, path):
+                  for key in path:
+                      if not isinstance(document, dict):
+                          return None
+                      document = document.get(key)
+                  return document
+
+              linux_path = ('config', 'container', 'linuxUse')
+              linux_changed = value(before, linux_path) != value(after, linux_path)
+              fields = [
+                  (('config', 'labviewVersion'), 'LabVIEW version'),
+                  (('config', 'os'), 'operating systems'),
+                  (('config', 'concurrency'), 'runner concurrency'),
+                  (('config', 'container', 'use'), 'default worker selection'),
+                  (('config', 'container', 'vipc'), 'VIPC dependency monitoring'),
+                  (('config', 'container', 'dragon'), 'Dragon dependency monitoring'),
+                  (('config', 'container', 'actions'), 'per-activity workers'),
+                  (('config', 'dependencyPolicy'), 'dependency policies'),
+                  (('config', 'viAnalyzer'), 'VI Analyzer rules'),
+                  (('config', 'builds'), 'build specifications'),
+                  (('config', 'viBrowser'), 'VI snapshot platforms'),
+                  (('config', 'triggers'), 'activity triggers'),
+                  (('config', 'actionOs'), 'activity platforms'),
+                  (('unitTests',), 'unit-test settings'),
+                  (('activities',), 'enabled activities'),
+              ]
+              changes = [label for path, label in fields if value(before, path) != value(after, path)]
+              if linux_changed:
+                  title = ('Activate digest-pinned Linux LVPM worker' if value(after, linux_path)
+                           else 'Reset Linux worker to the existing default selection')
+                  if changes:
+                      title += '; update ' + ', '.join(changes[:2])
+              else:
+                  title = 'Update ' + ', '.join(changes[:3]) if changes else 'Update committed VIPC package selections'
+              if len(changes) > (2 if linux_changed else 3):
+                  title += ' and other settings'
+              return title
 
           ver_in  = os.environ['IN_VERSION'].strip()
           oss     = os.environ['IN_OS'].strip()
@@ -136,6 +228,9 @@ jobs:
           runners = os.environ['IN_RUNNERS'].strip()
           acts_in = os.environ['IN_ACTS'].strip()
           container_use_in = os.environ.get('IN_CONTAINER_USE', '').strip()
+          linux_worker_in = os.environ.get('IN_LINUX_WORKER', '')
+          if linux_worker_in and linux_worker_in != 'reset' and not re.fullmatch(r'linux-lvpm-[a-f0-9]{64}@sha256:[a-f0-9]{64}', linux_worker_in):
+              raise ValueError('linux_worker must be an exact LVPM tag@sha256:digest or reset')
           container_vipc_in = os.environ.get('IN_CONTAINER_VIPC', '').strip()
           container_dragon_in = os.environ.get('IN_CONTAINER_DRAGON', '').strip()
           container_actions_in = os.environ.get('IN_CONTAINER_ACTIONS', '').strip()
@@ -151,8 +246,14 @@ jobs:
 
           # Preserve provenance fields from any existing manifest.
           mpath = pathlib.Path('.github/labview-ci.yml')
+          original_text = mpath.read_text(encoding='utf-8') if mpath.exists() else None
+          original = yaml.safe_load(original_text) if original_text is not None else None
+          if original_text is not None and not isinstance(original, dict):
+              raise ValueError('The existing manifest must be a mapping')
+          if original is not None and not isinstance(original.get('config', {}), dict):
+              raise ValueError('config must be a mapping')
           prev = {'activities': [], 'installedVersion': '', 'repo': '', 'ref': 'main',
-                  'container_use': '', 'vipc': [], 'dragon': [], 'actions': {}, 'triggers': {}, 'viBrowser': {}, 'actionOs': {}, 'dependencyPolicy': {}, 'unitTests_block': [],
+                  'container_use': '', 'linuxUse': '', 'vipc': [], 'dragon': [], 'actions': {}, 'triggers': {}, 'viBrowser': {}, 'actionOs': {}, 'dependencyPolicy': {}, 'unitTests_block': [],
                   'labviewVersion': '', 'os': [], 'maxParallel': None}
           if mpath.exists():
               in_acts = False; in_container = False; in_vipc = False; in_actions = False; in_triggers = False; in_vibrowser = False; in_action_os = False; in_dep_policy = False; in_ut = False; cur_vipc = None
@@ -185,7 +286,7 @@ jobs:
                       if m: prev['triggers'][m.group(1)] = m.group(2); continue
                       if re.match(r'^\s{0,3}\S', line): in_triggers = False
                   if in_vibrowser:
-                      m = re.match(r'^\s{4}(classic|positionAware):\s*(\S+)', line)
+                      m = re.match(r'^\s{4}(classic|positionAware|platforms):\s*(\S+)', line)
                       if m: prev['viBrowser'][m.group(1)] = m.group(2); continue
                       if re.match(r'^\s{0,3}\S', line): in_vibrowser = False
                   if in_action_os:
@@ -197,6 +298,8 @@ jobs:
                       if m: prev['dependencyPolicy'][m.group(1)] = m.group(2); continue
                       if re.match(r'^\s{0,3}\S', line): in_dep_policy = False
                   if in_container:
+                      m = re.match(r'^\s{4}linuxUse:\s*["\']?([^"\'\s]+)', line)
+                      if m: prev['linuxUse'] = m.group(1); in_vipc = False; in_actions = False; continue
                       m = re.match(r'^\s{4}use:\s*"?([^"\s]+)"?', line)
                       if m: prev['container_use'] = m.group(1); in_vipc = False; in_actions = False; continue
                       if re.match(r'^\s{4}vipc:\s*$', line): in_vipc = True; in_actions = False; continue
@@ -260,6 +363,7 @@ jobs:
               else (['windows', 'linux'] if oss == 'both' else [oss])
           acts = [a.strip() for a in acts_in.split(',') if a.strip()] \
               or prev['activities'] or ['dashboard', 'masscompile', 'vi-analyzer', 'vidiff']
+          acts = list(dict.fromkeys('snapshots' if a == 'snapshots-2' else a for a in acts))
           now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
           max_parallel = int(runners) if runners.isdigit() and int(runners) > 0 else (prev.get('maxParallel') or 5)
 
@@ -340,6 +444,9 @@ jobs:
                   if k and v: out[k] = v
               return out
           vi_browser = _parse_vibrowser(vi_browser_in) if vi_browser_in else prev['viBrowser']
+          snapshot_platforms = vi_browser.get('platforms', vi_browser.get('positionAware', 'windows'))
+          if snapshot_platforms in ('none', ''): snapshot_platforms = 'windows'
+          vi_browser = {'platforms': snapshot_platforms}
 
           # Per-action platforms (config.actionOs): same id::oses;.. shape as the
           # VI Browser matrix. Explicit input wins; blank keeps the manifest's.
@@ -464,7 +571,12 @@ jobs:
               f'    maxParallel: {max_parallel}',
           ]
           lines += ['  container:', f'    use: {container_use}']
-          if vipc:
+          linux_worker = '' if linux_worker_in == 'reset' else linux_worker_in or prev['linuxUse']
+          if linux_worker:
+              lines.append('    linuxUse: ' + json.dumps(linux_worker))
+          if container_vipc_in.lower() == 'none':
+              lines.append('    vipc: []')
+          elif vipc:
               lines.append('    vipc:')
               for v in vipc:
                   p = str(v['path']).replace('"', '')
@@ -473,7 +585,9 @@ jobs:
                   lines.append(f"        monitor: {'true' if on else 'false'}")
                   if on and set(on) != set(ALL_MON_PLATFORMS):
                       lines.append(f"        monitorOn: {'+'.join(on)}")
-          if dragon:
+          if container_dragon_in.lower() == 'none':
+              lines.append('    dragon: []')
+          elif dragon:
               lines.append('    dragon:')
               for v in dragon:
                   p = str(v['path']).replace('"', '')
@@ -488,7 +602,7 @@ jobs:
                   lines.append(f'      {_id}: {container_actions[_id]}')
           if vi_browser:
               lines.append('  viBrowser:')
-              for _k in ('classic', 'positionAware'):
+              for _k in ('platforms',):
                   if _k in vi_browser:
                       lines.append(f'    {_k}: {vi_browser[_k]}')
           if via_default and (via_default != 'builtin' or via_rules):
@@ -567,6 +681,11 @@ jobs:
                   locs = [str(x).strip() for x in raw_locs if str(x).strip()]
                   out.append(f'    {key}:')
                   out.append(f"      enabled: {'true' if enabled else 'false'}")
+                  command = cfg.get('command')
+                  if command:
+                      if not isinstance(command, str) or '\n' in command or '\r' in command:
+                          raise ValueError(f'command for {key} must be a single-line string')
+                      out.append('      command: ' + json.dumps(command))
                   if locs:
                       out.append('      locations:')
                       for loc in locs:
@@ -577,8 +696,68 @@ jobs:
           unit_tests_block = _unit_tests_block_from_json(unit_tests_in) if unit_tests_in else prev.get('unitTests_block')
           if unit_tests_block:
               lines += unit_tests_block + ['']
+          rendered = '\n'.join(lines)
+          if original is not None:
+              proposed = yaml.safe_load(rendered)
+              updated = copy.deepcopy(original)
+              missing = object()
+
+              def proposed_value(path):
+                  value = proposed
+                  for key in path:
+                      if not isinstance(value, dict) or key not in value:
+                          return missing
+                      value = value[key]
+                  return value
+
+              def update_path(path, value):
+                  target = updated
+                  for key in path[:-1]:
+                      if key not in target:
+                          if value is missing:
+                              return
+                          target[key] = {}
+                      if not isinstance(target[key], dict):
+                          raise ValueError('.'.join(path[:-1]) + ' must be a mapping')
+                      target[key] = copy.deepcopy(target[key])
+                      target = target[key]
+                  if value is missing:
+                      target.pop(path[-1], None)
+                  else:
+                      target[path[-1]] = value
+
+              fields = [
+                  (ver_in, ('config', 'labviewVersion')),
+                  (oss if oss != 'keep' else '', ('config', 'os')),
+                  (runners, ('config', 'concurrency', 'maxParallel')),
+                  (acts_in, ('activities',)),
+                  (container_use_in, ('config', 'container', 'use')),
+                  (linux_worker_in, ('config', 'container', 'linuxUse')),
+                  (container_vipc_in, ('config', 'container', 'vipc')),
+                  (container_dragon_in, ('config', 'container', 'dragon')),
+                  (container_actions_in, ('config', 'container', 'actions')),
+                  (action_triggers_in, ('config', 'triggers')),
+                  (vi_browser_in, ('config', 'viBrowser')),
+                  (action_os_in, ('config', 'actionOs')),
+                  (via_default_in, ('config', 'viAnalyzer', 'default')),
+                  (via_default_in or via_rules_in, ('config', 'viAnalyzer', 'rules')),
+                  (builds_in, ('config', 'builds')),
+                  (unit_tests_in, ('unitTests',)),
+              ]
+              for requested, path in fields:
+                  if requested:
+                      update_path(path, proposed_value(path))
+              for requested, key, value in ((require_deps_in, 'requireInstalled', require_installed),
+                                            (auto_install_in, 'autoInstall', auto_install)):
+                  if requested not in ('', 'keep'):
+                      update_path(('config', 'dependencyPolicy', key), value)
+              if updated != original:
+                  updated['configuredAt'] = now
+                  rendered = yaml.dump(updated, Dumper=ManifestDumper, sort_keys=False, allow_unicode=True, width=2**31 - 1)
+              else:
+                  rendered = original_text
           mpath.parent.mkdir(parents=True, exist_ok=True)
-          mpath.write_text('\n'.join(lines), encoding='utf-8')
+          mpath.write_text(rendered, encoding='utf-8')
           print('Wrote', mpath)
 
           # Hand the resolved LabVIEW version to the VIPC-regen step (the input may
@@ -586,6 +765,7 @@ jobs:
           if os.environ.get('GITHUB_ENV'):
               with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as _f:
                   _f.write(f'RESOLVED_LV={ver}\n')
+                  _f.write('RECONFIGURE_PR_TITLE=' + reconfigure_pr_title(original or {}, yaml.safe_load(rendered)) + '\n')
 
           # Antidoc dependencies are now owned by committed
           # .github/labview/antidoc/antidoc.vipc (VIPC-first). Keep this input
@@ -611,6 +791,7 @@ jobs:
       - name: Open pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RECONFIGURE_BASE: ${{ inputs.linux_worker != '' && github.event.repository.default_branch || github.ref_name }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -630,11 +811,23 @@ jobs:
           git push -u origin "$BRANCH"
 
           gh pr create \
-            --title "Reconfigure LabVIEW CI" \
-            --base "${{ github.ref_name }}" \
+            --title "$RECONFIGURE_PR_TITLE" \
+            --base "$RECONFIGURE_BASE" \
             --head "$BRANCH" \
             --body "$(cat <<'BODY'
-          Automated settings change via the **Reconfigure** workflow.
+          ## Features and fixes
+
+          Updates the client settings named in the pull request title. The table below lists requested inputs;
+          blank or keep values preserve existing settings. Review the actual configuration diff.
+
+          ## Release impact
+
+          Client configuration only: **no toolkit release from this PR; containing version unassigned**.
+          This does not install a new tooling version or deliver additional toolkit fixes.
+          Settings take effect after merge where supported; dependency/version changes may require an
+          explicit image build. No release-channel promotion or automatic LVPM build is requested.
+
+          ## Requested settings
 
           | Setting | Value |
           |---|---|

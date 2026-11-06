@@ -1,0 +1,78 @@
+lvci:unit-tests-linux:
+  extends: .lvci:linux-docker
+  stage: verify
+  needs:
+    - job: lvci:worker-linux
+      optional: true
+      artifacts: false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: manual
+      allow_failure: true
+    - changes:
+        - "**/*.vi"
+        - "**/*.ctl"
+        - "**/*.lvproj"
+        - "**/*.lvlib"
+        - "**/*.lvclass"
+        - "**/*.lvtest"
+  script:
+    - |
+      set +e
+      report_dir="ci-out/unit-tests"
+      results_dir="$report_dir/results"
+      mkdir -p "$results_dir"
+      if [ -n "${LVCI_LINUX_IMAGE:-}" ]; then
+        image="$LVCI_LINUX_IMAGE"
+      elif [ "${LVCI_USE_CUSTOM_IMAGE:-false}" = "true" ]; then
+        image="${CI_REGISTRY_IMAGE}/labview:linux-latest"
+      else
+        image="nationalinstruments/labview:latest-linux"
+      fi
+      case "$image" in "${CI_REGISTRY_IMAGE}"/*)
+        echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" --username "$CI_REGISTRY_USER" --password-stdin
+      ;; esac
+      docker pull "$image"
+      pull_exit=$?
+      run_exit=1
+      if [ "$pull_exit" -eq 0 ]; then
+        docker run --rm \
+          -e "GITHUB_REPOSITORY=$CI_PROJECT_PATH" \
+          -e "GITHUB_SHA=$CI_COMMIT_SHA" \
+          -e "LABVIEW_VERSION=${LVCI_LABVIEW_VERSION:-2026}" \
+          -v "$CI_PROJECT_DIR:/workspace" \
+          "$image" \
+          bash /workspace/.github/labview/run-unit-tests.sh /workspace "/workspace/$results_dir"
+        run_exit=$?
+      else
+        printf 'Could not pull LabVIEW image %s\n' "$image" > "$results_dir/runner-error.txt"
+      fi
+      python3 .github/labview/build-unittest-report.py \
+        --results "$results_dir" \
+        --out "$report_dir" \
+        --workspace "$CI_PROJECT_DIR" \
+        --sha "$CI_COMMIT_SHA" \
+        --platform linux \
+        --repo "$CI_PROJECT_PATH" \
+        --pages-url "$CI_PAGES_URL" \
+        --labview-version "${LVCI_LABVIEW_VERSION:-}" \
+        --commit-msg "$(git log -1 --pretty=%s "$CI_COMMIT_SHA")" \
+        --author "$(git log -1 --pretty=%an "$CI_COMMIT_SHA")" \
+        --date "$(git log -1 --pretty=%cI "$CI_COMMIT_SHA")"
+      report_exit=$?
+      python3 .gitlab/labview-ci/scripts/stage-report.py \
+        --source "$report_dir" \
+        --destination "unit-tests/$CI_COMMIT_SHA/linux" \
+        --fallback "Unit tests (Linux) did not produce a report. See the GitLab job log."
+      stage_exit=$?
+      [ "$run_exit" -eq 0 ] && [ "$report_exit" -eq 0 ] && [ "$stage_exit" -eq 0 ] || exit 1
+      python3 -c 'import json,sys; s=json.load(open(sys.argv[1]))["summary"]; sys.exit(0 if s["status"] == "passed" else 1)' "$report_dir/results.json"
+  artifacts:
+    when: always
+    expire_in: 30 days
+    reports:
+      junit: ci-out/unit-tests/results/*.xml
+    paths:
+      - ci-out/unit-tests/
+      - ci-out/gitlab-pages/unit-tests/$CI_COMMIT_SHA/linux/

@@ -17,6 +17,5 @@ activities:
   - vi-analyzer
   - vidiff
   - snapshots
-  - snapshots-2
   - unit-tests
   - sbom

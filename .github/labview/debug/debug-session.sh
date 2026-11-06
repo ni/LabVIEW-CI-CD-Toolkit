@@ -24,7 +24,7 @@ OPEN_PROJECT="${OPEN_PROJECT:-}"
 log() { echo "[lvci-debug] $*"; }
 
 # --- 1. Install the desktop + VNC tooling (best-effort) ----------------------
-# The worker image ships Xvfb (for headless 2.0 renders) but not a window manager
+# The worker image ships Xvfb (for headless snapshot renders) but not a window manager
 # or VNC bridge, so add them on demand. Only debug sessions pay this cost.
 if ! command -v x11vnc >/dev/null 2>&1 || ! command -v websockify >/dev/null 2>&1; then
   log "Installing desktop + VNC tools (fluxbox, x11vnc, novnc, websockify, xterm)..."
@@ -129,7 +129,7 @@ show_menu() {
   echo "   3) Build all binaries"
   echo "   4) VIDiff                       (run from the LabVIEW UI)"
   echo "   5) VI Analyzer                  (run from the LabVIEW UI)"
-  echo "   6) VI Browser 2.0 snapshots     (run from the LabVIEW UI)"
+  echo "   6) VI Browser snapshots     (run from the LabVIEW UI)"
   echo "   7) Unit tests                   (run from the LabVIEW UI)"
   echo
   echo "   q) Quit this menu (keep the desktop until the session ends)"

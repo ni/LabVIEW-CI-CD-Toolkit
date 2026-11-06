@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "4.18.4",
+  "version": "5.0.0",
   "stableVersion": "4.16.3",
   "betaVersion": "4.11.10",
   "name": "LabVIEW CI",
@@ -13,6 +13,20 @@
   "history": {
     "comment": "Release notes for the tooling, newest first. `version` (above) is the CURRENT published release and MUST equal releases[0].version. The dashboard version badge and the What's New dialog read these notes to tell a consumer what changed between the version they run and the latest this source repo publishes. Each published version should also be tagged v<version> in this repo so consumers can pin an update to a specific release. `stableVersion` (top level, optional) names the newest release the maintainer has promoted to the stable channel, and each such release entry is flagged \"stable\": true; installs and upgrades default to the stable channel and fall back to `version` (the beta tip) only while no stable release has been promoted yet. `betaVersion` is the same pointer for the beta (release-candidate) channel, with entries flagged \"beta\": true. The install/upgrade channel picker is cumulative: release only (stable), release+beta (beta), or release+beta+dev (every published build).",
     "releases": [
+      {"version": "5.0.0", "date": "2026-11-05", "notes": "Linux dependencies now use one “Update container image” action instead of exposing Find/Open settings steps. An explicit click checks complete committed settings and updates a verified current commit even from an equivalent historical view, preserving the inspected revision and monitoring choices. Unmerged or mismatching choices stop with a specific prerequisite rather than being ignored. VIPM retains exact-target approval; LVPM builds a candidate without activating it. Linux workflows dispatch the default branch with an optional expected_sha input, validate exactly 40 hexadecimal characters case-insensitively, and reject branch races before checkout, setup, or building with guidance to click again. Every Update request supplies this input; leaving it empty preserves existing manual, push, and schedule behavior. Older installed workflows require a tooling update before dispatch. Duplicate and uncertain requests remain blocked, and page loads or read-only checks never trigger a build. Workflow acceptance is not successful installation or runtime verification; Windows behavior is unchanged. Legacy implicit monitoring remains available for a fully loaded, unchanged current revision with verified repository and discovery provenance and no pending monitoring request. Overlapping revision loads cannot stamp newer provenance onto older inputs or replace monitoring edits with stale responses. Explicit empty lists remain opt-outs; historical, edited, malformed, or unverifiable implicit settings are not silently treated as committed choices. Windows workers now install supported exact VIPM dependencies declared in monitored Dragon files through the verified VIPM installer instead of silently continuing when an assumed Dragon CLI is unavailable. Trusted host-side TOML parsing binds normalized requests to their source files, including Dragon-only projects. Missing or unsupported declarations, conflicting pins, failed installs, and missing or wrong-version packages in the final requested LabVIEW inventory fail the worker build. Later optional tooling cannot silently replace a required Dragon version. Nonempty NIPM/feed declarations and legacy custom Dragon hooks are explicitly rejected rather than reported as installed; Windows runtime qualification still requires a real bake and final inventory. GitHub monitor selections now use shared safe YAML semantics in both the push gate and staging, including quoted Windows values, flow/block platform lists, quoted paths and comments; invalid selection types fail explicitly. Composite worker-image and GitLab Windows builds stage the same validated target plan and use the shared installer once, including Dragon-only projects, without a separate Dragon CLI. Required build/staging errors stop publication. Compatibility break / major-release candidate from 4.x: independent Dragon CLI, custom install-dragon.ps1 hooks, and unsupported NIPM/feed/project settings are not preserved. Migrate to supported exact VIPM declarations before updating. Do not classify this retirement as a backward-compatible patch unless the previous compatibility is restored. Publication and real runtime qualification remain pending."},
+      {"version": "4.20.3", "date": "2026-11-05", "notes": "Linux dependency tooling now explains the next monitoring step immediately after checkbox changes, when switching between VIPM and LVPM, and after a save request. Accepted requests are clearly distinguished from merged configuration changes; read-only HEAD checks offer a new-tab link to committed settings without losing local edits or starting an installation. Uncertain save outcomes retain the duplicate-request block. LVPM is presented as an optional Linux toolchain without experimental branding; package-file-only verification and runtime limitations remain explicit. Dragon dependency rows separate file presence/parsing from unresolved packages and expose exact declared names/versions with platform-specific worker evidence. This UI clarification does not install absent packages, resolve conflicting pins, or establish runtime success. Linux dependency management now presents one primary action that advances from monitoring review to checking committed settings, opening the exact matching revision, and building with LVPM or reviewing a VIPM build. Historical revisions and unsaved choices remain independently protected. Read-only checks preserve edits and compare complete monitoring and worker selections; accepted or uncertain Save requests never imply a merged proposal or allow duplicate submissions. Tooling source repositories and their forks remain excluded from client Reconfigure. Candidate activation and rollback remain separate reviewed actions in collapsed details. This improves the submission path, not runtime installation or package-pin compatibility: workflow acceptance is not a successful build, and candidate verification is not CI activity validation. Windows behavior is unchanged. Selecting all four committed VIPCs and the example Dragon file no longer fails Linux dependency planning because of stale experimental Antidoc CLI metadata. The experimental declaration now uses the authoritative Antidoc capability's existing exact version, 3.4.0.126, with its authentic package spec and icon. All selected sources and 35 package roots remain required; conflicting exact pins still fail rather than choosing a newer version automatically. Offline regression tests cover the combined declarations, archive integrity and conflict rejection. A real package installation, Linux worker bake and final runtime inventory remain separate validation requirements."},
+      {"version": "4.20.2", "date": "2026-11-04", "notes": "The example dependency configuration now uses the same five OpenG versions already pinned by the CI tooling, removing the conflicting declarations that prevented Linux LVPM candidate planning. Matching package metadata and icons are retained, and repository-backed tests check the real declarations and archive contents. Exact-version conflicts in client configurations still fail closed rather than silently selecting a winner. These OpenG versions require LabVIEW 2020 or newer. OpenG File 6.0.2.28 supports automatic caller relinking into `openg_file.lvlib`; downgrading to older packages can require manual relinking. Successful planning does not establish VI compatibility or a successful image build; those require runtime validation. Linux dependency requests now show an indeterminate progress bar while submitting, waiting, queued, or running, with visible failed, cancelled, and uncertain states and links to the identified run. Workflow success still requires candidate review and separate activation; Windows dependency updates are unchanged. Windows VIPM fallback resolution now matches VIPC-normalized versions to indexed OpenG packaging releases without relaxing explicit release pins. Skipping an unavailable transitive dependency no longer hides a later explicit required package request. Required packages must still resolve and pass target-inventory verification. This resolver fix does not upgrade VIPM or establish legacy package installation compatibility; a compatible vendor runtime and real Windows bake remain necessary. Windows dependency builds now use the official VIPM 2026 Q3 f2/build 4056 installer, whose vendor release notes identify the legacy OpenG package-file metadata fix. The base image and dependency hook verify the actual selected CLI and Desktop signatures and minimum versions, upgrade older or missing pairs, and fail closed on unsupported binaries, failed or reboot-requiring installs, and timeouts. Custom installer URLs remain authoritative and cannot silently bypass the supported floor or downgrade a newer installation. Bootstrap-only base builds avoid package and LabVIEW side effects, and immutable base cache keys include the shared bootstrap bytes. Real Windows bake validation of required Antidoc/palette and the final target inventory remains necessary; static payload inspection and mocked tests do not establish runtime repair."},
+      {"version": "4.20.1", "date": "2026-11-03", "notes": "Linux dependency management now presents one next action, with candidate evidence and advanced details collapsed. LVPM requests show identified workflow progress, failures, and log links instead of leaving users with an unexplained queued message. Duplicate clicks are blocked while a request is pending or uncertain; unidentified runs are never guessed from the latest build. Successful workflows remain separate from verified candidate evidence and explicit activation. Windows and dependency installation safeguards are unchanged. The Dependencies page no longer treats existing implicit dependency monitoring as unsaved changes when opening generated or live revision data. Worker update review is available on the current default-branch revision without a needless monitoring-save PR; explicit lists, empty lists, opt-outs, platform choices, and actual-edit safety gates are preserved. The VI Browser file tree no longer labels VIs with Snapshot, New, or Diff pills. Only files confirmed to have no snapshot show a small red X with accessible meaning. The marker disappears when snapshots become available from either platform; the toolbar Diff control remains available. Windows worker dependency builds no longer fail solely because an earlier transitive package-file attempt failed after the requested packages recovered during local-file retries. The installer verifies every requested package and version against the target LabVIEW installed inventory before accepting that recovery; missing required packages or failed verification still block the build."},
+      {"version": "4.20.0", "date": "2026-11-03", "notes": "Existing GitHub workflows can build or reuse a Windows LabVIEW worker and run one unit-test framework through standalone composite actions, without vendoring CI scripts or installing client configuration. Worker reuse hashes the resolved base digest, complete dependency context and build settings, and fails on registry or required dependency errors. Unit-test reports use the current runner and reject missing results, runner errors and empty or all-skipped runs, with hosted contract and Windows PowerShell regression coverage. LUnit tests now run in Linux workers as well as Windows, with per-platform reports and dashboard Run controls on GitHub and a native GitLab job. Linux runs retain framework autodetection, respect explicitly disabled tools, and fail visibly for missing tooling, runner errors, empty results or all-skipped tests. Report generation failures cannot publish partial output or produce a passing status. Other frameworks are identified as unsupported on Linux. The Linux driver isolates Python imports from client modules, Python environment paths and site startup hooks. The bundled LUnit CLI is upgraded to 1.7.1.32; rebuild shared and client Linux workers before use. Linux VIPM installs also preserve package revision suffixes so pinned dependencies resolve correctly. Published release notes and workflow summaries no longer claim that every new release automatically reaches clients on the major alias. Publication and stable or beta promotion remain separate; clients can opt into a new release using its immutable version tag. Channel movement and promotion requirements are unchanged. The reusable workflow now loads configuration from the canonical ni/LabVIEW-CI-CD-Toolkit repository at v4 and checks out capability tooling from that same repository. Missing or empty source.ref values, including a missing manifest, default to the v4 major alias that follows stable instead of v1-era tooling. Only source.ref selects the capability pin: quoted refs are supported, unrelated config and distribution refs are ignored, and malformed or unsupported source mappings produce a clear error. Explicit immutable pins fetch the exact release, including newer published releases outside stable. The config reader independently follows v4; publication alone does not promote stable or advance v4 to the new release. The ref resolver isolates Python imports from client-root modules, PYTHONPATH, and site packages so those modules cannot execute or forge the tooling ref. Browser reinstalls that keep settings now migrate the legacy snapshots-2 selection to the unified VI Snapshots capability, retaining its render workflows for the selected platforms. Snapshots remain selectable and revision scope is unchanged. Installers recognize the retired standalone render-image build workflow by its path and ownership markers: command-line installs remove it, while browser reinstalls include it in the existing stale-file cleanup preview. Unrecognized content is preserved, command-line retirement skips symlinks and directories, and source checkouts carrying release or relocation files are rejected before installation writes. VIDiff deploy now validates artifact metadata against trusted workflow_run lineage, resolves missing pull-request association from the commit-to-PR API, blocks Pages publication for fork PR artifacts (comment/status fall back to Actions artifact or run links), and requires trusted producer identity for publish events: push/workflow_dispatch producers need canonical same-repo head_repository and producer-head default-branch ancestry, with workflow_dispatch additionally requiring default-branch ancestry for the artifact-target SHA; otherwise publish fails closed to artifact/run links. ZIP extraction remains path-safe, rejecting absolute paths, parent traversal, and symlink entries before deploy/status/comment updates."},
+      {"version": "4.19.5", "date": "2026-11-02", "notes": "Dependency management now separates Windows and Linux into dedicated tabs, with platform-specific status, monitoring and update approvals. Windows retains its VIPM workflow; only Linux offers the experimental LVPM alternative. Tooling previews never change the active worker, candidate build/verification/explicit activation remain separate, and detailed inventories and provenance expand on demand. Other dashboard pages identify affected platforms instead of implying that both workers need a dependency update. Dependency banners use text-safe DOM rendering and HTTP(S)-only review links rather than interpreting navigation text as HTML. Late Linux build, activation and reset responses no longer dismiss a token prompt or change status after switching platforms, revisions or monitoring selections."},
+      {"version": "4.19.4", "date": "2026-11-02", "notes": "Update report artifact uploads with verified ZIP compatibility"},
+      {"version": "4.19.3", "date": "2026-11-02", "notes": "Update Python workflow setup without changing selected interpreters"},
+      {"version": "4.19.2", "date": "2026-11-02", "notes": "Configure Dependabot for multiple ecosystems"},
+      {"version": "4.19.1", "date": "2026-11-02", "notes": "Release proposals now describe the prepared features and fixes in their titles, with the version as supporting context and an explicit release-impact section. Reused bot proposals refresh their descriptions, and Reconfigure proposals name the actual changed settings or Linux worker activation/reset. Known generic process-only titles fail the PR gate, including after title edits. The same content-first policy applies to human and automated PRs; missing meaningful release notes stop generation rather than producing a placeholder headline."},
+      {"version": "4.19.0", "date": "2026-11-02", "notes": "The Dependencies page now offers an experimental LVPM alternative without replacing VIPM or changing Windows workers. Review the selected declarations, build a separate Linux candidate, inspect package-file verification, and explicitly request activation through a Reconfigure pull request. Existing per-action worker overrides remain in place. Reconfigure changes only explicitly requested settings, preserving separate VIPC/Dragon declarations, dependency-policy values, platforms, provenance and other client fields. Activation or reset no longer regenerates unrelated configuration defaults. Build controls require the Linux custom-image workflow to be installed; unavailable or unknown workflow access blocks dispatch with guidance rather than attempting a fallback. LVPM is consumed from pinned upstream source, not copied into the toolkit. The adapter rejects conflicting pins, unsupported dependencies, missing transitive packages, and incomplete installs. Candidates are digest-pinned, leave production tags untouched, and are checked for dependency freshness before Linux execution. Resetting the Linux default returns to the existing VIPM selection without changing Windows or per-action overrides. Declared embedded VIP subpackages are included in the exact dependency closure. Original archives remain available with their hashes; separately hashed installation copies normalize legacy ZIP/spec filename encoding and select only applicable LabVIEW-version file groups, recording excluded groups. A strict local-only dry run must verify the complete closure before installation; discovery warnings never count as a verified install. Exact root versions are fetched independently of transitive resolution and checked before installation. The frozen local closure is then installed without further dependency resolution, preventing upstream's transitive-first traversal from upgrading declared pins. System-package paths remain as declared, so package-file evidence is not a claim that Windows-shaped CLI integrations function on Linux. The first integration supports Linux x86-64 only: installation checks the host and binds explicit architecture evidence to the digest-pinned image. Missing or mismatched evidence requires rebuilding and verifying a candidate. Local freshness is bound to the inspected revision and exact selection. Changed inputs remain pending even when package pins match; unavailable checks show unknown instead of green satisfaction. Local freshness is not registry, provenance, or runtime verification. Dragon declarations are inspected only with parser code shipped in the trusted dashboard action repository, never Python code from the inspected client. Missing parsers or TOML backends, missing monitored files, and malformed declarations now stay unknown/pending instead of appearing installed. Unmonitored files do not create pending work, and existing measured Windows package statuses are retained. Update tooling or repair declarations and regenerate the dashboard to restore inspection; rebuilding an image alone does not fix it. Dragon package status now honors each file's monitored platforms: Linux-only declarations can be satisfied by exact VIPM name/version matches in the selected, locally current LVPM inventory without requiring Windows evidence. Stale/unknown evidence and unsupported native/NIPM dependencies remain unknown/pending. Mixed-platform declarations are satisfied only when every applicable platform is satisfied; Windows-only inference is unchanged. Linux satisfaction remains package-file evidence, not proof of working runtime activities. This is experimental package-file verification, not proof that the project's CI activities passed. LVPM cannot yet report a hook VI's internal error output, and this first integration does not support private feeds, NIPM installation, or developer virtual environments. Projects with conflicting tooling/project pins must reconcile those declarations before building a candidate. Linux container and GitHub Actions validation is required before relying on a candidate in production. Reconfigure keeps changed manifests readable by existing Configure and Dependencies pages and dashboard readers, retaining dependency-list indentation, path-first records, config-first VI Analyzer rules, double-quoted numeric strings and inline OS lists without line-wrapping scalar values. Explicit none selections remain configured empty lists instead of restoring automatic dependency discovery. The Dependencies page no longer skips adjacent VIPC, Dragon or action sections. Updates to a YAML-aliased mapping no longer change unrelated client fields that share that mapping. No-op requests still preserve the original bytes. Existing values in a previously normalized manifest are not lost; after updating tooling, an intentional change through the GitHub Reconfigure workflow regenerates compatible formatting."},
+      {"version": "4.18.7", "date": "2026-11-02", "notes": "Unit Tests now detect and run test frameworks automatically when a repository has the unit-tests activity but has never saved Unit Testing settings (no unitTests block in .github/labview-ci.yml). Every framework found runs: NI UTF for any .lvproj that contains .lvtest items, and Caraya, LUnit or VI Tester for directories holding VIs that link Caraya.lvlib, LUnit.lvlib or TestCase.lvclass. Previously such repositories produced an empty \"no tests\" report. An explicit unitTests block, even with every framework disabled, is still honoured as-is. VI snapshots now use a single rich interactive code view across configuration, generation, and browsing, while historical population respects the selected revisions and highlights gaps in snapshot coverage. Linux VIDiff renders LabVIEW XML comparisons as static HTML to avoid native HTML-report crashes, preserving change descriptions and available before/after screenshots. Missing screenshots are identified explicitly; native interactive sub-VI hotspots are not included. The source Dependencies page now matches the bundled dashboard's recovery guidance for workflow-dispatch 404 errors, including workflows that exist but have not been registered by GitHub Actions. Shared dashboard assets are checked for byte-for-byte parity to prevent the two views from drifting apart. Pull requests now document their target version, major/minor/incremental update type, publication status, and client update guidance. Projected versions are distinguished from published releases, with the first verified containing release linked after publication so client owners can identify an exact tooling version that includes a fix without assuming beta or stable has been promoted. Tooling upgrades now retain existing project configuration blocks, including native Caraya commands, test locations, worker dependency selections, build settings, and concurrency. Installer-owned version, branch, and OS fields still refresh, and an explicit image-name override takes precedence. This fixes an upgrade that could silently remove enabled test runners. Restore already-lost configuration from the last known-good manifest before upgrading; the installer cannot recover missing settings. Regression coverage runs when the installer or unit-test runtime changes. Configure Pipeline now also retains a supplied native runner command, including quoted Windows paths, and upgrades preserve its legacy top-level unitTests block. Reconfigure now changes only settings explicitly requested by the user instead of regenerating the complete client manifest. Separate VIPC and Dragon declarations, explicit false dependency policies, operating systems, provenance and unrecognized client extensions remain intact. Blank or unchanged requests keep the original file byte-for-byte, including comments. Actual updates can normalize YAML formatting. Malformed manifests or incompatible mapping paths fail before the configuration is written. Existing client workers and dependency-management choices do not change."},
+      {"version": "4.18.6", "date": "2026-10-23", "notes": "Protected-branch releases and promotions now recover when an older prepared catalog branch already exists for the same version. A non-fast-forward rejection uses a separate branch keyed to the new prepared commit, preserving the original branch and its review history without a force-push. Other push failures retain their Git diagnostics and still stop publication. Regression checks now run in the Catalog Source Sync pull-request gate. Review and merge only the current catalog proposal; close older proposals once their release notes are accounted for."},
+      {"version": "4.18.5", "date": "2026-10-23", "notes": "Caraya runs now retain runner startup/execution failures and LabVIEW CLI logs in the Unit Tests report instead of hiding an empty result as a missing report. The driver reads the configurator's nested configuration, preserves command quoting, removes stale output, and fails when an enabled runner cannot execute. Invalid JUnit, zero tests, and all-skipped runs cannot produce a green result. Caraya 1.4.4.148 is installed with the required early worker packages; a failed required bake now explicitly fails the final worker Docker build. Rebuild existing seed-only workers and supply all project dependencies. The documented native LabVIEWCLI wrapper path passed 44 assertions locally in Measurement Utility Reference; clean-container validation is not yet established. The old g-cli extension command remains an unverified scaffold."},
       {"version": "4.18.4", "date": "2026-09-18", "notes": "dashboard: surface SBOM reports on GitHub Pages"},
       {"version": "4.18.3", "date": "2026-09-18", "notes": "Bug fix: dashboard's populate history checkboxes"},
       {"version": "4.18.2", "date": "2026-08-31", "notes": "Running CI on a fresh fork of a configured repository now works on the first try. A fork copies the workflows but never the worker container images, so every container activity used to fail on an opaque \"manifest unknown\" pull error. The dependency gate now detects that the worker image has never been built, starts the Build LabVIEW CI Image run itself, waits for it (a first build takes 80-100 minutes), and then continues. When it cannot start the build automatically, the job stops up front with instructions instead of a doomed pull, the commit status reads \"Worker image unavailable - build it via Configure Workers\" rather than a generic activity failure, and a pinned container tag that was never published is reported as a configuration error. Applies the same on any repository whose first worker build never ran."},
@@ -240,12 +254,12 @@
       {
         "version": "4.9.10",
         "date": "2026-07-22",
-        "notes": "VI Browser now truly defaults opened files to 2.0 whenever a 2.0 render exists (Windows preferred when both platforms exist): the auto-default path no longer bails out just because local storage previously remembered viewer mode 1.0, so older 1.0 preferences no longer suppress the 2.0-first open behavior."
+        "notes": "VI Browser now truly defaults opened files to snapshots whenever a snapshot render exists (Windows preferred when both platforms exist): the auto-default path no longer bails out just because local storage previously remembered viewer mode snapshot, so older snapshot preferences no longer suppress the snapshot-first open behavior."
       },
       {
         "version": "4.9.9",
         "date": "2026-07-22",
-        "notes": "Linux worker rendering fix: the Linux worker image and the standalone VI Browser 2.0 render image now bake a set of X11 core and TrueType fonts (DejaVu, Liberation, Noto, and the 75/100 dpi xfonts-* families). NI's minimal Linux base ships almost none, so LabVIEW's UI controls and rendered VI text previously came out blank in VI Browser snapshots and the Debug Run desktop. The Debug Run session also installs those fonts on demand (best-effort), makes them visible to the running Xvfb (xset), and switches fluxbox to focus-follows-mouse so the on-screen terminal reliably receives the ENTER keystroke."
+        "notes": "Linux worker rendering fix: the Linux worker image and the standalone VI Browser render image now bake a set of X11 core and TrueType fonts (DejaVu, Liberation, Noto, and the 75/100 dpi xfonts-* families). NI's minimal Linux base ships almost none, so LabVIEW's UI controls and rendered VI text previously came out blank in VI Browser snapshots and the Debug Run desktop. The Debug Run session also installs those fonts on demand (best-effort), makes them visible to the running Xvfb (xset), and switches fluxbox to focus-follows-mouse so the on-screen terminal reliably receives the ENTER keystroke."
       },
       {
         "version": "4.9.8",
@@ -349,10 +363,10 @@
         "version": "4.8.7",
         "date": "2026-07-22",
         "type": "patch",
-        "summary": "VI Browser now defaults an opened VI to the 2.0 viewer whenever that VI has a 2.0 render, instead of only auto-switching when a Windows render exists. When both platforms exist, Windows 2.0 is still preferred for that first auto-default.",
+        "summary": "VI Browser now defaults an opened VI to the snapshot viewer whenever that VI has a snapshot render, instead of only auto-switching when a Windows render exists. When both platforms exist, Windows is still preferred for that first auto-default.",
         "changes": [
-          "vi-browser.html (dashboard/pages/snapshots): generalized the first-open auto-default from Windows-only to any available 2.0 render, with Windows preferred when both exist.",
-          "documentation.html (dashboard/pages): updated the VI Browser 2.0 behavior note to match the new defaulting rule."
+          "vi-browser.html (dashboard/pages/snapshots): generalized the first-open auto-default from Windows-only to any available snapshot render, with Windows preferred when both exist.",
+          "documentation.html (dashboard/pages): updated the VI Browser behavior note to match the new defaulting rule."
         ]
       },
       {
@@ -422,7 +436,7 @@
       {
         "version": "4.8.0",
         "date": "2026-07-21",
-        "notes": "VI Browser 2.0 Windows renders now auto-generate on every new revision. The Windows render workflow (vi-snapshots-json-windows.yml) previously ran only on manual dispatch, so a VI a revision changed showed 'No Windows 2.0 render' until someone clicked Re-run; it now has the same workflow_run auto-trigger and config gate as the Linux path, auto-running when config.viBrowser.positionAware includes windows (the configurator default) and the triggering snapshot run succeeded. Renders stay content-addressed by git blob SHA, so unchanged VIs reuse their existing frames with no work and only the new/changed blobs a revision actually touched are rendered."
+        "notes": "VI Browser Windows renders now auto-generate on every new revision. The Windows render workflow (vi-snapshots-json-windows.yml) previously ran only on manual dispatch, so a VI a revision changed showed 'No Windows render' until someone clicked Re-run; it now has the same workflow_run auto-trigger and config gate as the Linux path, auto-running when config.viBrowser.positionAware includes windows (the configurator default) and the triggering snapshot run succeeded. Renders stay content-addressed by git blob SHA, so unchanged VIs reuse their existing frames with no work and only the new/changed blobs a revision actually touched are rendered."
       },
       {
         "version": "4.7.0",
@@ -441,7 +455,7 @@
       {
         "version": "4.6.11",
         "date": "2026-07-21",
-        "notes": "VI Browser now remembers viewer/platform choices per browser, defaults to Windows 2.0 when that render is available on a fresh load, shows dismissible coaching tip strips for the block-diagram toggle and case/event selector arrows, and versions those dismissal keys so a new rollout deliberately re-surfaces the tips for everyone until they dismiss them again."
+        "notes": "VI Browser now remembers viewer/platform choices per browser, defaults to Windows when that render is available on a fresh load, shows dismissible coaching tip strips for the block-diagram toggle and case/event selector arrows, and versions those dismissal keys so a new rollout deliberately re-surfaces the tips for everyone until they dismiss them again."
       },
       {
         "version": "4.6.10",
@@ -694,11 +708,11 @@
         "date": "2026-06-28",
         "title": "Apply to New Repo now prunes obsolete vendored tooling files",
         "type": "patch",
-        "summary": "Re-applying the tooling with the browser \"Apply to New Repo\" installer now mirrors each vendored tooling directory against the source: any file the current tooling no longer ships is removed from the repository (the consumer's own preserved config is kept). This matches what one-click \"Update now\" already did, and fixes a Windows VI Browser 2.0 render failure where an obsolete Go source (viserver_windows.go and its siblings) lingered alongside the cross-platform replacement and produced duplicate-declaration build errors.",
+        "summary": "Re-applying the tooling with the browser \"Apply to New Repo\" installer now mirrors each vendored tooling directory against the source: any file the current tooling no longer ships is removed from the repository (the consumer's own preserved config is kept). This matches what one-click \"Update now\" already did, and fixes a Windows VI Browser render failure where an obsolete Go source (viserver_windows.go and its siblings) lingered alongside the cross-platform replacement and produced duplicate-declaration build errors.",
         "highlights": [
           "The browser installer deletes target files under each installed tooling directory that the source has removed, so a re-Apply leaves no orphans -- matching install.py --update.",
           "Preserved user-config files (e.g. .github/labview/vipm/ci-tooling.vipc) are never pruned.",
-          "Resolves the 'Session/viGetCtrlVariant redeclared in this block' Go build error on the Windows VI Browser 2.0 render after a stale viserver_windows.go was left behind by an older install."
+          "Resolves the 'Session/viGetCtrlVariant redeclared in this block' Go build error on the Windows VI Browser render after a stale viserver_windows.go was left behind by an older install."
         ]
       },
       {
@@ -745,7 +759,7 @@
         "summary": "Container activities wait up to 110 minutes for a first-time worker image build instead of 40, so a fresh install's first dispatched Mass Compile / VI Analyzer / Unit Tests / Antidoc / VIDiff no longer times out while the image is still building.",
         "highlights": [
           "wait-for-worker-image.sh overall timeout raised from 40 to 110 minutes - a cold build (multi-GB NI base pull + VIPC bake) reliably runs 80-100 minutes, so the old cap timed out every time on a first build.",
-          "Raised the Windows VI Browser 2.0 render job timeout to 180 minutes so the worker-image wait plus the render both fit."
+          "Raised the Windows VI Browser render job timeout to 180 minutes so the worker-image wait plus the render both fit."
         ]
       },
       {
@@ -753,10 +767,10 @@
         "date": "2026-06-25",
         "title": "Tooling updates prune files removed from the source",
         "type": "patch",
-        "summary": "Running an update now removes vendored tooling files that the source repo has since deleted, so an obsolete file can no longer linger in a consumer repo and break a build. This fixes the Windows VI Browser 2.0 render failing to compile after an old Go source file was left behind by a previous update.",
+        "summary": "Running an update now removes vendored tooling files that the source repo has since deleted, so an obsolete file can no longer linger in a consumer repo and break a build. This fixes the Windows VI Browser render failing to compile after an old Go source file was left behind by a previous update.",
         "highlights": [
           "install.py --update now mirrors each vendored tooling directory to the source: it prunes orphaned files (never touching your preserved config) instead of only adding and overwriting.",
-          "Resolves 'redeclared in this block' Go build failures in the VI Browser 2.0 Windows render caused by leftover viserver_windows.go / selectors_windows.go after the engine was consolidated onto one cross-platform source file."
+          "Resolves 'redeclared in this block' Go build failures in the VI Browser Windows render caused by leftover viserver_windows.go / selectors_windows.go after the engine was consolidated onto one cross-platform source file."
         ]
       },
       {
@@ -881,9 +895,9 @@
       {
         "version": "4.1.23",
         "date": "2026-06-24",
-        "title": "Bake the VI Browser 2.0 render engine into the Linux worker (no separate build)",
+        "title": "Bake the VI Browser render engine into the Linux worker (no separate build)",
         "type": "minor",
-        "summary": "The position-aware VI Browser 2.0 render engine (the vendored Go lvctl renderer + batch runner) is now baked INTO the Linux worker image instead of being a separate -toimages image that each repository built for itself. Onboarding the pipeline no longer kicks off a heavy render-image build: the engine ships inside the Linux worker that clients already copy on install, so nothing has to be built to generate 2.0 screenshots. The Linux render workflow runs the worker image directly (invoking the render entrypoint), and the standalone build-toimages-image.yml workflow is retired.",
+        "summary": "The position-aware VI Browser render engine (the vendored Go lvctl renderer + batch runner) is now baked INTO the Linux worker image instead of being a separate -toimages image that each repository built for itself. Onboarding the pipeline no longer kicks off a heavy render-image build: the engine ships inside the Linux worker that clients already copy on install, so nothing has to be built to generate snapshots. The Linux render workflow runs the worker image directly (invoking the render entrypoint), and the standalone build-toimages-image.yml workflow is retired.",
         "highlights": [
           "Bakes the render engine into .github/docker/labview-ci-linux.Dockerfile as a multi-stage build (byte-for-byte the same engine), so it is copied with the worker -- no separate image and no per-repo build.",
           "Retires build-toimages-image.yml; vi-snapshots-json.yml now runs the Linux worker image via --entrypoint instead of pulling a separate render image.",
@@ -1007,7 +1021,7 @@
         "date": "2026-06-25",
         "title": "Wire the experimental-gated Windows Beta container copy + dashboard lane",
         "type": "minor",
-        "summary": "Completes the four-container model. The Windows Beta worker container is now copied into a client's GHCR only when an experimental Windows capability (Antidoc today) is selected: its build files are owned by the antidoc capability, so they install only then, and the installer dispatches build-labview-windows-beta-image.yml with copy_only=true during install (it runs on ubuntu-latest and crane-copies the LCWC beta base, never rebuilds). The dashboard's Win Beta dependency lane now reads the windows-beta worker manifest (renamed from windows-experimental). VI Snapshots 2.0 is core; Antidoc is the sole experimental capability and the only thing that pulls in the Beta lane.",
+        "summary": "Completes the four-container model. The Windows Beta worker container is now copied into a client's GHCR only when an experimental Windows capability (Antidoc today) is selected: its build files are owned by the antidoc capability, so they install only then, and the installer dispatches build-labview-windows-beta-image.yml with copy_only=true during install (it runs on ubuntu-latest and crane-copies the LCWC beta base, never rebuilds). The dashboard's Win Beta dependency lane now reads the windows-beta worker manifest (renamed from windows-experimental). VI Snapshots is core; Antidoc is the sole experimental capability and the only thing that pulls in the Beta lane.",
         "highlights": [
           "Install copies the Windows Beta container only when an experimental Windows capability is selected; never rebuilt.",
           "antidoc capability owns the Windows Beta build files, so they install only with Antidoc.",
@@ -1044,12 +1058,12 @@
       {
         "version": "4.1.9",
         "date": "2026-06-25",
-        "title": "VI Snapshots 2.0 graduates to a core feature on Windows and Linux",
+        "title": "VI Snapshots graduates to a core feature on Windows and Linux",
         "type": "minor",
-        "summary": "VI Snapshots 2.0 (the cross-platform, position-aware VI Browser 2.0 render) is now a released core capability on Windows and Linux instead of experimental, so it is offered and installed like any other standard action. Nothing in the worker images changes: the render is a vendored Go engine that the Windows snapshot workflow compiles at run time and the Linux path ships in the separate -toimages image, so graduation is purely status + UX. Antidoc is now the only experimental capability. Also adds .github/labview/experimental.vipc (the experimental dependency set, currently Antidoc) ahead of resetting the Beta containers as the experimental branch.",
+        "summary": "VI Snapshots (the cross-platform, position-aware VI Browser render) is now a released core capability on Windows and Linux instead of experimental, so it is offered and installed like any other standard action. Nothing in the worker images changes: the render is a vendored Go engine that the Windows snapshot workflow compiles at run time and the Linux path ships in the separate -toimages image, so graduation is purely status + UX. Antidoc is now the only experimental capability. Also adds .github/labview/experimental.vipc (the experimental dependency set, currently Antidoc) ahead of resetting the Beta containers as the experimental branch.",
         "highlights": [
-          "VI Snapshots 2.0 is now a core feature (status stable) on Windows and Linux, not experimental.",
-          "Removed the experimental/known-bugs wording for 2.0 from the Configure and Dependencies UX.",
+          "VI Snapshots is now a core feature (status stable) on Windows and Linux, not experimental.",
+          "Removed the experimental/known-bugs wording for snapshots from the Configure and Dependencies UX.",
           "Added experimental.vipc (copy of antidoc.vipc) as the experimental dependency set.",
           "Antidoc remains the sole experimental capability."
         ]
@@ -1135,7 +1149,7 @@
         "date": "2026-06-24",
         "title": "Dashboard only offers runs for workflows that are installed",
         "type": "patch",
-        "summary": "The dashboard\u2019s Run and Populate history controls are now gated to the workflows actually present in the repository. Previously every capability in the run-target map was offered regardless of what was installed, so a repo without an experimental workflow (for example the Windows VI Browser 2.0 renderer, which is off by default) still showed a Run button and platform checkbox for it \u2014 and dispatching it failed with a confusing token-permission error even though the token was fine. The dashboard build now reads its own .github/workflows directory and drops any run target whose workflow file is missing (a platform is removed, or the whole capability if none remain), so the option simply isn\u2019t shown. Dispatch failures are also reported accurately: a 404 now says the workflow isn\u2019t installed (update the tooling) instead of blaming the token, and only real token/permission problems (401/403) re-prompt for a token.",
+        "summary": "The dashboard\u2019s Run and Populate history controls are now gated to the workflows actually present in the repository. Previously every capability in the run-target map was offered regardless of what was installed, so a repo without an experimental workflow (for example the Windows VI Browser renderer, which is off by default) still showed a Run button and platform checkbox for it \u2014 and dispatching it failed with a confusing token-permission error even though the token was fine. The dashboard build now reads its own .github/workflows directory and drops any run target whose workflow file is missing (a platform is removed, or the whole capability if none remain), so the option simply isn\u2019t shown. Dispatch failures are also reported accurately: a 404 now says the workflow isn\u2019t installed (update the tooling) instead of blaming the token, and only real token/permission problems (401/403) re-prompt for a token.",
         "highlights": [
           "Run / Populate history only offer activities and platforms whose workflow is installed in the repo \u2014 no more dead options that 404 on dispatch.",
           "A missing-workflow dispatch (404) is reported as out-of-date tooling, not a token error, and does not re-prompt for a token.",
@@ -1181,13 +1195,13 @@
       {
         "version": "3.51.0",
         "date": "2026-06-23",
-        "title": "VI Snapshots 2.0 is its own capability, on Windows and Linux",
+        "title": "VI Snapshots is its own capability, on Windows and Linux",
         "type": "minor",
-        "summary": "The cross-platform VI Browser 2.0 renderer is now a distinct capability, VI Snapshots 2.0, that runs on both Windows and Linux instead of being bundled invisibly inside the classic VI Snapshots capability (whose Linux 2.0 workflow was installed but never offered as an option) and a separate Windows-only entry. The classic VI Snapshots + VI Browser capability is now clearly the Windows-only gallery render, and VI Snapshots 2.0 owns the position-aware toimages render image, the Linux (vi-snapshots-json.yml) and Windows (vi-snapshots-json-windows.yml) frame workflows, and the in-place viewer assets, so the Configure and install Actions tables now show a Linux checkbox for 2.0.",
+        "summary": "VI Snapshots includes the cross-platform render engine, Windows and Linux frame workflows, and the interactive VI Browser. Configure and install expose the platforms under one capability.",
         "highlights": [
-          "Adds a VI Snapshots 2.0 capability supporting Windows and Linux, replacing the Windows-only 'Windows VI Browser 2.0 snapshots' entry.",
-          "Moves the position-aware 2.0 render workflows and toimages assets out of the classic VI Snapshots capability, which is now explicitly the Windows-only gallery render.",
-          "The Linux 2.0 renderer (vi-snapshots-json.yml) is now surfaced as a selectable Linux option instead of being installed but hidden."
+          "Adds a VI Snapshots capability supporting Windows and Linux, replacing the Windows-only 'Windows VI Browser snapshots' entry.",
+          "The Snapshots capability includes the frame workflows and render engine for Windows and Linux.",
+          "The Linux renderer (vi-snapshots-json.yml) is now surfaced as a selectable Linux option instead of being installed but hidden."
         ]
       },
       {
@@ -1564,7 +1578,7 @@
         "highlights": [
           "On small screens the VI file tree slides in as an off-canvas drawer instead of permanently occupying the top of the screen, so the open VI fills the viewport",
           "A \"VIs\" toggle in the viewer toolbar opens the tree; selecting a VI, tapping the backdrop, or the drawer's close button collapses it again",
-          "The viewer toolbar (1.0 / 2.0 / Diff and the front-panel / block-diagram switches) becomes one compact, horizontally scrollable row to free up vertical space",
+          "The viewer toolbar (Snapshot / Diff and the front-panel / block-diagram switches) becomes one compact, horizontally scrollable row to free up vertical space",
           "Revision switching and navigation to other document types stay in the always-visible header, so the drawer is never needed to move around the site",
           "Desktop layout and workflow are unchanged"
         ]
@@ -1699,11 +1713,11 @@
       {
         "version": "3.41.1",
         "date": "2026-06-23",
-        "title": "Label and isolate VI Browser 2.0 snapshot reruns",
-        "summary": "Manual VI Browser 2.0 snapshot reruns now show the target revision in the GitHub Actions run name, and the Windows/Linux 2.0 snapshot workflows scope concurrency by target revision instead of using one global queue per workflow. Re-running several selected revisions no longer appears as a stack of identical runs and no longer risks canceling different target revisions in the same batch.",
+        "title": "Label and isolate VI Browser snapshot reruns",
+        "summary": "Manual VI Browser snapshot reruns now show the target revision in the GitHub Actions run name, and the Windows/Linux snapshot workflows scope concurrency by target revision instead of using one global queue per workflow. Re-running several selected revisions no longer appears as a stack of identical runs and no longer risks canceling different target revisions in the same batch.",
         "highlights": [
-          "Adds target-SHA run names to Windows and Linux VI Browser 2.0 snapshot runs",
-          "Scopes 2.0 snapshot workflow concurrency by target revision so different selected commits do not cancel each other",
+          "Adds target-SHA run names to Windows and Linux VI Browser snapshot runs",
+          "Scopes snapshot workflow concurrency by target revision so different selected commits do not cancel each other",
           "Keeps duplicate reruns for the same target revision cancelable while making multi-revision history reruns clear in Actions"
         ]
       },
@@ -1890,7 +1904,7 @@
         "highlights": [
           "Adds Build LabVIEW CI Image - Linux Beta, a separate GHCR image lane that installs ni-vialin-labview-support and ni-vipm, applies configured VIPC files, and publishes linux-beta worker manifests",
           "Lets Linux Mass Compile, VI Analyzer, and VIDiff keep using the NI base image for empty/base/none while routing latest or Linux Beta tags to the linux-beta worker image",
-          "Keeps Antidoc, Linux Beta, Linux VIPM/VIPC support, and Windows VI Browser 2.0 snapshots behind a deselected Experimental features card in Apply to New Repo"
+          "Keeps Antidoc, Linux Beta, Linux VIPM/VIPC support, and Windows VI Browser snapshots behind a deselected Experimental features card in Apply to New Repo"
         ]
       },
       {
@@ -1962,8 +1976,8 @@
       {
         "version": "3.35.5",
         "date": "2026-06-22",
-        "title": "VI Browser 2.0: paging through cases no longer zooms the diagram",
-        "summary": "In the position-aware VI Browser (Snapshot 2.0) renderer, clicking through a Case/Event/Sequence structure's cases no longer randomly zooms the block diagram. Double-clicking a case selector arrow (or the Fit button) is now ignored by the zoom handler, so the diagram size stays fixed while you navigate cases.",
+        "title": "VI Browser: paging through cases no longer zooms the diagram",
+        "summary": "In the position-aware VI Browser (Snapshot) renderer, clicking through a Case/Event/Sequence structure's cases no longer randomly zooms the block diagram. Double-clicking a case selector arrow (or the Fit button) is now ignored by the zoom handler, so the diagram size stays fixed while you navigate cases.",
         "highlights": [
           "Double-clicking the case selector arrows or the Fit button no longer triggers the double-click-to-zoom action.",
           "Background double-click-to-zoom on the diagram itself is unchanged.",
@@ -2007,7 +2021,7 @@
         "version": "3.35.1",
         "date": "2026-06-22",
         "title": "Dependencies page: Win Beta column with a click-to-explain note",
-        "summary": "The experimental Windows container column on the Dependencies page is now labelled Win Beta, and its column header is clickable: clicking it reveals a short note explaining that Win Beta is a separate, isolated Windows container where new capabilities and new action runners are built and proven -- such as getting VI Browser 2.0 snapshots to render on Windows -- so the in-progress work never disrupts the containers production actions rely on, until it is ready to replace the main Windows container.",
+        "summary": "The experimental Windows container column on the Dependencies page is now labelled Win Beta, and its column header is clickable: clicking it reveals a short note explaining that Win Beta is a separate, isolated Windows container where new capabilities and new action runners are built and proven -- such as getting VI Browser snapshots to render on Windows -- so the in-progress work never disrupts the containers production actions rely on, until it is ready to replace the main Windows container.",
         "highlights": [
           "Renames the experimental Windows column to Win Beta across the VIPM/VIPC, NI Packages, and System Components tabs.",
           "Makes the Win Beta header clickable to reveal an explanatory popover (closes on a second click, an outside click, or Escape), replacing the always-on banner.",
@@ -2029,10 +2043,10 @@
         "version": "3.34.25",
         "date": "2026-06-22",
         "title": "Experimental Windows container lane on the Dependencies page",
-        "summary": "The Dependencies tables gain a third Windows (experimental) column so an isolated experimental Windows container can be tracked alongside the production Windows worker and Linux. Production actions keep running on the standard Windows worker; the VI Browser 2.0 Windows render opts into the experimental image only when the repository variable EXPERIMENTAL_WINDOWS_IMAGE is set, so new container work can be proven before it replaces the main Windows container. Until that image is published the experimental column is shown as experimental / pending.",
+        "summary": "The Dependencies tables gain a third Windows (experimental) column so an isolated experimental Windows container can be tracked alongside the production Windows worker and Linux. Production actions keep running on the standard Windows worker; the VI Browser Windows render opts into the experimental image only when the repository variable EXPERIMENTAL_WINDOWS_IMAGE is set, so new container work can be proven before it replaces the main Windows container. Until that image is published the experimental column is shown as experimental / pending.",
         "highlights": [
           "Adds a Windows (experimental) column to the VIPM/VIPC, NI Packages, and System Components tabs.",
-          "Wires an opt-in EXPERIMENTAL_WINDOWS_IMAGE repository variable into the Windows VI Browser 2.0 render so experimental runs use an isolated container and skip the production worker-build wait; unset leaves behaviour unchanged.",
+          "Wires an opt-in EXPERIMENTAL_WINDOWS_IMAGE repository variable into the Windows VI Browser render so experimental runs use an isolated container and skip the production worker-build wait; unset leaves behaviour unchanged.",
           "Shows the experimental column as experimental / pending until its image manifest is published, without affecting the existing Windows and Linux columns."
         ]
       },
@@ -2062,7 +2076,7 @@
         "version": "3.34.22",
         "date": "2026-06-22",
         "title": "Dependencies page publishes separate dependency-source tables",
-        "summary": "Publishes the dependency-source table update with the dashboard and catalog in sync. The page now separates VIPM/VIPC packages, NI Package Manager installed dependencies such as LabVIEW and NI Unit Test Framework, and repo-provided system components such as the VI Browser 2.0 toimages Go renderer.",
+        "summary": "Publishes the dependency-source table update with the dashboard and catalog in sync. The page now separates VIPM/VIPC packages, NI Package Manager installed dependencies such as LabVIEW and NI Unit Test Framework, and repo-provided system components such as the VI Browser toimages Go renderer.",
         "highlights": [
           "Renames the NI section to NI Package Manager Installed Dependencies to make its source explicit.",
           "Keeps the generated dashboard dependency inventory and published catalog on the same release.",
@@ -2073,10 +2087,10 @@
         "version": "3.34.21",
         "date": "2026-06-22",
         "title": "Dependencies page separates VIPM, NI packages, and system components",
-        "summary": "The Dependencies page now groups dependency coverage by source instead of putting everything into a single VIPC table. VIPM/VIPC packages remain in their own table, NI Package Manager-installed dependencies such as LabVIEW, VI Analyzer support, Unit Test Framework, and VIPM are listed separately from worker manifests, and repository-provided system components such as the VI Browser 2.0 toimages Go renderer are called out in a third table.",
+        "summary": "The Dependencies page now groups dependency coverage by source instead of putting everything into a single VIPC table. VIPM/VIPC packages remain in their own table, NI Package Manager-installed dependencies such as LabVIEW, VI Analyzer support, Unit Test Framework, and VIPM are listed separately from worker manifests, and repository-provided system components such as the VI Browser toimages Go renderer are called out in a third table.",
         "highlights": [
           "Adds a dedicated NI Package Manager Dependencies table that surfaces LabVIEW and NI Unit Test Framework alongside other NI-installed tooling from worker manifests.",
-          "Adds a System Components table for CI runtime pieces that do not come from VIPM or NIPM, including the VI Browser 2.0 toimages Go renderer.",
+          "Adds a System Components table for CI runtime pieces that do not come from VIPM or NIPM, including the VI Browser toimages Go renderer.",
           "Keeps the existing VIPM/VIPC package table and Linux VIPC pending banner intact while still showing Linux NI package and system-component context."
         ]
       },
@@ -2084,9 +2098,9 @@
         "version": "3.34.19",
         "date": "2026-06-22",
         "title": "Windows runners share the repo worker by default",
-        "summary": "Windows LabVIEW action runners now default to the repository's shared worker image instead of mixing base-image and worker-image defaults by action. Mass Compile, VIDiff, VI Snapshots, and Windows VI Browser 2.0 join VIA, Unit Tests, and Antidoc on the shared Windows dependency container unless a repo explicitly opts an action back to base. The Dependencies page now collapses package coverage to Windows and Linux columns, with Linux still marked pending until Linux dependency application is implemented.",
+        "summary": "Windows LabVIEW action runners now default to the repository's shared worker image instead of mixing base-image and worker-image defaults by action. Mass Compile, VIDiff, VI Snapshots, and Windows VI Browser join VIA, Unit Tests, and Antidoc on the shared Windows dependency container unless a repo explicitly opts an action back to base. The Dependencies page now collapses package coverage to Windows and Linux columns, with Linux still marked pending until Linux dependency application is implemented.",
         "highlights": [
-          "Makes Mass Compile, VIDiff, VI Snapshots, and Windows VI Browser 2.0 default to ghcr.io/<owner>/<repo>-labview:latest.",
+          "Makes Mass Compile, VIDiff, VI Snapshots, and Windows VI Browser default to ghcr.io/<owner>/<repo>-labview:latest.",
           "Keeps config.container.use and per-action config.container.actions overrides, including base, as explicit escape hatches.",
           "Collapses the Dependencies table to Windows and Linux OS-level coverage columns."
         ]
@@ -2094,12 +2108,12 @@
       {
         "version": "3.34.18",
         "date": "2026-06-22",
-        "title": "Windows VI Browser 2.0 zero-frame runs fail visibly",
-        "summary": "Windows VI Browser 2.0 render runs now propagate the Go runner process exit code reliably from the PowerShell container entrypoint. If the Go runner fails or a non-empty worklist produces zero frame JSON files, the workflow fails instead of finishing green with no Windows 2.0 output.",
+        "title": "Windows VI Browser zero-frame runs fail visibly",
+        "summary": "Windows VI Browser render runs now propagate the Go runner process exit code reliably from the PowerShell container entrypoint. If the Go runner fails or a non-empty worklist produces zero frame JSON files, the workflow fails instead of finishing green with no Windows output.",
         "highlights": [
           "Refreshes the runner process before reading ExitCode so failed Go render batches return non-zero from the container entrypoint.",
           "Treats a missing runner exit code as a failed render instead of allowing PowerShell to exit 0.",
-          "Adds a final non-empty worklist / zero-output guard so Windows 2.0 runs cannot report success without published frames."
+          "Adds a final non-empty worklist / zero-output guard so Windows runs cannot report success without published frames."
         ]
       },
       {
@@ -2116,34 +2130,34 @@
       {
         "version": "3.34.16",
         "date": "2026-06-22",
-        "title": "Windows VI Browser 2.0 uses the Go render path directly",
-        "summary": "The Windows VI Browser 2.0 container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux 2.0 path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering. The shared runner now fails when a non-empty batch produces zero frames, the Windows entrypoint times out a stuck Go runner while printing its captured logs, and newer manual Windows render runs replace stuck superseded runs.",
+        "title": "Windows VI Browser uses the Go render path directly",
+        "summary": "The Windows VI Browser container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering. The shared runner now fails when a non-empty batch produces zero frames, the Windows entrypoint times out a stuck Go runner while printing its captured logs, and newer manual Windows render runs replace stuck superseded runs.",
         "highlights": [
           "Removes the PowerShell GetActiveObject gate that prevented the Go renderer from running in the Windows container.",
           "Keeps the existing Go runner/lvctl toolchain as the owner of LabVIEW startup and rendering on Windows.",
           "Fails a non-empty Go render batch when every VI fails, while still allowing partial successes to publish.",
           "Adds a Windows runner timeout that terminates stuck LabVIEW/lvctl runs and prints runner stdout/stderr before exiting.",
-          "Lets newer Windows 2.0 render dispatches cancel older in-progress runs in the same workflow."
+          "Lets newer Windows render dispatches cancel older in-progress runs in the same workflow."
         ]
       },
       {
         "version": "3.34.15",
         "date": "2026-06-22",
-        "title": "Windows VI Browser 2.0 uses the Go render path directly",
-        "summary": "The Windows VI Browser 2.0 container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux 2.0 path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering. The shared runner now fails when a non-empty batch produces zero frames, the Windows entrypoint times out a stuck Go runner while printing its captured logs, and newer manual Windows render runs replace stuck superseded runs.",
+        "title": "Windows VI Browser uses the Go render path directly",
+        "summary": "The Windows VI Browser container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering. The shared runner now fails when a non-empty batch produces zero frames, the Windows entrypoint times out a stuck Go runner while printing its captured logs, and newer manual Windows render runs replace stuck superseded runs.",
         "highlights": [
           "Removes the PowerShell GetActiveObject gate that prevented the Go renderer from running in the Windows container.",
           "Keeps the existing Go runner/lvctl toolchain as the owner of LabVIEW startup and rendering on Windows.",
           "Fails a non-empty Go render batch when every VI fails, while still allowing partial successes to publish.",
           "Adds a Windows runner timeout that terminates stuck LabVIEW/lvctl runs and prints runner stdout/stderr before exiting.",
-          "Lets newer Windows 2.0 render dispatches cancel older in-progress runs in the same workflow."
+          "Lets newer Windows render dispatches cancel older in-progress runs in the same workflow."
         ]
       },
       {
         "version": "3.34.14",
         "date": "2026-06-22",
-        "title": "Windows VI Browser 2.0 uses the Go render path directly",
-        "summary": "The Windows VI Browser 2.0 container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux 2.0 path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering. The shared runner now fails when a non-empty batch produces zero frames, and the Windows entrypoint times out a stuck Go runner while printing its captured logs.",
+        "title": "Windows VI Browser uses the Go render path directly",
+        "summary": "The Windows VI Browser container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering. The shared runner now fails when a non-empty batch produces zero frames, and the Windows entrypoint times out a stuck Go runner while printing its captured logs.",
         "highlights": [
           "Removes the PowerShell GetActiveObject gate that prevented the Go renderer from running in the Windows container.",
           "Keeps the existing Go runner/lvctl toolchain as the owner of LabVIEW startup and rendering on Windows.",
@@ -2154,8 +2168,8 @@
       {
         "version": "3.34.13",
         "date": "2026-06-22",
-        "title": "Windows VI Browser 2.0 uses the Go render path directly",
-        "summary": "The Windows VI Browser 2.0 container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux 2.0 path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering. The shared runner now fails when a non-empty batch produces zero frames so a broken render path cannot look successful.",
+        "title": "Windows VI Browser uses the Go render path directly",
+        "summary": "The Windows VI Browser container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering. The shared runner now fails when a non-empty batch produces zero frames so a broken render path cannot look successful.",
         "highlights": [
           "Removes the PowerShell GetActiveObject gate that prevented the Go renderer from running in the Windows container.",
           "Keeps the existing Go runner/lvctl toolchain as the owner of LabVIEW startup and rendering on Windows.",
@@ -2165,8 +2179,8 @@
       {
         "version": "3.34.12",
         "date": "2026-06-22",
-        "title": "Windows VI Browser 2.0 uses the Go render path directly",
-        "summary": "The Windows VI Browser 2.0 container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux 2.0 path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering.",
+        "title": "Windows VI Browser uses the Go render path directly",
+        "summary": "The Windows VI Browser container no longer blocks rendering on a separate PowerShell COM-readiness probe. It now prepares the LabVIEW container and immediately hands off to the same Go batch runner used by the Linux path, letting lvctl own LabVIEW attach, launch, readiness, and per-VI rendering.",
         "highlights": [
           "Removes the PowerShell GetActiveObject gate that prevented the Go renderer from running in the Windows container.",
           "Keeps the existing Go runner/lvctl toolchain as the owner of LabVIEW startup and rendering on Windows.",
@@ -2176,8 +2190,8 @@
       {
         "version": "3.34.11",
         "date": "2026-06-22",
-        "title": "Windows VI Browser 2.0 render failures are reported correctly",
-        "summary": "Windows VI Browser 2.0 runs now fail the workflow when the LabVIEW Windows container cannot start the COM-backed renderer, instead of reporting success with zero published frames. The renderer also waits longer for LabVIEW to become COM-ready in the stock Windows container so slow first launches have a chance to render before the run is marked failed.",
+        "title": "Windows VI Browser render failures are reported correctly",
+        "summary": "Windows VI Browser runs now fail the workflow when the LabVIEW Windows container cannot start the COM-backed renderer, instead of reporting success with zero published frames. The renderer also waits longer for LabVIEW to become COM-ready in the stock Windows container so slow first launches have a chance to render before the run is marked failed.",
         "highlights": [
           "Propagates non-zero Windows render exit codes out of the workflow so failed LabVIEW startup is visible in the VI Browser.",
           "Extends the COM-ready wait for the in-container LabVIEW startup from four minutes to ten minutes.",
@@ -2219,10 +2233,10 @@
       {
         "version": "3.34.7",
         "date": "2026-06-21",
-        "title": "Linux VI Browser 2.0 renders fall back from stale image overrides",
-        "summary": "Fixes manual Linux VI Browser 2.0 snapshot runs that appeared successful while rendering nothing because the TOIMAGES_IMAGE variable pointed at an old private image. The workflow now tries the requested override first, falls back to the repository-owned render image when the override cannot be pulled, and fails a manual run loudly if no render image is available at all.",
+        "title": "Linux VI Browser renders fall back from stale image overrides",
+        "summary": "Fixes manual Linux VI Browser snapshot runs that appeared successful while rendering nothing because the TOIMAGES_IMAGE variable pointed at an old private image. The workflow now tries the requested override first, falls back to the repository-owned render image when the override cannot be pulled, and fails a manual run loudly if no render image is available at all.",
         "highlights": [
-          "A stale or unauthorized TOIMAGES_IMAGE value no longer blocks Linux 2.0 rendering when the repo-owned image exists.",
+          "A stale or unauthorized TOIMAGES_IMAGE value no longer blocks Linux rendering when the repo-owned image exists.",
           "The renderer passes the actually pulled image into run-toimages.sh, so fallback runs render and publish frames normally.",
           "Manual runs now fail visibly if no render image is pullable instead of ending green without producing frames."
         ]
@@ -2263,23 +2277,23 @@
       {
         "version": "3.34.3",
         "date": "2026-06-22",
-        "title": "Windows VI Browser 2.0 dispatches render the selected revision",
-        "summary": "Running a Windows VI Browser 2.0 render from the browser no longer dispatches the workflow at a raw commit SHA, which GitHub can reject with HTTP 422. The page now dispatches the workflow on the repository's default branch and passes the selected revision as a target_sha input. The Windows workflow then materializes that target revision before building the worklist and rendering, so the generated <blob>.windows.json frames match the VI Browser revision the user selected.",
+        "title": "Windows VI Browser dispatches render the selected revision",
+        "summary": "Running a Windows VI Browser render from the browser no longer dispatches the workflow at a raw commit SHA, which GitHub can reject with HTTP 422. The page now dispatches the workflow on the repository's default branch and passes the selected revision as a target_sha input. The Windows workflow then materializes that target revision before building the worklist and rendering, so the generated <blob>.windows.json frames match the VI Browser revision the user selected.",
         "highlights": [
-          "Fixes the HTTP 422 error when clicking Run the Windows 2.0 snapshot from the VI Browser.",
+          "Fixes the HTTP 422 error when clicking Run the Windows snapshot from the VI Browser.",
           "Passes the selected revision as target_sha instead of using it as the workflow_dispatch ref.",
-          "Renders from a checked-out copy of target_sha so Windows 2.0 frames match the selected revision."
+          "Renders from a checked-out copy of target_sha so Windows frames match the selected revision."
         ]
       },
       {
         "version": "3.34.2",
         "date": "2026-06-22",
-        "title": "VI Browser 2.0 renders can be generated from the Windows container",
-        "summary": "The Windows VI Browser 2.0 path now uses the same cross-platform Go toimages renderer as the Linux path, built as Windows binaries and run inside the stock NI LabVIEW Windows container. Windows renders are published to Pages as <blob>.windows.json with a json-blobs.windows.json index, so the VI Browser's Windows tab can show the same in-place presentation as Linux once frames are generated. The Windows workflow skips only existing Windows JSON, so Linux <blob>.json files no longer hide missing Windows renders, and the catalog now installs the workflow plus its shared renderer assets.",
+        "title": "VI Browser renders can be generated from the Windows container",
+        "summary": "The Windows VI Browser path now uses the same cross-platform Go toimages renderer as the Linux path, built as Windows binaries and run inside the stock NI LabVIEW Windows container. Windows renders are published to Pages as <blob>.windows.json with a json-blobs.windows.json index, so the VI Browser's Windows tab can show the same in-place presentation as Linux once frames are generated. The Windows workflow skips only existing Windows JSON, so Linux <blob>.json files no longer hide missing Windows renders, and the catalog now installs the workflow plus its shared renderer assets.",
         "highlights": [
-          "Adds the Windows VI Browser 2.0 workflow and shared toimages renderer assets to the snapshots capability, so consumers receive the Windows render path when they update.",
+          "Adds the Windows VI Browser workflow and shared toimages renderer assets to the snapshots capability, so consumers receive the Windows render path when they update.",
           "Publishes <blob>.windows.json files and json-blobs.windows.json to Pages beside existing snapshot HTML and Linux <blob>.json frames.",
-          "Fixes Windows worklist seeding so existing Linux 2.0 frames never mask missing Windows 2.0 frames."
+          "Fixes Windows worklist seeding so existing Linux frames never mask missing Windows frames."
         ]
       },
       {
@@ -2647,21 +2661,21 @@
       {
         "version": "3.14.1",
         "date": "2026-06-19",
-        "title": "The VI Browser 2.0 Linux / Windows switch is always visible",
-        "summary": "The Linux / Windows switch in the VI Browser 2.0 view now shows whenever a 2.0 render is on screen, instead of only appearing once a Windows render existed. When a VI has no Windows render yet, the Windows option is shown but greyed with a tooltip explaining it is not published for that VI / repository yet - the same convention as the greyed-out Diff option - so the control is discoverable and Linux stays the active view. It enables itself automatically once the Windows render pipeline publishes its frames.",
+        "title": "The VI Browser Linux / Windows switch is always visible",
+        "summary": "The Linux / Windows switch in the VI Browser view now shows whenever a snapshot render is on screen, instead of only appearing once a Windows render existed. When a VI has no Windows render yet, the Windows option is shown but greyed with a tooltip explaining it is not published for that VI / repository yet - the same convention as the greyed-out Diff option - so the control is discoverable and Linux stays the active view. It enables itself automatically once the Windows render pipeline publishes its frames.",
         "highlights": [
-          "The Linux / Windows toggle is now always visible in the 2.0 view, so you can see the platform choice exists.",
+          "The Linux / Windows toggle is now always visible in the snapshot view, so you can see the platform choice exists.",
           "Windows is greyed with an explanatory tooltip until a Windows render is published for that VI, then it enables automatically.",
-          "Linux remains the default and active render; nothing else about the 2.0 view changes."
+          "Linux remains the default and active render; nothing else about the snapshot view changes."
         ]
       },
       {
         "version": "3.14.0",
         "date": "2026-06-19",
-        "title": "Switch the VI Browser 2.0 view between the Linux and Windows render",
-        "summary": "The in-place VI Browser 2.0 viewer can now show the render produced on Windows as well as the one produced on Linux. When a VI has a Windows render, a Linux / Windows switch appears in the 2.0 toolbar next to Front Panel / Block Diagram; picking one loads that platform's position-aware frames, and the choice is carried in the shareable URL. The switch only appears for a VI that actually has a Windows render, so the view stays exactly as before until the Windows render pipeline publishes its frames - Linux remains the default.",
+        "title": "Switch the VI Browser view between the Linux and Windows render",
+        "summary": "The in-place VI Browser viewer can now show the render produced on Windows as well as the one produced on Linux. When a VI has a Windows render, a Linux / Windows switch appears in the snapshots toolbar next to Front Panel / Block Diagram; picking one loads that platform's position-aware frames, and the choice is carried in the shareable URL. The switch only appears for a VI that actually has a Windows render, so the view stays exactly as before until the Windows render pipeline publishes its frames - Linux remains the default.",
         "highlights": [
-          "A Linux / Windows toggle in the 2.0 view loads the position-aware render from whichever container produced it.",
+          "A Linux / Windows toggle in the snapshot view loads the position-aware render from whichever container produced it.",
           "The toggle appears only for VIs that have a Windows render (driven by the published render index), so there is never a dead button, and Linux stays the default.",
           "The selected platform is reflected in the shareable / printable VI Browser URL (plat2=windows)."
         ]
@@ -2931,12 +2945,12 @@
       {
         "version": "3.7.0",
         "date": "2026-06-18",
-        "title": "Choose how the VI Browser renders: Windows or Linux, 1.0 or 2.0",
-        "summary": "The Configure page gains a VI Browser tab (and the header menu gains a VI Browser entry) where you choose which renders run automatically when a new revision lands: the classic 1.0 HTML gallery, and the position-aware 2.0 view on Windows and/or Linux. 2.0 on Windows - produced by the same Windows snapshot run - is now the recommended path, while the experimental Linux toimages render, which has known diagram-capture display bugs, is kept available but turned off by default. The classic 1.0 gallery continues to run on Windows. Your selection is saved to config.viBrowser in .github/labview-ci.yml and honoured by the VI Snapshots workflows: the Windows run emits the position-aware 2.0 frames only when Windows 2.0 is enabled, and the Linux toimages render auto-runs only when Linux 2.0 is enabled (a manual run always works).",
+        "title": "Choose how the VI Browser renders: Windows or Linux, snapshot or snapshots",
+        "summary": "Configure selects the platforms that render interactive snapshots for each new revision. Windows and Linux share one Snapshots capability and the VI Browser uses frames for in-place navigation.",
         "highlights": [
           "New VI Browser tab on the Configure page (and a VI Browser entry in the header menu) to pick which render generations and operating systems run on each new revision.",
-          "VI Browser 2.0 can be rendered on Windows - now the recommended path - with the Linux toimages render kept as a configurable, experimental option (it has known diagram-capture display bugs).",
-          "The choice is stored in config.viBrowser in labview-ci.yml; the Windows snapshot run and the Linux 2.0 render honour it, and a manual run is always available."
+          "VI Browser can be rendered on Windows - now the recommended path - with the Linux toimages render kept as a configurable, experimental option (it has known diagram-capture display bugs).",
+          "The choice is stored in config.viBrowser in labview-ci.yml; the Windows snapshot run and the Linux render honour it, and a manual run is always available."
         ]
       },
       {
@@ -2987,11 +3001,11 @@
         "version": "3.6.3",
         "date": "2026-06-19",
         "title": "VI Browser: a new VI shows a \"New\" badge, and Diff is reserved for actual changes",
-        "summary": "In the VI Browser file tree, every changed VI used to show the same \"diff\" badge - even a brand-new VI that has no previous version to compare against, so clicking it opened a diff view that could not show a meaningful comparison. A VI that is new in the selected revision now shows a green \"New\" badge that opens its snapshot, while a modified VI keeps the brown \"Diff\" badge. The Diff view - and the toolbar's Diff toggle and \"View diff report\" link - is offered only for an actual change: selecting Diff shows only the side-by-side report, or a clear note when one has not been generated yet, and never falls back to the 1.0 or 2.0 visualization. A stale view=diff link to a new VI now opens its snapshot instead.",
+        "summary": "In the VI Browser file tree, every changed VI used to show the same \"diff\" badge - even a brand-new VI that has no previous version to compare against, so clicking it opened a diff view that could not show a meaningful comparison. A VI that is new in the selected revision now shows a green \"New\" badge that opens its snapshot, while a modified VI keeps the brown \"Diff\" badge. The Diff view - and the toolbar's Diff toggle and \"View diff report\" link - is offered only for an actual change: selecting Diff shows only the side-by-side report, or a clear note when one has not been generated yet, and never falls back to the snapshot or snapshots visualization. A stale view=diff link to a new VI now opens its snapshot instead.",
         "highlights": [
           "A VI that is new in a revision shows a green \"New\" badge (instead of \"diff\") and opens its snapshot; a modified VI shows the brown \"Diff\" badge.",
           "The Diff toggle and the \"View diff report\" link appear only for a modified VI; for a new VI the Diff toggle is grayed out with a tip that there is no earlier version to compare.",
-          "Selecting Diff shows only the side-by-side report, or a note when it has not been generated yet - it never shows the 1.0 or 2.0 render."
+          "Selecting Diff shows only the side-by-side report, or a note when it has not been generated yet - it never shows the snapshot or snapshot render."
         ]
       },
       {
@@ -3009,7 +3023,7 @@
         "version": "3.6.1",
         "date": "2026-06-18",
         "title": "Changelog: restore the v3.5.3 release note",
-        "summary": "While v3.6.0 was being published, a concurrent edit dropped the v3.5.3 entry (VI Browser 2.0: the diagram canvas stays white in dark mode) from this changelog. This patch restores it so the release history is complete - the v3.5.3 change itself already shipped as part of v3.6.0; only its note was missing. No tooling changed in this patch.",
+        "summary": "While v3.6.0 was being published, a concurrent edit dropped the v3.5.3 entry (VI Browser: the diagram canvas stays white in dark mode) from this changelog. This patch restores it so the release history is complete - the v3.5.3 change itself already shipped as part of v3.6.0; only its note was missing. No tooling changed in this patch.",
         "highlights": [
           "Restored the v3.5.3 release note that a concurrent edit dropped from the changelog (no tooling change)."
         ]
@@ -3028,27 +3042,27 @@
       {
         "version": "3.5.3",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0: the diagram canvas stays white in dark mode",
-        "summary": "The in-place 2.0 diagram viewing area now always uses a white canvas, even when the dashboard is in dark mode. LabVIEW block diagrams and front panels are drawn on white, so a dark backdrop made wires and labels harder to read and clashed with the rendered images. The page chrome around the viewer still follows the light/dark theme.",
+        "title": "VI Browser: the diagram canvas stays white in dark mode",
+        "summary": "The in-place snapshots diagram viewing area now always uses a white canvas, even when the dashboard is in dark mode. LabVIEW block diagrams and front panels are drawn on white, so a dark backdrop made wires and labels harder to read and clashed with the rendered images. The page chrome around the viewer still follows the light/dark theme.",
         "highlights": [
-          "The VI Browser 2.0 diagram canvas is always white - even in dark mode - matching how LabVIEW draws diagrams."
+          "The VI Browser diagram canvas is always white - even in dark mode - matching how LabVIEW draws diagrams."
         ]
       },
       {
         "version": "3.5.2",
         "date": "2026-06-18",
         "title": "VI Browser: a 'Diff' option on the Viewer switch",
-        "summary": "The VI Browser's Viewer switch now has a third option - Diff - alongside 1.0 and 2.0, so a changed VI's side-by-side diff is part of the same control you use to choose how a VI is shown. Diff is grayed out, with a tip strip explaining the VI was not modified in this revision, for any VI that did not change, and it lights up for changed VIs. Clicking a VI's diff badge in the file tree now also selects the Diff option, and switching back to 1.0 or 2.0 returns to that VI's snapshot - so moving between a VI's snapshot and its diff is one consistent toggle.",
+        "summary": "The VI Browser's Viewer switch now has a third option - Diff - alongside snapshot and snapshots, so a changed VI's side-by-side diff is part of the same control you use to choose how a VI is shown. Diff is grayed out, with a tip strip explaining the VI was not modified in this revision, for any VI that did not change, and it lights up for changed VIs. Clicking a VI's diff badge in the file tree now also selects the Diff option, and switching back to snapshot or snapshots returns to that VI's snapshot - so moving between a VI's snapshot and its diff is one consistent toggle.",
         "highlights": [
-          "The Viewer switch gained a third option, Diff, next to 1.0 and 2.0 for the open VI's side-by-side diff report.",
+          "The Viewer switch gained a third option, Diff, next to snapshot and snapshots for the open VI's side-by-side diff report.",
           "Diff is grayed out with an explanatory tip strip ('not modified in this revision') for VIs that did not change, and is enabled for changed VIs.",
-          "Clicking a VI's diff badge selects the Diff option; switching to 1.0 or 2.0 returns to that VI's snapshot, so snapshot and diff share one toggle."
+          "Clicking a VI's diff badge selects the Diff option; switching to snapshot or snapshots returns to that VI's snapshot, so snapshot and diff share one toggle."
         ]
       },
       {
         "version": "3.5.1",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0: case selectors restored on diagrams with structures",
+        "title": "VI Browser: case selectors restored on diagrams with structures",
         "summary": "A recent renderer change clipped the case selector that sits just above each Case, Event, and Stacked-Sequence structure, so some block diagrams - especially larger producer/consumer VIs with an event handler and a case structure - showed as a static image even though they had multiple cases to page through. The selector tab is now shown again on every structure (including nested ones), so you can step through each structure's cases with the on-frame arrows or the left/right keys. Stepping still keeps the diagram at its fixed parent size - only the clip that hid the selector was removed.",
         "highlights": [
           "The case selector (left/right through 'n/N') is visible again on every Case/Event/Stacked-Sequence structure, including nested ones.",
@@ -3059,20 +3073,20 @@
       {
         "version": "3.5.0",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0 is now built in - no render image or token to set up",
-        "summary": "The in-place 2.0 renderer (true-to-LabVIEW front panels and block diagrams) used to require a separate private image and a registry token. It is now built into the tooling: every repo builds its OWN render image from the vendored engine and pulls it with the built-in Actions token - so 2.0 works for everyone with no secrets, no token wizard, and no manual setup. A new 'Build VI Browser 2.0 render image' workflow publishes the image to your repo's own registry, and the snapshot-to-JSON workflow pulls it automatically (and skips gracefully until the first image build finishes). The classic 1.0 flat view is unchanged.",
+        "title": "VI Browser is now built in - no render image or token to set up",
+        "summary": "Interactive snapshots are generated by the repository-owned render engine using the built-in Actions token. The snapshot workflows publish frames for the VI Browser without a separate registry-token setup.",
         "highlights": [
-          "VI Browser 2.0 render engine is vendored into the tooling - no private image and no read:packages token.",
+          "VI Browser render engine is vendored into the tooling - no private image and no read:packages token.",
           "Each repo builds and pulls its own render image with the built-in GITHUB_TOKEN (override with the optional TOIMAGES_IMAGE variable).",
           "The old render-token setup is deprecated and no longer needed; existing TOIMAGES_IMAGE overrides still work.",
-          "The 1.0 flat VI Browser view is untouched; 2.0 lights up wherever a rendered JSON exists and falls back to 1.0 otherwise."
+          "The snapshot flat VI Browser view is untouched; snapshots lights up wherever a rendered JSON exists and falls back to snapshot otherwise."
         ]
       },
       {
         "version": "3.4.42",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0: diagrams open fitted, smoother zoom, and a Fit button",
-        "summary": "Polish for the in-place 2.0 renderer. Every diagram now opens fitted in the visible area - even very large block diagrams that previously overflowed - so the size stays consistent as you move between VIs. Ctrl/Cmd + scroll zoom is now smooth and proportional instead of jumping in big steps, and a new Fit button returns the diagram to its default size and position. Each Case/Event case is also clipped to its structure's slot so it always renders at the parent-diagram size.",
+        "title": "VI Browser: diagrams open fitted, smoother zoom, and a Fit button",
+        "summary": "Polish for the in-place snapshot renderer. Every diagram now opens fitted in the visible area - even very large block diagrams that previously overflowed - so the size stays consistent as you move between VIs. Ctrl/Cmd + scroll zoom is now smooth and proportional instead of jumping in big steps, and a new Fit button returns the diagram to its default size and position. Each Case/Event case is also clipped to its structure's slot so it always renders at the parent-diagram size.",
         "highlights": [
           "Diagrams always open fitted to the view (the fit no longer bottoms out, so very large diagrams fit too).",
           "Smoother Ctrl/Cmd+scroll zoom - proportional to the scroll amount and gentle per tick.",
@@ -3083,9 +3097,9 @@
         "version": "3.4.41",
         "date": "2026-06-18",
         "title": "Deep link and share any report - a Share button on snapshots, diffs, Mass Compile, VI Analyzer and more",
-        "summary": "Every report view is now a shareable, printable link. The VI Browser mirrors the open VI and whether you are viewing its snapshot or its side-by-side diff (along with the revision, container platform, 1.0/2.0 view and changed-only filter) into the address bar, and reopens that exact view when someone follows the link - so sending a colleague a specific snapshot or diff lands them on it instead of the default page. A new Share button in the shared header (and the mobile menu) copies the deep link, opens it in a new tab, prints just the report content, or hands off to the device native share sheet. The framed Mass Compile / VI Analyzer / Unit Tests / Antidoc reports were already deep-linkable and now carry the same Share and Print affordance. Printing drops the page chrome so the output is the report itself.",
+        "summary": "Every report view is now a shareable, printable link. The VI Browser mirrors the open VI and whether you are viewing its snapshot or its side-by-side diff (along with the revision, container platform, snapshot/snapshot view and changed-only filter) into the address bar, and reopens that exact view when someone follows the link - so sending a colleague a specific snapshot or diff lands them on it instead of the default page. A new Share button in the shared header (and the mobile menu) copies the deep link, opens it in a new tab, prints just the report content, or hands off to the device native share sheet. The framed Mass Compile / VI Analyzer / Unit Tests / Antidoc reports were already deep-linkable and now carry the same Share and Print affordance. Printing drops the page chrome so the output is the report itself.",
         "highlights": [
-          "VI Browser deep links: the open VI plus snapshot/diff view (and revision, platform, 1.0/2.0, changed-only) are encoded in the URL and restored on load.",
+          "VI Browser deep links: the open VI plus snapshot/diff view (and revision, platform, snapshot, changed-only) are encoded in the URL and restored on load.",
           "Share button in the header and mobile menu: copy link, open in a new tab, native share, and print.",
           "Print yields just the report or snapshot - the header chrome is hidden when printing.",
           "Covers snapshots, diffs, and the framed Mass Compile / VI Analyzer / Unit Tests / Antidoc reports."
@@ -3094,12 +3108,12 @@
       {
         "version": "3.4.40",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0 renders every revision (backfill) + a live 2.0 glyph in the file tree",
-        "summary": "The in-place 2.0 view now covers every VI in your history, not just ones whose content matches the latest commit. The render workflow walks each VI-touching commit in a detached worktree (so a VI that changed - like a top-level main.vi - is rendered with the dependencies of its own revision), publishes results incrementally, and the VI Browser file tree shows a small 2.0 glyph beside each file that has a position-aware render. The glyph appears on its own as a run publishes results, with no manual reload, and the in-viewer Re-run now renders the whole history.",
+        "title": "VI Browser renders every revision (backfill) + a live snapshots glyph in the file tree",
+        "summary": "The in-place snapshot view now covers every VI in your history, not just ones whose content matches the latest commit. The render workflow walks each VI-touching commit in a detached worktree (so a VI that changed - like a top-level main.vi - is rendered with the dependencies of its own revision), publishes results incrementally, and the VI Browser file tree shows a small snapshots glyph beside each file that has a position-aware render. The glyph appears on its own as a run publishes results, with no manual reload, and the in-viewer Re-run now renders the whole history.",
         "highlights": [
-          "2.0 renders now backfill across all VI-touching commits via per-commit worktrees, so every revision's VIs get a render (fixes VIs like main.vi that changed since HEAD never appearing in 2.0).",
-          "Results publish incrementally during a run, and a flat json-blobs.json index lets the file tree light up a 2.0 glyph per file as renders land - no reload.",
-          "The in-viewer 'Re-run the 2.0 snapshot' (and first-time Generate) now dispatch a full backfill instead of only the current commit."
+          "snapshot renders now backfill across all VI-touching commits via per-commit worktrees, so every revision's VIs get a render (fixes VIs like main.vi that changed since HEAD never appearing in snapshots).",
+          "Results publish incrementally during a run, and a flat json-blobs.json index lets the file tree light up a snapshots glyph per file as renders land - no reload.",
+          "The in-viewer 'Re-run the snapshot' (and first-time Generate) now dispatch a full backfill instead of only the current commit."
         ]
       },
       {
@@ -3116,10 +3130,10 @@
       {
         "version": "3.4.38",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0: switch between a VI's front panel and block diagram",
-        "summary": "The 2.0 in-place report adds a Front Panel / Block Diagram toggle to the viewer toolbar, so you can flip between a VI's user interface and its code (Case/Event structures navigated in place) without leaving the browser. Your choice sticks as you move between VIs.",
+        "title": "VI Browser: switch between a VI's front panel and block diagram",
+        "summary": "The snapshots in-place report adds a Front Panel / Block Diagram toggle to the viewer toolbar, so you can flip between a VI's user interface and its code (Case/Event structures navigated in place) without leaving the browser. Your choice sticks as you move between VIs.",
         "highlights": [
-          "New Front Panel / Block Diagram switch on the 2.0 report toolbar, beside the 1.0/2.0 viewer toggle.",
+          "New Front Panel / Block Diagram switch on the snapshots report toolbar, beside the Snapshot / Diff toggle.",
           "Front Panel shows the VI interface; Block Diagram opens the in-place renderer rooted on the diagram.",
           "The choice is sticky across VIs; a VI with no block-diagram render keeps that option disabled and stays on the front panel."
         ]
@@ -3139,7 +3153,7 @@
         "version": "3.4.36",
         "date": "2026-06-18",
         "title": "VI Browser shows a 'diff' badge on every changed VI and can run or regenerate the side-by-side VIDiff report on demand",
-        "summary": "In the VI Browser a changed VI now always shows a uniform 'diff' badge (its colour still encodes added/modified/deleted) instead of sometimes reading 'modified'. Opening a VI whose side-by-side VIDiff report has not been generated yet shows an in-viewer panel that explains the report has not been run and offers to run it - for just that VI or for every VI the revision changed. When a report already exists, the toolbar gains a 'Regenerate diff' button that re-runs VIDiff the same way. Runs are queued straight from the page using the same dispatch token the VI Browser 2.0 setup already stores; when the run finishes and the dashboard redeploys, reloading shows the report. The VIDiff container workflows gained an optional 'files' input so a single-VI diff only renders that VI, and the VIDiff deploy now merges each report into the revision's existing index so a single-VI run never drops other VIs' reports.",
+        "summary": "In the VI Browser a changed VI now always shows a uniform 'diff' badge (its colour still encodes added/modified/deleted) instead of sometimes reading 'modified'. Opening a VI whose side-by-side VIDiff report has not been generated yet shows an in-viewer panel that explains the report has not been run and offers to run it - for just that VI or for every VI the revision changed. When a report already exists, the toolbar gains a 'Regenerate diff' button that re-runs VIDiff the same way. Runs are queued straight from the page using the same dispatch token the VI Browser setup already stores; when the run finishes and the dashboard redeploys, reloading shows the report. The VIDiff container workflows gained an optional 'files' input so a single-VI diff only renders that VI, and the VIDiff deploy now merges each report into the revision's existing index so a single-VI run never drops other VIs' reports.",
         "highlights": [
           "Every changed VI shows a consistent 'diff' badge - no more 'modified' label when the side-by-side report has not been generated yet.",
           "Opening a VI with no diff report shows a clear message plus a button to run VIDiff for just that VI or for the entire revision.",
@@ -3406,21 +3420,21 @@
       {
         "version": "3.4.12",
         "date": "2026-06-18",
-        "title": "Apply to New Repo: VI Browser 2.0 render setup removed from install",
-        "summary": "The Apply to New Repo / Integrate page no longer includes the optional \"VI Browser 2.0 - position-aware renders\" panel for setting a private render image and read-token. That configuration does not need to be done at install time and is still available later from the dashboard's own VI Browser 2.0 setup wizard, which provisions the same render image and token when you choose to enable the in-place 2.0 view. Because that panel was the only part of the installer that writes a repository secret, the pre-filled install token no longer requests the Secrets permission; Variables (used to pin your settings) and the other permissions are unchanged. There is no change to an already-installed pipeline.",
+        "title": "Apply to New Repo: VI Browser render setup removed from install",
+        "summary": "The Apply to New Repo / Integrate page no longer includes the optional \"VI Browser - position-aware renders\" panel for setting a private render image and read-token. That configuration does not need to be done at install time and is still available later from the dashboard's own VI Browser setup wizard, which provisions the same render image and token when you choose to enable the in-place snapshot view. Because that panel was the only part of the installer that writes a repository secret, the pre-filled install token no longer requests the Secrets permission; Variables (used to pin your settings) and the other permissions are unchanged. There is no change to an already-installed pipeline.",
         "highlights": [
-          "The installer's optional VI Browser 2.0 render-image/token panel is removed - that setup is not needed at install time.",
-          "VI Browser 2.0 can still be provisioned later from the dashboard's own VI Browser setup wizard.",
+          "The installer's optional VI Browser render-image/token panel is removed - that setup is not needed at install time.",
+          "VI Browser can still be provisioned later from the dashboard's own VI Browser setup wizard.",
           "The pre-filled install token no longer requests Secrets (it was only used by that panel); Variables and the other permissions are unchanged."
         ]
       },
       {
         "version": "3.4.11",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0 reflects real render status instead of the token prompt",
-        "summary": "Once a repository is provisioned, the 2.0 view no longer shows the 'needs a render token' prompt (or a 1.0 fallback) for a VI that has no position-aware frames. It now reflects the actual state: the token prompt only when the repo is not connected; the in-place render when frames exist; a 'rendering...' status with a link to the run while the snapshot action is in progress; and, when a run finished without frames for a VI, a plain explanation - controls (.ctl) and VIs without a block diagram are skipped, and a render the image could not open is skipped - plus View run and Re-run buttons. It reads the latest vi-snapshots-json.yml run via the Actions API using the dispatch token, and polls while a run is in progress.",
+        "title": "VI Browser reflects real render status instead of the token prompt",
+        "summary": "Once a repository is provisioned, the snapshot view no longer shows the 'needs a render token' prompt (or a snapshot fallback) for a VI that has no position-aware frames. It now reflects the actual state: the token prompt only when the repo is not connected; the in-place render when frames exist; a 'rendering...' status with a link to the run while the snapshot action is in progress; and, when a run finished without frames for a VI, a plain explanation - controls (.ctl) and VIs without a block diagram are skipped, and a render the image could not open is skipped - plus View run and Re-run buttons. It reads the latest vi-snapshots-json.yml run via the Actions API using the dispatch token, and polls while a run is in progress.",
         "highlights": [
-          "The 2.0 view now reflects real state: token prompt / in-place render / rendering-in-progress / finished-with-no-frames or failed.",
+          "The snapshot view now reflects real state: token prompt / in-place render / rendering-in-progress / finished-with-no-frames or failed.",
           "A provisioned repo no longer shows 'needs a render token' for a VI that simply has no frames - it explains why and offers View run + Re-run.",
           "Reads the latest vi-snapshots-json.yml run status via the Actions API (dispatch token) and auto-refreshes while a run is in progress."
         ]
@@ -3439,12 +3453,12 @@
       {
         "version": "3.4.9",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0: clearer setup-token guidance (repository access + which permission)",
-        "summary": "The VI Browser 2.0 setup-token prompt now spells out the step the token URL cannot pre-fill: under Repository access, choose Only select repositories and pick this repo. A token left at the read-only default cannot write and returns a 403, which was the most common remaining cause of a stuck connect even after the permission params were fixed. When a token is then rejected, the error names exactly which permission is missing - 'cannot write Secrets' (check repository access plus Secrets: Read and write) versus 'the render token saved, but cannot write Variables' - so you know precisely what to fix instead of a generic message. The link still pre-checks Secrets and Variables.",
+        "title": "VI Browser: clearer setup-token guidance (repository access + which permission)",
+        "summary": "The VI Browser setup-token prompt now spells out the step the token URL cannot pre-fill: under Repository access, choose Only select repositories and pick this repo. A token left at the read-only default cannot write and returns a 403, which was the most common remaining cause of a stuck connect even after the permission params were fixed. When a token is then rejected, the error names exactly which permission is missing - 'cannot write Secrets' (check repository access plus Secrets: Read and write) versus 'the render token saved, but cannot write Variables' - so you know precisely what to fix instead of a generic message. The link still pre-checks Secrets and Variables.",
         "highlights": [
           "Setup-token prompt now tells you to select this repository under Repository access (the step the URL cannot pre-fill, and the most common 403 cause).",
           "403 errors now name the exact missing permission - Secrets vs Variables - and note when the secret already saved.",
-          "VI Browser 2.0 only; the token link still pre-checks Secrets + Variables (Read and write)."
+          "VI Browser only; the token link still pre-checks Secrets + Variables (Read and write)."
         ]
       },
       {
@@ -3462,10 +3476,10 @@
         "version": "3.4.7",
         "date": "2026-06-18",
         "title": "Setup-token links now pre-select the Variables permission",
-        "summary": "The pre-filled fine-grained token-creation links - the VI Browser 2.0 setup token and the installer token on the Integrate page - used the wrong URL parameter for the Variables permission (variables instead of GitHub's actual actions_variables), so GitHub silently ignored it and the generated token was missing Variables: Read and write. That left the token unable to save the TOIMAGES_IMAGE render-image variable even when Secrets was granted. The links now send actions_variables, so opening the token page pre-selects both Secrets and Variables (Read and write). Secrets and Actions were already correct.",
+        "summary": "The pre-filled fine-grained token-creation links - the VI Browser setup token and the installer token on the Integrate page - used the wrong URL parameter for the Variables permission (variables instead of GitHub's actual actions_variables), so GitHub silently ignored it and the generated token was missing Variables: Read and write. That left the token unable to save the TOIMAGES_IMAGE render-image variable even when Secrets was granted. The links now send actions_variables, so opening the token page pre-selects both Secrets and Variables (Read and write). Secrets and Actions were already correct.",
         "highlights": [
           "Token-creation links now correctly pre-select the Variables permission (GitHub's parameter is actions_variables, not variables).",
-          "Fixes both the VI Browser 2.0 setup token and the installer token on the Integrate page.",
+          "Fixes both the VI Browser setup token and the installer token on the Integrate page.",
           "The pre-filled GitHub token form now has Secrets + Variables (Read and write) ready - no manual permission hunting."
         ]
       },
@@ -3483,8 +3497,8 @@
       {
         "version": "3.4.5",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0: a rejected render-token setup token can be fixed in place",
-        "summary": "After the connect-hang fix, a setup token that lacked permission - for example reusing the read:packages render token, which cannot write secrets - showed a clear error but left the bad token saved, so clicking Connect again just repeated the same error with no way to enter a different one. Now a rejected or insufficient setup token (401/403/404) is dropped automatically and the prompt reopens in place with specific guidance - including that the setup token is a separate, fine-grained token with Secrets and Variables set to Read and write, distinct from the render token - so you can paste a corrected token and finish without reloading. The render token you already pasted is kept, and the same in-place recovery now applies to the Actions: write token used by the Generate the 2.0 snapshot button.",
+        "title": "VI Browser: a rejected render-token setup token can be fixed in place",
+        "summary": "After the connect-hang fix, a setup token that lacked permission - for example reusing the read:packages render token, which cannot write secrets - showed a clear error but left the bad token saved, so clicking Connect again just repeated the same error with no way to enter a different one. Now a rejected or insufficient setup token (401/403/404) is dropped automatically and the prompt reopens in place with specific guidance - including that the setup token is a separate, fine-grained token with Secrets and Variables set to Read and write, distinct from the render token - so you can paste a corrected token and finish without reloading. The render token you already pasted is kept, and the same in-place recovery now applies to the Actions: write token used by the Generate the snapshot button.",
         "highlights": [
           "A rejected or under-scoped setup token is now cleared and re-requested in place instead of dead-ending on the error.",
           "The prompt spells out that the setup token is a separate fine-grained token (Secrets + Variables: Read and write), not the read:packages render token.",
@@ -3516,12 +3530,12 @@
       {
         "version": "3.4.2",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0: reliable render-token connect",
-        "summary": "Connecting a render token from the VI Browser 2.0 lock screen could appear to hang at the sealing-and-saving step and never finish. The underlying cause - a response read before it had arrived, which silently aborted the connect - is fixed, and the flow now reports each step (reading the repository key, loading the encryption library, saving the token, checking the render image) and times out with a clear, retryable message instead of hanging. The in-browser encryption library also falls back to a second, integrity-pinned CDN if the first is blocked. On success the lock dialog is replaced by a Connected confirmation that names the render image and offers a one-click button to run the snapshot action that populates VI Browser 2.0 with imagery, and the two-step token prompt now confirms the render token is captured while it collects the one-time setup token.",
+        "title": "VI Browser: reliable render-token connect",
+        "summary": "Connecting a render token from the VI Browser lock screen could appear to hang at the sealing-and-saving step and never finish. The underlying cause - a response read before it had arrived, which silently aborted the connect - is fixed, and the flow now reports each step (reading the repository key, loading the encryption library, saving the token, checking the render image) and times out with a clear, retryable message instead of hanging. The in-browser encryption library also falls back to a second, integrity-pinned CDN if the first is blocked. On success the lock dialog is replaced by a Connected confirmation that names the render image and offers a one-click button to run the snapshot action that populates VI Browser with imagery, and the two-step token prompt now confirms the render token is captured while it collects the one-time setup token.",
         "highlights": [
           "The render-token connect no longer hangs: each step reports progress and fails with a clear, retryable message.",
           "The in-browser encryption library now has an integrity-pinned fallback CDN if the primary one is blocked.",
-          "On success the lock screen is replaced by a Connected panel with a one-click Generate the 2.0 snapshot button."
+          "On success the lock screen is replaced by a Connected panel with a one-click Generate the snapshot button."
         ]
       },
       {
@@ -3571,8 +3585,8 @@
       {
         "version": "3.3.1",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0 wizard: enter the setup token without leaving the page",
-        "summary": "The VI Browser 2.0 setup wizard could dead-end: if this browser had not already stored a setup token (one with Secrets: write), pasting the render token and clicking Connect only told you to go set one up on the Integrate page. Connect - and the Generate step - now prompt for the missing token right on the lock screen, with a pre-scoped 'Create one' link; you paste it, it is kept only in your browser, and the action retries automatically. If your browser already has the token from installing, nothing changes.",
+        "title": "VI Browser wizard: enter the setup token without leaving the page",
+        "summary": "The VI Browser setup wizard could dead-end: if this browser had not already stored a setup token (one with Secrets: write), pasting the render token and clicking Connect only told you to go set one up on the Integrate page. Connect - and the Generate step - now prompt for the missing token right on the lock screen, with a pre-scoped 'Create one' link; you paste it, it is kept only in your browser, and the action retries automatically. If your browser already has the token from installing, nothing changes.",
         "highlights": [
           "Connect and Generate now request a missing setup or dispatch token inline, with a correctly-scoped create link, instead of redirecting to the Integrate page.",
           "The render token stays a least-privilege read:packages token; the setup token is stored only in your browser and reused, so it is a one-time step."
@@ -3592,21 +3606,21 @@
       {
         "version": "3.2.0",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0: set up the render token right on the lock screen",
-        "summary": "When a repository has not been provisioned for the in-place VI Browser 2.0 view, the lock screen is now an interactive setup wizard instead of two links. Step 1 opens GitHub's token page with the read:packages scope preselected; step 2 is an in-place box where you paste the render token, which is sealed in your browser (libsodium) and saved as the TOIMAGES_REGISTRY_TOKEN secret along with the render image variable, reusing the setup token already stored in this browser; and once that succeeds a 'Generate the 2.0 snapshot' button appears that dispatches the render workflow. The repository is detected from the page URL. Because a browser cannot test a private-registry pull, the dispatched run is the real confirmation that the token works.",
+        "title": "VI Browser: set up the render token right on the lock screen",
+        "summary": "When a repository has not been provisioned for the in-place VI Browser view, the lock screen is now an interactive setup wizard instead of two links. Step 1 opens GitHub's token page with the read:packages scope preselected; step 2 is an in-place box where you paste the render token, which is sealed in your browser (libsodium) and saved as the TOIMAGES_REGISTRY_TOKEN secret along with the render image variable, reusing the setup token already stored in this browser; and once that succeeds a 'Generate the snapshot' button appears that dispatches the render workflow. The repository is detected from the page URL. Because a browser cannot test a private-registry pull, the dispatched run is the real confirmation that the token works.",
         "highlights": [
-          "The 2.0 lock screen is now a guided 3-step wizard: get a token, paste it to save the secret, then generate the snapshot - without leaving the page.",
+          "The snapshots lock screen is now a guided 3-step wizard: get a token, paste it to save the secret, then generate the snapshot - without leaving the page.",
           "The render token is sealed in your browser and stored as the TOIMAGES_REGISTRY_TOKEN secret; the raw token never reaches the page host.",
-          "A 'Generate the 2.0 snapshot' button dispatches the render workflow and surfaces a token or permission error if the run cannot be queued."
+          "A 'Generate the snapshot' button dispatches the render workflow and surfaces a token or permission error if the run cannot be queued."
         ]
       },
       {
         "version": "3.1.2",
         "date": "2026-06-18",
-        "title": "VI Browser 2.0: the 'Get a render token' link now points to the right repository",
-        "summary": "On the VI Browser 2.0 lock screen - shown when a repository has not yet been provisioned with a render token - the 'Get a render token' link pointed at the wrong URL, so it could not take you to the private render repository. The link now points to the correct repository, so anyone with access lands where they can obtain a token. Nothing else changed: the token is still entered on the Integrate page, sealed in your browser, and stored as the TOIMAGES_REGISTRY_TOKEN secret, and a repository without a token still shows the 1.0 view.",
+        "title": "VI Browser: the 'Get a render token' link now points to the right repository",
+        "summary": "On the VI Browser lock screen - shown when a repository has not yet been provisioned with a render token - the 'Get a render token' link pointed at the wrong URL, so it could not take you to the private render repository. The link now points to the correct repository, so anyone with access lands where they can obtain a token. Nothing else changed: the token is still entered on the Integrate page, sealed in your browser, and stored as the TOIMAGES_REGISTRY_TOKEN secret, and a repository without a token still shows the snapshot view.",
         "highlights": [
-          "Corrected the 'Get a render token' link on the VI Browser 2.0 lock screen so it opens the right private render repository.",
+          "Corrected the 'Get a render token' link on the VI Browser lock screen so it opens the right private render repository.",
           "No change to entering or using the token - only the link target was fixed."
         ]
       },
@@ -3694,13 +3708,13 @@
       {
         "version": "2.8.0",
         "date": "2026-06-17",
-        "title": "VI Browser 2.0: navigate Case and Event structures in place",
-        "summary": "The VI Browser gains a 1.0 / 2.0 viewer switch, styled like the Windows/Linux tabs on a diff. 1.0 is the classic gallery you already know and stays the default, so nothing changes unless you opt in. 2.0 is a new in-place renderer that draws Case, Event, and Stacked Sequence structures right on the block diagram the way the LabVIEW editor shows them: each structure carries an on-diagram selector so you can page through its cases (including nested structures) without the diagram jumping, and the whole diagram pans and zooms. Your choice is remembered in the page URL, and 2.0 falls back to the 1.0 view (with a short note) for any VI that does not yet have the position data it needs. The snapshot pipeline is set up to produce that position data, so VIs start rendering in place in 2.0 automatically as it becomes available - existing snapshots and the classic view are unaffected.",
+        "title": "VI Browser: navigate Case and Event structures in place",
+        "summary": "The VI Browser offers Snapshot and Diff views. Snapshots render front panels and block diagrams interactively, with Case, Event, and Sequence selectors on the diagram.",
         "highlights": [
-          "New 'Viewer' 1.0 / 2.0 switch in the VI Browser toolbar (styled like the Windows/Linux diff tabs); 1.0, the classic flat gallery, remains the default so existing behavior is unchanged.",
-          "2.0 renders Case / Event / Stacked Sequence structures in place on the diagram - page through a structure's cases with an on-diagram selector, including nested structures - the way the LabVIEW editor shows them, with pan and zoom.",
-          "Your 1.0 / 2.0 choice persists in the page URL, and 2.0 gracefully falls back to the classic 1.0 view (with a note) for any VI that does not yet have position data.",
-          "The snapshot pipeline is prepared to emit the position-aware data that powers 2.0, so VIs light up in place automatically as it is generated; classic snapshots are untouched."
+          "The VI Browser offers Snapshot and Diff views. Snapshots render front panels and block diagrams interactively, with Case, Event, and Sequence selectors on the diagram.",
+          "snapshot renders Case / Event / Stacked Sequence structures in place on the diagram - page through a structure's cases with an on-diagram selector, including nested structures - the way the LabVIEW editor shows them, with pan and zoom.",
+          "The VI Browser renders available frames in place and shows a render-needed state when frames are missing.",
+          "The snapshot pipeline emits content-addressed frames for interactive viewing across revisions."
         ]
       },
       {
@@ -4435,7 +4449,7 @@
         "windowsTag": "nationalinstruments/labview:2026q3-windows",
         "linuxTag": "nationalinstruments/labview:2026q3-linux",
         "nipmFeedUrl": "https://download.ni.com/support/nipkg/products/ni-l/ni-labview-2026/26.3/released",
-        "vipmInstallerUrl": "https://traffic.libsyn.com/secure/jkinc/vipm-26.3.3954-windows-setup.exe",
+        "vipmInstallerUrl": "https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe",
         "status": "qualified",
         "notes": "Qualified 2026-08-21: VIPM startup probe passed on the stock NI image and the full dependency bake (34 packages incl. UTF essentials and the Antidoc suite) succeeded end-to-end (run 32510104950). The Aug 2026 bake wedge was a baked LV_RTE_HEADLESS=1, not this pairing."
       },
@@ -4483,6 +4497,12 @@
       ".github/labview/vipm/ci-tooling.vipc"
     ]
   },
+  "retiredFiles": {
+    "files": [".github/workflows/build-toimages-image.yml"],
+    "signatures": {
+      ".github/workflows/build-toimages-image.yml": ["group: build-toimages-image", ".github/labview/toimages"]
+    }
+  },
   "base": {
     "comment": "Always installed: the self-describing tooling so the target repo can re-run, inspect, or upgrade the install.",
     "files": [
@@ -4495,6 +4515,9 @@
       ".github/labview-ci/providers/gitlab/",
       ".github/labview/wait-for-worker-image.sh",
       ".github/labview/ensure-docker.ps1",
+      ".github/labview/dragon_deps.py",
+      ".github/labview/lvpm/worker.py",
+      ".github/labview/lvpm/adapter.py",
       ".github/actions/publish-gh-pages/action.yml"
     ]
   },
@@ -4611,6 +4634,8 @@
       "files": {
         "any": [
           ".github/workflows/vidiff-deploy.yml",
+          ".github/labview/extract-vidiff-artifact.py",
+          ".github/labview/validate-vidiff-deploy-metadata.py",
           ".github/labview/backfill-vidiff-statuses.sh",
           ".github/labview/PrintToSingleFileHtml/"
         ],
@@ -4624,6 +4649,7 @@
           ".github/workflows/vidiff-linux-container.yml",
           ".github/workflows/vidiff-backfill.yml",
           ".github/labview/vidiff.sh",
+          ".github/labview/build-vidiff-report.py",
           ".github/labview/vidiff-backfill.sh"
         ]
       },
@@ -4631,12 +4657,13 @@
     },
     {
       "id": "snapshots",
-      "name": "VI Snapshots + VI Browser",
-      "summary": "Renders a browseable, blob-addressed gallery of every VI's block diagram across history (the VI Browser), so reviewers can inspect any VI without opening LabVIEW. This is the classic Windows-only gallery render; for cross-platform, position-aware in-place frames enable VI Snapshots 2.0.",
+      "name": "VI Snapshots",
+      "summary": "Interactive, zoomable front panels and block diagrams across revision history in the VI Browser. Navigate cases, events, and sequences directly on the diagram without opening LabVIEW.",
       "status": "stable",
       "recommended": false,
       "supportsOs": [
-        "windows"
+        "windows",
+        "linux"
       ],
       "requires": [],
       "recommends": [
@@ -4648,17 +4675,23 @@
           ".github/pages/vi-browser.html",
           ".github/pages/vi-interactive.html",
           ".github/labview/build-gallery.py",
-          ".github/labview/PrintToSingleFileHtml/"
+          ".github/labview/build-snapshot-metadata.py",
+          ".github/pages/vi-render.js",
+          ".github/labview/run-toimages.sh",
+          ".github/labview/build-json-worklist.sh",
+          ".github/labview/toimages/"
         ],
         "windows": [
           ".github/workflows/vi-snapshots.yml",
           ".github/labview/build-snapshots.ps1",
           ".github/labview/render-snapshots.ps1",
-          ".github/labview/export-vi-snapshots.ps1"
+          ".github/workflows/vi-snapshots-json-windows.yml"
         ],
-        "linux": []
+        "linux": [
+          ".github/workflows/vi-snapshots-json.yml"
+        ]
       },
-      "notes": "The classic snapshot gallery render runs on the Windows container (PowerShell). It is Windows-only; for cross-platform, position-aware in-place rendering on Windows and Linux, enable VI Snapshots 2.0."
+      "notes": "Snapshots always use interactive frames. Windows and Linux renders are content-addressed by VI blob SHA and reuse unchanged code across revisions. Select render platforms in Configure; VIs without frames show a render-needed state."
     },
     {
       "id": "custom-image",
@@ -4688,46 +4721,15 @@
         "linux": [
           ".github/workflows/build-labview-linux-image.yml",
           ".github/workflows/copy-labview-linux-image.yml",
+          ".github/workflows/build-labview-lvpm-image.yml",
           ".github/docker/labview-ci-linux.Dockerfile",
+          ".github/docker/labview-ci-lvpm.Dockerfile",
           ".github/labview/vipm/install-vipc-linux.sh",
+          ".github/labview/vipm/ci-tooling.vipc",
           ".github/labview/toimages/"
         ]
       },
       "notes": "Required when you want to bake .vipc dependencies into the worker. Any configured VIPC file is detected and baked automatically; if no config is present, repository VIPC files outside .github are staged."
-    },
-    {
-      "id": "snapshots-2",
-      "name": "VI Snapshots 2.0",
-      "summary": "Cross-platform, position-aware VI Browser 2.0 rendering. A vendored Go engine renders each VI's block diagram in place and publishes frames JSON on Windows and Linux, so the VI Browser can show an interactive, zoomable diagram beside the classic gallery.",
-      "status": "stable",
-      "recommended": false,
-      "supportsOs": [
-        "windows",
-        "linux"
-      ],
-      "requires": [],
-      "recommends": [
-        "dashboard",
-        "snapshots"
-      ],
-      "statusContext": null,
-      "files": {
-        "any": [
-          ".github/pages/vi-browser.html",
-          ".github/pages/vi-interactive.html",
-          ".github/pages/vi-render.js",
-          ".github/labview/run-toimages.sh",
-          ".github/labview/build-json-worklist.sh",
-          ".github/labview/toimages/"
-        ],
-        "windows": [
-          ".github/workflows/vi-snapshots-json-windows.yml"
-        ],
-        "linux": [
-          ".github/workflows/vi-snapshots-json.yml"
-        ]
-      },
-      "notes": "Cross-platform position-aware renderer. The Linux path runs the render engine that is BAKED INTO the Linux worker image (no separate build -- it is copied with the worker); the Windows path runs the same Go engine in the stock NI Windows container (unless EXPERIMENTAL_WINDOWS_IMAGE is set). Renders publish <blob>.json (Linux) and <blob>.windows.json (Windows) beside the gallery."
     },
     {
       "id": "unit-tests",
@@ -4736,7 +4738,8 @@
       "status": "stable",
       "recommended": false,
       "supportsOs": [
-        "windows"
+        "windows",
+        "linux"
       ],
       "requires": [],
       "recommends": [
@@ -4752,9 +4755,12 @@
           ".github/workflows/unit-tests-windows-container.yml",
           ".github/labview/run-unit-tests.ps1"
         ],
-        "linux": []
+        "linux": [
+          ".github/workflows/unit-tests-linux-container.yml",
+          ".github/labview/run-unit-tests.sh"
+        ]
       },
-      "notes": "Runs the configured LabVIEW unit-test frameworks headlessly in the Windows worker, normalises their JUnit output into one report, and links each failing test to the VI under test in the VI Browser. Supports Caraya, LUnit, JKI VI Tester, and the NI Unit Test Framework. Windows-only because the frameworks ship as VIPM packages; choose which tools run and where their tests live on the Unit Testing page."
+      "notes": "Runs configured unit-test frameworks on Windows and LUnit on Linux, normalises JUnit into a report, and links failures to the VI Browser. Linux reports explain unsupported frameworks; configure tools on the Unit Testing page."
     },
     {
       "id": "antidoc",

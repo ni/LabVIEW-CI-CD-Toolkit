@@ -88,7 +88,7 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"description\":\"Mass Compile in progress\",\"context\":\"CI / Mass Compile\"}"
 
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.sha.outputs.sha }}
           fetch-depth: 0
@@ -236,7 +236,7 @@ jobs:
 
       - name: Upload report artifact
         if: steps.report.outputs.exists == 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: masscompile-report-${{ steps.sha.outputs.sha }}
           path: ${{ github.workspace }}/ci-out/masscompile/

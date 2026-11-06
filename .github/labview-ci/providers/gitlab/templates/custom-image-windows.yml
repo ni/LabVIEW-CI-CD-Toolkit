@@ -11,6 +11,7 @@ lvci:worker-windows:
         - ".github/docker/labview-ci-base.Dockerfile"
         - ".github/docker/labview-ci.Dockerfile"
         - ".github/labview/vipm/**/*"
+        - ".github/labview/dragon_deps.py"
         - ".github/labview-ci.yml"
         - ".gitlab/labview-ci/templates/custom-image-windows.yml"
         - "**/*.vipc"
@@ -19,29 +20,59 @@ lvci:worker-windows:
     - |
       $ErrorActionPreference = 'Stop'
       $vipmDir = Join-Path $env:CI_PROJECT_DIR '.github\labview\vipm'
-      Get-ChildItem -Path $env:CI_PROJECT_DIR -Recurse -File -Include '*.vipc', '*.dragon' |
+      Get-ChildItem -Path $env:CI_PROJECT_DIR -Recurse -File -Include '*.vipc' |
         Where-Object { $_.FullName -notmatch '[\\/]\.github[\\/]' } |
         ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $vipmDir $_.Name) -Force }
       $env:CI_REGISTRY_PASSWORD | docker login $env:CI_REGISTRY --username $env:CI_REGISTRY_USER --password-stdin
+      if ($LASTEXITCODE -ne 0) { throw "Registry login failed: $LASTEXITCODE" }
       $baseImage = "$env:CI_REGISTRY_IMAGE/labview-base:windows-$env:CI_COMMIT_SHA"
       $workerImage = "$env:CI_REGISTRY_IMAGE/labview:windows-$env:CI_COMMIT_SHA"
       $latestImage = "$env:CI_REGISTRY_IMAGE/labview:windows-latest"
       $catalogPath = Join-Path $env:CI_PROJECT_DIR '.github\labview-ci\catalog.json'
-      $containers = (Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json).containers
+      $catalog = Get-Content -LiteralPath $catalogPath -Raw | ConvertFrom-Json
+      $containers = $catalog.containers
       $releaseId = if ($env:LVCI_CONTAINER_RELEASE) { $env:LVCI_CONTAINER_RELEASE } else { $containers.default }
       $release = $containers.supported | Where-Object { $_.id -eq $releaseId } | Select-Object -First 1
       if (-not $release) { throw "Unknown LabVIEW container release: $releaseId" }
       $windowsTag = ($release.windowsTag -split ':')[-1]
+      $labviewVersion = if ($env:LVCI_LABVIEW_VERSION) { $env:LVCI_LABVIEW_VERSION } elseif ($env:LABVIEW_VERSION) { $env:LABVIEW_VERSION } else { [string]$catalog.defaults.labviewVersion }
+      if ($labviewVersion -notmatch '^20[0-9]{2}$' -or -not $windowsTag.StartsWith($labviewVersion)) {
+        throw "Requested LabVIEW year $labviewVersion does not match Windows base $windowsTag"
+      }
+      $dragonParser = Join-Path $env:CI_PROJECT_DIR '.github\labview\dragon_deps.py'
+      python -I $dragonParser --root $env:CI_PROJECT_DIR --windows-stage $vipmDir --year $labviewVersion --bitness 64
+      if ($LASTEXITCODE -ne 0) { throw "Required Dragon staging failed: $LASTEXITCODE (Python 3.11+ with tomllib or installed tomli is required)" }
+      $inputPaths = @(
+        '.github/docker/labview-ci.Dockerfile', '.github/labview/dragon_deps.py'
+      ) + @(Get-ChildItem -LiteralPath $vipmDir -Recurse -File | ForEach-Object {
+        $_.FullName.Substring($env:CI_PROJECT_DIR.Length + 1).Replace('\', '/')
+      })
+      $inputHashes = @("year=$labviewVersion", 'bitness=64', "base=$baseImage") + @(
+        $inputPaths | Sort-Object -Unique | ForEach-Object {
+          "$_ $((Get-FileHash -LiteralPath (Join-Path $env:CI_PROJECT_DIR $_) -Algorithm SHA256).Hash)"
+        }
+      )
+      $hasher = [System.Security.Cryptography.SHA256]::Create()
+      try {
+        $workerVersion = 'win-' + ([BitConverter]::ToString($hasher.ComputeHash(
+          [Text.Encoding]::UTF8.GetBytes(($inputHashes -join "`n"))
+        ))).Replace('-', '').ToLowerInvariant().Substring(0, 24)
+      } finally { $hasher.Dispose() }
       Write-Host "Building Windows worker from catalog release $($release.id): $($release.windowsTag)"
       docker build `
         --build-arg "LV_CONTAINER_TAG=$windowsTag" `
         --build-arg "NIPM_FEED_URL=$($release.nipmFeedUrl)" `
         --build-arg "VIPM_INSTALLER_URL=$($release.vipmInstallerUrl)" `
         -f .github\docker\labview-ci-base.Dockerfile -t $baseImage .
-      docker build --build-arg "LCWC_BASE_IMAGE=$baseImage" --build-arg "CI_WORKER_VERSION=$env:CI_COMMIT_SHORT_SHA" -f .github\docker\labview-ci.Dockerfile -t $workerImage -t $latestImage .
+      if ($LASTEXITCODE -ne 0) { throw "Windows base build failed: $LASTEXITCODE" }
+      docker build --build-arg "LCWC_BASE_IMAGE=$baseImage" --build-arg "CI_WORKER_VERSION=$workerVersion" --build-arg "LABVIEW_VERSION=$labviewVersion" --build-arg "LABVIEW_BITNESS=64" -f .github\docker\labview-ci.Dockerfile -t $workerImage -t $latestImage .
+      if ($LASTEXITCODE -ne 0) { throw "Required Windows worker build failed: $LASTEXITCODE" }
       docker push $baseImage
+      if ($LASTEXITCODE -ne 0) { throw "Windows base push failed: $LASTEXITCODE" }
       docker push $workerImage
+      if ($LASTEXITCODE -ne 0) { throw "Windows worker push failed: $LASTEXITCODE" }
       docker push $latestImage
+      if ($LASTEXITCODE -ne 0) { throw "Windows latest push failed: $LASTEXITCODE" }
       $manifestDir = Join-Path $env:CI_PROJECT_DIR "ci-out\gitlab-pages\workers\windows\$env:CI_COMMIT_SHA"
       New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
       @{ platform = 'windows'; image = $latestImage; sha = $env:CI_COMMIT_SHA } | ConvertTo-Json -Compress | Set-Content -Encoding utf8 (Join-Path $manifestDir 'manifest.json')

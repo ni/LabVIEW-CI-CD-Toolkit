@@ -62,3 +62,25 @@ When you add a **new** bundled page, also:
 - The FAQ (`faq.html`) links to the Documentation, and the Documentation links
   back to the FAQ. Keep both links working.
 - The top-level `README.md` links to the live Documentation page. Keep it valid.
+
+## Rule 4 — PRs explain features and fixes first
+
+When creating or updating a PR, follow the
+[user-outcome PR policy](CONTRIBUTING.md#describe-pull-requests-in-terms-of-user-outcomes)
+and [PR template](pull_request_template.md). Titles and opening summaries explain
+concrete capabilities, fixes, and user benefits, not agent coordination or release
+mechanics. Match claims to the actual PR diff, separate already-landed features
+from new changes, disclose validation gaps, and link every PR reference.
+This applies equally to bot-generated release, promotion and Reconfigure PRs.
+Fix their generators and regression tests, not just individual titles. Generic
+version-only or "Reconfigure LabVIEW CI" headlines are not acceptable.
+
+## Rule 5 — Every PR identifies the containing release
+
+Follow the [release-impact policy](CONTRIBUTING.md#every-pr-identifies-its-release-version-and-update-type).
+After the feature summary, state the explicit target version, update type
+(major, minor, or incremental/patch), matching bump label, published baseline,
+availability, and exact client update guidance. Mark estimates as projected;
+refresh before merge and confirm the first containing immutable release after
+publication. A successful merge or workflow does not prove availability, and
+publication does not imply beta/stable promotion. CI still owns versioning.

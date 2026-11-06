@@ -60,21 +60,11 @@ RUN $ErrorActionPreference = 'Continue'; `
       Remove-Item -Path 'C:\ProgramData\National Instruments\NI Package Manager\cache\*' -Force -Recurse -ErrorAction SilentlyContinue `
     }
 
-ARG VIPM_INSTALLER_URL=https://traffic.libsyn.com/secure/jkinc/vipm-26.3.3954-windows-setup.exe
-RUN $ErrorActionPreference = 'Continue'; `
-    $vipmSetup = Join-Path $env:TEMP 'vipm-setup.exe'; `
-    Write-Host "Downloading VIPM 2026 Q3 installer: $env:VIPM_INSTALLER_URL"; `
-    try { `
-      Invoke-WebRequest -Uri $env:VIPM_INSTALLER_URL -OutFile $vipmSetup -UseBasicParsing; `
-      Write-Host ('Downloaded {0:N1} MB; installing VIPM silently (/exenoui /qn) ...' -f ((Get-Item $vipmSetup).Length / 1MB)); `
-      $p = Start-Process -Wait -PassThru -FilePath $vipmSetup -ArgumentList '/exenoui','/qn'; `
-      Write-Host "VIPM installer exit code: $($p.ExitCode)"; `
-      if ($p.ExitCode -ne 0) { Write-Host "::warning::VIPM 2026 Q3 installer returned exit $($p.ExitCode); VIPM-distributed add-ons may not be baked in." } `
-    } catch { `
-      Write-Host "::warning::VIPM 2026 Q3 install failed ($($_.Exception.Message)); VIPM-distributed add-ons will not be baked in." `
-    } finally { `
-      Remove-Item $vipmSetup -Force -ErrorAction SilentlyContinue `
-    }
+ARG VIPM_INSTALLER_URL=https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe
+COPY .github/labview/vipm/install-vipc.ps1 C:/ci-bootstrap/install-vipc.ps1
+RUN & C:\ci-bootstrap\install-vipc.ps1 -BootstrapOnly; `
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; `
+    Remove-Item -LiteralPath C:\ci-bootstrap\install-vipc.ps1 -Force
 
 ARG GIT_INSTALLER_URL=https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/Git-2.54.0-64-bit.exe
 ARG GIT_MINGIT_URL=https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/MinGit-2.54.0-64-bit.zip

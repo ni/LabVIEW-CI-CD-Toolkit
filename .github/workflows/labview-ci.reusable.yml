@@ -1,5 +1,5 @@
-# Reusable workflow (lives at .github/workflows/ in the standalone labview-ci repo).
-# Consumers call this with `uses: your-org/labview-ci/.github/workflows/labview-ci.reusable.yml@v1`.
+# Reusable workflow (lives at .github/workflows/ in the ni/LabVIEW-CI-CD-Toolkit repo).
+# Consumers call this with `uses: ni/LabVIEW-CI-CD-Toolkit/.github/workflows/labview-ci.reusable.yml@v4`.
 #
 # This is where repo settings actually DRIVE behavior: a `config` job reads the
 # consumer's .github/labview-ci.yml via the load-config action, and each activity
@@ -42,23 +42,97 @@ jobs:
       has-snapshots:   ${{ steps.cfg.outputs.has-snapshots }}
       # The capability version this repo has OPTED INTO, read from the consumer's
       # own .github/labview-ci.yml (source.ref). The capability jobs check out the
-      # tooling at this ref and run it, so a repo only changes versions when it
-      # edits that config file (via the token-free "Update now" button) — never
-      # automatically. Defaults to v1 when the config omits a ref.
+      # tooling at this ref and run it. An immutable source.ref changes only
+      # when the manifest is updated. Without a ref (or manifest), use the moving
+      # v4 major alias, which follows stable; pin a release for reproducibility.
       tooling-ref:     ${{ steps.ref.outputs.ref }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - id: cfg
         # Full repo path (not ./actions/...): inside a reusable workflow a ./ path
         # resolves against the CALLER's checked-out workspace, which doesn't contain
-        # this repo's actions. Pin to the same major alias consumers use (@v1).
-        uses: elijah286/LabVIEW-CI-with-Containers/actions/load-config@v1
+        # this repo's actions. Pin to the same major alias consumers use (@v4).
+        uses: ni/LabVIEW-CI-CD-Toolkit/actions/load-config@v4
       - id: ref
         shell: bash
         run: |
-          REF=$(awk '/^[[:space:]]*ref:[[:space:]]/{print $2; exit}' .github/labview-ci.yml 2>/dev/null)
-          echo "ref=${REF:-v1}" >> "$GITHUB_OUTPUT"
-          echo "Capability version (source.ref) this repo opted into: ${REF:-v1}"
+          python3 -I -S - <<'PY'
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+
+          def fail(number, message):
+              sys.exit(f'::error file=.github/labview-ci.yml,line={number}::Cannot resolve source.ref: {message}')
+
+          path = Path('.github/labview-ci.yml')
+          lines = path.read_text(encoding='utf-8').splitlines() if path.exists() else []
+          ref = ''
+          source_seen = False
+          in_source = False
+          stack = []
+          children = {}
+          root_seen = False
+          document_seen = False
+          for number, line in enumerate(lines, 1):
+              if not line.strip() or line.lstrip().startswith('#'):
+                  continue
+              if line == '---' and not root_seen and not document_seen:
+                  document_seen = True
+                  continue
+              indent = len(line) - len(line.lstrip(' '))
+              if indent and not root_seen:
+                  fail(number, 'top-level mapping keys must start at column one')
+              if line[indent:].startswith('\t'):
+                  fail(number, 'tab indentation is unsupported; use a block mapping with spaces')
+              if indent == 0:
+                  root_seen = True
+                  entry = re.fullmatch(r'([A-Za-z][A-Za-z0-9_-]*):(?:\s+(.*))?', line)
+                  if not entry:
+                      fail(number, 'expected a plain top-level mapping key')
+                  key, value = entry.groups()
+                  in_source = key == 'source'
+                  if not in_source:
+                      continue
+                  if source_seen:
+                      fail(number, 'duplicate source mapping')
+                  source_seen = True
+                  if value and not value.startswith('#'):
+                      fail(number, 'source must be a block mapping, not a scalar, alias, or flow mapping')
+                  stack = [(0, 'source', True)]
+                  continue
+              if not in_source:
+                  continue
+              entry = re.fullmatch(r'([A-Za-z][A-Za-z0-9_-]*):(?:\s+(.*))?', line[indent:])
+              if not entry:
+                  fail(number, 'source must contain plain block mapping keys')
+              key, value = entry.groups()
+              while stack[-1][0] >= indent:
+                  stack.pop()
+              _, parent, mapping = stack[-1]
+              if not mapping:
+                  fail(number, 'nested content under a scalar is unsupported')
+              expected_indent, keys = children.setdefault(parent, (indent, set()))
+              if indent != expected_indent or key in keys:
+                  fail(number, 'inconsistent mapping indentation or duplicate source key')
+              keys.add(key)
+              child = f'{parent}.{key}'
+              if child == 'source.ref':
+                  scalar = re.fullmatch(r'''(?:'([^']*)'|"([^"\\]*)"|([A-Za-z0-9_./-]+))?(?:[ \t]+\#.*)?[ \t]*''', '' if not value or value.startswith('#') else value)
+                  if not scalar:
+                      fail(number, 'ref must be a single-line plain, single-quoted, or double-quoted Git ref')
+                  if scalar.group(3) in ('null', 'Null', 'NULL', 'true', 'True', 'TRUE', 'false', 'False', 'FALSE'):
+                      fail(number, 'null and boolean ref names must be quoted strings')
+                  ref = next((part for part in scalar.groups() if part is not None), '')
+                  if ref and subprocess.run(['git', 'check-ref-format', '--allow-onelevel', ref], capture_output=True).returncode:
+                      fail(number, 'ref is not a valid Git ref')
+              stack.append((indent, child, child != 'source.ref' and (not value or value.startswith('#'))))
+          ref = ref or 'v4'
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'ref={ref}\n')
+          print(f'Capability version (source.ref) this repo opted into: {ref}')
+          PY
 
   # 1b) Dependency gate. If a worker rebuild is in progress for this SHA (an
   #     opt-in dependency update, or a worker-input change), the container
@@ -71,7 +145,7 @@ jobs:
     needs: config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Wait for worker image rebuild (dependency gate)
@@ -99,7 +173,7 @@ jobs:
       statuses: write     # post the CI / Mass Compile commit status
     steps:
       - name: Checkout caller repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -126,9 +200,9 @@ jobs:
       # (config source.ref), checked out at runtime, so the capability never
       # changes version automatically — only when the config is updated.
       - name: Check out tooling (opted-in version)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
-          repository: elijah286/LabVIEW-CI-with-Containers
+          repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
           path: _lvci
       - name: Mass Compile
@@ -144,7 +218,7 @@ jobs:
 
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: masscompile-report
           path: ci-out/masscompile/
@@ -231,7 +305,7 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"VI Analyzer in progress\",\"context\":\"CI / VI Analyzer\"}"
 
       - name: Checkout caller repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -257,9 +331,9 @@ jobs:
         continue-on-error: true
 
       - name: Check out tooling (opted-in version)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
-          repository: elijah286/LabVIEW-CI-with-Containers
+          repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
           path: _lvci
       - name: Run VI Analyzer
@@ -276,7 +350,7 @@ jobs:
 
       - name: Upload report artifact
         if: steps.analyze.outputs.report-exists == 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: vi-analyzer-report-${{ github.sha }}
           path: ci-out/vi-analyzer/
@@ -386,14 +460,14 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"VIDiff in progress\",\"context\":\"CI / VIDiff\"}"
 
       - name: Checkout head commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.shas.outputs.head }}
           fetch-depth: 0
           path: head
 
       - name: Checkout base commit
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         if: steps.shas.outputs.base != ''
         with:
           ref: ${{ steps.shas.outputs.base }}
@@ -420,9 +494,9 @@ jobs:
           docker version
 
       - name: Check out tooling (opted-in version)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
-          repository: elijah286/LabVIEW-CI-with-Containers
+          repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
           path: _lvci
       - name: VIDiff
@@ -486,12 +560,12 @@ jobs:
       statuses: write
     steps:
       - name: Checkout caller repository (full history)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Checkout deployed gallery (gh-pages) for incremental seeding
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         continue-on-error: true
         with:
           ref: gh-pages
@@ -527,9 +601,9 @@ jobs:
             -d "{\"state\":\"pending\",\"target_url\":\"https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"description\":\"VI Snapshots in progress\",\"context\":\"CI / VI Snapshots\"}"
 
       - name: Check out tooling (opted-in version)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
-          repository: elijah286/LabVIEW-CI-with-Containers
+          repository: ni/LabVIEW-CI-CD-Toolkit
           ref: ${{ needs.config.outputs.tooling-ref }}
           path: _lvci
       - name: VI Snapshots

@@ -1,0 +1,201 @@
+name: Build LabVIEW LVPM Candidate - Linux
+run-name: Build opt-in LVPM Linux candidate (package-file verification only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: 'Reviewed default-branch commit; reject a changed dispatch target'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+concurrency:
+  group: build-labview-lvpm-image
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Verify reviewed commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if [ -n "$EXPECTED_SHA" ]; then
+            if ! [[ "$EXPECTED_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              echo "::error::Invalid reviewed commit SHA; expected exactly 40 hexadecimal characters."
+              exit 1
+            fi
+            reviewed_sha=$(printf '%s' "$EXPECTED_SHA" | tr '[:upper:]' '[:lower:]')
+            if [ "$GITHUB_SHA" != "$reviewed_sha" ]; then
+              echo "::error::Reviewed HEAD moved. Click Update container image again to review the new target."
+              exit 1
+            fi
+          fi
+
+      - name: Require the canonical default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: test "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH"
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install planning dependencies
+        run: python3 -m pip install PyYAML==6.0.3 tomli==2.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Plan Linux dependencies and candidate identity
+        id: plan
+        env:
+          IMAGE_OVERRIDE: ${{ vars.LABVIEW_IMAGE_NAME }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess, sys
+          sys.path.insert(0, '.github/labview/lvpm')
+          import worker
+          root = pathlib.Path('.')
+          _, year = worker.configuration(root)
+          subprocess.run([sys.executable, '.github/labview/lvpm/adapter.py', 'plan',
+                          '--repo', '.', '--out', 'ci-out/lvpm-plan', '--labview-version', year], check=True)
+          plan = json.loads(pathlib.Path('ci-out/lvpm-plan/requirements.json').read_text())
+          fingerprint = plan['requirements_fingerprint']
+          import re
+          if not re.fullmatch('[0-9a-f]{64}', fingerprint):
+              raise SystemExit('Invalid requirements fingerprint')
+          catalog = json.loads(pathlib.Path('.github/labview-ci/catalog.json').read_text())['containers']
+          release = next(entry for entry in catalog['supported'] if entry['id'] == catalog['default'])
+          if release['status'] != 'qualified' or str(release['labviewYear']) != year:
+              raise SystemExit('The catalog default must be qualified for the configured LabVIEW year')
+          base = release['linuxTag']
+          if not re.fullmatch(r'nationalinstruments/labview:[a-z0-9.-]+-linux', base) or ':latest' in base:
+              raise SystemExit('An immutable NI Linux release tag is required')
+          base_digest = subprocess.check_output(['docker', 'buildx', 'imagetools', 'inspect', base,
+                                                '--format', '{{.Manifest.Digest}}'], text=True).strip()
+          if not re.fullmatch(r'sha256:[0-9a-f]{64}', base_digest):
+              raise SystemExit('Cannot resolve the pinned NI base digest')
+          inputs_hash = worker.build_inputs_hash(root)
+          tag = worker.candidate_tag(fingerprint, base_digest, inputs_hash,
+                                     int(os.environ['GITHUB_RUN_ID']), int(os.environ['GITHUB_RUN_ATTEMPT']))
+          values = {'tag': tag, 'fingerprint': fingerprint, 'inputs_hash': inputs_hash,
+                    'image': worker.image_name(os.environ['GITHUB_REPOSITORY'], os.environ.get('IMAGE_OVERRIDE')),
+                    'year': year, 'base': base + '@' + base_digest, 'base_digest': base_digest}
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for key, value in values.items():
+                  output.write(f'{key}={value}\n')
+          PY
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push only the fingerprint-derived LVPM candidate
+        env:
+          IMAGE: ${{ steps.plan.outputs.image }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          YEAR: ${{ steps.plan.outputs.year }}
+          BASE_IMAGE: ${{ steps.plan.outputs.base }}
+        run: |
+          docker buildx build --platform linux/amd64 \
+            --file .github/docker/labview-ci-lvpm.Dockerfile \
+            --build-arg "LV_BASE_IMAGE=$BASE_IMAGE" \
+            --build-arg "LABVIEW_VERSION=$YEAR" \
+            --build-arg "CI_WORKER_VERSION=$TAG" \
+            --tag "$IMAGE:$TAG" --metadata-file ci-out/lvpm-build.json --push .
+
+      - name: Bind the installed file inventory to the exact published digest
+        env:
+          IMAGE: ${{ steps.plan.outputs.image }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          BASE: ${{ steps.plan.outputs.base }}
+          BASE_DIGEST: ${{ steps.plan.outputs.base_digest }}
+          INPUTS_HASH: ${{ steps.plan.outputs.inputs_hash }}
+        run: |
+          set -euo pipefail
+          digest=$(python3 -c "import json; print(json.load(open('ci-out/lvpm-build.json'))['containerimage.digest'])")
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          image_ref="$IMAGE:$TAG@$digest"
+          docker pull "$image_ref"
+          docker image inspect "$image_ref" > ci-out/lvpm-image.json
+          container=$(docker create --entrypoint /bin/true "$image_ref")
+          trap 'docker rm "$container" >/dev/null' EXIT
+          docker cp "$container:/opt/lvci/lvpm/inventory.json" ci-out/lvpm-inventory.json
+          export IMAGE_REF="$image_ref" IMAGE_DIGEST="$digest"
+          python3 - <<'PY'
+          import json, os, pathlib, sys
+          sys.path.insert(0, '.github/labview/lvpm')
+          import worker
+          plan = json.loads(pathlib.Path('ci-out/lvpm-plan/requirements.json').read_text())
+          inventory = json.loads(pathlib.Path('ci-out/lvpm-inventory.json').read_text())
+          image = json.loads(pathlib.Path('ci-out/lvpm-image.json').read_text())
+          if not isinstance(image, list) or len(image) != 1:
+              raise SystemExit('Expected one exact digest-pinned image inspection')
+          worker.verify_image_platform(image[0], inventory)
+          for key, value in {'schema': 1, 'installer': 'lvpm', 'tool_revision': worker.TOOL_REVISION,
+                             'requirements_fingerprint': plan['requirements_fingerprint'],
+                             'labview_version': plan['labview_version']}.items():
+              if inventory.get(key) != value:
+                  raise SystemExit('Installed inventory mismatch: ' + key)
+          required = {'status': 'passed', 'scope': 'package-files', 'activity_checks': 'not_run',
+                      'hook_error_output': 'not_observable_by_upstream'}
+          if inventory.get('verification') != required:
+              raise SystemExit('Missing package-file verification or incorrect activity claim')
+          worker.verify_packages(inventory, plan)
+          tag = os.environ['TAG']
+          manifest_path = f'workers/linux-lvpm/{tag}/manifest.json'
+          manifest = {**inventory, 'platform': 'linux', 'repository': os.environ['GITHUB_REPOSITORY'],
+                      'tag': tag, 'manifest_path': manifest_path,
+                      'image_ref': os.environ['IMAGE_REF'], 'image_digest': os.environ['IMAGE_DIGEST'],
+                      'base_image': os.environ['BASE'], 'base_digest': os.environ['BASE_DIGEST'],
+                      'build_inputs_sha256': os.environ['INPUTS_HASH'],
+                      'workflow_run': {'id': int(os.environ['GITHUB_RUN_ID']),
+                                       'attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+                                       'head_sha': os.environ['GITHUB_SHA'], 'workflow_path': worker.WORKFLOW}}
+          destination = pathlib.Path('ci-out/lvpm-pages')
+          target = destination / manifest_path
+          target.parent.mkdir(parents=True, exist_ok=True)
+          target.write_text(json.dumps(manifest, indent=2) + '\n')
+          latest = {key: manifest[key] for key in ('schema', 'repository', 'tag', 'manifest_path',
+                    'image_ref', 'image_digest', 'requirements_fingerprint', 'verification', 'workflow_run')}
+          (destination / 'workers/linux-lvpm/latest.json').write_text(json.dumps(latest, indent=2) + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('### Opt-in LVPM Linux candidate\n'
+                            f"- Selection: `{tag}@{os.environ['IMAGE_DIGEST']}`\n"
+                            f"- Image: `{os.environ['IMAGE_REF']}`\n"
+                            '- Package files verified; runtime activities have NOT been tested.\n'
+                            '- Hook VI error output is not observable by upstream LVPM.\n'
+                            '- Candidate is selectable only after this canonical build run succeeds.\n'
+                            '- No existing VIPM/default tags or worker selections were changed.\n')
+          PY
+
+      - name: Retain the dependency plan and candidate evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-lvpm-candidate
+          path: |
+            ci-out/lvpm-plan/
+            ci-out/lvpm-inventory.json
+            ci-out/lvpm-image.json
+            ci-out/lvpm-build.json
+            ci-out/lvpm-pages/
+
+      - name: Publish only the LVPM candidate namespace
+        uses: ./.github/actions/publish-gh-pages
+        with:
+          publish_dir: ci-out/lvpm-pages/workers/linux-lvpm
+          destination_dir: workers/linux-lvpm
+          commit_message: Publish opt-in LVPM Linux candidate (package files only)

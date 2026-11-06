@@ -1,0 +1,68 @@
+name: Artifact Archive Checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/artifact-archive-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  archive-contract:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Create representative VIDiff report
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+          report = Path('artifact-fixture')
+          (report / 'vidiff' / 'folder with spaces').mkdir(parents=True)
+          (report / 'vidiff-meta.json').write_text(json.dumps({'head_sha': 'a' * 40, 'platform': 'linux'}), encoding='utf-8')
+          (report / 'vidiff' / 'changes.json').write_text('{"files":[]}', encoding='utf-8')
+          (report / 'vidiff' / 'folder with spaces' / 'index.html').write_text('<html>report</html>', encoding='utf-8')
+      - uses: actions/upload-artifact@v7
+        id: upload
+        with:
+          name: vidiff-archive-contract-${{ matrix.os }}
+          path: artifact-fixture/
+          retention-days: 1
+          if-no-files-found: error
+      - name: Verify REST ZIP download and unchanged layout
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          from pathlib import Path
+          import os
+          import subprocess
+          import zipfile
+          artifact_id = os.environ['ARTIFACT_ID']
+          assert artifact_id.isdecimal() and int(artifact_id) > 0
+          endpoint = f"repos/{os.environ['REPOSITORY']}/actions/artifacts/{artifact_id}/zip"
+          archive = Path('artifact.zip')
+          with archive.open('wb') as output:
+              subprocess.run(['gh', 'api', endpoint], stdout=output, check=True)
+          report = Path('artifact-fixture')
+          expected = {path.relative_to(report).as_posix(): path.read_bytes()
+                      for path in report.rglob('*') if path.is_file()}
+          with zipfile.ZipFile(archive) as downloaded:
+              actual = {name: downloaded.read(name) for name in downloaded.namelist()
+                        if not name.endswith('/')}
+          assert actual == expected, (sorted(actual), sorted(expected))
+          print('REST ZIP preserves VIDiff metadata, nested report paths, names and contents')

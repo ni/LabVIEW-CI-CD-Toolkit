@@ -138,7 +138,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # A PAT with repo + workflow scope (added as TOOLING_UPDATE_TOKEN) lets the
           # update push changes to .github/workflows/** — the default token cannot.
@@ -147,7 +147,7 @@ jobs:
           token: ${{ steps.token.outputs.usable == 'true' && secrets.TOOLING_UPDATE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
 

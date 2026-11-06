@@ -49,6 +49,7 @@ from urllib.parse import quote
 
 # ── tool identity ────────────────────────────────────────────────────────────
 TOOLS = {
+    "runner":    {"id": "runner",    "label": "Unit test runner"},
     "caraya":    {"id": "caraya",    "label": "Caraya"},
     "vi-tester": {"id": "vi-tester", "label": "VI Tester"},
     "lunit":     {"id": "lunit",     "label": "LUnit"},
@@ -65,6 +66,8 @@ STATUS_META = {
 
 def tool_for_filename(name: str) -> str:
     n = name.lower()
+    if n.startswith("unit-tests-runner"):
+        return "runner"
     if "caraya" in n:
         return "caraya"
     if "vitester" in n or "vi-tester" in n or "vi_tester" in n:
@@ -146,21 +149,46 @@ def _text(el) -> str:
     return (el.text or "").strip() if el is not None else ""
 
 
+def report_error(tool: str, name: str, message: str) -> dict:
+    return {
+        "tool": tool, "name": name,
+        "tests": 1, "failures": 0, "errors": 1, "skipped": 0, "time": 0.0,
+        "cases": [{
+            "name": "JUnit report validation (not a test assertion)",
+            "classname": "", "status": "error", "time": 0.0,
+            "message": message, "details": message,
+            "test_vi_rel": "", "test_vi_name": "",
+            "target_vi_rel": "", "target_vi_name": "",
+        }],
+    }
+
+
 def parse_junit(xml_path: Path, tool: str, by_base: dict[str, list[str]]) -> list[dict]:
     """Parse one JUnit XML file into a list of suite dicts for `tool`."""
     try:
         root = ET.parse(str(xml_path)).getroot()
     except Exception as e:  # malformed XML shouldn't sink the whole report
-        return [{
-            "tool": tool, "name": f"(could not parse {xml_path.name})",
-            "tests": 0, "failures": 0, "errors": 0, "skipped": 0, "time": 0.0,
-            "cases": [], "parse_error": str(e),
-        }]
+        return [report_error(tool, xml_path.name, f"Could not parse JUnit: {e}")]
 
-    suites_el = root.iter("testsuite") if root.tag != "testsuite" else [root]
+    if root.tag not in ("testsuite", "testsuites") or not list(root.iter("testcase")):
+        return [report_error(tool, xml_path.name, "Runner produced no JUnit test cases.")]
+
+    suites_el = root.iter("testsuite")
     out: list[dict] = []
+    count_errors = []
     for s in suites_el:
         sname = s.get("name") or "(unnamed suite)"
+        descendants = list(s.iter("testcase"))
+        observed = {
+            "tests": len(descendants),
+            "failures": sum(case.find("failure") is not None for case in descendants),
+            "errors": sum(case.find("error") is not None for case in descendants),
+            "skipped": sum(case.find("skipped") is not None for case in descendants),
+        }
+        for attribute, actual in observed.items():
+            declared = s.get(attribute)
+            if declared is not None and (not declared.isdigit() or int(declared) != actual):
+                count_errors.append(f"{sname}: declared {attribute}={declared}, found {actual}.")
         cases = []
         for c in s.findall("testcase"):
             name = c.get("name") or "(unnamed test)"
@@ -217,6 +245,10 @@ def parse_junit(xml_path: Path, tool: str, by_base: dict[str, list[str]]) -> lis
             "time": _to_float(s.get("time")),
             "cases": cases,
         })
+    if not out:
+        return [report_error(tool, xml_path.name, "JUnit contains no test suites.")]
+    if count_errors:
+        out.append(report_error(tool, xml_path.name, "\n".join(count_errors)))
     return out
 
 
@@ -256,7 +288,7 @@ def classify(passed: int, failed: int, errored: int, total: int) -> tuple[str, i
     if total == 0:
         return "empty", 0
     percent = round(100 * passed / total)
-    if failed == 0 and errored == 0:
+    if failed == 0 and errored == 0 and passed > 0:
         return "passed", percent
     return "failed", percent
 
@@ -306,9 +338,6 @@ def build_data(args) -> dict:
         platforms = [{"id": "windows", "url": "../results.json"}, {"id": "linux", "url": None}]
         snap_depth = "../../../"
 
-    # Optional marker written by run-unit-tests.ps1 when a configured tool could
-    # not run because the selected container lacks the required tooling. Drives
-    # the shared "missing container tooling" banner (see tooling_banner_html).
     tooling = {}
     res_dir = Path(args.results) if args.results else None
     if res_dir and (res_dir / "_tooling.json").exists():
@@ -391,6 +420,28 @@ def tooling_banner_html(missing: list, configure_url: str) -> str:
     )
 
 
+def unsupported_note_html(missing: list) -> str:
+    """Render an informational note for configured tools that have no runner on
+    this platform yet (kind `unsupported-on-linux`, written by run-unit-tests.sh),
+    so the report explains why those tools have no results here."""
+    if isinstance(missing, dict):
+        missing = [missing]
+    unsup = [x for x in (missing or []) if isinstance(x, dict) and x.get("kind") == "unsupported-on-linux"]
+    if not unsup:
+        return ""
+    names = ", ".join(_esc(x.get("name") or x.get("tool") or "") for x in unsup if (x.get("name") or x.get("tool")))
+    return (
+        '<div class="lvci-needtool info" role="note">'
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>'
+        '<line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+        '<div class="lvci-needtool-t"><strong>Not run on Linux.</strong>'
+        f' {names} {"is" if len(unsup) == 1 else "are"} enabled but not supported in the Linux container yet. '
+        'Run these tools with the Windows unit-test workflow.</div></div>'
+    )
+
+
 def render(data: dict) -> str:
     blob = json.dumps(data, ensure_ascii=False)
     blob = blob.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
@@ -409,7 +460,8 @@ def render(data: dict) -> str:
     dash = m.get("dash_url") or ""
     repo = m.get("repo") or ""
     cfg_url = (dash or "") + "configure.html" + ("?repo=" + quote(repo, safe="") if repo else "")
-    banner = tooling_banner_html((data.get("tooling") or {}).get("missing") or [], cfg_url)
+    missing = (data.get("tooling") or {}).get("missing") or []
+    banner = tooling_banner_html(missing, cfg_url) + unsupported_note_html(missing)
 
     out = _TEMPLATE.replace("__UT_DATA_JSON__", blob)
     out = out.replace("__UT_HEADER_CFG__", json.dumps(hdr_cfg, ensure_ascii=False))
@@ -516,6 +568,8 @@ details[open]>summary .tw{transform:rotate(90deg)}
 .lvci-needtool-cta{flex:0 0 auto;align-self:center;font-size:.85em;font-weight:600;color:#fff;background:#bb8009;border-radius:7px;padding:8px 13px;text-decoration:none;white-space:nowrap}
 .lvci-needtool-cta:hover{background:#a17609}
 @media(max-width:560px){.lvci-needtool{flex-wrap:wrap}.lvci-needtool-cta{align-self:stretch;text-align:center}}
+.lvci-needtool.info{background:rgba(56,139,253,.1);border-color:rgba(56,139,253,.4);border-left-color:#388bfd}
+.lvci-needtool.info svg{color:#388bfd}
 /* snapshot drawer */
 #backdrop{position:fixed;inset:0;background:rgba(1,4,9,.5);opacity:0;pointer-events:none;transition:opacity .15s;z-index:40}
 #backdrop.show{opacity:1;pointer-events:auto}
@@ -530,7 +584,7 @@ details[open]>summary .tw{transform:rotate(90deg)}
 </style>
 </head>
 <body>
-__UT_TOOLING_BANNER__
+<div id="tooling-banner">__UT_TOOLING_BANNER__</div>
 <div class="wrap">
   <h1>Unit Tests <span class="badge" id="statusbadge" style="display:none"></span>
     <span class="plat" id="plat-toggle"></span>
@@ -568,6 +622,7 @@ const SELF = JSON.parse(document.getElementById('ut-data').textContent);
 const PLATFORMS = SELF.platforms || [{id:SELF.meta.platform,url:null}];
 const SELF_PLATFORM = SELF.meta.platform;
 const CACHE = { [SELF_PLATFORM]: SELF };
+const SELF_TOOLING_HTML = document.getElementById('tooling-banner').innerHTML;
 let CUR = SELF_PLATFORM, D = SELF;
 const META = SELF.meta;
 const SNAP_BASE = META.snap_base;
@@ -615,6 +670,7 @@ async function switchPlatform(pid){
   D = data; active = new Set(SORDER); renderToggle(); renderAll();
 }
 function showEmpty(pid){
+  document.getElementById('tooling-banner').innerHTML='';
   document.getElementById('cards').innerHTML='';
   document.getElementById('barfill').style.width='0%';
   document.getElementById('barlabel').textContent='';
@@ -624,12 +680,32 @@ function showEmpty(pid){
   document.getElementById('rescount').textContent='';
 }
 
+function renderTooling(){
+  const host = document.getElementById('tooling-banner');
+  if(CUR===SELF_PLATFORM){ host.innerHTML=SELF_TOOLING_HTML; return; }
+  host.replaceChildren();
+  const raw = (D.tooling||{}).missing || [];
+  const issues = Array.isArray(raw) ? raw : [raw];
+  for(const kind of ['missing-tooling','unsupported-on-linux']){
+    const entries = issues.filter(x=>x && (kind==='missing-tooling' ? !x.kind || x.kind===kind : x.kind===kind));
+    if(!entries.length) continue;
+    const note = document.createElement('div');
+    note.className='lvci-needtool'+(kind==='unsupported-on-linux'?' info':'');
+    note.setAttribute('role','note');
+    const names=entries.map(x=>x.name||x.tool||'Unknown tool').join(', ');
+    note.textContent=kind==='unsupported-on-linux'
+      ? `Not run on Linux. ${names}: run these tools with the Windows unit-test workflow.`
+      : `Container is missing required tooling: ${names}. Set up the container and re-run.`;
+    host.appendChild(note);
+  }
+}
 function renderAll(){
+  renderTooling();
   const s = D.summary;
   document.getElementById('platnote').textContent = s.duration ? `Ran in ${s.duration}s on ${PLAT_LABEL[CUR]||CUR}.` : '';
   const sb = document.getElementById('statusbadge');
   sb.style.display='inline-block';
-  sb.textContent = s.status==='passed'?'all passing':(s.status==='empty'?'no tests':`${s.percent}% passing`);
+    sb.textContent = s.status==='passed'&&!s.skipped?'all passing':(s.status==='empty'?'no tests':`${s.percent}% passing`);
   sb.style.background = STATUS_BADGE[s.status] || '#6e7681';
 
   const cards=[
@@ -724,6 +800,14 @@ async function ensureSnapshots(){
   if(snapMap) return; snapMap={};
   let m = META.sha ? await fetchJson(SNAP_BASE+META.sha+'/manifest.json').catch(()=>null) : null;
   if(m) snapFromSha=META.sha;
+  if(!m && META.sha){
+    const revisions = await fetchJson(SNAP_BASE+'files.json').catch(()=>[]);
+    const revision = Array.isArray(revisions) && revisions.find(entry=>entry.sha===META.sha);
+    if(revision && Array.isArray(revision.vis)){
+      m = revision.vis.map(entry=>({vi_rel:entry.vi_rel,html:'by-blob/'+entry.blob.slice(0,2)+'/'+entry.blob+'.html'}));
+      snapFromSha = META.sha;
+    }
+  }
   if(!m){
     const commits = await fetchJson(SNAP_BASE+'commits.json').catch(()=>[]);
     if(commits && commits.length){ m=await fetchJson(SNAP_BASE+commits[0].sha+'/manifest.json').catch(()=>null); if(m) snapFromSha=commits[0].sha; }
@@ -740,7 +824,7 @@ async function openSnap(viRel,name){
   try{ await ensureSnapshots(); }catch(e){}
   const html = snapMap[viRel];
   if(html){
-    frame.src = SNAP_BASE+html; frame.style.display='block'; note.style.display='none';
+    frame.src = SNAP_BASE+'vi-interactive.html?file='+encodeURIComponent(html); frame.style.display='block'; note.style.display='none';
     if(snapFromSha && META.sha && snapFromSha!==META.sha){ note.style.display='block'; note.innerHTML=`<em>Showing the latest available snapshot (commit ${esc(snapFromSha.slice(0,7))}); this commit's snapshots may still be rendering.</em>`; }
   }else{
     frame.style.display='none'; note.style.display='block';
@@ -753,7 +837,7 @@ document.getElementById('backdrop').addEventListener('click',closeSnap);
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeSnap(); });
 
 renderToggle();
-if(D.suites.length || D.summary.tests) renderAll(); else showEmpty(SELF_PLATFORM);
+renderAll();
 </script>
 </body>
 </html>

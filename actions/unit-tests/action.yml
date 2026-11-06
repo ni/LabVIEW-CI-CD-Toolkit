@@ -1,0 +1,61 @@
+name: LabVIEW Unit Tests
+description: Run one LabVIEW unit-test framework in a Windows worker and render its JUnit report.
+author: labview-ci
+inputs:
+  image:
+    description: Windows worker image with the selected framework and CLI installed.
+    required: true
+  framework:
+    description: caraya, vi-tester, utf, lunit, or a custom identifier with command.
+    required: true
+  test-dir:
+    description: Workspace-relative test directory, glob, or UTF project; empty selects the whole project.
+    default: ''
+  command:
+    description: Trusted cmd.exe command template; tokens {ver}, {dir}, {out}, {lv}, {cli}, and {proj} for UTF. Overrides the selected runner.
+    default: ''
+  labview-version:
+    description: LabVIEW year matching the image; the runner retains installed-path autodetection.
+    default: '2026'
+  report-dir:
+    description: Dedicated workspace-relative output directory owned by this action; previous results are removed.
+    default: ci-out/unit-tests
+  pages-url:
+    description: Optional Pages base URL for report navigation; this action does not deploy reports.
+    default: ''
+  fail-on-test-failure:
+    description: Fail on assertion failures. Runner errors, no tests and all skipped always fail.
+    default: 'true'
+outputs:
+  report-exists:
+    description: Whether index.html was generated.
+    value: ${{ steps.tests.outputs.report-exists }}
+  tests:
+    description: Total test count.
+    value: ${{ steps.tests.outputs.tests }}
+  passed:
+    description: Passed test count.
+    value: ${{ steps.tests.outputs.passed }}
+  failed:
+    description: Failed and errored test count.
+    value: ${{ steps.tests.outputs.failed }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v7
+      with:
+        python-version: '3.13'
+    - name: Run tests and render report
+      id: tests
+      shell: pwsh
+      env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
+        UT_IMAGE: ${{ inputs.image }}
+        UT_FRAMEWORK: ${{ inputs.framework }}
+        UT_TEST_DIR: ${{ inputs.test-dir }}
+        UT_COMMAND: ${{ inputs.command }}
+        UT_LV_VERSION: ${{ inputs.labview-version }}
+        UT_REPORT_DIR: ${{ inputs.report-dir }}
+        UT_PAGES_URL: ${{ inputs.pages-url }}
+        UT_FAIL: ${{ inputs.fail-on-test-failure }}
+      run: python "$env:ACTION_DIRECTORY/run.py"

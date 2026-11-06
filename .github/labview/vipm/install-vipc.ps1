@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Installs VIPM and applies all .vipc dependency files found in C:\vipm.
+    Installs VIPM and applies required VIPC/normalized Dragon dependencies in C:\vipm.
     This script runs INSIDE the Docker build container (Windows Server Core).
 
     Used to bake third-party VIPM add-ons into the CI image -- e.g. Antidoc
@@ -8,14 +8,19 @@
     which is distributed only through VIPM and is the supported way to produce
     project documentation headlessly in CI/CD.
 
+.PARAMETER BootstrapOnly
+    Verify/upgrade the selected CLI and Desktop, then exit before environment,
+    LabVIEW, Git/settings, or package operations. Used by the Windows base image.
+
 .NOTES
     These values can be overridden at image-build time via environment variables
     so the script does not need editing for each LabVIEW major version:
       LABVIEW_VERSION     LabVIEW year passed to `vipm install`; MUST match the
                           LabVIEW in the NI base image. Default: 2026.
       LABVIEW_BITNESS     LabVIEW bitness passed to `vipm install`. Default: 64.
-      VIPM_INSTALLER_URL  VIPM community installer (https://vipm.jki.net) for a
-                          VIPM build that supports LABVIEW_VERSION.
+      VIPM_INSTALLER_URL  Authoritative HTTPS vendor-signed installer when an
+                          upgrade is needed. Both selected executable floors
+                          are verified independently of the installer version.
 
     Headless install model: the vipm CLI installs packages in Community Edition
     (no VIPM Pro license needed) -- the script sets VIPM_COMMUNITY_EDITION and
@@ -24,6 +29,7 @@
     LabVIEW or it fails with "IO error: Failed to load". VIPM Pro activation is
     still honored if VIPM_SERIAL_NUMBER / VIPM_FULL_NAME / VIPM_EMAIL are supplied.
 #>
+param([switch] $BootstrapOnly)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference   = 'SilentlyContinue'
@@ -33,7 +39,231 @@ $VipmExe          = $null
 $VipcDir          = 'C:\vipm'
 $LabVIEWVersion   = if ($Env:LABVIEW_VERSION)    { $Env:LABVIEW_VERSION }    else { '2026' }  # match the LabVIEW version in the NI base image
 $LabVIEWBitness   = if ($Env:LABVIEW_BITNESS)    { $Env:LABVIEW_BITNESS }    else { '64' }    # NI base image ships 64-bit LabVIEW
-$VipmInstallerUrl = if ($Env:VIPM_INSTALLER_URL) { $Env:VIPM_INSTALLER_URL } else { 'https://traffic.libsyn.com/secure/jkinc/vipm-26.3.3954-windows-setup.exe' }
+$VipmInstallerUrl = if ($Env:VIPM_INSTALLER_URL) { $Env:VIPM_INSTALLER_URL } else { 'https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe' }
+
+function Find-VipmExecutable {
+    param([ValidateSet('CLI', 'Desktop')] [string] $Kind)
+    $candidates = if ($Kind -eq 'CLI') {
+        @(
+            'C:\Program Files\JKI\VIPM\vipm.exe',
+            'C:\Program Files (x86)\JKI\VIPM\vipm.exe',
+            'C:\Program Files\JKI\VI Package Manager\vipm.exe',
+            'C:\Program Files\JKI\VI Package Manager\support\vipm.exe'
+        )
+    } else {
+        @(
+            'C:\Program Files\JKI\VI Package Manager\VI Package Manager.exe',
+            'C:\Program Files (x86)\JKI\VI Package Manager\VI Package Manager.exe'
+        )
+    }
+    $selected = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if ($selected) { return $selected }
+    if ($Kind -eq 'CLI') {
+        foreach ($root in @('C:\Program Files\JKI', 'C:\Program Files (x86)\JKI')) {
+            if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
+            $found = Get-ChildItem -LiteralPath $root -Filter 'vipm.exe' -Recurse -File -ErrorAction Stop |
+                Sort-Object @{ Expression = { $_.FullName -notmatch '\\VIPM\\' } }, FullName |
+                Select-Object -First 1
+            if ($found) { return $found.FullName }
+        }
+    }
+}
+
+function Assert-VipmPublisher {
+    param([string] $Path)
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop
+    if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate -or
+        $signature.SignerCertificate.GetNameInfo(
+            [System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false) -ne 'James Kring, Inc.') {
+        throw "VIPM signature verification failed for '$Path': expected a Windows-trusted James Kring, Inc. signature; status=$($signature.Status)."
+    }
+}
+
+function Invoke-VipmBootstrapProcess {
+    param([string] $Path, [string[]] $Arguments, [int] $TimeoutSeconds)
+    $outputFile = Join-Path $Env:TEMP ("vipm-bootstrap-" + [guid]::NewGuid().ToString('N') + '.out')
+    $errorFile = $outputFile + '.err'
+    $process = $null
+    try {
+        $process = Start-Process -FilePath $Path -ArgumentList $Arguments -PassThru `
+            -RedirectStandardOutput $outputFile -RedirectStandardError $errorFile -ErrorAction Stop
+        $null = $process.Handle
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Host
+            if ($LASTEXITCODE -ne 0 -and -not $process.HasExited) {
+                throw "VIPM bootstrap timed out after ${TimeoutSeconds}s; could not stop process $($process.Id)."
+            }
+            if (-not $process.WaitForExit(5000)) {
+                throw "VIPM bootstrap timed out after ${TimeoutSeconds}s; process $($process.Id) did not terminate after cleanup."
+            }
+            throw "VIPM bootstrap process '$Path' timed out after ${TimeoutSeconds}s."
+        }
+        $output = @(
+            Get-Content -LiteralPath $outputFile -ErrorAction Stop
+            Get-Content -LiteralPath $errorFile -ErrorAction Stop
+        ) -join "`n"
+        return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output }
+    } finally {
+        if ($process) { $process.Dispose() }
+        foreach ($file in @($outputFile, $errorFile)) {
+            if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force -ErrorAction Stop }
+        }
+    }
+}
+
+function Get-VipmRuntime {
+    $cliPath = Find-VipmExecutable 'CLI'
+    $desktopPath = Find-VipmExecutable 'Desktop'
+    $cliVersion = $null
+    $desktopVersion = $null
+    if ($cliPath) {
+        Assert-VipmPublisher $cliPath
+        $result = Invoke-VipmBootstrapProcess -Path $cliPath -Arguments @('--version') -TimeoutSeconds 30
+        if ($result.ExitCode -ne 0 -or $result.Output -notmatch '(?m)^\s*vipm\s+v?(\d+\.\d+\.\d+(?:\.\d+)?)\s*$') {
+            throw "Cannot verify selected VIPM CLI version at '$cliPath': exit=$($result.ExitCode); $($result.Output)"
+        }
+        $cliVersion = [version]$Matches[1]
+    }
+    if ($desktopPath) {
+        Assert-VipmPublisher $desktopPath
+        $identity = (Get-Item -LiteralPath $desktopPath -ErrorAction Stop).VersionInfo
+        if ($identity.ProductName -ne 'VI Package Manager' -or
+            -not [version]::TryParse($identity.FileVersion, [ref]$desktopVersion)) {
+            throw "Cannot verify selected VIPM Desktop identity/version at '$desktopPath'."
+        }
+    }
+    Write-Host "Selected VIPM CLI: '$cliPath' version='$cliVersion'; Desktop: '$desktopPath' version='$desktopVersion'."
+    return [pscustomobject]@{
+        CliPath = $cliPath; CliVersion = $cliVersion
+        DesktopPath = $desktopPath; DesktopVersion = $desktopVersion
+    }
+}
+
+function Test-VipmRuntimeSupported {
+    param($Runtime)
+    return ($Runtime.CliPath -and $Runtime.DesktopPath -and
+        $Runtime.CliVersion -ge [version]'26.3.2' -and
+        $Runtime.DesktopVersion -ge [version]'2026.3.2.4056')
+}
+
+function Initialize-VipmRuntime {
+    param([string] $InstallerUrl)
+    $before = Get-VipmRuntime
+    if (Test-VipmRuntimeSupported $before) {
+        Write-Host 'Both selected VIPM executables satisfy the supported floor; installer URL is unused (no downgrade).'
+        return $before
+    }
+    if (($before.CliVersion -and $before.CliVersion -gt [version]'26.3.2') -or
+        ($before.DesktopVersion -and $before.DesktopVersion -gt [version]'2026.3.2.4056')) {
+        throw 'Mixed VIPM installation includes a newer executable but lacks a supported pair. Upgrade both executables explicitly; refusing a possible downgrade.'
+    }
+    $uri = $null
+    if (-not [uri]::TryCreate($InstallerUrl, [UriKind]::Absolute, [ref]$uri) -or
+        $uri.Scheme -ne 'https' -or $uri.UserInfo) {
+        throw 'VIPM_INSTALLER_URL must be an absolute HTTPS URL without embedded credentials.'
+    }
+    $installerFile = Join-Path $Env:TEMP ("vipm-installer-" + [guid]::NewGuid().ToString('N') + '.exe')
+    try {
+        Write-Host "Upgrading missing/old VIPM pair from configured HTTPS installer host '$($uri.Host)' (download limit 300s)."
+        Invoke-WebRequest -Uri $uri -OutFile $installerFile -UseBasicParsing -TimeoutSec 300 -ErrorAction Stop | Out-Null
+        Assert-VipmPublisher $installerFile
+        $identity = (Get-Item -LiteralPath $installerFile -ErrorAction Stop).VersionInfo
+        $installerVersion = $null
+        if ($identity.ProductName -notlike 'VIPM *' -or
+            -not [version]::TryParse($identity.FileVersion, [ref]$installerVersion) -or
+            $installerVersion -lt [version]'26.3.4056') {
+            throw "Configured VIPM installer has an unsupported/unverifiable identity or version '$($identity.FileVersion)'; minimum installer version is 26.3.4056."
+        }
+        Write-Host "Verified vendor installer version $installerVersion; installing without reboot (limit 1200s)."
+        $result = Invoke-VipmBootstrapProcess -Path $installerFile `
+            -Arguments @('/exenoui', '/qn', '/norestart', 'REBOOT=ReallySuppress') -TimeoutSeconds 1200
+        if ($result.ExitCode -in @(1641, 3010)) {
+            throw "VIPM installer requires a reboot (exit $($result.ExitCode)); a container layer cannot safely continue."
+        }
+        if ($result.ExitCode -ne 0) {
+            throw "VIPM installer failed (exit $($result.ExitCode)): $($result.Output)"
+        }
+        $after = Get-VipmRuntime
+        if (-not (Test-VipmRuntimeSupported $after)) {
+            throw 'VIPM upgrade did not produce a supported selected CLI/Desktop pair. Check preferred stale paths; required packages have not been attempted.'
+        }
+        return $after
+    } finally {
+        if (Test-Path -LiteralPath $installerFile) { Remove-Item -LiteralPath $installerFile -Force -ErrorAction Stop }
+    }
+}
+
+function Get-WindowsDragonPlan {
+    param([string] $Directory, [string] $TargetYear, [string] $TargetBitness = '64')
+    $Directory = (Get-Item -LiteralPath (Join-Path $Directory '.') -ErrorAction Stop).FullName
+    $sources = @(Get-ChildItem -LiteralPath $Directory -Filter '*.dragon' -Recurse -File -ErrorAction Stop)
+    $planPath = Join-Path $Directory 'dragon-plan.json'
+    if (-not (Test-Path -LiteralPath $planPath -PathType Leaf)) {
+        if ($sources.Count) { throw 'Required Dragon declarations have no trusted dragon-plan.json. Stage them with the current Windows worker workflow before building.' }
+        return [pscustomobject]@{ Specs = @() }
+    }
+    $plan = Get-Content -LiteralPath $planPath -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    if (($plan.schema -isnot [int] -and $plan.schema -isnot [long]) -or
+        $plan.schema -ne 1 -or $plan.platform -cne 'windows' -or
+        $plan.labview_version -cne $TargetYear -or $plan.labview_bitness -cne $TargetBitness -or
+        $plan.files -isnot [array] -or $plan.specs -isnot [array] -or
+        @($plan.PSObject.Properties.Name | Where-Object { $_ -notin @(
+            'schema', 'platform', 'labview_version', 'labview_bitness', 'files', 'specs'
+        ) }).Count -or
+        @($plan.files).Count -ne $sources.Count) {
+        throw 'Invalid required Windows Dragon plan schema, target year/bitness/platform, or source count.'
+    }
+    if ($sources.Count -and (Test-Path -LiteralPath (Join-Path $Directory 'install-dragon.ps1'))) {
+        throw 'Legacy install-dragon.ps1 overrides are not supported by the verified Windows Dragon path. Migrate to exact [vipm.dependencies] declarations; the custom hook was not executed.'
+    }
+    $seen = @{}
+    $expectedSpecs = @()
+    foreach ($file in $plan.files) {
+        if ($file.source_file -isnot [string] -or -not $file.source_file -or
+            $file.path -isnot [string] -or $file.path -notmatch '^[^/\\:]+\.dragon$' -or
+            $file.sha256 -isnot [string] -or $file.labview_version -isnot [string] -or
+            $seen.ContainsKey([string]$file.path) -or $file.sha256 -notmatch '^[a-f0-9]{64}$' -or
+            $file.specs -isnot [array] -or @($file.PSObject.Properties.Name | Where-Object {
+                $_ -notin @('path', 'source_file', 'sha256', 'labview_version', 'specs')
+            }).Count) {
+            throw 'Invalid/duplicate source identity in required Windows Dragon plan.'
+        }
+        $seen[[string]$file.path] = $true
+        $source = @($sources | Where-Object { $_.Name -eq $file.path -and $_.DirectoryName -eq $Directory })
+        if ($source.Count -ne 1 -or
+            ($source[0].Attributes -band [System.IO.FileAttributes]::ReparsePoint) -or
+            (Get-FileHash -LiteralPath $source[0].FullName -Algorithm SHA256 -ErrorAction Stop).Hash -ne $file.sha256) {
+            throw "Required Dragon source '$($file.path)' is missing, relocated, or changed since trusted TOML parsing."
+        }
+        if ($file.labview_version -and $file.labview_version -ne $TargetYear) {
+            throw "Required Dragon '$($file.path)' targets LabVIEW $($file.labview_version), not worker LabVIEW $TargetYear."
+        }
+        foreach ($spec in $file.specs) {
+            if ($spec -isnot [string] -or $spec -notmatch '^[A-Za-z0-9_][A-Za-z0-9_.-]*@\d+(?:\.\d+)+(?:-\d+)?$') {
+                throw "Unsupported required Dragon VIPM spec '$spec'. Re-stage with the trusted parser."
+            }
+            $expectedSpecs += [string]$spec
+        }
+        Write-Host "Required Dragon source verified: $($file.source_file) [$($file.sha256)]."
+    }
+    $expectedSpecs = @($expectedSpecs | Sort-Object -Unique)
+    if ((@($plan.specs | Sort-Object -Unique) -join "`n") -cne ($expectedSpecs -join "`n")) {
+        throw 'Required Dragon plan package set does not match its source declarations.'
+    }
+    return [pscustomobject]@{ Specs = $expectedSpecs }
+}
+
+$dragonPlan = $null
+if (-not $BootstrapOnly) {
+    $dragonPlan = Get-WindowsDragonPlan -Directory $VipcDir -TargetYear $LabVIEWVersion -TargetBitness $LabVIEWBitness
+}
+$vipmRuntime = Initialize-VipmRuntime -InstallerUrl $VipmInstallerUrl
+$VipmExe = $vipmRuntime.CliPath
+$script:VipmEngineExe = $vipmRuntime.DesktopPath
+if ($BootstrapOnly) {
+    Write-Host 'VIPM bootstrap verified; no LabVIEW, engine, Git context, or package operations requested.'
+    exit 0
+}
 # VIPM 26.3 Community Edition only installs packages when the working directory is
 # inside a PUBLIC Git repository (otherwise it exits 6 with "VIPM Community Edition
 # requires a public Git repository"). The worker image is built from this public
@@ -150,66 +380,10 @@ try {
     }
 } catch { Write-Host ("Memory preflight skipped: " + $_.Exception.Message) }
 
-# -- 1. Install VIPM if not already present -----------------------------------
-# VIPM is normally pre-installed into the image by labview-ci.Dockerfile, which
-# downloads the official VIPM 2026 Q3 (26.3.3954) Windows installer from the JKI
-# CDN and runs it silently, so this script just finds vipm.exe and applies the
-# .vipc. If it is NOT already present we fall back to downloading the same
-# installer here ($VipmInstallerUrl, overridable via VIPM_INSTALLER_URL). That
-# fallback is OPTIONAL and fetched from a vendor-controlled URL that can move or
-# 404 at any time, so a download/install failure must NOT brick the core CI image
-# (LabVIEW + VI Analyzer were installed above). Treat the fallback as best-effort:
-# on failure, warn and skip the add-ons (exit 0) instead of failing the build.
-# Prefer the MODERN vipm CLI (C:\Program Files\JKI\VIPM) over the legacy
-# LabVIEW-based CLI (C:\Program Files\JKI\VI Package Manager\...). The modern CLI
-# has first-class headless/container support (--refresh, Community Edition mode)
-# and installs packages without a VIPM Pro license.
-$vipmCandidates = @(
-    'C:\Program Files\JKI\VIPM\vipm.exe',
-    'C:\Program Files (x86)\JKI\VIPM\vipm.exe',
-    "$VipmDir\vipm.exe",
-    "$VipmDir\support\vipm.exe"
-)
-$VipmExe = $vipmCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $VipmExe) {
-    # Fall back to a recursive search of the JKI install roots, preferring any
-    # path under a '\VIPM\' folder (the modern CLI) over the legacy product folder.
-    $found = Get-ChildItem -Path 'C:\Program Files\JKI', 'C:\Program Files (x86)\JKI' `
-        -Filter 'vipm.exe' -Recurse -ErrorAction SilentlyContinue |
-        Sort-Object @{ Expression = { $_.FullName -notmatch '\\VIPM\\' } }, FullName |
-        Select-Object -First 1
-    if ($found) { $VipmExe = $found.FullName }
-}
-if ($VipmExe) { Write-Host "Using VIPM CLI: $VipmExe" }
-if (-not $VipmExe -or -not (Test-Path $VipmExe)) {
-    Write-Host 'VIPM not found - downloading installer...'
-    $InstallerFile = Join-Path $Env:TEMP 'vipm-installer.exe'
-    try {
-        Invoke-WebRequest -Uri $VipmInstallerUrl -OutFile $InstallerFile -UseBasicParsing
-
-        Write-Host 'Running VIPM installer silently...'
-        $p = Start-Process -FilePath $InstallerFile `
-            -ArgumentList '/exenoui', '/qn' `
-            -Wait -PassThru
-        if ($p.ExitCode -ne 0) {
-            throw "VIPM installer exited with code $($p.ExitCode)"
-        }
-        Write-Host "VIPM installed to: $VipmDir"
-        $VipmExe = $vipmCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-        if (-not $VipmExe) { $VipmExe = "$VipmDir\vipm.exe" }
-    }
-    catch {
-        Write-Warning ("VIPM add-on install SKIPPED: could not install VIPM from '" + $VipmInstallerUrl + "' (" + $_.Exception.Message + "). " +
-            "Core image (LabVIEW + VI Analyzer) is unaffected; VIPM-only add-ons such as Antidoc are NOT baked in. " +
-            "Provide a reachable VIPM_INSTALLER_URL to enable them.")
-        exit 1
-    }
-}
-
 # -- 2. Apply each .vipc file -------------------------------------------------
 $vipcFiles = @(Get-ChildItem $VipcDir -Filter '*.vipc')
-if ($vipcFiles.Count -eq 0) {
-    Write-Host 'No .vipc files found - nothing to apply.'
+if ($vipcFiles.Count -eq 0 -and $dragonPlan.Specs.Count -eq 0) {
+    Write-Host 'No VIPC or required Dragon package declarations found - nothing to apply.'
     exit 0
 }
 
@@ -338,13 +512,15 @@ function Start-HeadlessLabVIEW {
 # engine is already running. Pre-launch the engine here (best-effort) and give it
 # time to come up so the install can attach to an already-running engine.
 $VipmEngineProc = $null
-$script:VipmEngineExe = @(
-    (Join-Path $VipmDir 'VI Package Manager.exe'),
-    'C:\Program Files (x86)\JKI\VI Package Manager\VI Package Manager.exe'
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
 function Start-VipmEngineProcess {
     if (-not $script:VipmEngineExe) { return }
-    if (Get-Process -Name 'VI Package Manager' -ErrorAction SilentlyContinue) { return }
+    $running = @(Get-Process -Name 'VI Package Manager' -ErrorAction SilentlyContinue)
+    foreach ($engine in $running) {
+        if ($engine.Path -ne $script:VipmEngineExe) {
+            throw "Running VIPM Desktop '$($engine.Path)' does not match verified selected executable '$script:VipmEngineExe'."
+        }
+    }
+    if ($running.Count) { return }
     Write-Host "Pre-launching VIPM engine so the CLI can attach: $script:VipmEngineExe"
     try {
         $script:VipmEngineProc = Start-Process -FilePath $script:VipmEngineExe -PassThru -ErrorAction Stop
@@ -453,6 +629,37 @@ function Get-NumericVersionKey([string] $Version) {
     return ($nums[0..5] | ForEach-Object { '{0:D8}' -f $_ }) -join '.'
 }
 
+function Test-VipmPackageVersion($Request, [string] $Version) {
+    if (-not $Version) { return $false }
+    if (-not $Request.Version) { return $true }
+    if ($Request.Minimum) {
+        return (Get-NumericVersionKey $Version) -ge (Get-NumericVersionKey $Request.Version)
+    }
+    return $Version -eq $Request.Version -or
+        ($Request.Version -notmatch '-' -and ($Version -replace '-\d+$', '') -eq $Request.Version)
+}
+
+function Assert-WindowsDragonVipcPins {
+    param([string[]] $Specs, [object[]] $VipcFiles)
+    $requests = @{}
+    foreach ($spec in $Specs) {
+        $request = Split-VipmPackageSpec $spec
+        if ($requests.ContainsKey($request.Name) -and $requests[$request.Name].Version -ne $request.Version) {
+            throw "Conflicting required Dragon pins for '$($request.Name)'."
+        }
+        $requests[$request.Name] = $request
+    }
+    foreach ($vipc in $VipcFiles) {
+        foreach ($spec in (Get-VipcPackageSpecs $vipc.FullName)) {
+            $request = Split-VipmPackageSpec $spec
+            if ($request.Version -and $requests.ContainsKey($request.Name) -and
+                -not (Test-VipmPackageVersion $request $requests[$request.Name].Version)) {
+                throw "Required Dragon pin '$($requests[$request.Name].Name)@$($requests[$request.Name].Version)' conflicts with '$spec' in '$($vipc.Name)'. Reconcile the declarations; no implicit newest-version selection is allowed."
+            }
+        }
+    }
+}
+
 function ConvertFrom-VipmRepositoryIndex([string] $IndexPath, [string] $BaseUrl, [string] $Name) {
     $packages = New-Object System.Collections.Generic.List[object]
     $current = $null
@@ -549,7 +756,7 @@ function Select-PublicVipmPackage($Request, [object[]] $Packages) {
             $minKey = Get-NumericVersionKey $Request.Version
             $matches = @($matches | Where-Object { $_.VersionKey -ge $minKey })
         } else {
-            $matches = @($matches | Where-Object { $_.Version -eq $Request.Version })
+            $matches = @($matches | Where-Object { Test-VipmPackageVersion $Request $_.Version })
         }
     }
     return @($matches | Sort-Object VersionKey -Descending | Select-Object -First 1)[0]
@@ -657,7 +864,7 @@ function Select-LocalVipPackage($Request, [object[]] $LocalVips) {
             $minKey = Get-NumericVersionKey $Request.Version
             $cands = @($cands | Where-Object { $_.VersionKey -ge $minKey })
         } else {
-            $cands = @($cands | Where-Object { $_.Version -eq $Request.Version })
+            $cands = @($cands | Where-Object { Test-VipmPackageVersion $Request $_.Version })
         }
     }
     if ($cands.Count -eq 0) { return $null }
@@ -716,7 +923,6 @@ function Get-LocalVipFilesForSpecs([string[]] $Specs) {
             # installs the parent fine without a separate file for it.
             if ($IsDependency) {
                 Write-Warning ("  Skipping dependency '$($Request.Name)'$vtext" + ": not in the reachable public VIPM indexes (assumed bundled in its parent package).")
-                $visited[$key] = $true
                 $visiting.Remove($key)
                 return
             }
@@ -834,6 +1040,63 @@ function Invoke-VipmInstall {
     return $vipmExit
 }
 
+# A failed transitive file (notably legacy .ogp metadata rejected by the CLI) does
+# not prove the requested packages failed: later per-file installs can recover.
+# Only the target's installed inventory can confirm that recovery.
+function Test-VipmSpecsInstalled {
+    param([string[]] $Specs, [switch] $RequireTarget)
+    Write-Host '  Verifying requested packages against the target LabVIEW installed inventory ...'
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $out = & $VipmExe @GlobalFlags list --installed 2>&1
+        $inventoryExit = $LASTEXITCODE
+        if ($inventoryExit -eq 2) {
+            Write-Host '  (list rejected global LabVIEW flags; retrying bare form against active target)'
+            $out = & $VipmExe list --installed 2>&1
+            $inventoryExit = $LASTEXITCODE
+        }
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    $out | Out-Host
+    if ($inventoryExit -ne 0) {
+        Write-Warning "  Cannot verify installed packages: vipm list --installed failed (exit $inventoryExit)."
+        return $false
+    }
+    if ($RequireTarget) {
+        $targets = [regex]::Matches(($out | Out-String -Width 8192), 'Using LabVIEW\s+(\d{4})\s+\((32|64)-bit\)')
+        if (-not $targets.Count -or @($targets | Where-Object {
+            $_.Groups[1].Value -ne $LabVIEWVersion -or $_.Groups[2].Value -ne $LabVIEWBitness
+        }).Count) {
+            Write-Warning "Cannot verify required Dragon packages: installed inventory does not identify only requested LabVIEW $LabVIEWVersion ($LabVIEWBitness-bit)."
+            return $false
+        }
+    }
+
+    $installed = @{}
+    foreach ($line in ($out | Out-String -Stream -Width 8192)) {
+        # Modern CLI: Display Name (package_id v1.2.3); older CLI: id 1.2.3 or id-1.2.3.
+        if ($line -match '^\s*.*\((?<name>[A-Za-z0-9_.-]+)\s+v(?<version>\d[\w.-]*)\)\s*$' -or
+            $line -match '^\s*(?<name>[A-Za-z0-9_.-]+)\s+v?(?<version>\d[\w.-]*)\s*$' -or
+            $line -match '^\s*(?<name>[A-Za-z0-9_.-]+?)-(?<version>\d+(?:\.\d+)+(?:-\d+)?)\s*$') {
+            $installed[$Matches.name] = $Matches.version
+        }
+    }
+
+    $verified = $true
+    foreach ($spec in $Specs) {
+        $request = Split-VipmPackageSpec $spec
+        $version = $installed[$request.Name]
+        $matchesVersion = Test-VipmPackageVersion $request $version
+        if (-not $matchesVersion) {
+            Write-Warning "  Requested package '$spec' is not installed at the requested version."
+            $verified = $false
+        }
+    }
+    return $verified
+}
+
 # Install a set of package SPECS (name@version) using the by-name path first and,
 # when the container resolver index is empty, the public-index local-file fallback.
 # Returns $true only if every spec installed. Stops early (returns $false) the
@@ -860,19 +1123,36 @@ function Install-VipmSpecs {
         $vipFiles = @(Get-LocalVipFilesForSpecs $Specs)
         Write-Host ("  Installing local VIP files: " + (($vipFiles | ForEach-Object { Split-Path $_ -Leaf }) -join ', '))
         $rc = Invoke-VipmInstall @vipFiles
-        if ($rc -eq 0) { return $true }
+        if ($rc -eq 0) { return (Test-VipmSpecsInstalled $Specs) }
         Write-Host "  local VIP file batch install failed (exit $rc); retrying each file individually ..."
-        $localFailed = $false
         foreach ($vipFile in $vipFiles) {
             if ($script:VipmEngineDead) { Write-Warning '  VIPM engine wedged; stopping per-file retries.'; return $false }
             $rc = Invoke-VipmInstall $vipFile
-            if ($rc -ne 0) { Write-Warning "  local package file '$vipFile' failed (exit $rc)."; $localFailed = $true }
+            if ($rc -ne 0) { Write-Warning "  local package file '$vipFile' failed (exit $rc)." }
             if ($script:VipmEngineDead) { Write-Warning '  VIPM engine wedged; stopping per-file retries.'; return $false }
         }
-        return (-not $localFailed)
+        return (Test-VipmSpecsInstalled $Specs)
     } catch {
         Write-Warning ("  local VIP file fallback failed: " + $_.Exception.Message)
         return $false
+    }
+}
+
+function Install-RequiredWindowsDragon {
+    param([string[]] $Specs)
+    if (-not $Specs.Count) { return }
+    Write-Host ("Installing REQUIRED Dragon VIPM declarations: " + ($Specs -join ', '))
+    if ($script:VipmEngineDead -or -not (Install-VipmSpecs $Specs)) {
+        throw 'Required Windows Dragon dependencies did not install. The worker must not be published; VIPM_ALLOW_MISSING_PACKAGES does not bypass Dragon requirements.'
+    }
+}
+
+function Assert-FinalWindowsDragonInventory {
+    param([string[]] $Specs)
+    if (-not $Specs.Count) { return }
+    Write-Host 'Verifying FINAL required Dragon inventory after project and best-effort tooling installs.'
+    if ($script:VipmEngineDead -or -not (Test-VipmSpecsInstalled -Specs $Specs -RequireTarget)) {
+        throw 'FINAL required Windows Dragon target inventory is missing, unreadable, wrong-target, or has missing/wrong-version packages. Reconcile conflicting project/tooling pins; the worker must not be published.'
     }
 }
 
@@ -958,6 +1238,7 @@ function New-PublicRepoWorkdir {
 
 $prevLocation   = Get-Location
 $installWorkdir = $null
+Assert-WindowsDragonVipcPins -Specs $dragonPlan.Specs -VipcFiles $vipcFiles
 try {
     $installWorkdir = New-PublicRepoWorkdir $PublicRepoUrl
     Write-Host "Running VIPM installs from a public-repo context (origin=$PublicRepoUrl) to satisfy Community Edition."
@@ -998,21 +1279,23 @@ try {
     # list with VIPM_REQUIRED_PACKAGES (comma/semicolon separated name@version); set
     # it to a single '-' to disable the required pre-install entirely.
     $requiredRaw = if ($null -ne $Env:VIPM_REQUIRED_PACKAGES) { $Env:VIPM_REQUIRED_PACKAGES } else {
-        'ni_lib_utf_junit_report@1.0.1.43,ni_lib_junit_results_api@1.0.1.6,ni_lib_simple_xml@1.0.0.4'
+        'ni_lib_utf_junit_report@1.0.1.43,ni_lib_junit_results_api@1.0.1.6,ni_lib_simple_xml@1.0.0.4,jki_lib_caraya@1.4.4.148'
     }
     $requiredSpecs = @($requiredRaw -split '[,;]' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne '-' })
     if ($requiredSpecs.Count -gt 0) {
-        Write-Host ("Installing REQUIRED UTF essentials first: " + ($requiredSpecs -join ', '))
+        Write-Host ("Installing REQUIRED unit-test essentials first: " + ($requiredSpecs -join ', '))
         if ($script:VipmEngineDead) {
-            Write-Warning 'Skipping REQUIRED UTF essentials because VIPM Desktop did not start during the refresh health check.'
+            Write-Warning 'Skipping REQUIRED unit-test essentials because VIPM Desktop did not start during the refresh health check.'
             $applyFailed = $true
         } elseif (Install-VipmSpecs $requiredSpecs) {
-            Write-Host 'REQUIRED UTF essentials installed.'
+            Write-Host 'REQUIRED unit-test essentials installed.'
         } else {
-            Write-Warning 'One or more REQUIRED UTF essentials failed to install; headless UTF (RunUnitTests) will fail with -350053.'
+            Write-Warning 'One or more REQUIRED unit-test essentials failed to install; UTF may fail with -350053 and Caraya entry VIs may be broken (1003).'
             $applyFailed = $true
         }
     }
+
+    Install-RequiredWindowsDragon -Specs $dragonPlan.Specs
 
     # Phase A2 (EARLY, BEST-EFFORT): unit-test framework packages that only resolve
     # through the public-index local-file fallback (the container's by-name resolver
@@ -1104,6 +1387,7 @@ try {
             }
         }
     }
+    Assert-FinalWindowsDragonInventory -Specs $dragonPlan.Specs
 }
 finally {
     Set-Location $prevLocation

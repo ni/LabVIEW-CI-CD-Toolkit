@@ -28,7 +28,7 @@ jobs:
     if: github.repository == 'elijah286/LabVIEW-CI-with-Containers'
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Discover client repositories
         env:
