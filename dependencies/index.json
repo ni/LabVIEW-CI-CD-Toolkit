@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "5a6a722b4bcac36c50f134e80eed50dda2b153a0",
+  "sha": "1eb4b2455a8d968383485b066e8798ba434da0c4",
   "revisions": [
+    {
+      "sha": "1eb4b2455a8d968383485b066e8798ba434da0c4",
+      "short": "1eb4b24",
+      "message": "Merge pull request #145 from ni/fix/windows-snapshot-contract-utf8-20261105",
+      "author": "Elijah Kerry",
+      "date": "2026-11-06T22:07:55Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "25a3917e08cd9ef425a4750ee828fb8afdb46673",
+      "short": "25a3917",
+      "message": "snapshots: use UTF-8 for Windows contract test text",
+      "author": "elijah286",
+      "date": "2026-11-05T17:12:13Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "5a6a722b4bcac36c50f134e80eed50dda2b153a0",
       "short": "5a6a722",
@@ -882,24 +900,6 @@
       "message": "Merge pull request #99 from ni/lvci-release/release-4.19.1",
       "author": "Elijah Kerry",
       "date": "2026-11-02T21:15:06Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "72784afae73c1505d8814d8fe603d8ef94fb7965",
-      "short": "72784af",
-      "message": "Merge branch 'main' into fix/dependencies-platform-ux-20261102",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:14:48Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "3e23a50d36e030c0dd1c146aa70936cf22c2f666",
-      "short": "3e23a50",
-      "message": "Merge branch 'main' into MIpetrov-NI-enable-dependabot",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:14:46Z",
       "project": false,
       "dep_only": false
     },
