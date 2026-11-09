@@ -25,6 +25,7 @@ SHARED_HELPERS = HELPERS | {".github/labview/dragon_deps.py"}
 CANDIDATE_FILES = {
     ".github/workflows/build-labview-lvpm-image.yml",
     ".github/docker/labview-ci-lvpm.Dockerfile",
+    ".github/labview/vipm/linux-worker.py",
     ".github/labview/vipm/ci-tooling.vipc",
     ".github/labview/toimages/",
 }
@@ -33,6 +34,16 @@ PLATFORMS = (("linux",), ("windows", "linux"), ("windows",))
 
 
 class DistributionTests(unittest.TestCase):
+    def test_linux_only_install_contains_inventory_and_staging_helper(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary)
+            self.stage(target, ("custom-image",), ("linux",))
+            helper = target / ".github/labview/vipm/linux-worker.py"
+            self.assertTrue(helper.is_file())
+            result = INSTALLER.subprocess.run([sys.executable, str(helper), "--help"],
+                                              capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def setUp(self):
         self.catalog = json.loads((ROOT / ".github/labview-ci/catalog.json").read_text())
 

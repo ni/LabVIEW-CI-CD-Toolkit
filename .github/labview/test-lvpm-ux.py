@@ -365,7 +365,105 @@ class ReconfigureLvpmTests(unittest.TestCase):
                              (ROOT / 'actions/dashboard' / page).read_bytes())
 
 
+class WorkerInventoryTests(unittest.TestCase):
+    def generate(self, inventory=None, raw='diagnostic_package 1.0', platform='windows'):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw_path = root / 'vipm-list.txt'
+            raw_path.write_text(raw)
+            arguments = [sys.executable, str(ROOT / '.github/labview/build-worker-manifest.py'),
+                         '--platform', platform, '--version', 'test-worker',
+                         '--labview-version', '2026', '--labview-bitness', '64',
+                         '--dependency-sha', 'd' * 40, '--vipm-list', str(raw_path),
+                         '--out-dir', str(root / 'out')]
+            if inventory is not None:
+                path = root / 'observed.json'
+                path.write_text(json.dumps(inventory), encoding='utf-8-sig')
+                arguments += ['--observed-inventory', str(path)]
+            result = subprocess.run(arguments, text=True, capture_output=True)
+            output = root / 'out/manifest.json'
+            return result, json.loads(output.read_text()) if output.exists() else None
+
+    def evidence(self, **overrides):
+        return {'schema': 1, 'platform': 'windows', 'labview_version': '2026',
+                'labview_bitness': '64', 'source': 'vipm list --installed',
+                'target_verified': True, 'required_project': True, 'status': 'observed',
+                'raw': 'LabVIEW 2026 (64-bit)\nactual 1.2',
+                'packages': [{'name': 'actual', 'version': '1.2'}], **overrides}
+
+    def test_only_structured_target_bound_evidence_is_installed(self):
+        result, manifest = self.generate(self.evidence())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(manifest['schema'], 3)
+        self.assertEqual(manifest['dependency_sha'], 'd' * 40)
+        self.assertEqual(manifest['vipm_packages'], [{'name': 'actual', 'version': '1.2'}])
+        self.assertTrue(manifest['vipm_inventory']['target_verified'])
+        result, manifest = self.generate()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(manifest['vipm_packages'], [])
+        self.assertEqual(manifest['vipm_inventory']['status'], 'unverified')
+
+    def test_baseline_unavailable_never_claims_packages(self):
+        result, manifest = self.generate(self.evidence(status='unavailable',
+            target_verified=False, required_project=False, packages=[]))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(manifest['vipm_packages'], [])
+
+    def test_invalid_or_wrong_target_inventory_cannot_publish(self):
+        invalid = [None, [], {'schema': True}, {'platform': 'linux'},
+                   {'labview_version': '2025'}, {'labview_bitness': '32'},
+                   {'source': 'requested VIPC'}, {'target_verified': 'true'},
+                   {'required_project': 'false'}, {'status': 'verified'},
+                   {'target_verified': False}, {'packages': []},
+                   {'packages': [{'name': 'bad package', 'version': '1.2'}]},
+                   {'packages': [{'name': 'actual', 'version': ''}]},
+                   {'packages': [{'name': 'actual', 'version': '1.2'}] * 2},
+                   {'status': 'unavailable', 'target_verified': False}]
+        for overrides in invalid:
+            with self.subTest(overrides=overrides):
+                evidence = self.evidence(**overrides) if isinstance(overrides, dict) else overrides
+                if overrides is None:
+                    evidence = 'not-an-object'
+                result, manifest = self.generate(evidence)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIsNone(manifest)
+
+
 class DashboardLvpmTests(unittest.TestCase):
+    def test_vipm_coverage_uses_observations_not_requests_or_seed_inference(self):
+        namespace = dashboard_functions('_manifest_packages')
+        namespace['_core_tooling_packages'] = lambda: ['inferred-core-1.0']
+        manifest = {'platform': 'windows', 'copied_from_base': True,
+                    'vipc': [{'packages': ['declared-only-1.0']}]}
+        self.assertEqual(namespace['_manifest_packages'](manifest), [])
+        manifest['vipm_packages'] = [{'name': 'actual', 'version': 'v1.2'}]
+        self.assertIn('actual-1.2', namespace['_manifest_packages'](manifest))
+        self.assertNotIn('declared-only-1.0', namespace['_manifest_packages'](manifest))
+        manifest['vipm_inventory'] = {'status': 'unavailable'}
+        self.assertEqual(namespace['_manifest_packages'](manifest), [])
+
+    def test_vipm_wrong_version_remains_pending(self):
+        namespace = dashboard_functions('_compute_deps_pending')
+        data = {'columns': [{'key': 'windows', 'ready': True, 'tag': 'win-existing',
+                             'packages': ['actual', 'actual-v1.2']}],
+                'vipc': [{'path': 'project.vipc', 'role': 'project', 'configured': True,
+                          'monitorOn': ['windows'], 'packages': ['actual-1.2']}]}
+        self.assertFalse(namespace['_compute_deps_pending'](data)['pending'])
+        data['vipc'][0]['packages'] = ['actual-9.0']
+        self.assertTrue(namespace['_compute_deps_pending'](data)['pending'])
+
+    def test_selected_linux_worker_with_unavailable_inventory_remains_pending(self):
+        namespace = dashboard_functions('_compute_deps_pending')
+        data = {'columns': [{'key': 'linux', 'ready': False, 'tag': 'linux-existing',
+                             'packages': ['actual-1.2']}],
+                'vipc': [{'path': 'project.vipc', 'role': 'project', 'configured': True,
+                          'monitorOn': ['linux'], 'packages': ['actual-1.2']}]}
+        pending = namespace['_compute_deps_pending'](data)
+        self.assertTrue(pending['pending'])
+        self.assertIn('linux', pending['containers'])
+        data['columns'][0]['tag'] = 'base'
+        self.assertFalse(namespace['_compute_deps_pending'](data)['pending'])
+
     def test_selected_inventory_does_not_count_declarations_as_installed(self):
         namespace = dashboard_functions('_manifest_packages')
         namespace['_core_tooling_packages'] = lambda: ['inferred-core-1.0']

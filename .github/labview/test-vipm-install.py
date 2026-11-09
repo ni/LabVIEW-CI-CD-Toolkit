@@ -95,7 +95,7 @@ class WindowsDragonPlanTests(unittest.TestCase):
         second = self.source('[vipm.dependencies]\npkg={version="1.0-1"}\n', 'Other.dragon')
         self.assertEqual(DRAGON.windows_install_plan([first, second])['specs'], ['pkg@1.0-1'])
 
-    def stage(self, dragon_text, config='', vipc=False, expected_exit=0):
+    def stage(self, dragon_text, config='', vipc=False, expected_exit=0, dependency_root='.'):
         root = INSTALLER.parents[3]
         workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
         stage = workflow.split('- name: Stage repo VIPC and Dragon files', 1)[1]
@@ -114,7 +114,8 @@ class WindowsDragonPlanTests(unittest.TestCase):
         if vipc:
             with zipfile.ZipFile(self.root / 'Dependencies.vipc', 'w') as archive:
                 archive.writestr('config.xml', '<VI_Package_Configuration/>')
-        environment = dict(os.environ, GITHUB_OUTPUT=str(self.root / 'outputs'))
+        environment = dict(os.environ, GITHUB_OUTPUT=str(self.root / 'outputs'),
+                   DEPENDENCY_ROOT=dependency_root)
         environment['PYTHONPATH'] = str(self.root / 'shadow')
         result = subprocess.run([os.sys.executable, '-I', '-c', code], cwd=self.root, env=environment,
                                 text=True, capture_output=True, timeout=30)
@@ -268,6 +269,49 @@ class WindowsDragonPlanTests(unittest.TestCase):
             with self.subTest(year=year, bitness=bitness):
                 with self.assertRaisesRegex(DRAGON.DragonParseError, 'invalid Windows Dragon target'):
                     DRAGON.windows_install_plan([], target_year=year, target_bitness=bitness)
+
+    def test_ancestor_dependencies_do_not_replace_reviewed_tooling(self):
+        self.source('[vipm.dependencies]\nancestor_pkg="1.0"\n',
+                    '.dependency-source/example/Ancestor.dragon')
+        self.source('config:\n  container:\n    dragon:\n'
+                    '      - path: example/Ancestor.dragon\n        monitor: true\n',
+                    '.dependency-source/.github/labview-ci.yml')
+        self.source('not executable tooling', '.dependency-source/.github/labview/dragon_deps.py')
+        staged = self.stage('[vipm.dependencies]\nhead_pkg="2.0"\n',
+                            dependency_root='.dependency-source')
+        plan = json.loads((staged / 'dragon-plan.json').read_text())
+        self.assertEqual(plan['specs'], ['ancestor_pkg@1.0'])
+        self.assertEqual(plan['files'][0]['source_file'], 'example/Ancestor.dragon')
+
+    def test_selected_vipc_missing_or_colliding_fails_closed(self):
+        self.stage('[vipm.dependencies]\npkg="1.0"\n', config=(
+            'config:\n  container:\n    vipc:\n      - path: Missing.vipc\n        monitor: true\n'),
+            expected_exit=1)
+        for folder in ('one', 'two'):
+            source = self.root / folder / 'Same.vipc'
+            source.parent.mkdir()
+            with zipfile.ZipFile(source, 'w') as archive:
+                archive.writestr('config.xml', '<VI_Package_Configuration/>')
+        self.stage('[vipm.dependencies]\npkg="1.0"\n', expected_exit=1)
+
+    def test_staging_discards_deselected_payloads_and_preserves_baseline(self):
+        self.source('baseline', '.github/labview/vipm/ci-tooling.vipc')
+        self.source('stale', '.github/labview/vipm/Old.vipc')
+        self.source('stale', '.github/labview/vipm/Old.vip')
+        staged = self.stage('[vipm.dependencies]\npkg="1.0"\n', config=(
+            'config:\n  container:\n    vipc: []\n    dragon: []\n'))
+        self.assertEqual((staged / 'ci-tooling.vipc').read_text(), 'baseline')
+        self.assertFalse((staged / 'Old.vipc').exists())
+        self.assertFalse((staged / 'Old.vip').exists())
+
+    def test_vipc_sources_cannot_escape_repository_or_overwrite_baseline(self):
+        for path in ('../Outside.vipc', 'project/ci-tooling.vipc'):
+            with self.subTest(path=path):
+                if path.startswith('project'):
+                    self.source('not the baseline', path)
+                self.stage('[vipm.dependencies]\npkg="1.0"\n', config=(
+                    f'config:\n  container:\n    vipc:\n      - path: {path}\n        monitor: true\n'),
+                    expected_exit=1)
 
     def test_selected_symlinks_are_rejected(self):
         source = Path(self.source('[vipm.dependencies]\npkg="1.0"\n'))
@@ -445,6 +489,42 @@ Install-RequiredWindowsDragon @('oglib_boolean@6.0.0.9')
 """)
         self.assertIn('REQUIRED=True', output)
 
+    def test_selected_vipc_release_is_preserved_and_controls_baseline_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'Project.vipc'
+            with zipfile.ZipFile(path, 'w') as archive:
+                archive.writestr('config.xml', '<VI_Package_Configuration><Target><Package>'
+                                 '<Name>jki_labs_tool_vi_tester-1.1-1</Name>'
+                                 '</Package></Target></VI_Package_Configuration>')
+            escaped = str(path).replace("'", "''")
+            output = self.run_script(f"""
+$specs = @(Get-VipcPackageSpecs '{escaped}')
+if (($specs -join ',') -ne 'jki_labs_tool_vi_tester@1.1-1') {{ throw 'Selected release suffix lost' }}
+$files = @([pscustomobject]@{{ Name = 'Project.vipc'; FullName = '{escaped}' }})
+$resolved = @(Resolve-WindowsSelectedSpecs @('jki_vi_tester') $files @())
+if (($resolved -join ',') -ne 'jki_labs_tool_vi_tester@1.1-1') {{ throw 'Baseline did not use selected exact source pin' }}
+'SELECTED-EXACT=True'
+""")
+            self.assertIn('SELECTED-EXACT=True', output)
+
+    def test_selected_vipc_rejects_unsafe_cli_package_declarations(self):
+        for package in ('--force', 'pkg;command', 'pkg@--option', 'pkg/../../other'):
+            with self.subTest(package=package), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'Project.vipc'
+                with zipfile.ZipFile(path, 'w') as archive:
+                    archive.writestr('config.xml', '<VI_Package_Configuration><Target><Package>'
+                                     f'<Name>{package}</Name>'
+                                     '</Package></Target></VI_Package_Configuration>')
+                escaped = str(path).replace("'", "''")
+                output = self.run_script(f"""
+try {{ Get-VipcPackageSpecs '{escaped}'; throw 'Unsafe package accepted' }}
+catch {{
+    if ($_.Exception.Message -notlike 'Unsafe VIPC package declaration*') {{ throw }}
+    'REJECTED=True'
+}}
+""")
+                self.assertIn('REJECTED=True', output)
+
     def test_final_dragon_inventory_is_target_specific_and_fails_closed(self):
         good = 'Using LabVIEW 2026 (64-bit)'
         for banner, package, exit_code, success in (
@@ -567,6 +647,7 @@ $script:InventoryExit = 0
 $script:LastVipmOutput = ''
 function New-PublicRepoWorkdir {{ return '{escaped}' }}
 function Get-Command {{ return $null }}
+function Get-VipcPackageSpecs {{ @() }}
 function Install-VipmSpecs {{
     param($Specs)
     $script:Inventory = @('Using LabVIEW 2026 (64-bit)', 'oglib_boolean 6.0.0.9')
@@ -1174,7 +1255,7 @@ Write-Output "RESULT=$result"
 """)
         self.assertIn('RESULT=False', output)
 
-    def test_inventory_preserves_legacy_cli_active_target_fallback(self):
+    def test_inventory_rejects_unsupported_target_flags_without_bare_retry(self):
         output = self.run_script("""
 function Mock-Vipm {
     param([Parameter(ValueFromRemainingArguments = $true)] [string[]] $Arguments)
@@ -1189,8 +1270,8 @@ function Mock-Vipm {
 $result = Test-VipmSpecsInstalled @('jki_lib_caraya@1.4.4.148')
 Write-Output "RESULT=$result"
 """)
-        self.assertIn('RESULT=True', output)
-        self.assertIn('retrying bare form against active target', output)
+        self.assertIn('RESULT=False', output)
+        self.assertNotIn('retrying bare form against active target', output)
 
     def test_project_failure_is_required_but_tooling_failure_is_optional(self):
         for name, required, optional in (('Dependencies.vipc', True, False),

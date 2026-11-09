@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - '.github/labview/lvpm/**'
+      - '.github/labview/vipm/linux-worker.py'
+      - '.github/labview/vipm/install-vipc-linux.sh'
+      - '.github/labview/build-worker-manifest.py'
+      - '.github/labview/test-linux-worker.py'
       - '.github/labview/vipm/ci-tooling.vipc'
       - '.github/labview/experimental.vipc'
       - '.github/labview/antidoc/antidoc.vipc'
@@ -27,6 +31,10 @@ on:
     branches: [main]
     paths:
       - '.github/labview/lvpm/**'
+      - '.github/labview/vipm/linux-worker.py'
+      - '.github/labview/vipm/install-vipc-linux.sh'
+      - '.github/labview/build-worker-manifest.py'
+      - '.github/labview/test-linux-worker.py'
       - '.github/labview/vipm/ci-tooling.vipc'
       - '.github/labview/experimental.vipc'
       - '.github/labview/antidoc/antidoc.vipc'
@@ -68,6 +76,7 @@ jobs:
         run: python -m pip install PyYAML==6.0.3
       - name: Check adapter, provenance, and configuration contracts
         run: |
+          python .github/labview/test-linux-worker.py
           python .github/labview/test-lvpm.py
           python .github/labview/test-lvpm-worker.py
           python .github/labview/test-lvpm-ux.py

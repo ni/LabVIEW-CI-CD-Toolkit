@@ -19,6 +19,7 @@ SHELL ["powershell", "-NoLogo", "-NoProfile", "-Command", "$ErrorActionPreferenc
 ARG CI_WORKER_VERSION=dev
 ARG LABVIEW_VERSION=2026
 ARG LABVIEW_BITNESS=64
+ARG LVCI_UNIT_TESTS_INSTALLED=true
 
 # VIPC automation assets. install-vipc.ps1 plus any *.vipc are staged here; the
 # build workflow also copies repo-root *.vipc (e.g. "COTC Dependencies.vipc")
@@ -32,6 +33,7 @@ RUN $vipcFiles = Get-ChildItem -Path 'C:\vipm' -Filter '*.vipc' -Recurse -ErrorA
     if ($vipcFiles -or $dragonFiles) { `
       if (Test-Path 'C:\vipm\install-vipc.ps1') { `
         Write-Host 'Required VIPC/Dragon declarations detected. Running C:\vipm\install-vipc.ps1 ...'; `
+        if ($env:LVCI_UNIT_TESTS_INSTALLED -eq 'false') { $env:VIPM_REQUIRED_PACKAGES = '-'; $env:VIPM_EARLY_PACKAGES = '-' }; `
         powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File 'C:\vipm\install-vipc.ps1'; `
         if ($LASTEXITCODE -ne 0) { throw ('Required VIPM dependency bake failed with exit ' + $LASTEXITCODE) } `
       } else { `

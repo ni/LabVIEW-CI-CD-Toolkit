@@ -441,9 +441,15 @@ hooks.setState({ candidate, revision:'e'.repeat(40), inventory:inventoryFor() })
 assert.equal(hooks.pkgCellState('actual-1.2', reusedState).state, 'missing');
 assert.equal(hooks.lvpmFreshness(reusedState).status, 'unknown');
 hooks.setState({ candidate });
-const vipmState = hooks.enrichPlatformState({ key:'linux', tag:'vipm-existing', ready:false }, { vipc:[{ packages:['actual-1.2'] }] });
+const vipmState = hooks.enrichPlatformState({ key:'linux', tag:'vipm-existing', ready:false }, {
+  vipc:[{ packages:['declared-only-1.0'] }], vipm_packages:[{name:'actual',version:'v1.2'}]
+});
 assert.equal(vipmState.ready, true);
-assert.equal(hooks.pkgCellState('actual-9.0', vipmState).state, 'present');
+assert.equal(hooks.pkgCellState('actual-1.2', vipmState).state, 'present');
+assert.equal(hooks.pkgCellState('actual-9.0', vipmState).state, 'missing');
+assert.equal(hooks.pkgCellState('declared-only-1.0', vipmState).state, 'missing');
+assert.deepEqual([...hooks.packagesInManifest({vipc:[{packages:['actual-1.2']}],copied_from_base:true})], []);
+assert.equal(hooks.enrichPlatformState({key:'windows'}, {vipm_inventory:{status:'unavailable'}}).ready, false);
 assert.equal(hooks.lvpmFreshness(vipmState), null);
 const dragonPath = 'project.dragon';
 const monitoredDragon = { path:dragonPath, monitored:true, monitorOn:['linux'] };
@@ -1816,6 +1822,21 @@ assert.equal(sourceGuardReads, 1);
 for (const functionName of ['installToRepo', 'proceedInstall']) {
   const body = integrate.slice(integrate.indexOf('async function ' + functionName + '('));
   assert.match(body.slice(0, 1000), /await toolingSourceBlock\(repo\)/);
+}
+hooks.setState({platform:'linux', vipcs:[{...projectVipc, monitorOn:['windows']}], dragons:[], columns:loaderPlatforms()});
+hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
+assert.equal(elements.get('saveMonitor').disabled, false);
+assert.match(hooks.monitorInputs().container_vipc, /project\.vipc::windows\+linux/);
+const restrictedContext = vm.createContext({...context, window:{LVCI:{repo:'ni/LabVIEW-CI-CD-Toolkit'}}});
+vm.runInContext(fixtureSource, restrictedContext);
+for (const platform of ['windows', 'linux']) {
+  restrictedContext.hooks.setState({platform, vipcs:[{...projectVipc}], dragons:[], columns:loaderPlatforms()});
+  restrictedContext.hooks.setFileMonitor('vipc', 'project.vipc', platform, false);
+  assert.equal(elements.get('saveMonitor').disabled, true);
+  assert.match(elements.get('monitorStatus').innerHTML, /reviewed source PR/);
+  const before = requests.length;
+  await restrictedContext.hooks.dispatchMonitor();
+  assert.equal(requests.length, before);
 }
 console.log('Linux monitoring prerequisites: ' + prerequisiteCases + ' actual-function cases; Dragon file/package details: ' + dragonDetailCases + ' renderer cases passed.');
 console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety and monitoring regressions passed; ' + progressCases + ' dispatch identity/progress/error/duplicate/stale-context cases and ' + visualChecks + ' visual progress checks passed.');

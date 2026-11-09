@@ -128,7 +128,50 @@ def parse_vipm_list(raw: str) -> list[dict]:
     return sorted(packages.values(), key=lambda p: p["name"].lower())
 
 
+def observed_inventory(args: argparse.Namespace) -> dict:
+    inventory = {"status": "unverified", "target_verified": False, "packages": []}
+    if not args.observed_inventory:
+        return inventory
+    inventory = json.loads(Path(args.observed_inventory).read_text(encoding="utf-8-sig"))
+    if not isinstance(inventory, dict):
+        raise ValueError("Observed inventory must be an object")
+    if (type(inventory.get("schema")) is not int or inventory["schema"] != 1
+            or inventory.get("platform") != args.platform
+            or inventory.get("labview_version") != args.labview_version
+            or inventory.get("labview_bitness") != args.labview_bitness
+            or inventory.get("source") != "vipm list --installed"
+            or type(inventory.get("target_verified")) is not bool
+            or type(inventory.get("required_project")) is not bool
+            or inventory.get("status") not in ("observed", "unavailable")
+            or not isinstance(inventory.get("raw"), str)
+            or not isinstance(inventory.get("packages"), list)):
+        raise ValueError("Observed inventory target or schema is invalid")
+    observed = inventory["status"] == "observed"
+    if observed != inventory["target_verified"]:
+        raise ValueError("Observed inventory requires a verified LabVIEW target")
+    if not observed and (inventory["packages"] or inventory["required_project"]):
+        raise ValueError("Required project inventory is unavailable")
+    identities = set()
+    for package in inventory["packages"]:
+        if (not isinstance(package, dict)
+                or not isinstance(package.get("name"), str)
+                or not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", package["name"])
+                or not isinstance(package.get("version"), str)
+                or not re.fullmatch(r"[vV]?\d[\w.+-]*", package["version"])):
+            raise ValueError("Observed inventory package is malformed")
+        identity = package["name"].lower()
+        if identity in identities:
+            raise ValueError("Observed inventory contains duplicate package names")
+        identities.add(identity)
+    if inventory["required_project"] and not inventory["packages"]:
+        raise ValueError("Required project inventory is empty")
+    return inventory
+
+
 def build_manifest(args: argparse.Namespace) -> dict:
+    inventory = observed_inventory(args)
+    if args.dependency_sha and not re.fullmatch(r"[a-fA-F0-9]{40}", args.dependency_sha):
+        raise ValueError("Dependency revision must be a full commit SHA")
     nipkg_raw = ""
     if args.nipkg_list:
         p = Path(args.nipkg_list)
@@ -157,10 +200,11 @@ def build_manifest(args: argparse.Namespace) -> dict:
         )
 
     return {
-        "schema": 2,
+        "schema": 3,
         "platform": args.platform,
         "version": args.version,
         "labview_version": args.labview_version,
+        "labview_bitness": args.labview_bitness,
         "base_image": args.base_image,
         "base_digest": args.base_digest or "",
         "seed_image": args.seed_image or "",
@@ -170,10 +214,12 @@ def build_manifest(args: argparse.Namespace) -> dict:
         "image_ref": args.image_ref or "",
         "build_date": args.build_date,
         "git_sha": args.git_sha,
+        "dependency_sha": args.dependency_sha or args.git_sha,
         "run_url": args.run_url,
         "vipc": vipcs,
         "vipm_raw": vipm_raw,
-        "vipm_packages": parse_vipm_list(vipm_raw),
+        "vipm_inventory": inventory,
+        "vipm_packages": inventory["packages"],
         "nipkg_raw": nipkg_raw,
         "nipkg_packages": parse_nipkg_list(nipkg_raw),
     }
@@ -226,11 +272,12 @@ _PAGE = """<!DOCTYPE html>
     <tr><td class="k">LCWC seed digest</td><td><code>{seed_digest}</code></td></tr>
     <tr><td class="k">Worker layer</td><td>{worker_layer}</td></tr>
     <tr><td class="k">Built</td><td>{build_date}</td></tr>
-    <tr><td class="k">Source commit</td><td><code>{git_sha}</code></td></tr>
+    <tr><td class="k">Tooling commit</td><td><code>{git_sha}</code></td></tr>
+    <tr><td class="k">Dependency commit</td><td><code>{dependency_sha}</code></td></tr>
     <tr><td class="k">Build run</td><td>{run_link}</td></tr>
   </table>
 
-  <h2>Applied VI Package Configurations (.vipc)</h2>
+    <h2>Declared VI Package Configurations (.vipc)</h2>
   {vipc_section}
 
     <h2>Installed packages (VIPM)</h2>
@@ -276,7 +323,7 @@ def render_html(m: dict, pages_url: str) -> str:
         vipc_section = '<p class="muted">None. This worker applies no VI Package Configuration.</p>'
 
     # VIPM section
-    if m.get("vipm_raw", "").strip():
+    if m.get("vipm_packages") or m.get("vipm_raw", "").strip():
         rows = "".join(
             f"<tr><td><code>{esc(p['name'])}</code></td><td><code>{esc(p['version'])}</code></td></tr>"
             for p in m.get("vipm_packages", [])
@@ -292,6 +339,9 @@ def render_html(m: dict, pages_url: str) -> str:
         )
     else:
         vipm_section = '<p class="muted">No VIPM installed-package listing was captured for this worker.</p>'
+    vipm_section = (f'<p>Inventory: <strong>{esc(m.get("vipm_inventory", {}).get("status", "unverified"))}</strong>'
+                    f' &middot; LabVIEW {esc(m["labview_version"])} ({esc(m.get("labview_bitness", ""))}-bit)</p>'
+                    + vipm_section)
 
     # nipkg section
     if m["nipkg_raw"].strip():
@@ -323,6 +373,7 @@ def render_html(m: dict, pages_url: str) -> str:
         worker_layer=esc(m.get("worker_layer")) or "—",
         build_date=esc(m["build_date"]),
         git_sha=esc(m["git_sha"]) or "—",
+        dependency_sha=esc(m.get("dependency_sha", m["git_sha"])) or "—",
         run_link=run_link,
         nav=nav,
         vipc_section=vipc_section,
@@ -344,6 +395,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--platform", required=True, choices=["windows", "linux"])
     ap.add_argument("--version", required=True, help="Worker version, e.g. win-abc123def456")
     ap.add_argument("--labview-version", default="")
+    ap.add_argument("--labview-bitness", default="64", choices=["32", "64"])
+    ap.add_argument("--dependency-sha", default="")
+    ap.add_argument("--observed-inventory", default="", help="Target-verified structured VIPM inventory")
     ap.add_argument("--base-image", default="")
     ap.add_argument("--base-digest", default="")
     ap.add_argument("--seed-image", default="", help="Reusable seed/base image used before any repo-specific layer")

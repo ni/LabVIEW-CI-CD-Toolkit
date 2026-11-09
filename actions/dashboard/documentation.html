@@ -1100,10 +1100,10 @@ mass-compile:
           The dashboard compares those declarations against what is baked into the current worker manifest; if any are
           missing it shows a persistent <em>&ldquo;dependencies need to be installed&rdquo;</em> banner, and the
           Dependencies page&rsquo;s update panel itemizes exactly which files and packages are pending. The comparison is
-          <strong>version-tolerant</strong>: a VIPC pins a specific build (e.g.
-          <code>wovalab_lib_antidoc_cli-3.3.0.117</code>), but VIPM installs one version per package, so a baked
-          <code>&hellip;-3.4.0.126</code> satisfies the request &mdash; matching is on the versionless base identifier, so a
-          present-but-different build reads as installed instead of a false <em>missing</em>. Applying it is
+          <strong>exact-version</strong>: a VIPC pin such as
+          <code>wovalab_lib_antidoc_cli-3.3.0.117</code> is not satisfied by a different installed build.
+          Only observed installed packages count; requested VIPC declarations and copied seed-image assumptions
+          never establish satisfaction. A leading <code>v</code> in an observed VIPM version is normalized. Applying it is
           <strong>opt-in</strong>: from the Dependencies page you dispatch the dependency build
           (<code>build-labview-image.yml</code>, &ldquo;Build LabVIEW CI Image&rdquo;), which runs on a Windows runner and
           this time starts <code>FROM</code> the base and applies a thin dependency layer
@@ -1356,6 +1356,29 @@ docker run --rm `
 
       <!-- 15 ──────────────────────────────────────────────────────────────── -->
       <h2 id="vipm">15. VIPM dependency baking — lessons from the trenches <a class="anchor" href="#vipm">#</a></h2>
+      <p>Windows and Linux builds keep trusted tooling at reviewed HEAD while optionally reading committed dependency
+        inputs from <code>dependency_sha</code>, a full ancestor SHA. The <code>expected_sha</code> guard rejects a moved
+        reviewed HEAD. Selected configuration and dependency bytes participate in worker identity; staging rejects
+        escaping paths, symlinks and collisions. Linux uses <code>vipm/linux-worker.py</code> with the existing LVPM
+        planner for selection and safe input validation. The catalog explicitly ships this helper to Linux-only clients;
+        Windows helpers ship in the existing VIPM directory payload. These are installer/update payload changes, not
+        machine-local repairs.</p>
+      <p>Both VIPM installers capture structured, target-bound installed inventory and verify required project pins before
+        publishing active worker aliases. A requested file or a successful command alone is not installed-package
+        evidence. Baseline-only unavailable inventory is retained honestly without installed-package claims.
+        Separately tagged <code>new</code> workers do not move active aliases or the default Pages pointer. Registry
+        alias updates are not atomic; Windows attempts rollback on failure. Native Windows/Linux LabVIEW, VIPM,
+        registry publication and activity checks still require CI qualification; local fixtures do not establish them.</p>
+      <p>The revision picker compares that revision's declarations and monitoring choices with its selected worker.
+        Saving in a client submits a configuration proposal; it is not applied until reviewed and merged.
+        Windows and Linux checkboxes preserve the other platform's selection. The tooling source intentionally disables
+        client Save on both platforms and explains that monitoring changes require a source PR; forks remain ineligible
+        for the client installer. Existing LVPM candidate verification, digest pins and explicit activation are unchanged.</p>
+      <p><code>native-dependency-validation.yml</code> runs only on its dedicated validation branch or manual dispatch.
+        Windows x64 VIPM and Linux x64 VIPM/LVPM jobs build the candidate with the real example VIPC and retain source
+        hashes, build logs and installed-inventory evidence as artifacts. The jobs have read-only repository/package
+        permissions and never publish images, active aliases or Pages pointers. A passed native build verifies the
+        selected fixture and recorded scope, not every project or LabVIEW activity; failures retain diagnostic artifacts.</p>
       <p class="lead-in">This section is the single hardest part of the whole stack, and it is documented in detail
         precisely because it was painful to get right. If you ever fork the worker build or debug a baking failure,
         read it carefully — every numbered point below is a real problem that was hit and solved.</p>
@@ -2516,6 +2539,8 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
           <tr><td><code>dragon.files[].dependencies[].platform_status</code> / <code>dragon.install_set[].platform_status</code></td><td>Monitored Windows inventory and selected, locally current Linux LVPM inventory</td><td>Per-platform status, installed_version and message; Linux scope is package-files. Aggregate status cannot be installed when an applicable platform is missing or unknown.</td></tr>
           <tr><td><code>deps-pending.json</code></td><td>Dashboard publisher</td><td>Persistent pending banner, including local LVPM freshness under <code>linux_lvpm</code> and monitored Dragon inspection failures as <code>dragon[].status: unknown</code></td></tr>
           <tr><td><code>workers/&lt;platform&gt;/&lt;version&gt;/manifest.json</code></td><td>Worker image workflows</td><td>Dependencies page installed-package status</td></tr>
+          <tr><td><code>manifest.json</code> schema 3: <code>vipm_inventory</code>, <code>vipm_packages</code>, <code>dependency_sha</code>, <code>labview_bitness</code></td><td>Shared worker manifest producer</td><td>Target-verified observed packages, explicit unavailable/unverified evidence, and separate tooling/input revisions. Raw lists and <code>vipc[].packages</code> remain diagnostic/declaration data, never installed inventory.</td></tr>
+          <tr><td><code>workers/&lt;platform&gt;/&lt;version&gt;/observed-inventory.json</code></td><td>VIPM worker builds</td><td>Schema 1 evidence: platform, LabVIEW year/bitness, boolean target verification and required-project flags, source, status, raw output, and exact package names/versions. Malformed or wrong-target evidence blocks manifest generation.</td></tr>
           <tr><td><code>workers/linux-lvpm/&lt;tag&gt;/manifest.json</code></td><td>LVPM candidate build</td><td>Digest-bound candidate inventory, activation and Linux runtime freshness checks</td></tr>
           <tr><td><code>workers/linux-lvpm/latest.json</code></td><td>LVPM candidate build</td><td>Alternative candidate discovery only; never selects an active worker</td></tr>
           <tr><td><code>catalog.json</code> (root)</td><td>Installer / integrate-deploy</td><td>Version badge, What's New</td></tr>

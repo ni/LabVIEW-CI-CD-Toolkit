@@ -597,7 +597,10 @@ function Get-VipcPackageSpecs([string]$VipcPath) {
     $names = @($cfg.VI_Package_Configuration.Target.Package | ForEach-Object { $_.Name })
     $specs = foreach ($n in $names) {
         if ([string]::IsNullOrWhiteSpace($n)) { continue }
-        if ($n -match '^(?<n>.+)-(?<v>\d+(?:\.\d+)+)(?:-\d+)?$') { '{0}@{1}' -f $Matches.n, $Matches.v } else { $n.Trim() }
+        if ($n -notmatch '^[A-Za-z0-9_][A-Za-z0-9_.-]*(?:@\d[\w.-]*)?$') {
+            throw "Unsafe VIPC package declaration in '$VipcPath': $n"
+        }
+        if ($n -match '^(?<n>.+)-(?<v>\d+(?:\.\d+)+(?:-\d+)?)$') { '{0}@{1}' -f $Matches.n, $Matches.v } else { $n.Trim() }
     }
     return @($specs)
 }
@@ -627,6 +630,32 @@ function Get-NumericVersionKey([string] $Version) {
     $nums = @([regex]::Matches(([string]$Version), '\d+') | ForEach-Object { [int]$_.Value })
     while ($nums.Count -lt 6) { $nums += 0 }
     return ($nums[0..5] | ForEach-Object { '{0:D8}' -f $_ }) -join '.'
+}
+
+function Resolve-WindowsSelectedSpecs {
+    param([string[]] $Specs, [object[]] $VipcFiles, [string[]] $DragonSpecs)
+    $selected = @($DragonSpecs)
+    foreach ($vipc in $VipcFiles) {
+        if ($vipc.Name -ine 'ci-tooling.vipc') {
+            $selected += @(Get-VipcPackageSpecs $vipc.FullName)
+        }
+    }
+    $requests = @{}
+    foreach ($spec in $selected) {
+        $request = Split-VipmPackageSpec $spec
+        if (-not $request.Version) { continue }
+        if ($requests.ContainsKey($request.Name) -and
+            -not (Test-VipmPackageVersion $request $requests[$request.Name].Version)) {
+            throw "Conflicting selected project versions for '$($request.Name)'."
+        }
+        $requests[$request.Name] = $request
+    }
+    foreach ($spec in $Specs) {
+        $request = Split-VipmPackageSpec $spec
+        if ($requests.ContainsKey($request.Name)) {
+            '{0}@{1}' -f $request.Name, $requests[$request.Name].Version
+        } else { $spec }
+    }
 }
 
 function Test-VipmPackageVersion($Request, [string] $Version) {
@@ -786,13 +815,18 @@ function Save-PublicVipmPackage($Package, [string] $OutDir) {
     if ([string]$Package.PackageUrl -match '\.(?<ext>vip|ogp)(?:$|\?)') { $ext = '.' + $Matches.ext }
     $fileName = '{0}-{1}{2}' -f $Package.Name, $Package.Version, $ext
     $outFile = Join-Path $OutDir $fileName
-    if (Test-Path $outFile) { return $outFile }
     $url = Resolve-PublicVipmPackageUrl $Package
     if (-not $url) { throw "No downloadable package URL found for $($Package.Id) from $($Package.Repository)." }
-    Write-Host "  Downloading $($Package.Id) from $url"
-    Invoke-WebRequest -Uri $url -OutFile $outFile -UseBasicParsing -MaximumRedirection 10 -TimeoutSec 300 -Headers @{ 'User-Agent' = 'LabVIEW-CI-with-Containers VIPM downloader' } | Out-Null
-    $bytes = Get-Content -LiteralPath $outFile -Encoding Byte -TotalCount 4
-    if ($bytes.Count -lt 4 -or $bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4b) {
+    if (-not (Test-Path -LiteralPath $outFile)) {
+        Write-Host "  Downloading $($Package.Id) from $url"
+        Invoke-WebRequest -Uri $url -OutFile $outFile -UseBasicParsing -MaximumRedirection 10 -TimeoutSec 300 -Headers @{ 'User-Agent' = 'LabVIEW-CI-with-Containers VIPM downloader' } | Out-Null
+    }
+    $stream = [System.IO.File]::OpenRead($outFile)
+    try {
+        $bytes = New-Object byte[] 4
+        $length = $stream.Read($bytes, 0, 4)
+    } finally { $stream.Dispose() }
+    if ($length -lt 4 -or $bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4b) {
         throw "Downloaded file for $($Package.Id) is not a VIP/ZIP archive: $outFile"
     }
     if ($Package.PackageMD5) {
@@ -984,11 +1018,6 @@ function Invoke-VipmInstallOnce {
     param([Parameter(ValueFromRemainingArguments = $true)] [string[]] $Targets)
     $out = & $VipmExe @GlobalFlags install @Targets 2>&1
     $out | Out-Host
-    if ($LASTEXITCODE -eq 2) {
-        Write-Host '  (install rejected global LabVIEW flags; retrying bare form against active target)'
-        $out = & $VipmExe install @Targets 2>&1
-        $out | Out-Host
-    }
     # Capture the vipm exit code before any further work: 124 is the CLI's timeout
     # exit (the operation ran the full VIPM_TIMEOUT and was killed), which is the
     # by-name install's symptom of an unresponsive engine.
@@ -1045,21 +1074,19 @@ function Invoke-VipmInstall {
 # Only the target's installed inventory can confirm that recovery.
 function Test-VipmSpecsInstalled {
     param([string[]] $Specs, [switch] $RequireTarget)
+    $script:ObservedVipmInventory = $null
+    $script:LastVipmInventoryRaw = ''
     Write-Host '  Verifying requested packages against the target LabVIEW installed inventory ...'
     $previousPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
         $out = & $VipmExe @GlobalFlags list --installed 2>&1
         $inventoryExit = $LASTEXITCODE
-        if ($inventoryExit -eq 2) {
-            Write-Host '  (list rejected global LabVIEW flags; retrying bare form against active target)'
-            $out = & $VipmExe list --installed 2>&1
-            $inventoryExit = $LASTEXITCODE
-        }
     } finally {
         $ErrorActionPreference = $previousPreference
     }
     $out | Out-Host
+    $script:LastVipmInventoryRaw = ($out | Out-String -Width 8192)
     if ($inventoryExit -ne 0) {
         Write-Warning "  Cannot verify installed packages: vipm list --installed failed (exit $inventoryExit)."
         return $false
@@ -1069,7 +1096,7 @@ function Test-VipmSpecsInstalled {
         if (-not $targets.Count -or @($targets | Where-Object {
             $_.Groups[1].Value -ne $LabVIEWVersion -or $_.Groups[2].Value -ne $LabVIEWBitness
         }).Count) {
-            Write-Warning "Cannot verify required Dragon packages: installed inventory does not identify only requested LabVIEW $LabVIEWVersion ($LabVIEWBitness-bit)."
+                Write-Warning "Cannot verify required packages: installed inventory does not identify only requested LabVIEW $LabVIEWVersion ($LabVIEWBitness-bit)."
             return $false
         }
     }
@@ -1081,6 +1108,21 @@ function Test-VipmSpecsInstalled {
             $line -match '^\s*(?<name>[A-Za-z0-9_.-]+)\s+v?(?<version>\d[\w.-]*)\s*$' -or
             $line -match '^\s*(?<name>[A-Za-z0-9_.-]+?)-(?<version>\d+(?:\.\d+)+(?:-\d+)?)\s*$') {
             $installed[$Matches.name] = $Matches.version
+        }
+    }
+
+    if ($RequireTarget) {
+        $script:ObservedVipmInventory = [ordered]@{
+            schema = 1
+            platform = 'windows'
+            labview_version = $LabVIEWVersion
+            labview_bitness = $LabVIEWBitness
+            source = 'vipm list --installed'
+            target_verified = $true
+            raw = ($out | Out-String -Width 8192)
+            packages = @($installed.Keys | Sort-Object | ForEach-Object {
+                [ordered]@{ name = $_; version = $installed[$_] }
+            })
         }
     }
 
@@ -1145,6 +1187,35 @@ function Install-RequiredWindowsDragon {
     if ($script:VipmEngineDead -or -not (Install-VipmSpecs $Specs)) {
         throw 'Required Windows Dragon dependencies did not install. The worker must not be published; VIPM_ALLOW_MISSING_PACKAGES does not bypass Dragon requirements.'
     }
+}
+
+function Assert-FinalWindowsProjectInventory {
+    param([object[]] $VipcFiles, [string[]] $DragonSpecs)
+    $specs = @($DragonSpecs)
+    foreach ($vipc in $VipcFiles) {
+        if ($vipc.Name -ieq 'ci-tooling.vipc') { continue }
+        $required = @(Get-VipcPackageSpecs $vipc.FullName)
+        if (-not $required.Count) { throw "Required VIPC '$($vipc.Name)' has no readable package declarations." }
+        $specs += $required
+    }
+    $verified = Test-VipmSpecsInstalled -Specs $specs -RequireTarget
+    if (-not $verified -and $specs.Count) {
+        throw 'FINAL required Windows project target inventory is missing, unreadable, wrong-target, or has missing/wrong-version packages. VIPM_ALLOW_MISSING_PACKAGES cannot bypass project requirements.'
+    }
+    if (-not $script:ObservedVipmInventory) {
+        Write-Warning 'Best-effort baseline inventory is unavailable; no installed packages will be claimed.'
+        $script:ObservedVipmInventory = [ordered]@{
+            schema = 1; platform = 'windows'
+            labview_version = $LabVIEWVersion; labview_bitness = $LabVIEWBitness
+            source = 'vipm list --installed'; target_verified = $false
+            raw = $script:LastVipmInventoryRaw; packages = @()
+        }
+    }
+    $script:ObservedVipmInventory['required_project'] = [bool]$specs.Count
+    $script:ObservedVipmInventory['status'] = if ($verified) { 'observed' } else { 'unavailable' }
+    $path = Join-Path $VipcDir 'observed-inventory.json'
+    $script:ObservedVipmInventory | ConvertTo-Json -Depth 8 |
+        Set-Content -LiteralPath $path -Encoding UTF8 -ErrorAction Stop
 }
 
 function Assert-FinalWindowsDragonInventory {
@@ -1282,6 +1353,7 @@ try {
         'ni_lib_utf_junit_report@1.0.1.43,ni_lib_junit_results_api@1.0.1.6,ni_lib_simple_xml@1.0.0.4,jki_lib_caraya@1.4.4.148'
     }
     $requiredSpecs = @($requiredRaw -split '[,;]' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne '-' })
+    $requiredSpecs = @(Resolve-WindowsSelectedSpecs -Specs $requiredSpecs -VipcFiles $vipcFiles -DragonSpecs $dragonPlan.Specs)
     if ($requiredSpecs.Count -gt 0) {
         Write-Host ("Installing REQUIRED unit-test essentials first: " + ($requiredSpecs -join ', '))
         if ($script:VipmEngineDead) {
@@ -1314,6 +1386,7 @@ try {
                 elseif ($requiredSpecs.Count -gt 0) { 'astemes_lib_lunit,astemes_lib_lunit_cli' }
                 else { '' }
     $earlySpecs = @($earlyRaw -split '[,;]' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -ne '-' })
+    $earlySpecs = @(Resolve-WindowsSelectedSpecs -Specs $earlySpecs -VipcFiles $vipcFiles -DragonSpecs $dragonPlan.Specs)
     if ($earlySpecs.Count -gt 0 -and -not $script:VipmEngineDead) {
         Write-Host ("Installing EARLY best-effort framework packages (engine still fresh): " + ($earlySpecs -join ', '))
         if (Install-VipmSpecs $earlySpecs) {
@@ -1328,7 +1401,7 @@ try {
     # A best-effort add-on (Antidoc) can wedge the headless VIPM engine, so it must
     # run LAST - otherwise it would kill the engine before a required project VIPC
     # (the OpenG / domain dependencies the project's VIs load against) gets to apply.
-    $vipcFiles = @($vipcFiles | Sort-Object @{ Expression = { if ($_.Name -like 'ci-tooling*') { 1 } else { 0 } } }, Name)
+    $vipcFiles = @($vipcFiles | Sort-Object @{ Expression = { if ($_.Name -ieq 'ci-tooling.vipc') { 1 } else { 0 } } }, Name)
 
     foreach ($vipc in $vipcFiles) {
         # Tooling VIPCs (ci-tooling*.vipc) carry opportunistic add-ons (Antidoc,
@@ -1337,7 +1410,7 @@ try {
         # fail the image build (the required essentials above are already installed).
         # Any other (project) VIPC is REQUIRED - its packages are what the project's
         # VIs load against, so a failure must fail the build.
-        $bestEffort = ($vipc.Name -like 'ci-tooling*')
+        $bestEffort = ($vipc.Name -ieq 'ci-tooling.vipc')
         $label = if ($bestEffort) { 'best-effort tooling' } else { 'required project' }
         $vipcFailed = $false
 
@@ -1347,10 +1420,16 @@ try {
         }
         else {
             Write-Host "Applying VIPC: $($vipc.Name) [$label]"
+            $toolingSpecs = if ($bestEffort) { @(Get-VipcPackageSpecs $vipc.FullName) } else { @() }
+            $effectiveSpecs = @(Resolve-WindowsSelectedSpecs -Specs $toolingSpecs -VipcFiles $vipcFiles -DragonSpecs $dragonPlan.Specs)
             # Preferred path: install the .vipc file directly (the form VIPM documents:
             # `vipm install -y project.vipc`).
             Write-Host "  Installing from file: vipm install -y '$($vipc.Name)'"
-            $rc = Invoke-VipmInstall '-y' $vipc.FullName
+            if ($bestEffort -and ($effectiveSpecs -join ',') -cne ($toolingSpecs -join ',')) {
+                $rc = if (Install-VipmSpecs $effectiveSpecs) { 0 } else { 1 }
+            } else {
+                $rc = Invoke-VipmInstall '-y' $vipc.FullName
+            }
             if ($rc -eq 0 -and $script:LastVipmOutput -match 'No packages were installed') {
                 Write-Warning "  VIPM accepted '$($vipc.Name)' but reported that no packages were installed; falling back to package-level install."
                 $rc = 42
@@ -1388,6 +1467,7 @@ try {
         }
     }
     Assert-FinalWindowsDragonInventory -Specs $dragonPlan.Specs
+    Assert-FinalWindowsProjectInventory -VipcFiles $vipcFiles -DragonSpecs $dragonPlan.Specs
 }
 finally {
     Set-Location $prevLocation

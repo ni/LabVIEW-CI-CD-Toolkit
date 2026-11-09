@@ -585,20 +585,18 @@
         });
         return set;
       }
-      (man && man.vipc || []).forEach(v => (v.packages || []).forEach(p => set.add(p)));
+      (man && man.vipm_packages || []).forEach(pkg => {
+        if (!pkg || typeof pkg !== "object" || !pkg.name) return;
+        set.add(String(pkg.name));
+        if (pkg.version) set.add(pkg.name + "-" + String(pkg.version).replace(/^[vV]/, ""));
+      });
       return set;
     }
-    // Version-tolerant package matching: a VIPC declares a specific build
-    // (e.g. "wovalab_lib_antidoc_cli-3.3.0.117") but VIPM installs one version
-    // per package, so a baked "...-3.4.0.126" satisfies the request. Match on the
-    // versionless base identifier (strip a trailing "-<dotted digits>") so a
-    // present-but-different build reads as installed, not a false "missing".
-    function pkgBase(pkg){ return String(pkg || "").replace(/-\d[\d.]*$/, "").toLowerCase(); }
     function pkgInSet(pkg, set){
       if (!set || !set.size) return false;
-      if (set.has(pkg)) return true;
-      const base = pkgBase(pkg);
-      for (const p of set) if (pkgBase(p) === base) return true;
+      const key = value => String(value).toLowerCase().replace(/-v(?=\d)/, "-");
+      const wanted = key(pkg);
+      for (const installed of set) if (key(installed) === wanted) return true;
       return false;
     }
     function nipkgInManifest(man){ return Array.isArray(man && man.nipkg_packages) ? man.nipkg_packages : []; }
@@ -634,6 +632,7 @@
       st.manifest = man || null;
       st.installer = man && man.installer || (String(st.tag || "").startsWith("linux-lvpm-") ? "lvpm" : "vipm");
       st.ready = !!man && (st.installer !== "lvpm" || st.ready !== false);
+      if (man && man.vipm_inventory && man.vipm_inventory.status !== "observed") st.ready = false;
       st.packages = packagesInManifest(man);
       st.nipkg = nipkgInManifest(man);
       st.nipkg_ready = Array.isArray(man && man.nipkg_packages);
@@ -827,6 +826,9 @@
         && intent.context.loaded === linuxLoadedInputs;
     }
     function linuxReviewedWorkflow(text, file){
+      const inputDirectory = file === "build-labview-linux-image.yml" ? "linux-source" : "lvpm-source";
+      const inputCheckout = '      - name: Checkout selected dependency revision\n        uses: actions/checkout@v7\n        with:\n          ref: $' + '{{ inputs.dependency_sha || github.sha }}\n          path: ci-out/' + inputDirectory + '\n          persist-credentials: false\n';
+      text = text.replace(inputCheckout, "");
       const guard = '      - name: Verify reviewed commit\n        env:\n          EXPECTED_SHA: $' + "{{ inputs.expected_sha }}\n        run: |\n          if [ -n \"$EXPECTED_SHA\" ]; then\n            if ! [[ \"$EXPECTED_SHA\" =~ ^[0-9a-fA-F]{40}$ ]]; then\n              echo \"::error::Invalid reviewed commit SHA; expected exactly 40 hexadecimal characters.\"\n              exit 1\n            fi\n            reviewed_sha=$(printf '%s' \"$EXPECTED_SHA\" | tr '[:upper:]' '[:lower:]')\n            if [ \"$GITHUB_SHA\" != \"$reviewed_sha\" ]; then\n              echo \"::error::Reviewed HEAD moved. Click Update container image again to review the new target.\"\n              exit 1\n            fi\n          fi";
       const checkout = /uses: actions\/checkout@[^\n]+\n        with:\n          ref: \$\{\{ github.sha \}\}/g;
       const count = (text.match(/uses: actions\/checkout@/g) || []).length;
@@ -1287,7 +1289,9 @@
       const btn = $("saveMonitor");
       const counts = monitorCounts();
       if (monitorDirty) ["lvpmBuild", "lvpmActivate", "lvpmReset"].forEach(id => { if ($(id)) $(id).disabled = true; });
-      if (btn) { btn.hidden = false; btn.disabled = !monitorDirty || counts.total === 0 || (activePlatform === "linux" && repo.toLowerCase() === "ni/labview-ci-cd-toolkit"); }
+      const sourceRepository = repo.toLowerCase() === "ni/labview-ci-cd-toolkit";
+      if (btn) { btn.hidden = false; btn.disabled = !monitorDirty || counts.total === 0 || sourceRepository; }
+      if (sourceRepository) { setMonitorStatus("The tooling source cannot use client Save. Change monitoring through a reviewed source PR. Your local choices have not been saved."); return; }
       const request = activePlatform === "linux" && matchingLinuxMonitoringRequest();
       if (request && ["submitting", "accepted", "uncertain"].includes(request.status) && btn) btn.disabled = true;
       if (!counts.total) { setMonitorStatus("No dependency files found."); return; }
@@ -1334,6 +1338,7 @@
     function hideTokenPanel(){ const p = $("tokPanel"); if (p) p.hidden = true; }
     function monitorInputs(){ return { container_vipc:encodeMonitorList(currentVipcs), container_dragon:encodeMonitorList(currentDragons) }; }
     async function dispatchMonitor(){
+      if (repo.toLowerCase() === "ni/labview-ci-cd-toolkit") { updateMonitorUi(); return; }
       const previous = activePlatform === "linux" && matchingLinuxMonitoringRequest();
       if (previous && ["submitting", "accepted", "uncertain"].includes(previous.status)) return;
       if (!repo.includes("/")) { setMonitorStatus("Could not determine repository.", "err"); return; }
@@ -1896,8 +1901,6 @@
       if (freshness && freshness.status !== "current") return { state:"missing", title:localFreshnessText(colState) };
       if (colState.label === "base" || colState.label === "none") return { state:"missing", title:'No dependency worker is baked for this platform yet -- run the container update' };
       if (!colState.ready) return { state:"missing", title:'Worker dependency manifest has not been published yet -- run the container update' };
-      // Version-tolerant: a baked build of the same package satisfies a
-      // differently-versioned VIPC request (VIPM installs one version per package).
       if (colState.installer === "lvpm" ? colState.packages.has(pkg) : pkgInSet(pkg, colState.packages)) return { state:"present", title:colState.label };
       return { state:"missing", title:'Not baked into this worker yet -- run the container update' };
     }

@@ -4412,6 +4412,8 @@ def _manifest_packages(man):
           packages.add(f'{name}-{version.lstrip("vV")}')
     return sorted(packages, key=str.lower)
   if isinstance(man, dict):
+    if man.get('vipm_inventory', {}).get('status', 'observed') != 'observed':
+      return []
     for pkg in man.get('vipm_packages') or []:
       if isinstance(pkg, dict):
         name = str(pkg.get('name') or '').strip()
@@ -4429,16 +4431,6 @@ def _manifest_packages(man):
             packages.add(value)
       elif isinstance(pkg, str) and pkg.strip():
         packages.add(pkg.strip())
-    # Always union the manifest's own vipc[].packages, which are stored in the
-    # SAME identifier form the VIPC files declare (no "v" prefix) and include
-    # every installed version of a package. Never return early on vipm_packages
-    # alone -- that list can differ in version format and omit second versions.
-    for vipc in man.get('vipc') or []:
-      for pkg in vipc.get('packages') or []:
-        if pkg:
-          packages.add(pkg)
-    if not packages and man.get('platform') == 'windows' and man.get('copied_from_base'):
-      packages.update(_core_tooling_packages())
   return sorted(packages, key=str.lower)
 
 def _core_tooling_packages():
@@ -4941,35 +4933,26 @@ def _compute_deps_pending(data):
   current Windows worker manifest; plus declared Dragon deps not yet installed."""
   cols = {c.get('key'): c for c in data.get('columns', [])}
 
-  # Version-tolerant matching: a VIPC pins a specific build (e.g.
-  # "wovalab_lib_antidoc_cli-3.3.0.117") but VIPM installs one version per
-  # package, so a baked "...-3.4.0.126" satisfies the request. Compare on the
-  # versionless base identifier so a present-but-different build is not flagged
-  # as a missing dependency.
-  def _pkg_base(pkg):
-    return re.sub(r'-\d[\d.]*$', '', str(pkg or '')).lower()
-
   def baked(key):
     c = cols.get(key) or {}
+    if c.get('ready') is False:
+      return set()
     pkgs = c.get('packages') or []
-    return {str(p).lower() for p in pkgs}, (set() if c.get('installer') == 'lvpm' else {_pkg_base(p) for p in pkgs})
+    return {re.sub(r'-v(?=\d)', '-', str(pkg).lower()) for pkg in pkgs}
 
-  def _missing(pkgs, baked_pair):
-    exact, bases = baked_pair
-    return [p for p in pkgs if str(p).lower() not in exact and _pkg_base(p) not in bases]
+  def _missing(pkgs, installed):
+    return [pkg for pkg in pkgs if re.sub(r'-v(?=\d)', '-', str(pkg).lower()) not in installed]
 
   win_baked = baked('windows')
   # The Linux worker now installs VIPM natively and bakes repository VIPC (same as
-  # Windows), so a Linux dependency gap is flagged independently -- but only when a
-  # real Linux worker manifest resolved for this revision (a non-base, ready tag).
-  # Otherwise (Linux unused / base image) there is no worker to bake into and we do
-  # not surface a spurious Linux update prompt.
+  # Windows), so a selected dependency worker stays pending when its inventory
+  # cannot be verified. An unused/base selection does not request a dependency bake.
   lin_col = cols.get('linux') or {}
   freshness = lin_col.get('freshness') or {}
   lvpm_pending = lin_col.get('installer') == 'lvpm' and (
     freshness.get('status') != 'current' or freshness.get('revision') != data.get('sha')
     or freshness.get('selection') != lin_col.get('tag'))
-  lin_active = bool(lin_col.get('ready')) and str(lin_col.get('tag') or 'base') not in ('base', 'none')
+  lin_active = bool(lin_col) and str(lin_col.get('tag') or 'base') not in ('base', 'none')
   lin_baked = baked('linux') if lin_active else set()
   pending_pkgs = set()
   pending_files = []
@@ -5101,6 +5084,8 @@ def _build_dependencies_index():
         manifest_cache[cache_key] = _worker_manifest(col['platform'], tag)
       man = manifest_cache[cache_key]
       col['ready'] = isinstance(man, dict)
+      if isinstance(man, dict) and man.get('vipm_inventory', {}).get('status', 'observed') != 'observed':
+        col['ready'] = False
       col['installer'] = man.get('installer', 'vipm') if isinstance(man, dict) else ('lvpm' if tag.startswith('linux-lvpm-') else 'vipm')
       col['verification'] = man.get('verification', {}) if isinstance(man, dict) else {}
       if col['installer'] == 'lvpm':
