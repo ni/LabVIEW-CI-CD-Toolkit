@@ -1914,6 +1914,11 @@ jobs:
         <code>Composite Action Checks</code> runs portable regressions on Linux and Windows plus real Windows
         PowerShell runner tests without LabVIEW; an actual Windows container bake/test remains a separate
         acceptance check.</p>
+      <p>VIPM bootstrap contract checks read the catalog, workflows, Dockerfiles, and installer source as
+        UTF-8 rather than the Windows host's legacy code page. A portable regression exercises the affected
+        catalog/bootstrap assertion with simulated Windows-1252 defaults (<code>None</code> and
+        <code>locale</code>), confirming implicit reads fail and explicit UTF-8 preserves Unicode notes.
+        This validates source contracts, not a native Windows VIPM install or container bake.</p>
       <p class="lead-in">Every capability is built to the same template, so once you understand one you understand them
         all. <a href="#cap-unittests">§16.4 (Unit Tests)</a> is documented end-to-end as the fully worked example you can
         copy from.</p>
