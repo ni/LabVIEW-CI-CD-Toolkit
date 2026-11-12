@@ -44,13 +44,14 @@ function treeHarness() {
   const context = vm.createContext({
     document: {createElement, querySelectorAll: () => rows},
     json2Set: null, json2WinSet: null, json2IndexKnown: false, json2WinIndexKnown: false,
-    activeHtml: null, changeMap: {}, changedFolders: new Set(), expanded: new Set(), changedOnly: false,
+    activeHtml: null, diffPlatform: 'linux', changeMap: {}, changedFolders: new Set(), expanded: new Set(), changedOnly: false,
     ICON: {vi: '<svg></svg>'}, fileVisible: () => true, escapeHtml: value => value,
     openVI: row => { context.opened = row; },
+    openDiff: (viRel, type, row) => { context.openedDiff = {viRel, type, row, report: context.diffReportFor(viRel)}; },
     BASE: 'snapshots/', syncVb2PlatToggle: () => {}, vb2Prefer2Default: () => false,
     currentSnapshot: null, vb2DidWinRestore: true,
   });
-  for (const name of ['renderTree', 'rowBlob', 'decorate2', 'loadJson2Index']) {
+  for (const name of ['diffReportFor', 'renderTree', 'rowBlob', 'decorate2', 'loadJson2Index']) {
     vm.runInContext(functionSource(browser, name), context);
   }
   const render = files => {
@@ -61,7 +62,7 @@ function treeHarness() {
   return {context, rows, render};
 }
 
-test('VI file rows with either-platform snapshots have no status pills and still open', () => {
+test('VI file rows without reports have no status pills and still open', () => {
   assert.equal(browser, read('.github/pages/vi-browser.html'));
   assert.equal(browser, read('actions/dashboard/vi-browser.html'));
   for (const platform of ['json2Set', 'json2WinSet']) {
@@ -81,6 +82,51 @@ test('VI file rows with either-platform snapshots have no status pills and still
       assert.equal(context.opened, row);
     }
   }
+});
+
+test('brown Diff pills open real reports independently of snapshot availability', () => {
+  for (const platform of ['linux', 'windows']) {
+    for (const availability of ['unknown', 'missing', 'available']) {
+      const {context, rows, render} = treeHarness();
+      const report = `reports/${platform}/code.html`;
+      context.changeMap['code.vi'] = {type: 'modified', isDiff: true, reports: {[platform]: report}};
+      if (availability !== 'unknown') {
+        context.json2IndexKnown = context.json2WinIndexKnown = true;
+        context.json2Set = new Set(availability === 'available' ? ['code'] : []);
+        context.json2WinSet = new Set();
+      }
+      render([{vi_rel: 'code.vi', vi_name: 'code.vi', html: 'code.html', blob: 'code'}]);
+      const pill = rows[0].children.find(child => child.className === 'chg modified');
+      assert.ok(pill, platform + ' ' + availability);
+      assert.equal(pill.type, 'button');
+      assert.equal(pill.textContent, 'Diff');
+      assert.equal(pill.attributes['aria-label'], 'View diff report for code.vi');
+      let stopped = false;
+      pill.events.click({stopPropagation() { stopped = true; }});
+      assert.equal(stopped, true);
+      assert.equal(context.opened, undefined);
+      assert.equal(context.openedDiff.row, rows[0]);
+      assert.equal(context.openedDiff.report.url, report);
+      assert.equal(context.openedDiff.report.platform, platform);
+      context.decorate2();
+      assert.equal(rows[0].children.filter(child => child.className === 'chg modified').length, 1);
+      assert.equal(rows[0].children.filter(child => child.className === 'snapshot-missing').length, availability === 'missing' ? 1 : 0);
+      rows[0].events.click();
+      assert.equal(context.opened, rows[0]);
+    }
+  }
+  assert.match(browser, /\.chg\{[^}]*background:#9a6700/);
+});
+
+test('diff report loading ignores records without a report path', async () => {
+  const context = vm.createContext({
+    changeMap: {}, changedFolders: new Set(), commitList: [], commitPlatforms: new Set(),
+    manifest: [{vi_rel: 'code.vi', html: 'code.html', blob: 'code'}], BASE: 'site/vi-snapshots/',
+    fetchJson: async () => ({files: [{file: 'code.vi'}, {file: 'code.vi', report: ''}, {file: 'code.vi', report: ' '}]})
+  });
+  vm.runInContext(functionSource(browser, 'loadChanges'), context);
+  await context.loadChanges('revision');
+  assert.equal(Object.keys(context.changeMap).length, 0);
 });
 
 test('only confirmed missing snapshots receive a small accessible X', () => {

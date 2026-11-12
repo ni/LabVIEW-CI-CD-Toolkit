@@ -2503,7 +2503,7 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
         revisions. Each job keeps a warm container to avoid per-VI startup costs. The dashboard counts frame
         coverage, not exported HTML files.</p>
       <h4>Browsing and missing snapshots</h4>
-      <p>VI file rows have no Snapshot, New, or Diff pills. Once the frame indexes confirm that neither
+      <p>VI file rows show a brown, keyboard-accessible <strong>Diff</strong> pill when a side-by-side report exists for that revision. Clicking it opens the report in the viewer, independently of snapshot availability, with the existing Linux/Windows report fallback. Snapshot and New pills remain omitted. Once the frame indexes confirm that neither
         platform has a snapshot, a small red X beside the filename indicates <strong>No snapshot available</strong>,
         with the same accessible label and hover text. Unknown or still-loading availability has no marker.
         The X disappears when polling finds frames from either platform. Folder change indicators and the

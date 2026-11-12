@@ -79,6 +79,10 @@
     .tree-row.file.active .icon{color:var(--link)}
     .sidebar-note{padding:16px;color:var(--fg-muted);font-size:.8em}
     /* change indicators sourced from the VIDiff changes.json for the selected commit */
+    .chg{flex:0 0 auto;border:0;font:inherit;font-size:.64em;font-weight:700;padding:1px 6px;
+         border-radius:10px;background:#9a6700;color:#fff;text-transform:uppercase;letter-spacing:.03em;cursor:pointer}
+    .chg:hover{filter:brightness(1.15)}
+    .chg:focus-visible{outline:2px solid var(--link);outline-offset:2px}
     .chg-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:#9a6700;opacity:.85}
     .snapshot-missing{flex:0 0 auto;color:var(--error);font-size:.9em;font-weight:700;line-height:1;cursor:default}
     /* "Changed only" toggle (shown only when the commit has VIDiff data) */
@@ -690,7 +694,7 @@ async function loadChanges(sha) {
     if (data && Array.isArray(data.files) && data.files.length) {
       commitPlatforms.add(platform);
       for (const f of data.files) {
-        if (!f.file) continue;
+        if (!f.file || typeof f.report !== 'string' || !f.report.trim()) continue;
         let chg = changeMap[f.file];
         if (!chg) {
           // Missed by the blob diff. Only surface VIs present in this revision's
@@ -762,6 +766,22 @@ function renderTree(node, depth, f, frag) {
       `<span class="icon">${ICON.vi}</span>` +
       `<span class="label">${escapeHtml(v.vi_rel.split('/').pop() || v.vi_name)}</span>`;
     row.addEventListener('click', () => openVI(row));
+    const chg = changeMap[v.vi_rel];
+    const report = diffReportFor(v.vi_rel);
+    // Report availability is independent of snapshot-frame availability.
+    if (chg && chg.type !== 'added' && report) {
+      const badge = document.createElement('button');
+      badge.type = 'button';
+      badge.className = 'chg modified';
+      badge.textContent = 'Diff';
+      badge.title = `View the side-by-side diff report (${report.platform})`;
+      badge.setAttribute('aria-label', `View diff report for ${v.vi_rel}`);
+      badge.addEventListener('click', e => {
+        e.stopPropagation();
+        openDiff(v.vi_rel, chg.type, row);
+      });
+      row.appendChild(badge);
+    }
     frag.appendChild(row);
   }
 }
