@@ -70,7 +70,7 @@ try {
         $unavailable.packages.Count -or $unavailable.required_project) { throw 'Baseline failure claimed packages' }
     'PASS: empty selection records unavailable observation without claiming packages'
     $workflow = Get-Content (Join-Path $Root '.github/workflows/build-labview-image.yml') -Raw
-    $validation = [regex]::Match($workflow, '(?s)            if \(\$observed -isnot \[pscustomobject\].*?(?=            docker push \$immutable)')
+    $validation = [regex]::Match($workflow, '(?s)            if \(\$observed -isnot \[pscustomobject\].*?(?=            try \{\r?\n              docker run)')
     if (-not $validation.Success) { throw 'Candidate inventory validation block not found' }
     $validateInventory = [scriptblock]::Create($validation.Value)
     $ver = '2026'
@@ -125,6 +125,33 @@ try {
     try { & $validateInventory } catch { $rejected = $true }
     if (-not $rejected) { throw 'Unavailable baseline claimed installed packages' }
     'PASS: strict candidate inventory fixtures (34 cases)'
+    $nativeCapture = [regex]::Match($workflow, '(?s)            try \{\r?\n              docker run.*?(?=            docker push \$immutable)')
+    if (-not $nativeCapture.Success) { throw 'Installed NI inventory capture block not found' }
+    $captureNative = [scriptblock]::Create($nativeCapture.Value)
+    $immutable = 'fixture-image'
+    $script:NativeExit = 0
+    function docker {
+        param([Parameter(ValueFromRemainingArguments = $true)] [string[]] $Arguments)
+        if (($Arguments -join ' ') -cne 'run --rm --entrypoint powershell fixture-image -NoLogo -NoProfile -Command & nipkg list-installed; exit $LASTEXITCODE') {
+            throw "Unexpected native inventory command: $Arguments"
+        }
+        $global:LASTEXITCODE = $script:NativeExit
+        'ni-viawin-labview-support 26.3.0'
+    }
+    Push-Location $VipcDir
+    try {
+        New-Item -ItemType Directory -Path 'ci-out/worker' -Force | Out-Null
+        & $captureNative
+        if ((Get-Content 'ci-out/worker/nipkg-list.txt' -Raw).Trim() -ne 'ni-viawin-labview-support 26.3.0') {
+            throw 'Installed native inventory was not retained'
+        }
+        $script:NativeExit = 9
+        $rejected = $false
+        try { & $captureNative } catch { $rejected = $true }
+        if (-not $rejected) { throw 'Failed native query reached publication' }
+    } finally { Pop-Location; Remove-Item Function:docker }
+    'PASS: installed NI inventory capture and publication failure gate (2 cases)'
+
     if ($workflow -notmatch "--dependency-sha '\$\{\{ inputs.dependency_sha \|\| github.sha \}\}'" -or
         $workflow -notmatch '--labview-bitness 64' -or $workflow -notmatch '@inventoryArgs') {
         throw 'Manifest target/provenance arguments are missing'
