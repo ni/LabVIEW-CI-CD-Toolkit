@@ -193,7 +193,7 @@ assert.equal(hooks.pkgCellState('actual-1.2', state).state, 'present');
 assert.equal(hooks.pkgCellState('actual-9.0', state).state, 'missing');
 const linuxColumn = { platform:'linux' };
 const nativeState = hooks.enrichPlatformState({ tag:tag + '@' + digest }, { ...candidate, labview_version:'2026' });
-const analyzer = { key:'via', platforms:['windows', 'linux'], packages:{ linux:['ni-vialin-labview-support'] } };
+const analyzer = { key:'via', platforms:['windows', 'linux'], packages:{ linux:['ni-vialinux-labview-support'] } };
 assert.equal(nativeState.nipkg_ready, false);
 assert.match(hooks.nipmCell({ key:'labview', labview:true }, linuxColumn, nativeState), /aria-label="Present"/);
 assert.match(hooks.nipmCell({ key:'vipm' }, linuxColumn, nativeState), /N\/A/);
@@ -201,9 +201,21 @@ const unknownAnalyzer = hooks.nipmCell(analyzer, linuxColumn, nativeState);
 assert.match(unknownAnalyzer, /Unknown: native package not inventoried/);
 assert.doesNotMatch(unknownAnalyzer, /dep-missing|Missing dependency/);
 assert.match(hooks.nipmCell({ key:'utf', platforms:['windows'] }, linuxColumn, nativeState), /N\/A/);
-const emptyNativeState = hooks.enrichPlatformState({ tag:tag + '@' + digest }, { ...candidate, labview_version:'2026', nipkg_packages:[] });
+const emptyNativeState = hooks.enrichPlatformState({ tag:tag + '@' + digest }, { ...candidate, labview_version:'2026', dpkg_packages:[] });
 assert.equal(emptyNativeState.nipkg_ready, true);
 assert.match(hooks.nipmCell(analyzer, linuxColumn, emptyNativeState), /Missing dependency/);
+// Available feed records from older Windows manifests cannot claim installation.
+const windowsColumn = { platform:'windows' };
+const legacyNative = {platform:'windows', labview_version:'2026', nipkg_packages:[{name:'ni-viawin-labview-support',version:'26.3'}]};
+const windowsAnalyzer = {key:'via', packages:{windows:['ni-viawin-labview-support']}};
+const legacyState = hooks.enrichPlatformState({key:'windows',tag:'latest'}, legacyNative);
+assert.equal(legacyState.nipkg_ready, false);
+assert.match(hooks.nipmCell(windowsAnalyzer,windowsColumn,legacyState), /Unknown: native package not inventoried/);
+const installedNative = {...legacyNative, nipkg_inventory:{source:'nipkg list-installed',status:'observed'}};
+assert.match(hooks.nipmCell(windowsAnalyzer,windowsColumn,hooks.enrichPlatformState({key:'windows',tag:'latest'},installedNative)), /aria-label="Present"/);
+const cliNative = {...installedNative, vipm_inventory:{status:'observed',target_verified:true}};
+assert.match(hooks.nipmCell({key:'vipm'},windowsColumn,hooks.enrichPlatformState({key:'windows',tag:'latest'},cliNative)), /aria-label="Present"/);
+assert.match(hooks.nipmCell({key:'vipm'},windowsColumn,hooks.enrichPlatformState({key:'windows',tag:'latest'},{...cliNative,vipm_inventory:{status:'observed',target_verified:false}})), /Missing dependency/);
 const manifestStart = requests.length;
 assert.equal((await hooks.loadManifestFor(tag + '@' + digest, 'linux')).image_digest, digest);
 assert.ok(requests.slice(manifestStart).every(request => !request.url.includes('latest.json')));
@@ -395,7 +407,7 @@ for (const id of ['vipcWrap', 'nipmWrap', 'systemWrap', 'dragonWrap']) elements.
 for (const testCase of freshnessCases) {
   const ready = testCase.status === 'current';
   hooks.setState({ candidate, revision:testCase.revision, config:{ use:'base', linuxUse:selection }, inventory:testCase.inventory });
-  const enriched = hooks.enrichPlatformState({ key:'linux', tag:selection }, { ...candidate, labview_version:'2026', nipkg_packages:[] });
+  const enriched = hooks.enrichPlatformState({ key:'linux', tag:selection }, { ...candidate, labview_version:'2026', dpkg_packages:[] });
   assert.equal(enriched.freshness.status, testCase.status, testCase.name);
   assert.equal(enriched.ready, ready, testCase.name);
   assert.equal(hooks.pkgCellState('actual-1.2', enriched).state, ready ? 'present' : 'missing', testCase.name);
@@ -441,10 +453,24 @@ hooks.setState({ candidate, revision:'e'.repeat(40), inventory:inventoryFor() })
 assert.equal(hooks.pkgCellState('actual-1.2', reusedState).state, 'missing');
 assert.equal(hooks.lvpmFreshness(reusedState).status, 'unknown');
 hooks.setState({ candidate });
-const vipmState = hooks.enrichPlatformState({ key:'linux', tag:'vipm-existing', ready:false }, { vipc:[{ packages:['actual-1.2'] }] });
+const vipmState = hooks.enrichPlatformState({ key:'linux', tag:'vipm-existing', ready:false }, {
+  vipc:[{ packages:['declared-only-1.0'] }], vipm_packages:[{name:'actual',version:'v1.2'}]
+});
 assert.equal(vipmState.ready, true);
-assert.equal(hooks.pkgCellState('actual-9.0', vipmState).state, 'present');
+assert.equal(hooks.pkgCellState('actual-1.2', vipmState).state, 'present');
+assert.equal(hooks.pkgCellState('actual-9.0', vipmState).state, 'missing');
+assert.equal(hooks.pkgCellState('declared-only-1.0', vipmState).state, 'missing');
+assert.deepEqual([...hooks.packagesInManifest({vipc:[{packages:['actual-1.2']}],copied_from_base:true})], []);
+assert.equal(hooks.enrichPlatformState({key:'windows'}, {vipm_inventory:{status:'unavailable'}}).ready, false);
 assert.equal(hooks.lvpmFreshness(vipmState), null);
+const coreFixture = {role:'core',monitorOn:['linux'],packages:['actual-1.0']};
+hooks.setState({vipcs:[coreFixture,{role:'project',configured:true,monitored:true,monitorOn:['linux'],packages:['actual-1.2']}]});
+assert.equal(hooks.pkgCellState('actual-1.0', vipmState, coreFixture, {key:'linux'}).state, 'present');
+assert.equal(hooks.pkgCellState('actual-1.0', {...vipmState,packages:new Set(['actual-1.0'])}, coreFixture, {key:'linux'}).state, 'missing');
+hooks.setState({vipcs:[coreFixture,{role:'project',configured:true,monitored:true,monitorOn:['windows'],packages:['actual-1.2']}]});
+assert.equal(hooks.pkgCellState('actual-1.0', vipmState, coreFixture, {key:'linux'}).state, 'missing');
+hooks.setState({vipcs:[]});
+
 const dragonPath = 'project.dragon';
 const monitoredDragon = { path:dragonPath, monitored:true, monitorOn:['linux'] };
 function dragonInventory(file, available = true){
@@ -1816,6 +1842,21 @@ assert.equal(sourceGuardReads, 1);
 for (const functionName of ['installToRepo', 'proceedInstall']) {
   const body = integrate.slice(integrate.indexOf('async function ' + functionName + '('));
   assert.match(body.slice(0, 1000), /await toolingSourceBlock\(repo\)/);
+}
+hooks.setState({platform:'linux', vipcs:[{...projectVipc, monitorOn:['windows']}], dragons:[], columns:loaderPlatforms()});
+hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
+assert.equal(elements.get('saveMonitor').disabled, false);
+assert.match(hooks.monitorInputs().container_vipc, /project\.vipc::windows\+linux/);
+const restrictedContext = vm.createContext({...context, window:{LVCI:{repo:'ni/LabVIEW-CI-CD-Toolkit'}}});
+vm.runInContext(fixtureSource, restrictedContext);
+for (const platform of ['windows', 'linux']) {
+  restrictedContext.hooks.setState({platform, vipcs:[{...projectVipc}], dragons:[], columns:loaderPlatforms()});
+  restrictedContext.hooks.setFileMonitor('vipc', 'project.vipc', platform, false);
+  assert.equal(elements.get('saveMonitor').disabled, true);
+  assert.match(elements.get('monitorStatus').innerHTML, /reviewed source PR/);
+  const before = requests.length;
+  await restrictedContext.hooks.dispatchMonitor();
+  assert.equal(requests.length, before);
 }
 console.log('Linux monitoring prerequisites: ' + prerequisiteCases + ' actual-function cases; Dragon file/package details: ' + dragonDetailCases + ' renderer cases passed.');
 console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety and monitoring regressions passed; ' + progressCases + ' dispatch identity/progress/error/duplicate/stale-context cases and ' + visualChecks + ' visual progress checks passed.');

@@ -480,7 +480,8 @@ class LvpmAdapterTests(unittest.TestCase):
         installed.mkdir()
         target = self.root / "library.vi"
         target.write_bytes(b"fixture")
-        package = {"name": "some_lib", "version": "1.0.0", "files": [str(target)], "relinked": True}
+        package = {"name": "some_lib", "version": "1.0.0", "files": [str(target)], "relinked": True,
+               "skipped_hooks": [], "skipped_groups": []}
         record = installed / "some_lib.json"
         record.write_text(json.dumps(package))
         requirements = {"requirements": [{"name": "some_lib", "version": "1.0.0"}]}
@@ -489,11 +490,57 @@ class LvpmAdapterTests(unittest.TestCase):
         record.write_text(json.dumps(package))
         with self.assertRaisesRegex(ValueError, "incomplete"):
             ADAPTER.verify_inventory(requirements, [package], installed)
-        package.pop("skipped_hooks")
+        package["skipped_hooks"] = []
         record.write_text(json.dumps(package))
         target.unlink()
         with self.assertRaisesRegex(ValueError, "files are missing"):
             ADAPTER.verify_inventory(requirements, [package], installed)
+
+    def test_declared_install_hook_missing_from_archive_is_rejected(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(self.spec())) as original, zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("spec", original.read("spec") + b"\n[Script VIs]\nPostInstall=builder-hook.vi\n")
+        data = buffer.getvalue()
+        with self.assertRaisesRegex(ValueError, "declared install hook.*PostInstall"):
+            ADAPTER.cached_archives(self.cached(data), [{"name": "some_lib", "version": "1.0.0"}],
+                                    self.root / "archives")
+
+    def test_inventory_rejects_wrong_target_duplicates_and_unknown_completion(self):
+        installed = self.root / "installed"
+        installed.mkdir()
+        payload = self.root / "library.vi"
+        payload.write_bytes(b"fixture")
+        target = "LabVIEW 2026 (64-bit)  v26"
+        package = {"name": "some_lib", "version": "1.0.0", "files": [str(payload)],
+                   "target": target, "relinked": True, "skipped_hooks": [], "skipped_groups": []}
+        plan = {"labview_target": target, "requirements": [{"name": "some_lib", "version": "1.0.0"}]}
+        record = installed / "some_lib.json"
+        for key, value in (("target", "LabVIEW 2025 (64-bit)  v25"), ("relinked", "true"),
+                           ("skipped_hooks", None), ("skipped_groups", None)):
+            with self.subTest(key=key):
+                record.write_text(json.dumps({**package, key: value}))
+                with self.assertRaises(ValueError):
+                    ADAPTER.verify_inventory(plan, [package], installed)
+        record.write_text(json.dumps(package))
+        (installed / "duplicate.json").write_text(json.dumps(package))
+        with self.assertRaisesRegex(ValueError, "Unexpected package"):
+            ADAPTER.verify_inventory(plan, [package], installed)
+
+    def test_integer_internal_target_version_is_captured_and_normalized(self):
+        plan = self.root / "requirements.json"
+        plan.write_text(json.dumps(ADAPTER.make_plan(self.root)))
+        records = [{"name": "core_lib", "version": "1.0.0"}]
+        with patch.object(ADAPTER, "supported_architecture", return_value="amd64"), \
+                patch.object(ADAPTER, "run_lvpm", side_effect=["LabVIEW 2026 (64-bit)  v26",
+                    "resolved 1 package:\n  core_lib 1.0.0\n\n", "resolved 1 package:\n  core_lib 1.0.0\n\n",
+                    "resolved 1 package:\n  core_lib 1.0.0\n\n", ""]), \
+                patch.object(ADAPTER, "cached_archives", return_value=records) as archives, \
+                patch.object(ADAPTER, "verify_inventory", return_value=records) as inventory:
+            report = ADAPTER.install(plan, self.root / "report")
+        self.assertEqual(archives.call_args.args[3], "26.0")
+        self.assertEqual(report["labview_internal_version"], "26.0")
+        self.assertEqual(report["labview_target"], "LabVIEW 2026 (64-bit)  v26")
+        self.assertEqual(inventory.call_args.args[0]["labview_target"], report["labview_target"])
 
     def test_linux_x86_64_architecture_is_normalized(self):
         for machine in ("x86_64", "AMD64"):

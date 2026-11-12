@@ -220,10 +220,9 @@
     }
     const NIPM_DEPS = [
       { key:"labview", name:"LabVIEW", source:"NI Package Manager", labview:true, platforms:["windows","linux"] },
-      { key:"via", name:"VI Analyzer support", source:"NI Package Manager", packages:{ windows:["ni-viawin-labview-support"], linux:["ni-vialin-labview-support"] }, platforms:["windows","linux"] },
+      { key:"via", name:"VI Analyzer support", source:"NI Package Manager", packages:{ windows:["ni-viawin-labview-support"], linux:["ni-vialinux-labview-support"] }, platforms:["windows","linux"] },
       { key:"utf", name:"NI Unit Test Framework", source:"NI Package Manager", packages:{ windows:["ni-utf-labview-support"] }, platforms:["windows"] },
-      { key:"dragon", name:"JKI Dragon", source:"NI Package Manager", packages:{ windows:["jki-dragon"] }, platforms:["windows"] },
-      { key:"vipm", name:"VI Package Manager", source:"NI Package Manager", packages:{ windows:["ni-vipm"], linux:["ni-vipm"] }, platforms:["windows","linux"] }
+      { key:"vipm", name:"VI Package Manager", source:"JKI installer / Debian", packages:{ windows:["ni-vipm"], linux:["vipm"] }, platforms:["windows","linux"] }
     ];
     const $ = id => document.getElementById(id);
     const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
@@ -585,23 +584,21 @@
         });
         return set;
       }
-      (man && man.vipc || []).forEach(v => (v.packages || []).forEach(p => set.add(p)));
+      (man && man.vipm_packages || []).forEach(pkg => {
+        if (!pkg || typeof pkg !== "object" || !pkg.name) return;
+        set.add(String(pkg.name));
+        if (pkg.version) set.add(pkg.name + "-" + String(pkg.version).replace(/^[vV]/, ""));
+      });
       return set;
     }
-    // Version-tolerant package matching: a VIPC declares a specific build
-    // (e.g. "wovalab_lib_antidoc_cli-3.3.0.117") but VIPM installs one version
-    // per package, so a baked "...-3.4.0.126" satisfies the request. Match on the
-    // versionless base identifier (strip a trailing "-<dotted digits>") so a
-    // present-but-different build reads as installed, not a false "missing".
-    function pkgBase(pkg){ return String(pkg || "").replace(/-\d[\d.]*$/, "").toLowerCase(); }
     function pkgInSet(pkg, set){
       if (!set || !set.size) return false;
-      if (set.has(pkg)) return true;
-      const base = pkgBase(pkg);
-      for (const p of set) if (pkgBase(p) === base) return true;
+      const key = value => String(value).toLowerCase().replace(/-v(?=\d)/, "-");
+      const wanted = key(pkg);
+      for (const installed of set) if (key(installed) === wanted) return true;
       return false;
     }
-    function nipkgInManifest(man){ return Array.isArray(man && man.nipkg_packages) ? man.nipkg_packages : []; }
+    function nipkgInManifest(man){ return [...(man && man.nipkg_inventory && man.nipkg_inventory.source === "nipkg list-installed" && man.nipkg_inventory.status === "observed" && Array.isArray(man.nipkg_packages) ? man.nipkg_packages : []), ...(Array.isArray(man && man.dpkg_packages) ? man.dpkg_packages : [])]; }
     function lvpmFreshness(st){
       if (!st || st.key === "windows" || (st.installer !== "lvpm" && !String(st.tag || "").startsWith("linux-lvpm-"))) return null;
       const unknown = reason => ({ status:"unknown", reason });
@@ -634,9 +631,11 @@
       st.manifest = man || null;
       st.installer = man && man.installer || (String(st.tag || "").startsWith("linux-lvpm-") ? "lvpm" : "vipm");
       st.ready = !!man && (st.installer !== "lvpm" || st.ready !== false);
+      if (man && man.vipm_inventory && man.vipm_inventory.status !== "observed") st.ready = false;
       st.packages = packagesInManifest(man);
       st.nipkg = nipkgInManifest(man);
-      st.nipkg_ready = Array.isArray(man && man.nipkg_packages);
+      st.nipkg_ready = !!(man && man.nipkg_inventory && man.nipkg_inventory.source === "nipkg list-installed" && man.nipkg_inventory.status === "observed") || (man && man.platform === "linux" && Array.isArray(man.dpkg_packages));
+      st.vipm_verified = !!(man && man.vipm_inventory && man.vipm_inventory.status === "observed" && man.vipm_inventory.target_verified === true);
       st.nipkgNames = new Set(st.nipkg.map(p => String(p.name || "").toLowerCase()).filter(Boolean));
       st.labview = man && man.labview_version ? String(man.labview_version) : "";
       if (man && (man.tag || man.version)) st.label = man.tag || man.version;
@@ -827,6 +826,9 @@
         && intent.context.loaded === linuxLoadedInputs;
     }
     function linuxReviewedWorkflow(text, file){
+      const inputDirectory = file === "build-labview-linux-image.yml" ? "linux-source" : "lvpm-source";
+      const inputCheckout = '      - name: Checkout selected dependency revision\n        uses: actions/checkout@v7\n        with:\n          ref: $' + '{{ inputs.dependency_sha || github.sha }}\n          path: ci-out/' + inputDirectory + '\n          persist-credentials: false\n';
+      text = text.replace(inputCheckout, "");
       const guard = '      - name: Verify reviewed commit\n        env:\n          EXPECTED_SHA: $' + "{{ inputs.expected_sha }}\n        run: |\n          if [ -n \"$EXPECTED_SHA\" ]; then\n            if ! [[ \"$EXPECTED_SHA\" =~ ^[0-9a-fA-F]{40}$ ]]; then\n              echo \"::error::Invalid reviewed commit SHA; expected exactly 40 hexadecimal characters.\"\n              exit 1\n            fi\n            reviewed_sha=$(printf '%s' \"$EXPECTED_SHA\" | tr '[:upper:]' '[:lower:]')\n            if [ \"$GITHUB_SHA\" != \"$reviewed_sha\" ]; then\n              echo \"::error::Reviewed HEAD moved. Click Update container image again to review the new target.\"\n              exit 1\n            fi\n          fi";
       const checkout = /uses: actions\/checkout@[^\n]+\n        with:\n          ref: \$\{\{ github.sha \}\}/g;
       const count = (text.match(/uses: actions\/checkout@/g) || []).length;
@@ -1287,7 +1289,9 @@
       const btn = $("saveMonitor");
       const counts = monitorCounts();
       if (monitorDirty) ["lvpmBuild", "lvpmActivate", "lvpmReset"].forEach(id => { if ($(id)) $(id).disabled = true; });
-      if (btn) { btn.hidden = false; btn.disabled = !monitorDirty || counts.total === 0 || (activePlatform === "linux" && repo.toLowerCase() === "ni/labview-ci-cd-toolkit"); }
+      const sourceRepository = repo.toLowerCase() === "ni/labview-ci-cd-toolkit";
+      if (btn) { btn.hidden = false; btn.disabled = !monitorDirty || counts.total === 0 || sourceRepository; }
+      if (sourceRepository) { setMonitorStatus("The tooling source cannot use client Save. Change monitoring through a reviewed source PR. Your local choices have not been saved."); return; }
       const request = activePlatform === "linux" && matchingLinuxMonitoringRequest();
       if (request && ["submitting", "accepted", "uncertain"].includes(request.status) && btn) btn.disabled = true;
       if (!counts.total) { setMonitorStatus("No dependency files found."); return; }
@@ -1334,6 +1338,7 @@
     function hideTokenPanel(){ const p = $("tokPanel"); if (p) p.hidden = true; }
     function monitorInputs(){ return { container_vipc:encodeMonitorList(currentVipcs), container_dragon:encodeMonitorList(currentDragons) }; }
     async function dispatchMonitor(){
+      if (repo.toLowerCase() === "ni/labview-ci-cd-toolkit") { updateMonitorUi(); return; }
       const previous = activePlatform === "linux" && matchingLinuxMonitoringRequest();
       if (previous && ["submitting", "accepted", "uncertain"].includes(previous.status)) return;
       if (!repo.includes("/")) { setMonitorStatus("Could not determine repository.", "err"); return; }
@@ -1887,6 +1892,30 @@
     // Single source of truth for a package's status in one worker column. Returns
     // { state:'present'|'missing'|'na'|'', title }. statusCell renders it and the
     // per-file header pill rolls it up, so the cells and the pill never disagree.
+    function effectiveToolingPin(pkg, vipc, col){
+      if (!vipc || vipc.role !== "core" || !col) return pkg;
+      const identity = value => String(value).match(/^(.+?)-v?(\d+(?:\.\d+)+[\w.+-]*)$/i);
+      const baseline = identity(pkg);
+      if (!baseline) return pkg;
+      const selected = file => file.monitored !== false && file.configured !== false
+        && (!Array.isArray(file.monitorOn) || file.monitorOn.includes(col.key));
+      const pins = new Set();
+      for (const file of currentVipcs.filter(file => file.role !== "core" && selected(file))) {
+        for (const value of file.packages || []) {
+          const match = identity(value);
+          if (match && match[1].toLowerCase() === baseline[1].toLowerCase()) pins.add(match[1].toLowerCase() + "-" + match[2]);
+        }
+      }
+      const section = generatedInventory && generatedInventory.sha === selectedRevision && generatedInventory.dragon;
+      for (const file of section && section.files || []) {
+        if (!selected(file) || file.error) continue;
+        for (const dep of file.dependencies || []) {
+          if ((dep.manager || "vipm") === "vipm" && String(dep.package_id).toLowerCase() === baseline[1].toLowerCase() && dep.declared_version)
+            pins.add(baseline[1].toLowerCase() + "-" + dep.declared_version);
+        }
+      }
+      return pins.size === 1 ? [...pins][0] : pkg;
+    }
     function pkgCellState(pkg, colState, vipc, col){
       if (!pkg) return { state:"" };
       if (vipc && col && Array.isArray(vipc.monitorOn) && vipc.monitorOn.indexOf(col.key) === -1) return { state:"na", title:'Not monitored for ' + (MONITOR_LABELS[col.key] || col.key) };
@@ -1896,9 +1925,9 @@
       if (freshness && freshness.status !== "current") return { state:"missing", title:localFreshnessText(colState) };
       if (colState.label === "base" || colState.label === "none") return { state:"missing", title:'No dependency worker is baked for this platform yet -- run the container update' };
       if (!colState.ready) return { state:"missing", title:'Worker dependency manifest has not been published yet -- run the container update' };
-      // Version-tolerant: a baked build of the same package satisfies a
-      // differently-versioned VIPC request (VIPM installs one version per package).
-      if (colState.installer === "lvpm" ? colState.packages.has(pkg) : pkgInSet(pkg, colState.packages)) return { state:"present", title:colState.label };
+      const effective = colState.installer === "lvpm" ? pkg : effectiveToolingPin(pkg, vipc, col);
+      if (colState.installer === "lvpm" ? colState.packages.has(effective) : pkgInSet(effective, colState.packages))
+        return { state:"present", title:effective === pkg ? colState.label : 'Project-selected version installed: ' + effective };
       return { state:"missing", title:'Not baked into this worker yet -- run the container update' };
     }
     function statusCell(pkg, colState, vipc, col){
@@ -1934,7 +1963,8 @@
       if (freshness && freshness.status !== "current") return missingCell(localFreshnessText(st));
       if (!st || !st.ready) return simpleCell(null);
       if (dep.labview) return st.labview ? simpleCell(true, 'LabVIEW ' + st.labview) : simpleCell(null);
-      if (lvpm && st.nipkg_ready !== true) return '<td class="cell" title="Native packages were not inventoried for this LVPM worker"><span aria-label="Unknown: native package not inventoried">Unknown</span></td>';
+      if (dep.key === "vipm" && st.vipm_verified === true) return simpleCell(true, "VIPM CLI verified against target LabVIEW");
+      if (st.nipkg_ready !== true) return '<td class="cell" title="Installed native packages were not inventoried for this worker; rebuild to refresh coverage"><span aria-label="Unknown: native package not inventoried">Unknown</span></td>';
       const wanted = ((dep.packages || {})[col.platform] || []).map(p => p.toLowerCase());
       const found = (st.nipkg || []).find(p => wanted.includes(String(p.name || '').toLowerCase()));
       return found ? simpleCell(true, found.version || found.name) : simpleCell(false, 'missing');
@@ -2155,12 +2185,12 @@
       currentDragons = generatedDragons;
       monitorDirty = false;
       const platformStates = {};
-      (data.platforms || []).forEach(p => { platformStates[p.key] = { tag:p.tag || 'base', label:p.version || p.tag || 'base', installer:p.installer || 'vipm', ready:p.ready !== false, packages:new Set(p.packages || []), nipkg_ready:p.nipkg_ready !== false && Array.isArray(p.nipkg_packages), nipkg:p.nipkg_packages || [], nipkgNames:new Set((p.nipkg_packages || []).map(x => String(x.name || '').toLowerCase())), labview:p.labview_version || '' }; });
+      (data.platforms || []).forEach(p => { platformStates[p.key] = { tag:p.tag || 'base', label:p.version || p.tag || 'base', installer:p.installer || 'vipm', vipm_verified:p.vipm_verified === true, ready:p.ready !== false, packages:new Set(p.packages || []), nipkg_ready:p.nipkg_ready !== false && Array.isArray(p.nipkg_packages), nipkg:p.nipkg_packages || [], nipkgNames:new Set((p.nipkg_packages || []).map(x => String(x.name || '').toLowerCase())), labview:p.labview_version || '' }; });
       platformStates.nipmDeps = data.nipm || [];
       const colStates = {};
       (data.columns || []).forEach(col => {
         const known = COLS.find(c => c.key === col.key) || {};
-        if (!platformStates[col.key]) platformStates[col.key] = { tag:col.tag || 'base', label:col.nipkg_version || col.version || col.tag || 'base', installer:col.installer || 'vipm', ready:col.ready !== false, packages:new Set(col.packages || []), nipkg_ready:col.nipkg_ready !== false && Array.isArray(col.nipkg_packages), nipkg:col.nipkg_packages || [], nipkgNames:new Set((col.nipkg_packages || []).map(x => String(x.name || '').toLowerCase())), labview:col.labview_version || '' };
+        if (!platformStates[col.key]) platformStates[col.key] = { tag:col.tag || 'base', label:col.nipkg_version || col.version || col.tag || 'base', installer:col.installer || 'vipm', vipm_verified:col.vipm_verified === true, ready:col.ready !== false, packages:new Set(col.packages || []), nipkg_ready:col.nipkg_ready !== false && Array.isArray(col.nipkg_packages), nipkg:col.nipkg_packages || [], nipkgNames:new Set((col.nipkg_packages || []).map(x => String(x.name || '').toLowerCase())), labview:col.labview_version || '' };
         colStates[col.key] = markLinuxVipcPending(known, {
           installer: col.installer || (String(col.tag || "").startsWith("linux-lvpm-") ? "lvpm" : "vipm"),
           tag: col.tag || "base",

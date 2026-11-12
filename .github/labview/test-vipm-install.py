@@ -11,6 +11,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 INSTALLER = Path(__file__).parent / 'vipm' / 'install-vipc.ps1'
@@ -95,9 +96,9 @@ class WindowsDragonPlanTests(unittest.TestCase):
         second = self.source('[vipm.dependencies]\npkg={version="1.0-1"}\n', 'Other.dragon')
         self.assertEqual(DRAGON.windows_install_plan([first, second])['specs'], ['pkg@1.0-1'])
 
-    def stage(self, dragon_text, config='', vipc=False, expected_exit=0):
+    def stage(self, dragon_text, config='', vipc=False, expected_exit=0, dependency_root='.'):
         root = INSTALLER.parents[3]
-        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text(encoding='utf-8')
         stage = workflow.split('- name: Stage repo VIPC and Dragon files', 1)[1]
         stage = stage.split("          python -I - <<'PY'\n", 1)[1]
         stage = stage.split('\n          PY', 1)[0]
@@ -114,7 +115,8 @@ class WindowsDragonPlanTests(unittest.TestCase):
         if vipc:
             with zipfile.ZipFile(self.root / 'Dependencies.vipc', 'w') as archive:
                 archive.writestr('config.xml', '<VI_Package_Configuration/>')
-        environment = dict(os.environ, GITHUB_OUTPUT=str(self.root / 'outputs'))
+        environment = dict(os.environ, GITHUB_OUTPUT=str(self.root / 'outputs'),
+                   DEPENDENCY_ROOT=dependency_root)
         environment['PYTHONPATH'] = str(self.root / 'shadow')
         result = subprocess.run([os.sys.executable, '-I', '-c', code], cwd=self.root, env=environment,
                                 text=True, capture_output=True, timeout=30)
@@ -123,7 +125,7 @@ class WindowsDragonPlanTests(unittest.TestCase):
 
     def push_gate(self, config, expected_exit=0, changed_path='example/Example.dragon'):
         root = INSTALLER.parents[3]
-        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text(encoding='utf-8')
         gate = workflow.split('- name: Decide whether to rebuild', 1)[1]
         gate = gate.split("          python -I - <<'PY'\n", 1)[1].split('\n          PY', 1)[0]
         code = '\n'.join(line[10:] for line in gate.splitlines())
@@ -269,6 +271,49 @@ class WindowsDragonPlanTests(unittest.TestCase):
                 with self.assertRaisesRegex(DRAGON.DragonParseError, 'invalid Windows Dragon target'):
                     DRAGON.windows_install_plan([], target_year=year, target_bitness=bitness)
 
+    def test_ancestor_dependencies_do_not_replace_reviewed_tooling(self):
+        self.source('[vipm.dependencies]\nancestor_pkg="1.0"\n',
+                    '.dependency-source/example/Ancestor.dragon')
+        self.source('config:\n  container:\n    dragon:\n'
+                    '      - path: example/Ancestor.dragon\n        monitor: true\n',
+                    '.dependency-source/.github/labview-ci.yml')
+        self.source('not executable tooling', '.dependency-source/.github/labview/dragon_deps.py')
+        staged = self.stage('[vipm.dependencies]\nhead_pkg="2.0"\n',
+                            dependency_root='.dependency-source')
+        plan = json.loads((staged / 'dragon-plan.json').read_text())
+        self.assertEqual(plan['specs'], ['ancestor_pkg@1.0'])
+        self.assertEqual(plan['files'][0]['source_file'], 'example/Ancestor.dragon')
+
+    def test_selected_vipc_missing_or_colliding_fails_closed(self):
+        self.stage('[vipm.dependencies]\npkg="1.0"\n', config=(
+            'config:\n  container:\n    vipc:\n      - path: Missing.vipc\n        monitor: true\n'),
+            expected_exit=1)
+        for folder in ('one', 'two'):
+            source = self.root / folder / 'Same.vipc'
+            source.parent.mkdir()
+            with zipfile.ZipFile(source, 'w') as archive:
+                archive.writestr('config.xml', '<VI_Package_Configuration/>')
+        self.stage('[vipm.dependencies]\npkg="1.0"\n', expected_exit=1)
+
+    def test_staging_discards_deselected_payloads_and_preserves_baseline(self):
+        self.source('baseline', '.github/labview/vipm/ci-tooling.vipc')
+        self.source('stale', '.github/labview/vipm/Old.vipc')
+        self.source('stale', '.github/labview/vipm/Old.vip')
+        staged = self.stage('[vipm.dependencies]\npkg="1.0"\n', config=(
+            'config:\n  container:\n    vipc: []\n    dragon: []\n'))
+        self.assertEqual((staged / 'ci-tooling.vipc').read_text(), 'baseline')
+        self.assertFalse((staged / 'Old.vipc').exists())
+        self.assertFalse((staged / 'Old.vip').exists())
+
+    def test_vipc_sources_cannot_escape_repository_or_overwrite_baseline(self):
+        for path in ('../Outside.vipc', 'project/ci-tooling.vipc'):
+            with self.subTest(path=path):
+                if path.startswith('project'):
+                    self.source('not the baseline', path)
+                self.stage('[vipm.dependencies]\npkg="1.0"\n', config=(
+                    f'config:\n  container:\n    vipc:\n      - path: {path}\n        monitor: true\n'),
+                    expected_exit=1)
+
     def test_selected_symlinks_are_rejected(self):
         source = Path(self.source('[vipm.dependencies]\npkg="1.0"\n'))
         link = self.root / 'Link.dragon'
@@ -279,16 +324,66 @@ class WindowsDragonPlanTests(unittest.TestCase):
         with self.assertRaisesRegex(DRAGON.DragonParseError, 'symlink|regular file'):
             DRAGON.windows_install_plan([str(link)], repository_root=str(self.root))
 
+    def test_windows_build_forwards_client_repository_context(self):
+        root = INSTALLER.parents[3]
+        docker = (root / '.github/docker/labview-ci.Dockerfile').read_text()
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        self.assertIn('ARG VIPM_PUBLIC_REPO_URL=https://github.com/ni/LabVIEW-CI-CD-Toolkit.git', docker)
+        self.assertIn('--build-arg VIPM_PUBLIC_REPO_URL=$repoUrl', workflow)
+        self.assertIn("$repoUrl = '${{ github.server_url }}/${{ github.repository }}.git'", workflow)
+
     def test_workflow_fingerprint_and_docker_closure_include_dragon_plan(self):
         root = INSTALLER.parents[3]
-        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text(encoding='utf-8')
         self.assertIn("$files += '.github/labview/vipm/dragon-plan.json'", workflow)
         self.assertIn("$files += '.github/labview/dragon_deps.py'", workflow)
-        docker = (root / '.github/docker/labview-ci.Dockerfile').read_text()
+        docker = (root / '.github/docker/labview-ci.Dockerfile').read_text(encoding='utf-8')
         self.assertIn('COPY .github/labview/vipm/ C:/vipm/', docker)
         self.assertIn('if ($vipcFiles -or $dragonFiles)', docker)
         self.assertNotIn('dragon apply', docker)
         self.assertIn("if ($LASTEXITCODE -ne 0) { throw", docker)
+
+
+    def test_base_defaults_contract_uses_utf8_with_legacy_windows_defaults(self):
+        repository = INSTALLER.parents[3]
+        url = 'https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe'
+        notes = '\u201ccaf\u00e9\u201d \u2014 \u65e5\u672c\u8a9e'
+        catalog = {
+            'containers': {'supported': [{'id': '2026q3', 'vipmInstallerUrl': url}]},
+            'notes': notes,
+        }
+        original_open = Path.open
+        original_loads = json.loads
+
+        def legacy_windows_open(path, mode='r', buffering=-1, encoding=None, errors=None, newline=None):
+            if 'b' not in mode and encoding in (None, 'locale'):
+                encoding = 'cp1252'
+            return original_open(path, mode, buffering, encoding, errors, newline)
+
+        def load_catalog(text):
+            result = original_loads(text)
+            self.assertEqual(result['notes'], notes)
+            return result
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_root = Path(directory)
+            for name in ('.github/labview/vipm/install-vipc.ps1',
+                         '.github/docker/labview-ci-base.Dockerfile'):
+                target = fixture_root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((repository / name).read_bytes())
+            catalog_path = fixture_root / '.github/labview-ci/catalog.json'
+            catalog_path.parent.mkdir(parents=True)
+            catalog_path.write_bytes(json.dumps(catalog, ensure_ascii=False).encode('utf-8'))
+            for default_encoding in (None, 'locale'):
+                with self.subTest(default_encoding=default_encoding):
+                    with patch.dict(globals(), {'INSTALLER': fixture_root / '.github/labview/vipm/install-vipc.ps1'}), \
+                            patch.object(Path, 'open', legacy_windows_open):
+                        with self.assertRaises(UnicodeDecodeError):
+                            catalog_path.read_text(encoding=default_encoding)
+                        with patch.object(json, 'loads', side_effect=load_catalog) as loader:
+                            VipmInstallTests().test_base_defaults_catalog_override_and_shared_bootstrap_are_wired()
+                        loader.assert_called_once()
 
 
 @unittest.skipUnless(POWERSHELL, 'PowerShell is required')
@@ -445,6 +540,93 @@ Install-RequiredWindowsDragon @('oglib_boolean@6.0.0.9')
 """)
         self.assertIn('REQUIRED=True', output)
 
+    def test_selected_vipc_release_is_preserved_and_controls_baseline_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'Project.vipc'
+            with zipfile.ZipFile(path, 'w') as archive:
+                archive.writestr('config.xml', '<VI_Package_Configuration><Target><Package>'
+                                 '<Name>jki_labs_tool_vi_tester-1.1-1</Name>'
+                                 '</Package></Target></VI_Package_Configuration>')
+            escaped = str(path).replace("'", "''")
+            output = self.run_script(f"""
+$specs = @(Get-VipcPackageSpecs '{escaped}')
+if (($specs -join ',') -ne 'jki_labs_tool_vi_tester@1.1-1') {{ throw 'Selected release suffix lost' }}
+$files = @([pscustomobject]@{{ Name = 'Project.vipc'; FullName = '{escaped}' }})
+$resolved = @(Resolve-WindowsSelectedSpecs @('jki_vi_tester') $files @())
+if (($resolved -join ',') -ne 'jki_labs_tool_vi_tester@1.1-1') {{ throw 'Baseline did not use selected exact source pin' }}
+'SELECTED-EXACT=True'
+""")
+            self.assertIn('SELECTED-EXACT=True', output)
+
+    def test_tooling_retry_preserves_selected_pin_and_project_fallback(self):
+        for source in ('dragon', 'project', 'project-fallback'):
+            with self.subTest(source=source):
+                output = self.run_script(f"""
+$dragonPlan = [pscustomobject]@{{ Specs = @() }}
+$project = [pscustomobject]@{{ Name = 'Project.vipc'; FullName = 'Project.vipc' }}
+$tooling = [pscustomobject]@{{ Name = 'ci-tooling.vipc'; FullName = 'ci-tooling.vipc' }}
+$vipcFiles = @($tooling)
+if ('{source}' -eq 'dragon') {{ $dragonPlan.Specs = @('oglib_boolean@6.0.0.10') }}
+if ('{source}' -eq 'project') {{ $vipcFiles = @($project, $tooling) }}
+if ('{source}' -eq 'project-fallback') {{ $vipcFiles = @($project) }}
+$script:Attempts = @()
+$script:FileAttempts = @()
+$script:ToolingAttempts = 0
+$script:LastVipmOutput = ''
+$script:bestEffortFailed = $false
+$applyFailed = $false
+function Get-VipcPackageSpecs {{
+    param($Path)
+    if ($Path -eq 'Project.vipc') {{ 'oglib_boolean@6.0.0.10' }}
+    else {{ 'oglib_boolean@6.0.0.9' }}
+}}
+function Install-VipmSpecs {{
+    param($Specs)
+    $script:Attempts += ($Specs -join ',')
+    if ($vipc.Name -eq 'Project.vipc') {{ return $true }}
+    $script:ToolingAttempts++
+    return ($script:ToolingAttempts -gt 1)
+}}
+function Invoke-VipmInstall {{
+    param($Flag, $Path)
+    $script:FileAttempts += $Path
+    return 42
+}}
+$loop = $ast.Find({{
+    param($node)
+    $node -is [System.Management.Automation.Language.ForEachStatementAst] -and
+    $node.Extent.Text.StartsWith('foreach ($vipc in $vipcFiles)') -and
+    $node.Extent.Text.Contains('$effectiveSpecs = ')
+}}, $true)
+if (-not $loop) {{ throw 'VIPC install loop not found' }}
+. ([scriptblock]::Create($loop.Extent.Text))
+Write-Output "ATTEMPTS=$($script:Attempts -join ';')"
+Write-Output "FILE-ATTEMPTS=$($script:FileAttempts -join ';')"
+if ($applyFailed -or $script:bestEffortFailed) {{ throw 'Fallback did not recover' }}
+""")
+                expected_count = {'dragon': 2, 'project': 3, 'project-fallback': 1}[source]
+                self.assertIn('ATTEMPTS=' + ';'.join(['oglib_boolean@6.0.0.10'] * expected_count), output)
+                expected_files = '' if source == 'dragon' else 'Project.vipc'
+                self.assertIn(f'FILE-ATTEMPTS={expected_files}\n', output)
+
+    def test_selected_vipc_rejects_unsafe_cli_package_declarations(self):
+        for package in ('--force', 'pkg;command', 'pkg@--option', 'pkg/../../other'):
+            with self.subTest(package=package), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'Project.vipc'
+                with zipfile.ZipFile(path, 'w') as archive:
+                    archive.writestr('config.xml', '<VI_Package_Configuration><Target><Package>'
+                                     f'<Name>{package}</Name>'
+                                     '</Package></Target></VI_Package_Configuration>')
+                escaped = str(path).replace("'", "''")
+                output = self.run_script(f"""
+try {{ Get-VipcPackageSpecs '{escaped}'; throw 'Unsafe package accepted' }}
+catch {{
+    if ($_.Exception.Message -notlike 'Unsafe VIPC package declaration*') {{ throw }}
+    'REJECTED=True'
+}}
+""")
+                self.assertIn('REJECTED=True', output)
+
     def test_final_dragon_inventory_is_target_specific_and_fails_closed(self):
         good = 'Using LabVIEW 2026 (64-bit)'
         for banner, package, exit_code, success in (
@@ -523,7 +705,7 @@ if (-not $guard) { throw 'No-input guard not found' }
         self.assertIn('DRAGON-ONLY=True', output)
 
     def test_actual_docker_hook_runs_for_dragon_only_and_propagates_failures(self):
-        docker = (INSTALLER.parents[3] / '.github/docker/labview-ci.Dockerfile').read_text()
+        docker = (INSTALLER.parents[3] / '.github/docker/labview-ci.Dockerfile').read_text(encoding='utf-8')
         hook = docker.split('RUN $vipcFiles = ', 1)[1].split('\n\n# Stamp', 1)[0]
         hook = '$vipcFiles = ' + hook.replace('`\n', '\n')
         for mode, failed in (('dragon-only', False), ('mixed', False),
@@ -567,6 +749,7 @@ $script:InventoryExit = 0
 $script:LastVipmOutput = ''
 function New-PublicRepoWorkdir {{ return '{escaped}' }}
 function Get-Command {{ return $null }}
+function Get-VipcPackageSpecs {{ @() }}
 function Install-VipmSpecs {{
     param($Specs)
     $script:Inventory = @('Using LabVIEW 2026 (64-bit)', 'oglib_boolean 6.0.0.9')
@@ -594,7 +777,7 @@ try {{
 
     def test_worker_identity_changes_with_effective_dragon_inputs(self):
         repository = INSTALLER.parents[3]
-        workflow = (repository / '.github/workflows/build-labview-image.yml').read_text()
+        workflow = (repository / '.github/workflows/build-labview-image.yml').read_text(encoding='utf-8')
         start = workflow.index("          $vipcFiles = @(Get-ChildItem", workflow.index('- name: Compute worker version'))
         end = workflow.index('          "version=$version"', start)
         code = '\n'.join(line[10:] for line in workflow[start:end].splitlines())
@@ -1005,11 +1188,11 @@ foreach ($file in $script:Files) { if (Test-Path -LiteralPath $file) { throw 'Ou
     def test_base_defaults_catalog_override_and_shared_bootstrap_are_wired(self):
         root = INSTALLER.parents[3]
         url = 'https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe'
-        catalog = json.loads((root / '.github/labview-ci/catalog.json').read_text())
+        catalog = json.loads((root / '.github/labview-ci/catalog.json').read_text(encoding='utf-8'))
         release = next(item for item in catalog['containers']['supported'] if item['id'] == '2026q3')
         self.assertEqual(release['vipmInstallerUrl'], url)
-        self.assertIn(f"else {{ '{url}' }}", INSTALLER.read_text())
-        dockerfile = (root / '.github/docker/labview-ci-base.Dockerfile').read_text()
+        self.assertIn(f"else {{ '{url}' }}", INSTALLER.read_text(encoding='utf-8'))
+        dockerfile = (root / '.github/docker/labview-ci-base.Dockerfile').read_text(encoding='utf-8')
         self.assertIn(f'ARG VIPM_INSTALLER_URL={url}', dockerfile)
         self.assertIn('COPY .github/labview/vipm/install-vipc.ps1 C:/ci-bootstrap/install-vipc.ps1', dockerfile)
         self.assertIn(r'RUN & C:\ci-bootstrap\install-vipc.ps1 -BootstrapOnly;', dockerfile)
@@ -1018,7 +1201,7 @@ foreach ($file in $script:Files) { if (Test-Path -LiteralPath $file) { throw 'Ou
         root = INSTALLER.parents[3]
         snippets = []
         for workflow in ('build-labview-image.yml', 'publish-base-images.yml'):
-            source = (root / '.github/workflows' / workflow).read_text()
+            source = (root / '.github/workflows' / workflow).read_text(encoding='utf-8')
             snippet = re.search(r'\$hashInput = .*?\$baseHash = [^\n]+', source, re.S).group()
             for name in ('windowsTag', 'nipmFeedUrl', 'vipmInstallerUrl'):
                 snippet = snippet.replace("'${{ matrix." + name + " }}'", f'$rel.{name}')
@@ -1174,7 +1357,7 @@ Write-Output "RESULT=$result"
 """)
         self.assertIn('RESULT=False', output)
 
-    def test_inventory_preserves_legacy_cli_active_target_fallback(self):
+    def test_inventory_rejects_unsupported_target_flags_without_bare_retry(self):
         output = self.run_script("""
 function Mock-Vipm {
     param([Parameter(ValueFromRemainingArguments = $true)] [string[]] $Arguments)
@@ -1189,8 +1372,8 @@ function Mock-Vipm {
 $result = Test-VipmSpecsInstalled @('jki_lib_caraya@1.4.4.148')
 Write-Output "RESULT=$result"
 """)
-        self.assertIn('RESULT=True', output)
-        self.assertIn('retrying bare form against active target', output)
+        self.assertIn('RESULT=False', output)
+        self.assertNotIn('retrying bare form against active target', output)
 
     def test_project_failure_is_required_but_tooling_failure_is_optional(self):
         for name, required, optional in (('Dependencies.vipc', True, False),

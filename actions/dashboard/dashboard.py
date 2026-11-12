@@ -4412,6 +4412,8 @@ def _manifest_packages(man):
           packages.add(f'{name}-{version.lstrip("vV")}')
     return sorted(packages, key=str.lower)
   if isinstance(man, dict):
+    if man.get('vipm_inventory', {}).get('status', 'observed') != 'observed':
+      return []
     for pkg in man.get('vipm_packages') or []:
       if isinstance(pkg, dict):
         name = str(pkg.get('name') or '').strip()
@@ -4429,16 +4431,6 @@ def _manifest_packages(man):
             packages.add(value)
       elif isinstance(pkg, str) and pkg.strip():
         packages.add(pkg.strip())
-    # Always union the manifest's own vipc[].packages, which are stored in the
-    # SAME identifier form the VIPC files declare (no "v" prefix) and include
-    # every installed version of a package. Never return early on vipm_packages
-    # alone -- that list can differ in version format and omit second versions.
-    for vipc in man.get('vipc') or []:
-      for pkg in vipc.get('packages') or []:
-        if pkg:
-          packages.add(pkg)
-    if not packages and man.get('platform') == 'windows' and man.get('copied_from_base'):
-      packages.update(_core_tooling_packages())
   return sorted(packages, key=str.lower)
 
 def _core_tooling_packages():
@@ -4519,7 +4511,7 @@ def _manifest_failed_packages(man):
 def _manifest_nipkg_packages(man):
   packages = []
   if isinstance(man, dict):
-    for pkg in man.get('nipkg_packages') or []:
+    for pkg in ((man.get('nipkg_packages') or []) if man.get('nipkg_inventory', {}).get('source') == 'nipkg list-installed' and man.get('nipkg_inventory', {}).get('status') == 'observed' else []) + (man.get('dpkg_packages') or []):
       if isinstance(pkg, dict) and pkg.get('name'):
         packages.append({'name': str(pkg.get('name') or ''), 'version': str(pkg.get('version') or '')})
   return sorted(packages, key=lambda p: p['name'].lower())
@@ -4536,7 +4528,7 @@ def _known_nipm_dependencies():
     {
       'name': 'VI Analyzer support',
       'source': 'NI Package Manager',
-      'packages': {'windows': ['ni-viawin-labview-support'], 'linux': ['ni-vialin-labview-support']},
+      'packages': {'windows': ['ni-viawin-labview-support'], 'linux': ['ni-vialinux-labview-support']},
       'platforms': ['windows', 'linux'],
       'details': 'NI VI Analyzer support package used by the analyzer runners.',
     },
@@ -4548,18 +4540,12 @@ def _known_nipm_dependencies():
       'details': 'NI UTF support package used by the Windows unit-test runner.',
     },
     {
-      'name': 'JKI Dragon',
-      'source': 'NI Package Manager',
-      'packages': {'windows': ['jki-dragon']},
-      'platforms': ['windows'],
-      'details': 'JKI Dragon dependency-management tooling installed from the LabVIEW 2026 NI Package Manager feed.',
-    },
-    {
+      'key': 'vipm',
       'name': 'VI Package Manager',
-      'source': 'NI Package Manager',
-      'packages': {'windows': ['ni-vipm']},
-      'platforms': ['windows'],
-      'details': 'NI-published Windows VIPM package that enables VIPC application during worker builds. Linux installs VIPM from the native Debian package during its worker build.',
+      'source': 'JKI installer / Debian',
+      'packages': {'windows': ['ni-vipm'], 'linux': ['vipm']},
+      'platforms': ['windows', 'linux'],
+      'details': 'Windows installs VIPM using the JKI installer and verifies its CLI against the target LabVIEW. Linux installs the native Debian package.',
     },
   ]
 
@@ -4631,7 +4617,7 @@ def _vipm_version_index(man):
 def _nipkg_version_index(man):
   """Map nipkg package name -> installed version set from a worker manifest."""
   out = {}
-  if isinstance(man, dict):
+  if isinstance(man, dict) and man.get('nipkg_inventory', {}).get('source') == 'nipkg list-installed' and man.get('nipkg_inventory', {}).get('status') == 'observed':
     for pkg in man.get('nipkg_packages') or []:
       if isinstance(pkg, dict):
         name = str(pkg.get('name') or '').strip().lower()
@@ -4740,6 +4726,27 @@ def _annotate_dragon_status(dep, status_index, have_manifest, baked_packages, vi
       dep.setdefault('message', '')
 
 def _linux_dragon_status(dep, selection, manifest, freshness):
+  if isinstance(manifest, dict) and manifest.get('installer', 'vipm') == 'vipm':
+    inventory = manifest.get('vipm_inventory') or {}
+    unknown_vipm = {'status': 'unknown', 'installed_version': '', 'scope': 'installed-packages',
+                    'message': 'Verified Linux VIPM inventory is unavailable; rebuild the selected worker.'}
+    if (manifest.get('platform') != 'linux' or inventory.get('platform') != 'linux'
+        or inventory.get('status') != 'observed' or inventory.get('target_verified') is not True
+        or inventory.get('labview_version') != manifest.get('labview_version')
+        or inventory.get('labview_bitness') != '64'
+        or inventory.get('source') != 'vipm list --installed'):
+      return unknown_vipm
+    if str(dep.get('manager') or 'vipm').lower() != 'vipm':
+      return {**unknown_vipm, 'message': 'NIPM dependencies cannot be installed by Linux VIPM.'}
+    name = str(dep.get('package_id') or '').lower()
+    declared = str(dep.get('declared_version') or '')
+    versions = sorted({str(package.get('version') or '') for package in inventory.get('packages') or []
+                       if isinstance(package, dict) and str(package.get('name') or '').lower() == name})
+    if not name or not declared:
+      return {**unknown_vipm, 'message': 'An exact VIPM name/version declaration is required.'}
+    return {'status': 'installed' if declared in versions else 'wrong_version' if versions else 'missing',
+            'installed_version': declared if declared in versions else versions[0] if versions else '',
+            'scope': 'installed-packages', 'message': 'Exact version checked against the selected Linux VIPM target inventory.'}
   unknown = {'status': 'unknown', 'installed_version': '', 'scope': 'package-files',
              'message': 'Current digest-bound Linux LVPM package-file evidence is unavailable. Rebuild, reverify, and explicitly re-activate the candidate.'}
   if str(dep.get('manager') or 'vipm').lower() != 'vipm':
@@ -4823,17 +4830,16 @@ def _build_dragon_section(config=None):
       'conflicts': inv.get('conflicts') or [],
     }
   platforms = sorted({platform for file in files if file['monitored'] for platform in file['monitorOn']})
-  win_man = _worker_manifest('windows', 'latest') if 'windows' in platforms else None
+  win_man = _worker_manifest('windows', config.get('use') or 'latest') if 'windows' in platforms else None
   have_manifest = isinstance(win_man, dict)
   status_index = _dragon_status_index(win_man)
   win_dragon = win_man.get('dragon') if have_manifest else None
   baked_packages = {str(p).lower() for p in _manifest_packages(win_man)} if have_manifest else set()
   vipm_index = _vipm_version_index(win_man) if have_manifest else {}
   nipkg_index = _nipkg_version_index(win_man) if have_manifest else {}
-  selection = config.get('linuxUse') or config.get('use') or ''
-  canonical = re.fullmatch(r'linux-lvpm-[a-f0-9]{64}@sha256:[a-f0-9]{64}', selection)
-  linux_man = _worker_manifest('linux', selection) if 'linux' in platforms and canonical else None
-  freshness = _lvpm_local_freshness(selection, linux_man) if isinstance(linux_man, dict) else {}
+  selection = config.get('linuxUse') or config.get('use') or 'latest'
+  linux_man = _worker_manifest('linux', selection) if 'linux' in platforms else None
+  freshness = _lvpm_local_freshness(selection, linux_man) if isinstance(linux_man, dict) and linux_man.get('installer') == 'lvpm' else {}
   for f in files:
     for dep in f.get('dependencies') or []:
       evidence = {}
@@ -4862,10 +4868,10 @@ def _build_dragon_section(config=None):
   inspected = all(not f['monitored'] or f['inspection']['status'] == 'parsed' for f in files)
   health = win_dragon.get('health', '') if isinstance(win_dragon, dict) else ''
   measured = ('windows' not in platforms or have_manifest) and (
-      'linux' not in platforms or (isinstance(linux_man, dict) and linux_man.get('installer') == 'lvpm'
-      and linux_man.get('platform') == 'linux' and linux_man.get('architecture') == 'amd64'
-      and freshness.get('status') == 'current' and freshness.get('selection') == selection
-      and bool(os.environ.get('GITHUB_SHA')) and freshness.get('revision') == os.environ.get('GITHUB_SHA')))
+      'linux' not in platforms or (isinstance(linux_man, dict) and all(
+          dep.get('platform_status', {}).get('linux', {}).get('status') not in (None, 'unknown')
+          for file in files if file['monitored'] and 'linux' in file['monitorOn']
+          for dep in file.get('dependencies') or [])))
   return {
     'available': inv.get('available', False),
     'column': 'windows',
@@ -4941,35 +4947,26 @@ def _compute_deps_pending(data):
   current Windows worker manifest; plus declared Dragon deps not yet installed."""
   cols = {c.get('key'): c for c in data.get('columns', [])}
 
-  # Version-tolerant matching: a VIPC pins a specific build (e.g.
-  # "wovalab_lib_antidoc_cli-3.3.0.117") but VIPM installs one version per
-  # package, so a baked "...-3.4.0.126" satisfies the request. Compare on the
-  # versionless base identifier so a present-but-different build is not flagged
-  # as a missing dependency.
-  def _pkg_base(pkg):
-    return re.sub(r'-\d[\d.]*$', '', str(pkg or '')).lower()
-
   def baked(key):
     c = cols.get(key) or {}
+    if c.get('ready') is False:
+      return set()
     pkgs = c.get('packages') or []
-    return {str(p).lower() for p in pkgs}, (set() if c.get('installer') == 'lvpm' else {_pkg_base(p) for p in pkgs})
+    return {re.sub(r'-v(?=\d)', '-', str(pkg).lower()) for pkg in pkgs}
 
-  def _missing(pkgs, baked_pair):
-    exact, bases = baked_pair
-    return [p for p in pkgs if str(p).lower() not in exact and _pkg_base(p) not in bases]
+  def _missing(pkgs, installed):
+    return [pkg for pkg in pkgs if re.sub(r'-v(?=\d)', '-', str(pkg).lower()) not in installed]
 
   win_baked = baked('windows')
   # The Linux worker now installs VIPM natively and bakes repository VIPC (same as
-  # Windows), so a Linux dependency gap is flagged independently -- but only when a
-  # real Linux worker manifest resolved for this revision (a non-base, ready tag).
-  # Otherwise (Linux unused / base image) there is no worker to bake into and we do
-  # not surface a spurious Linux update prompt.
+  # Windows), so a selected dependency worker stays pending when its inventory
+  # cannot be verified. An unused/base selection does not request a dependency bake.
   lin_col = cols.get('linux') or {}
   freshness = lin_col.get('freshness') or {}
   lvpm_pending = lin_col.get('installer') == 'lvpm' and (
     freshness.get('status') != 'current' or freshness.get('revision') != data.get('sha')
     or freshness.get('selection') != lin_col.get('tag'))
-  lin_active = bool(lin_col.get('ready')) and str(lin_col.get('tag') or 'base') not in ('base', 'none')
+  lin_active = bool(lin_col) and str(lin_col.get('tag') or 'base') not in ('base', 'none')
   lin_baked = baked('linux') if lin_active else set()
   pending_pkgs = set()
   pending_files = []
@@ -5101,6 +5098,8 @@ def _build_dependencies_index():
         manifest_cache[cache_key] = _worker_manifest(col['platform'], tag)
       man = manifest_cache[cache_key]
       col['ready'] = isinstance(man, dict)
+      if isinstance(man, dict) and man.get('vipm_inventory', {}).get('status', 'observed') != 'observed':
+        col['ready'] = False
       col['installer'] = man.get('installer', 'vipm') if isinstance(man, dict) else ('lvpm' if tag.startswith('linux-lvpm-') else 'vipm')
       col['verification'] = man.get('verification', {}) if isinstance(man, dict) else {}
       if col['installer'] == 'lvpm':
@@ -5108,7 +5107,8 @@ def _build_dependencies_index():
         col['ready'] = col['ready'] and col['freshness'].get('status') == 'current'
       col['packages'] = _manifest_packages(man)
       col['failed_packages'] = _manifest_failed_packages(man)
-      col['nipkg_ready'] = isinstance(man, dict) and isinstance(man.get('nipkg_packages'), list)
+      col['nipkg_ready'] = isinstance(man, dict) and (man.get('nipkg_inventory', {}).get('status') == 'observed' and man.get('nipkg_inventory', {}).get('source') == 'nipkg list-installed' or isinstance(man.get('dpkg_packages'), list) and col['platform'] == 'linux')
+      col['vipm_verified'] = isinstance(man, dict) and man.get('vipm_inventory', {}).get('status') == 'observed' and man.get('vipm_inventory', {}).get('target_verified') is True
       col['nipkg_packages'] = _manifest_nipkg_packages(man)
       col['labview_version'] = man.get('labview_version', '') if isinstance(man, dict) else ''
       col['version'] = (man.get('tag') or man.get('version', tag)) if isinstance(man, dict) else tag

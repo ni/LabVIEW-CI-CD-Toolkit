@@ -168,8 +168,15 @@ def make_plan(root, labview_version=None):
 def run_lvpm(arguments, environment, discovery=False):
     if discovery and ("install" not in arguments or "--dry-run" not in arguments):
         raise ValueError("Package discovery must be read-only")
-    result = subprocess.run(["lvpm", *arguments], env=environment, text=True,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=3600)
+    try:
+        result = subprocess.run(["lvpm", *arguments], env=environment, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=3600)
+    except subprocess.TimeoutExpired as error:
+        output = error.stdout or ""
+        if isinstance(output, bytes):
+            output = output.decode("utf-8", errors="replace")
+        print(output, file=sys.stderr, flush=True)
+        raise ValueError("LVPM timed out; installation completion is unknown") from error
     print(result.stdout, flush=True)
     rejected = r"FAILED" if discovery else r"unresolved|FAILED|absent from archive"
     if result.returncode or re.search(rejected, result.stdout, re.IGNORECASE):
@@ -387,6 +394,13 @@ def cached_archives(cache, packages, destination, labview_version=None):
         specifications[name] = spec
         children = spec.get("Files", "Sub-Packages", fallback="").strip('"')
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            required_hooks = [hook for hook in ("PreInstall", "PostInstall")
+                              if spec.get("Script VIs", hook, fallback="").strip('"').strip()]
+            for hook in required_hooks:
+                matches = [entry for entry in archive.infolist() if entry.filename == hook + ".vi"]
+                if len(matches) != 1 or not 0 < matches[0].file_size <= MAX_SPEC:
+                    raise ValueError(f"Missing, ambiguous, or oversized declared install hook: {name}: {hook}")
+            originals[name]["required_install_hooks"] = required_hooks
             for child in filter(None, (part.strip() for part in children.split(","))):
                 if not re.fullmatch(rf"{NAME}-{VERSION}", child):
                     raise ValueError(f"Unsupported embedded package declaration: {child}")
@@ -438,16 +452,25 @@ def verify_inventory(plan, records, installed):
     for path in installed.glob("*.json"):
         package = json.loads(path.read_text())
         name = package.get("name", "").lower()
-        if name not in expected:
+        if name not in expected or name in actual:
             raise ValueError(f"Unexpected package installed: {name}")
+        target = package.get("target", "")
+        if plan.get("labview_target") and target != plan["labview_target"]:
+            raise ValueError(f"Installed LabVIEW target mismatch: {name}")
         if package.get("version") != expected[name]["version"]:
             raise ValueError(f"Installed version mismatch: {name}")
         files = package.get("files")
         if not isinstance(files, list) or not files or not all(Path(file).is_file() for file in files):
             raise ValueError(f"Required installed files are missing: {name}")
-        if package.get("skipped_hooks") or package.get("skipped_groups") or not package.get("relinked"):
+        if (package.get("skipped_hooks") != [] or package.get("skipped_groups") != []
+            or package.get("relinked") is not True):
             raise ValueError(f"Package hooks, groups, or relinking are incomplete: {name}")
-        actual[name] = {**expected[name], "files": files}
+        for hook in expected[name].get("required_install_hooks", []):
+            field = {"PreInstall": "pre_install_vi", "PostInstall": "post_install_vi"}[hook]
+            extracted = package.get(field)
+            if not isinstance(extracted, str) or not Path(extracted).is_absolute() or not Path(extracted).is_file():
+                raise ValueError(f"Declared install hook was not extracted: {name}: {hook}")
+        actual[name] = {**expected[name], "files": files, "target": target}
     if actual.keys() != expected.keys():
         raise ValueError("The installed inventory does not match the resolved dependency closure")
     for package in plan["requirements"]:
@@ -470,14 +493,18 @@ def install(plan_path, output):
         raise ValueError("Unrecognized or modified dependency plan")
     plan["requirements_fingerprint"] = fingerprint
     output.mkdir(parents=True, exist_ok=True)
+    (output / "inventory.json").unlink(missing_ok=True)
     environment = {**os.environ, "LV_RTE_HEADLESS": "1", "LVPM_CONFIG_CACHE": str(output / "cache")}
     initial = output / "lvpm.toml"
     initial.write_text(manifest_text(plan["requirements"]))
     flags = ["--global", "--labview-version", plan["labview_version"]]
     targets = run_lvpm(["targets"], environment)
-    target = re.search(rf'LabVIEW {plan["labview_version"]} \(64-bit\)\s+v(\d+\.\d+)', targets)
+    target = re.search(rf'LabVIEW {plan["labview_version"]} \(64-bit\)\s+v(\d+(?:\.\d+)?)\b', targets)
     if not target:
         raise ValueError("The requested 64-bit LabVIEW target was not detected")
+    detected_version = target[1] if "." in target[1] else target[1] + ".0"
+    if int(detected_version.split(".")[0]) + 2000 != int(plan["labview_version"]):
+        raise ValueError("The detected LabVIEW internal version does not match the requested year")
     roots = run_lvpm([*flags, "install", "--manifest", str(initial), "--no-deps", "--dry-run"], environment, discovery=True)
     root_packages = resolved_packages(roots)
     require_root_pins(root_packages, plan)
@@ -485,7 +512,7 @@ def install(plan_path, output):
     discovered = {package["name"]: package for package in resolved_packages(resolution)}
     discovered.update({package["name"]: package for package in root_packages})
     packages = list(discovered.values())
-    records = cached_archives(output / "cache", packages, output / "packages", target[1])
+    records = cached_archives(output / "cache", packages, output / "packages", detected_version)
     require_root_pins(records, plan)
     frozen = output / "frozen.toml"
     frozen.write_text(manifest_text(records, local=True))
@@ -495,10 +522,12 @@ def install(plan_path, output):
     if {package["name"]: package["version"] for package in resolved_packages(verified)} != expected:
         raise ValueError("The local install plan does not match the complete verified package closure")
     run_lvpm([*flags, "install", "--manifest", str(frozen), "--no-deps", "--hooks", "--relink"], environment)
-    inventory = verify_inventory(plan, records, Path(f'/var/lib/lvpm/LabVIEW-{plan["labview_version"]}-64bit/installed'))
+    installed_plan = {**plan, "labview_target": target[0]}
+    inventory = verify_inventory(installed_plan, records, Path(f'/var/lib/lvpm/LabVIEW-{plan["labview_version"]}-64bit/installed'))
     report = {"schema": 1, "installer": "lvpm", "tool_revision": TOOL_REVISION,
               "platform": "linux", "architecture": architecture,
               "requirements_fingerprint": fingerprint, "labview_version": plan["labview_version"],
+              "labview_target": target[0], "labview_internal_version": detected_version,
               "packages": inventory, "verification": {"status": "passed", "scope": "package-files",
               "activity_checks": "not_run", "hook_error_output": "not_observable_by_upstream"}}
     (output / "inventory.json").write_text(json.dumps(report, indent=2) + "\n")

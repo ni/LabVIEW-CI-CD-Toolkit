@@ -8,7 +8,7 @@
 # with no separate image to build -- a client just copies this worker.
 # =============================================================================
 
-ARG VIPM_DEB_URL=https://traffic.libsyn.com/secure/jkinc/vipm_26.3.0-3954_amd64.deb
+ARG VIPM_DEB_URL=https://traffic.libsyn.com/secure/jkinc/vipm_26.3.2-4056_amd64.deb
 ARG LV_CONTAINER_TAG=2026q1patch2-linux
 
 # ---- build stage: compile the VI Browser render engine (lvctl + runner) ---
@@ -41,13 +41,14 @@ ARG CI_WORKER_VERSION=dev
 ARG LABVIEW_VERSION=2026
 
 COPY .github/labview/vipm/install-vipc-linux.sh /opt/lvci/vipm/install-vipc-linux.sh
+COPY .github/labview/vipm/linux-worker.py /opt/lvci/vipm/linux-worker.py
 COPY .github/labview/vipm/ /opt/lvci/vipc/
 
 RUN set -eux; \
       chmod +x /opt/lvci/vipm/install-vipc-linux.sh; \
       export DEBIAN_FRONTEND=noninteractive; \
       apt-get update; \
-                  apt-get install -y --no-install-recommends ca-certificates curl unzip xvfb \
+                  apt-get install -y --no-install-recommends ca-certificates curl unzip xvfb python3 \
         fonts-dejavu-core fonts-liberation fonts-noto-core xfonts-base xfonts-75dpi xfonts-100dpi fontconfig; \
       fc-cache -f >/dev/null 2>&1 || true; \
       curl -fL --retry 3 --retry-delay 2 -o /tmp/vipm.deb "${VIPM_DEB_URL}"; \

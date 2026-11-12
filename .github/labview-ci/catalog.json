@@ -4726,6 +4726,7 @@
           ".github/docker/labview-ci-linux.Dockerfile",
           ".github/docker/labview-ci-lvpm.Dockerfile",
           ".github/labview/vipm/install-vipc-linux.sh",
+          ".github/labview/vipm/linux-worker.py",
           ".github/labview/vipm/ci-tooling.vipc",
           ".github/labview/toimages/"
         ]

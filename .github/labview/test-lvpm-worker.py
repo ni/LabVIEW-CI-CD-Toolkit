@@ -46,6 +46,7 @@ class WorkerTests(unittest.TestCase):
                          "repository": self.repository, "tool_revision": worker.TOOL_REVISION,
                          "manifest_path": f"workers/linux-lvpm/{self.tag}/manifest.json",
                          "requirements_fingerprint": self.fingerprint, "labview_version": "2026",
+                         "labview_target": "LabVIEW 2026 (64-bit)  v26", "labview_internal_version": "26.0",
                          "image_digest": self.digest,
                          "image_ref": f"ghcr.io/example/project-labview:{self.selection}",
                          "base_image": f"nationalinstruments/labview:2026q3-linux@{self.base_digest}",
@@ -53,6 +54,7 @@ class WorkerTests(unittest.TestCase):
                          "verification": {"status": "passed", "scope": "package-files", "activity_checks": "not_run",
                                           "hook_error_output": "not_observable_by_upstream"},
                          "packages": [{"name": "example", "version": "1.2.3", "sha256": "e" * 64,
+                                       "target": "LabVIEW 2026 (64-bit)  v26",
                                        "files": ["/usr/local/natinst/LabVIEW-2026/vi.lib/example.vi"]}],
                          "workflow_run": {"id": 123, "attempt": 1, "head_sha": "f" * 40,
                                           "workflow_path": worker.WORKFLOW}}
@@ -322,6 +324,86 @@ class WorkerTests(unittest.TestCase):
 
 
 class NetworkAndWorkflowTests(unittest.TestCase):
+    def test_native_linux_installer_is_targeted_and_fails_closed(self):
+        script = (ROOT / '.github/labview/vipm/install-vipc-linux.sh').read_text()
+        mocks = (
+            "find_vipm() { printf 'vipm\\n'; }\n"
+            "setup_display() { :; }\n"
+            "start_labview() { LABVIEW_PID=$$; }\n"
+            "kill() { if [ \"$EXIT_DURING_REFRESH\" = 1 ] && [ -f \"$CALLS.refresh\" ]; then return 1; fi; builtin kill \"$@\"; }\n"
+            "vipc_package_specs() { printf 'some_lib-1.1-1\\n'; }\n"
+            "timeout() { printf '%s\\n' \"$*\" >> \"$CALLS\"; shift 2; \"$@\"; }\n"
+            "vipm() { case \" $* \" in\n"
+            "*' refresh '*) : > \"$CALLS.refresh\" ;;\n"
+            "*' install '*) return \"$INSTALL_EXIT\" ;;\n"
+            "*' list '*) printf '%s\\n' \"$INSTALLED_INVENTORY\"; return \"$LIST_EXIT\" ;;\n"
+            "*) return 0 ;; esac; }\n")
+        script = script.replace('VIPM_BIN="$(find_vipm || true)"', mocks + '\nVIPM_BIN="$(find_vipm || true)"')
+        inventory = 'Using LabVIEW 2026 (64-bit)\nsome_lib v1.1-1'
+        cases = (
+            ('0', '0', '0', inventory, True),
+            ('2', '0', '0', inventory, False),
+            ('0', '1', '0', inventory, False),
+            ('0', '0', '1', inventory, True),
+            ('2', '0', '1', inventory, False),
+            ('0', '1', '1', inventory, False),
+            ('0', '0', '1', '', False),
+            ('0', '0', '1', inventory.replace('1.1-1', '1.1-2'), False),
+            ('0', '0', '1', inventory.replace('some_lib v1.1-1', 'other_lib v1.1-1'), False),
+            ('0', '0', '1', inventory.replace('2026', '2025'), False),
+            ('0', '0', '1', inventory.replace('64-bit', '32-bit'), False),
+        )
+        for install_exit, list_exit, exit_during_refresh, installed_inventory, success in cases:
+            with self.subTest(install=install_exit, inventory=list_exit, exited=exit_during_refresh,
+                              installed=installed_inventory), tempfile.TemporaryDirectory() as temporary:
+                repo = Path(temporary)
+                import zipfile
+                with zipfile.ZipFile(repo / 'project-deps.vipc', 'w') as archive:
+                    archive.writestr('config.xml', '<Root><Package><Name>some_lib-1.1-1</Name></Package></Root>')
+                evidence = repo / 'evidence'
+                result = subprocess.run(['bash', '-c', script, str(ROOT / '.github/labview/vipm/install-vipc-linux.sh')], env={**os.environ,
+                    'VIPC_DIR': str(repo), 'INVENTORY_DIR': str(evidence), 'CALLS': str(repo / 'calls'),
+                    'INSTALL_EXIT': install_exit, 'LIST_EXIT': list_exit, 'LABVIEW_VERSION': '2026',
+                    'EXIT_DURING_REFRESH': exit_during_refresh, 'INSTALLED_INVENTORY': installed_inventory,
+                    'VIPM_SERIAL_NUMBER': '', 'LV_RTE_HEADLESS': '1'}, capture_output=True, text=True)
+                self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
+                calls = (repo / 'calls').read_text()
+                self.assertIn('--kill-after=30s 1200s vipm', calls)
+                self.assertIn('--labview-version 2026 --labview-bitness 64 install some_lib@1.1-1', calls)
+                self.assertEqual(calls.count(' install '), 1)
+                self.assertEqual((evidence / 'observed-inventory.json').exists(), install_exit == '0')
+                if install_exit == '0':
+                    self.assertIn('--labview-version 2026 --labview-bitness 64 list --installed', calls)
+                    self.assertEqual('Initial LabVIEW process exited' in result.stdout, exit_during_refresh == '1')
+                else:
+                    self.assertNotIn(' list ', calls)
+                if success:
+                    self.assertIn('--labview-version 2026 --labview-bitness 64 list --installed', calls)
+                    observed = json.loads((evidence / 'observed-inventory.json').read_text())
+                    self.assertTrue(observed['target_verified'])
+                    self.assertTrue(observed['required_project'])
+                    self.assertEqual(observed['packages'], [{'name': 'some_lib', 'version': '1.1-1'}])
+
+    def test_linux_gate_executes_nested_monitor_configuration(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/build-labview-linux-image.yml').read_text())
+        step = next(step for step in workflow['jobs']['gate']['steps'] if step.get('id') == 'decide')
+        script = step['run'].split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
+        prefix = ("import subprocess\nfrom types import SimpleNamespace\n"
+                  "subprocess.run=lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout='Deps.vipc\\n')\n")
+        for platforms, enabled, expected in ((['linux'], True, 'true'), ('windows+linux', True, 'true'),
+                                              (['windows'], True, 'false'), (['linux'], False, 'false')):
+            with self.subTest(platforms=platforms, enabled=enabled), tempfile.TemporaryDirectory() as temporary:
+                repo = Path(temporary)
+                (repo / '.github').mkdir()
+                (repo / '.github/labview-ci.yml').write_text(yaml.safe_dump({'config': {'container': {'vipc': [
+                    {'path': 'Deps.vipc', 'monitor': enabled, 'monitorOn': platforms}]}}}))
+                output = repo / 'output'
+                result = subprocess.run([sys.executable, '-c', prefix + script], cwd=repo,
+                    env={**os.environ, 'EVENT_NAME': 'push', 'BEFORE': 'a' * 40, 'SHA': 'b' * 40,
+                         'GITHUB_OUTPUT': str(output)}, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(output.read_text(), f'build={expected}\n', result.stdout)
+
     def test_local_cli_treats_client_helpers_as_data_not_executable_code(self):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
@@ -341,9 +423,11 @@ class NetworkAndWorkflowTests(unittest.TestCase):
             selection = f'linux-lvpm-{"a" * 64}@sha256:{"b" * 64}'
             manifest = {'schema': 1, 'installer': 'lvpm', 'platform': 'linux', 'architecture': 'amd64',
                 'tool_revision': worker.TOOL_REVISION, 'tag': selection.split('@')[0], 'image_digest': selection.split('@')[1],
-                'labview_version': '2026', 'requirements_fingerprint': plan['requirements_fingerprint'],
+                'labview_version': '2026', 'labview_target': 'LabVIEW 2026 (64-bit)  v26',
+                'labview_internal_version': '26.0', 'requirements_fingerprint': plan['requirements_fingerprint'],
                 'build_inputs_sha256': worker.build_inputs_hash(repo), 'packages': [
-                    {'name': 'core_lib', 'version': '1.0.0', 'sha256': 'c' * 64, 'files': ['/example/library.vi']}],
+                    {'name': 'core_lib', 'version': '1.0.0', 'sha256': 'c' * 64, 'files': ['/example/library.vi'],
+                     'target': 'LabVIEW 2026 (64-bit)  v26'}],
                 'verification': {'status': 'passed', 'scope': 'package-files', 'activity_checks': 'not_run',
                                  'hook_error_output': 'not_observable_by_upstream'}}
             shadow_marker = repo / 'shadow-executed'
@@ -479,10 +563,30 @@ class NetworkAndWorkflowTests(unittest.TestCase):
                 for job in workflow['jobs'].values():
                     for step in job['steps']:
                         if step.get('uses', '').startswith('actions/checkout@'):
-                            self.assertEqual(step['with']['ref'], '${{ github.sha }}')
+                            if step.get('name') == 'Checkout selected dependency revision':
+                                self.assertEqual(step['with']['ref'], '${{ inputs.dependency_sha || github.sha }}')
+                                self.assertIn(step['with']['path'], ('ci-out/linux-source', 'ci-out/lvpm-source'))
+                                self.assertEqual(step['with']['persist-credentials'], 'false')
+                            else:
+                                self.assertEqual(step['with']['ref'], '${{ github.sha }}')
                 if first_job == 'gate':
                     self.assertEqual(workflow['jobs']['build-and-push']['needs'], 'gate')
                     self.assertEqual(workflow['jobs']['build-and-push']['if'], "needs.gate.outputs.build == 'true'")
+
+    def test_selected_dependency_revision_requires_full_committed_ancestor(self):
+        head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        previous = subprocess.check_output(['git', 'rev-parse', 'HEAD^'], cwd=ROOT, text=True).strip()
+        for filename, job in (("build-labview-lvpm-image.yml", "candidate"),
+                              ("build-labview-linux-image.yml", "gate")):
+            workflow = yaml.safe_load((ROOT / '.github/workflows' / filename).read_text())
+            step = next(step for step in workflow['jobs'][job]['steps']
+                        if step.get('name') == 'Validate selected dependency revision')
+            for revision, expected in ((head, 0), (previous, 0), ('f' * 40, 1), ('abc123', 1), ('$(id)', 1)):
+                with self.subTest(workflow=filename, revision=revision):
+                    result = subprocess.run(['bash', '-e', '-c', step['run']], cwd=ROOT,
+                        env={**os.environ, 'DEPENDENCY_SHA': revision, 'GITHUB_SHA': head},
+                        capture_output=True, text=True)
+                    self.assertEqual(result.returncode == 0, expected == 0, result.stderr)
 
     def test_actual_linux_sha_guard_accepts_matching_and_legacy_empty_inputs(self):
         for filename, job in (("build-labview-lvpm-image.yml", "candidate"),
@@ -528,7 +632,7 @@ class NetworkAndWorkflowTests(unittest.TestCase):
         self.assertIn('node .github/labview/test-lvpm-ux.mjs', commands)
 
     def test_all_owned_workflows_parse_and_embedded_scripts_compile(self):
-        for name in ("build-labview-lvpm-image.yml", "masscompile-linux-container.yml", "run-vi-analyzer-linux-container.yml",
+        for name in ("build-labview-lvpm-image.yml", "build-labview-linux-image.yml", "masscompile-linux-container.yml", "run-vi-analyzer-linux-container.yml",
                      "vidiff-linux-container.yml", "build-binaries-linux-container.yml", "vi-snapshots-json.yml"):
             with self.subTest(workflow=name):
                 data = yaml.safe_load((ROOT / ".github/workflows" / name).read_text())

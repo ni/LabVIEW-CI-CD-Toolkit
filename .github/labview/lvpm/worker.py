@@ -83,6 +83,12 @@ def verify_image_platform(image, inventory):
 
 
 def verify_packages(manifest, plan):
+    target = manifest.get("labview_target")
+    match = re.fullmatch(r"LabVIEW (20\d{2}) \(64-bit\)\s+v(\d+(?:\.\d+)?)", str(target))
+    if (not match or match[1] != plan.get("labview_version")
+            or int(match[2].split(".")[0]) + 2000 != int(match[1])
+            or manifest.get("labview_internal_version") != (match[2] if "." in match[2] else match[2] + ".0")):
+        raise ValueError("Candidate has no captured matching 64-bit LabVIEW target")
     packages = manifest.get("packages")
     if not isinstance(packages, list) or not packages:
         raise ValueError("Candidate has no package inventory")
@@ -96,6 +102,7 @@ def verify_packages(manifest, plan):
                 or name in installed or not isinstance(version, str) or not version
                 or not re.fullmatch(r"[0-9a-f]{64}", str(package.get("sha256", "")))
                 or not isinstance(files, list) or not files
+                or package.get("target") != target
                 or not all(isinstance(path, str) and path.startswith("/") and ".." not in Path(path).parts
                            for path in files)):
             raise ValueError("Invalid candidate package version, archive hash, or installed file inventory")
@@ -134,7 +141,7 @@ def github_json(endpoint):
         raise ValueError("Authenticated GitHub API access requires GH_TOKEN or GITHUB_TOKEN")
     result = subprocess.run(
         ["gh", "api", "--hostname", "github.com", "-H", "Accept: application/vnd.github+json", endpoint],
-        check=True, capture_output=True, text=True,
+        check=True, capture_output=True, text=True, timeout=60,
     )
     return json.loads(result.stdout)
 

@@ -15,7 +15,7 @@ inputs:
     description: Existing workspace-relative flat directory of .vipc/.dragon declarations and referenced .vip payloads.
     default: ''
   include-ci-tooling:
-    description: Include the current source ci-tooling.vipc and required unit-test essentials; optional framework packages retain source best-effort semantics.
+    description: Include the current source ci-tooling.vipc and required unit-test essentials; the final inventory must satisfy every effective selected tooling and project requirement.
     default: 'true'
   tag-latest:
     description: Also move the latest worker tag after verifying the immutable image.
