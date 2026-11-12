@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mass Compile (Linux) — LabVIEW-CI-with-Containers</title>
+<script>window.LVCI={context:'masscompile-report',repo:'ni/LabVIEW-CI-CD-Toolkit',pagesUrl:'../../..',sha:'d0e080c128589707c82a13a45d842952fb3a5fc8',short:'d0e080c',platform:'linux',rawUrl:'masscompile.log'};</script>
+<script src="../../../lvci-header.js" defer></script>
+<style>body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d1117;color:#e6edf3}
+.wrap{max-width:1180px;margin:0 auto;padding:20px}
+pre{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:14px;font-size:.75em;white-space:pre-wrap;word-break:break-all}</style>
+</head><body><div class="wrap"><h1>Mass Compile (Linux)</h1><pre>LabVIEWCLI started logging in file:  /tmp/lvtemporary_579847.log
+Using LabVIEW: "/usr/local/natinst/LabVIEW-2026-64/labviewprofull"
+LabVIEW launched successfully.
+Connection established with LabVIEW at port number 3363.
+
+Operation output: 
+#### Starting Mass Compile: Thu, Nov 12, 2026 05:02:32 PM
+  Directory: "/workspace"
+/workspace/.github/labview/PrintToSingleFileHtml/PrintToSingleFileHtml.lvclass (PrintToSingleFileHtml.lvclass)
+    - The class expected to be at "/workspace/.github/labview/CoreOperation/CoreOperation.lvclass" was loaded from "/usr/local/natinst/share/nilvcli/Operations/CoreOperation/CoreOperation.lvclass".
+Search failed to find "LV AI Core.lvlib:XML generator.vi" previously from "/workspace/.github/labview/toimages/_ni/labview/lvctl/vis/LV AI Core/XML generator.vi"  +=+   Caller: "VI to XML.vi"
+  ### Bad VI:    "VI to XML.vi"	Path="/workspace/.github/labview/toimages/_ni/labview/lvctl/vis/VI to XML.vi" 
+Search failed to find "LV AI Core.lvlib:VI generator.vi" previously from "/workspace/.github/labview/toimages/_ni/labview/lvctl/vis/LV AI Core/VI generator.vi"  +=+   Caller: "XML to VI.vi"
+  ### Bad VI:    "XML to VI.vi"	Path="/workspace/.github/labview/toimages/_ni/labview/lvctl/vis/XML to VI.vi" 
+Search failed to find "NI_UnitTestFramework.lvlib:Create Report.vi" previously from "/&lt;vilib&gt;/utf/Create Report.vi"  +=+   Caller: "Run UTF Tests.vi"
+Search failed to find "NI_UnitTestFramework.lvlib:Run Tests from Project.vi" previously from "/&lt;vilib&gt;/utf/Run Tests from Project.vi"  +=+   Caller: "Run UTF Tests.vi"
+Search failed to find "NI_UnitTestFramework.lvlib:utf_testsuite_report_type.ctl" previously from "/&lt;vilib&gt;/utf/dialogs/utf_testsuite_report_type.ctl"  +=+   Caller: "Run UTF Tests.vi"
+  ### Bad VI:    "Run UTF Tests.vi"	Path="/workspace/.github/utf/Run UTF Tests.vi" 
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/Append log.vi) because (/workspace/.github/labview/PrintToSingleFileHtml/Append log.vi) in memory
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/Create output file.vi) because (/workspace/.github/labview/PrintToSingleFileHtml/Create output file.vi) in memory
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/GetHelp.vi) because (/workspace/.github/labview/PrintToSingleFileHtml/GetHelp.vi) in memory
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/Make path absolute.vi) because (/workspace/.github/labview/PrintToSingleFileHtml/Make path absolute.vi) in memory
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/Open VI.vi) because (/workspace/.github/labview/PrintToSingleFileHtml/Open VI.vi) in memory
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/Parse inputs.vi) because (/workspace/.github/labview/PrintToSingleFileHtml/Parse inputs.vi) in memory
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/Print to temp file.vi) because (/workspace/.github/labview/PrintToSingleFileHtml/Print to temp file.vi) in memory
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/PrintToSingleFileHtml.lvclass) because (/workspace/.github/labview/PrintToSingleFileHtml/PrintToSingleFileHtml.lvclass) in memory
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/RunOperation.vi) because (/workspace/.github/labview/PrintToSingleFileHtml/RunOperation.vi) in memory
+Could not load (/workspace/actions/vidiff/PrintToSingleFileHtml/base64_fast_encode.vi) because (/workspace/.github/labview/PrintToSingleFileHtml/base64_fast_encode.vi) in memory
+  ### Bad VI:    "Revidyne Generator.lvlib:VI Tree.vi"	Path="/workspace/example/Curriculum/Generator API/subVIs/Public/VI Tree.vi" 
+Search failed to find "NI_UnitTestFramework.lvlib:utf_test_result_troll.ctl" previously from "/&lt;vilib&gt;/utf/common/utf_test_result_troll.ctl"  +=+   Caller: "User-Defined Test Advanced.vi"
+Search failed to find "NI_UnitTestFramework.lvlib:utf_test_result_failure.ctl" previously from "/&lt;vilib&gt;/utf/common/utf_test_result_failure.ctl"  +=+   Caller: "User-Defined Test Advanced.vi"
+Search failed to find "NI_UnitTestFramework.lvlib:utf_test_comparison_operators.ctl" previously from "/&lt;vilib&gt;/utf/common/utf_test_comparison_operators.ctl"  +=+   Caller: "User-Defined Test Advanced.vi"
+Search failed to find "NI_UnitTestFramework.lvlib:utf_test_result.ctl" previously from "/&lt;vilib&gt;/utf/common/utf_test_result.ctl"  +=+   Caller: "User-Defined Test Advanced.vi"
+  ### Bad VI:    "User-Defined Test Advanced.vi"	Path="/workspace/example/User-Defined Test/User-Defined Test Advanced.vi" 
+  ### Bad VI:    "User-Defined Test Basic.vi"	Path="/workspace/example/User-Defined Test/User-Defined Test Basic.vi" 
+#### Finished Mass Compile: Thu, Nov 12, 2026 05:02:40 PM
+
+MassCompile operation failed.</pre></div></body></html>
