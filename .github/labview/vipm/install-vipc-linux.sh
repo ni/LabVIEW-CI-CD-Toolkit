@@ -183,7 +183,9 @@ for vipc_file in "${vipc_files[@]}"; do
   exit "$install_result"
 done
 
-kill -0 "$LABVIEW_PID" 2>/dev/null || { echo "LabVIEW exited during dependency installation." >&2; exit 1; }
+if ! kill -0 "$LABVIEW_PID" 2>/dev/null; then
+  echo "Initial LabVIEW process exited; verifying installed packages for LabVIEW ${LABVIEW_VERSION} (64-bit)."
+fi
 mkdir -p "$INVENTORY_DIR"
 inventory_args=(--vipc-dir "$VIPC_DIR")
 for vipc_file in "${vipc_files[@]}"; do

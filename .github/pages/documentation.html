@@ -1379,6 +1379,11 @@ docker run --rm `
         hashes, build logs and installed-inventory evidence as artifacts. The jobs have read-only repository/package
         permissions and never publish images, active aliases or Pages pointers. A passed native build verifies the
         selected fixture and recorded scope, not every project or LabVIEW activity; failures retain diagnostic artifacts.</p>
+      <p>The fresh Windows container creates a genuine public Git checkout at the exact candidate commit before
+        invoking VIPM Community Edition, verifies the staged VIPC hash, and deletes the baked inventory before
+        querying again. Linux installation does not treat the original LabVIEW process exiting as proof of failure:
+        after successful install commands, target-bound inventory must still verify every required exact package pin.
+        Failed queries, missing packages, wrong versions and wrong LabVIEW targets remain fatal.</p>
       <p class="lead-in">This section is the single hardest part of the whole stack, and it is documented in detail
         precisely because it was painful to get right. If you ever fork the worker build or debug a baking failure,
         read it carefully — every numbered point below is a real problem that was hit and solved.</p>

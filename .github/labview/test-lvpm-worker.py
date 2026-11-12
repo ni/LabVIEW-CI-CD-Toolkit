@@ -330,15 +330,32 @@ class NetworkAndWorkflowTests(unittest.TestCase):
             "find_vipm() { printf 'vipm\\n'; }\n"
             "setup_display() { :; }\n"
             "start_labview() { LABVIEW_PID=$$; }\n"
+            "kill() { if [ \"$EXIT_DURING_REFRESH\" = 1 ] && [ -f \"$CALLS.refresh\" ]; then return 1; fi; builtin kill \"$@\"; }\n"
             "vipc_package_specs() { printf 'some_lib-1.1-1\\n'; }\n"
             "timeout() { printf '%s\\n' \"$*\" >> \"$CALLS\"; shift 2; \"$@\"; }\n"
             "vipm() { case \" $* \" in\n"
+            "*' refresh '*) : > \"$CALLS.refresh\" ;;\n"
             "*' install '*) return \"$INSTALL_EXIT\" ;;\n"
-            "*' list '*) printf 'Using LabVIEW 2026 (64-bit)\\nsome_lib v1.1-1\\n'; return \"$LIST_EXIT\" ;;\n"
+            "*' list '*) printf '%s\\n' \"$INSTALLED_INVENTORY\"; return \"$LIST_EXIT\" ;;\n"
             "*) return 0 ;; esac; }\n")
         script = script.replace('VIPM_BIN="$(find_vipm || true)"', mocks + '\nVIPM_BIN="$(find_vipm || true)"')
-        for install_exit, list_exit, success in (('0', '0', True), ('2', '0', False), ('0', '1', False)):
-            with self.subTest(install=install_exit, inventory=list_exit), tempfile.TemporaryDirectory() as temporary:
+        inventory = 'Using LabVIEW 2026 (64-bit)\nsome_lib v1.1-1'
+        cases = (
+            ('0', '0', '0', inventory, True),
+            ('2', '0', '0', inventory, False),
+            ('0', '1', '0', inventory, False),
+            ('0', '0', '1', inventory, True),
+            ('2', '0', '1', inventory, False),
+            ('0', '1', '1', inventory, False),
+            ('0', '0', '1', '', False),
+            ('0', '0', '1', inventory.replace('1.1-1', '1.1-2'), False),
+            ('0', '0', '1', inventory.replace('some_lib v1.1-1', 'other_lib v1.1-1'), False),
+            ('0', '0', '1', inventory.replace('2026', '2025'), False),
+            ('0', '0', '1', inventory.replace('64-bit', '32-bit'), False),
+        )
+        for install_exit, list_exit, exit_during_refresh, installed_inventory, success in cases:
+            with self.subTest(install=install_exit, inventory=list_exit, exited=exit_during_refresh,
+                              installed=installed_inventory), tempfile.TemporaryDirectory() as temporary:
                 repo = Path(temporary)
                 import zipfile
                 with zipfile.ZipFile(repo / 'project-deps.vipc', 'w') as archive:
@@ -347,6 +364,7 @@ class NetworkAndWorkflowTests(unittest.TestCase):
                 result = subprocess.run(['bash', '-c', script, str(ROOT / '.github/labview/vipm/install-vipc-linux.sh')], env={**os.environ,
                     'VIPC_DIR': str(repo), 'INVENTORY_DIR': str(evidence), 'CALLS': str(repo / 'calls'),
                     'INSTALL_EXIT': install_exit, 'LIST_EXIT': list_exit, 'LABVIEW_VERSION': '2026',
+                    'EXIT_DURING_REFRESH': exit_during_refresh, 'INSTALLED_INVENTORY': installed_inventory,
                     'VIPM_SERIAL_NUMBER': '', 'LV_RTE_HEADLESS': '1'}, capture_output=True, text=True)
                 self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
                 calls = (repo / 'calls').read_text()
@@ -354,6 +372,11 @@ class NetworkAndWorkflowTests(unittest.TestCase):
                 self.assertIn('--labview-version 2026 --labview-bitness 64 install some_lib@1.1-1', calls)
                 self.assertEqual(calls.count(' install '), 1)
                 self.assertEqual((evidence / 'observed-inventory.json').exists(), install_exit == '0')
+                if install_exit == '0':
+                    self.assertIn('--labview-version 2026 --labview-bitness 64 list --installed', calls)
+                    self.assertEqual('Initial LabVIEW process exited' in result.stdout, exit_during_refresh == '1')
+                else:
+                    self.assertNotIn(' list ', calls)
                 if success:
                     self.assertIn('--labview-version 2026 --labview-bitness 64 list --installed', calls)
                     observed = json.loads((evidence / 'observed-inventory.json').read_text())

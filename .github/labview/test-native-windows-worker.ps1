@@ -112,7 +112,8 @@ config:
     $installerAst = [System.Management.Automation.Language.Parser]::ParseFile("$vipm/install-vipc.ps1", [ref]$null, [ref]$parseErrors)
     if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
     $functionNames = @('Get-VipcPackageSpecs', 'Split-VipmPackageSpec', 'Find-VipmExecutable',
-        'Test-VipmSpecsInstalled', 'Test-VipmPackageVersion', 'Get-NumericVersionKey', 'Assert-FinalWindowsProjectInventory')
+        'Test-VipmSpecsInstalled', 'Test-VipmPackageVersion', 'Get-NumericVersionKey', 'Assert-FinalWindowsProjectInventory',
+        'New-PublicRepoWorkdir')
     $functions = @($installerAst.FindAll({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in $functionNames
@@ -140,6 +141,65 @@ config:
     $inventoryPath = Join-Path $OutputDirectory 'observed-inventory.json'
     $baseImage = $env:WINDOWS_BASE_IMAGE
     $seedDigest = ''
+    $runtimeCode = ($functions | ForEach-Object { $_.Extent.Text }) -join "`n"
+    $runtimeCode += @'
+
+$ErrorActionPreference = 'Stop'
+$LabVIEWVersion = '2026'
+$LabVIEWBitness = '64'
+$GlobalFlags = @('--labview-version', '2026', '--labview-bitness', '64')
+$VipcDir = 'C:\vipm'
+$VipmExe = Find-VipmExecutable -Kind CLI
+if (-not $VipmExe) { throw 'Installed VIPM CLI not found.' }
+Write-Host "Runtime CLI: $VipmExe"
+$env:VIPM_COMMUNITY_EDITION = 'true'
+$env:VIPM_NONINTERACTIVE = '1'
+$env:VIPM_ASSUME_YES = '1'
+$env:NO_COLOR = '1'
+foreach ($gitDir in @('C:\git\cmd', 'C:\Program Files\Git\cmd')) {
+    if ((Test-Path (Join-Path $gitDir 'git.exe')) -and ($Env:Path -notlike "*$gitDir*")) {
+        $Env:Path = "$gitDir;$Env:Path"
+    }
+}
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'Real Git is required for runtime validation.' }
+if ($env:VIPM_PUBLIC_REPO_URL -cne 'https://github.com/ni/LabVIEW-CI-CD-Toolkit.git' -or
+    $env:VIPM_PUBLIC_REPO_COMMIT -notmatch '^[a-f0-9]{40}$') { throw 'Expected public source URL and exact candidate commit.' }
+$previousLocation = Get-Location
+$installWorkdir = $null
+Remove-Item -LiteralPath "$VipcDir/observed-inventory.json" -Force -ErrorAction Stop
+try {
+    $installWorkdir = New-PublicRepoWorkdir $env:VIPM_PUBLIC_REPO_URL
+    Set-Location $installWorkdir
+    $head = & git rev-parse --verify HEAD 2>&1
+    if ($LASTEXITCODE -ne 0) { throw 'Public repository bootstrap did not produce a genuine commit.' }
+    $origin = & git remote get-url origin
+    if ($LASTEXITCODE -ne 0 -or "$origin".Trim() -cne $env:VIPM_PUBLIC_REPO_URL) { throw 'Unexpected public origin.' }
+    & git fetch --depth 1 origin $env:VIPM_PUBLIC_REPO_COMMIT
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch the exact public candidate commit.' }
+    & git checkout --detach FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot check out the exact public candidate commit.' }
+    $head = & git rev-parse --verify HEAD
+    if ($LASTEXITCODE -ne 0 -or "$head".Trim() -cne $env:VIPM_PUBLIC_REPO_COMMIT) { throw 'Public context commit mismatch.' }
+    if ((Get-FileHash 'example/Dependencies.vipc').Hash -cne (Get-FileHash "$VipcDir/Dependencies.vipc").Hash) {
+        throw 'Public checkout does not contain the trusted staged dependency fixture.'
+    }
+    Write-Host "Runtime public context: $origin at $head"
+    Assert-FinalWindowsProjectInventory -VipcFiles @(Get-Item "$VipcDir/Dependencies.vipc") -DragonSpecs @()
+} finally {
+    $script:LastVipmInventoryRaw | Set-Content -LiteralPath "$VipcDir/runtime-inventory-raw.txt" -Encoding UTF8
+    Set-Location $previousLocation
+    if ($installWorkdir) { Remove-Item -LiteralPath $installWorkdir -Recurse -Force }
+}
+'@
+    $runtimePath = Join-Path $OutputDirectory 'native-runtime.ps1'
+    $runtimeCode | Set-Content -LiteralPath $runtimePath -Encoding utf8NoBOM
+    $runtimeErrors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile($runtimePath, [ref]$null, [ref]$runtimeErrors)
+    if ($runtimeErrors.Count) { throw ($runtimeErrors | Out-String) }
+    $publicEnvironment = @('--env', 'VIPM_PUBLIC_REPO_URL=https://github.com/ni/LabVIEW-CI-CD-Toolkit.git',
+        '--env', "VIPM_PUBLIC_REPO_COMMIT=$sha", '--env', 'CI=true', '--env', 'GITHUB_ACTIONS=true',
+        '--env', 'GITHUB_SERVER_URL=https://github.com', '--env', 'GITHUB_REPOSITORY=ni/LabVIEW-CI-CD-Toolkit',
+        '--env', 'GITHUB_REPOSITORY_OWNER=ni')
     if ($FixtureOnly) {
         $packages = @($specs | ForEach-Object {
             $request = Split-VipmPackageSpec $_
@@ -211,31 +271,18 @@ config:
         Invoke-Checked docker @('create', '--name', $stopped, $tag, 'cmd', '/c', 'exit', '0')
         Invoke-Checked docker @('cp', "${stopped}:C:/vipm/observed-inventory.json", $inventoryPath)
         Assert-RequiredInventory $inventoryPath $specs
-        $runtimeCode = ($functions | ForEach-Object { $_.Extent.Text }) -join "`n"
-        $runtimeCode += @'
-
-$ErrorActionPreference = 'Stop'
-$LabVIEWVersion = '2026'
-$LabVIEWBitness = '64'
-$GlobalFlags = @('--labview-version', '2026', '--labview-bitness', '64')
-$VipcDir = 'C:\vipm'
-$VipmExe = Find-VipmExecutable -Kind CLI
-if (-not $VipmExe) { throw 'Installed VIPM CLI not found.' }
-Write-Host "Runtime CLI: $VipmExe"
-$env:VIPM_COMMUNITY_EDITION = 'true'
-$env:NO_COLOR = '1'
-Assert-FinalWindowsProjectInventory -VipcFiles @(Get-Item 'C:\vipm\Dependencies.vipc') -DragonSpecs @()
-'@
-        $runtimePath = Join-Path $context 'native-runtime.ps1'
-        $runtimeCode | Set-Content -LiteralPath $runtimePath -Encoding utf8NoBOM
         $runtime = 'lvci-native-runtime-' + [guid]::NewGuid().ToString('N')
         $containerNames += $runtime
-        Invoke-Checked docker @('create', '--name', $runtime, '--memory', '8g', '--entrypoint', 'powershell',
-            $tag, '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', 'C:/vipm/native-runtime.ps1')
+        Invoke-Checked docker (@('create', '--name', $runtime, '--memory', '8g', '--entrypoint', 'powershell') +
+            $publicEnvironment + @($tag, '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', 'C:/vipm/native-runtime.ps1'))
         Invoke-Checked docker @('cp', $runtimePath, "${runtime}:C:/vipm/native-runtime.ps1")
-        Invoke-Checked docker @('start', '--attach', $runtime) "$OutputDirectory/runtime-vipm.log"
+        & docker start --attach $runtime 2>&1 | Tee-Object -FilePath "$OutputDirectory/runtime-vipm.log" | Out-Host
+        $runtimeStartExit = $LASTEXITCODE
         $runtimeExit = & docker inspect --format '{{.State.ExitCode}}' $runtime
-        if ($LASTEXITCODE -ne 0 -or "$runtimeExit".Trim() -cne '0') { throw "Native runtime exited with $runtimeExit" }
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect native runtime exit code.' }
+        Invoke-Checked docker @('cp', "${runtime}:C:/vipm/runtime-inventory-raw.txt", "$OutputDirectory/runtime-inventory-raw.txt")
+        if ($runtimeStartExit -ne 0) { throw "Native runtime attach failed with exit $runtimeStartExit (container exit $runtimeExit)" }
+        if ("$runtimeExit".Trim() -cne '0') { throw "Native runtime exited with $runtimeExit" }
         $runtimeInventory = Join-Path $OutputDirectory 'runtime-observed-inventory.json'
         Invoke-Checked docker @('cp', "${runtime}:C:/vipm/observed-inventory.json", $runtimeInventory)
         Assert-RequiredInventory $runtimeInventory $specs
