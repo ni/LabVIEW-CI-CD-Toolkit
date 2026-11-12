@@ -270,6 +270,16 @@ try {
         $evidence['seed_digest'] = $seedDigest
         $evidence['pinned_seed'] = $pinnedSeed
         $evidence | ConvertTo-Json -Depth 8 | Set-Content "$OutputDirectory/provenance.json" -Encoding utf8NoBOM
+        # Fail early if the seed lacks required native tooling, before the lengthy VIPM bake.
+        Invoke-Checked docker @('run', '--rm', '--network', 'none', '--entrypoint', 'powershell',
+            $pinnedSeed, '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+            '& nipkg list-installed; exit $LASTEXITCODE') "$OutputDirectory/seed-nipkg-list.txt"
+        $nativePackages = Get-Content "$OutputDirectory/seed-nipkg-list.txt" -Raw
+        foreach ($nativePackage in @('ni-viawin-labview-support', 'ni-utf-labview-support')) {
+            if ($nativePackages -notmatch ('(?m)^\s*' + [regex]::Escape($nativePackage) + '\s+\d')) {
+                throw "Seed lacks installed native package $nativePackage. See seed-nipkg-list.txt."
+            }
+        }
         Invoke-Checked docker @('build', '--no-cache', '--memory', '8g', '--build-arg', "LCWC_BASE_IMAGE=$pinnedSeed",
             '--build-arg', "CI_WORKER_VERSION=$version", '--build-arg', 'LABVIEW_VERSION=2026',
             '--build-arg', 'LABVIEW_BITNESS=64', '--build-arg', 'LVCI_UNIT_TESTS_INSTALLED=true',
@@ -296,6 +306,11 @@ try {
         $runtimeInventory = Join-Path $OutputDirectory 'runtime-observed-inventory.json'
         Invoke-Checked docker @('cp', "${runtime}:C:/vipm/observed-inventory.json", $runtimeInventory)
         Assert-RequiredInventory $runtimeInventory $specs
+        # Capture native packages from the completed image, as production does.
+        # VIPM evidence alone cannot establish NI Analyzer/UTF coverage.
+        Invoke-Checked docker @('run', '--rm', '--network', 'none', '--entrypoint', 'powershell',
+            $tag, '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+            '& nipkg list-installed; exit $LASTEXITCODE') "$OutputDirectory/nipkg-list.txt"
     }
     Assert-RequiredInventory $inventoryPath $specs
     $manifestArguments = @('-I', "$context/.github/labview/build-worker-manifest.py", '--platform', 'windows',
@@ -303,6 +318,7 @@ try {
         '--git-sha', $sha, '--dependency-sha', $sha, '--observed-inventory', $inventoryPath,
         '--worker-layer', 'repo-vipc-layer', '--image-ref', $tag, '--out-dir', $OutputDirectory,
         '--vipc', "$vipm/Dependencies.vipc", '--vipc', "$vipm/ci-tooling.vipc", '--vipc', "$vipm/antidoc.vipc")
+    if (-not $FixtureOnly) { $manifestArguments += @('--nipkg-list', "$OutputDirectory/nipkg-list.txt") }
     if ($baseImage) { $manifestArguments += @('--base-image', $baseImage, '--seed-image', $baseImage) }
     if ($seedDigest) { $manifestArguments += @('--base-digest', $seedDigest, '--seed-digest', $seedDigest) }
     if ($env:GITHUB_SERVER_URL -and $env:GITHUB_REPOSITORY -and $env:GITHUB_RUN_ID) {

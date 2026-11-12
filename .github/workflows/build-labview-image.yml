@@ -767,6 +767,11 @@ jobs:
                 throw 'Built image inventory package is invalid.'
               }
             }
+            try {
+              docker run --rm --entrypoint powershell $immutable -NoLogo -NoProfile -Command '& nipkg list-installed; exit $LASTEXITCODE' |
+                Out-File -FilePath 'ci-out/worker/nipkg-list.txt' -Encoding utf8
+              if ($LASTEXITCODE -ne 0) { throw "Installed NI inventory capture failed (exit $LASTEXITCODE)." }
+            } catch { throw "nipkg list-installed capture failed: $_" }
             docker push $immutable
             if ($LASTEXITCODE -ne 0) { throw 'Verified immutable worker push failed; active aliases were not changed.' }
             & ./.github/labview/vipm/publish-worker-tags.ps1 -Immutable $immutable -References $tags
@@ -790,8 +795,8 @@ jobs:
             -References @('${{ steps.base.outputs.image }}', '${{ steps.base.outputs.release_tag }}')
 
       # Capture what's installed and render the human/machine worker manifest.
-      # All of this is best-effort: a hiccup here must not fail an otherwise good
-      # image build (the image is already pushed by this point).
+      # Installed inventories were captured before publication. Preserve them
+      # when rendering the manifest; never substitute available feed packages.
       - name: Generate worker manifest
         shell: pwsh
         run: |
@@ -804,18 +809,14 @@ jobs:
           $outDir = "ci-out/workers-pages/workers/windows/$wv"
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
           New-Item -ItemType Directory -Force -Path 'ci-out/worker' | Out-Null
-          New-Item -ItemType File -Force -Path 'ci-out/worker/nipkg-list.txt','ci-out/worker/vipm-list.txt' | Out-Null
+          New-Item -ItemType File -Force -Path 'ci-out/worker/vipm-list.txt' | Out-Null
 
-          # Installed-package list captured from inside the freshly built image.
+          # Installed-package list was captured before publishing the built image.
           # A seed-only copy is byte-identical to the LCWC base and is NOT present on
           # the runner (it was copied at the registry level), so pulling it back just
           # to read nipkg would re-download multiple gigabytes. Skip it on the copy
-          # path; the VIPC-layer path already has the image locally from docker build.
+          # path; the VIPC-layer path preserves the captured installed inventory.
           if ($workerLayer -eq 'repo-vipc-layer') {
-            try {
-              docker run --rm $img powershell -NoLogo -NoProfile -Command "nipkg list" 2>$null |
-                Out-File -FilePath 'ci-out/worker/nipkg-list.txt' -Encoding utf8
-            } catch { Write-Host "nipkg list capture failed: $_" }
             $observed = Get-Content 'ci-out/worker/observed-inventory.json' -Raw -Encoding UTF8 | ConvertFrom-Json
             $observed.packages | ForEach-Object { '{0} {1}' -f $_.name, $_.version } |
               Set-Content 'ci-out/worker/vipm-list.txt' -Encoding UTF8

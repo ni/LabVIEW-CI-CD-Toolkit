@@ -49,6 +49,20 @@ def dashboard_functions(*names):
     return namespace
 
 
+class NativeInventoryTests(unittest.TestCase):
+    def test_available_packages_cannot_establish_installed_coverage(self):
+        functions = dashboard_functions('_manifest_nipkg_packages', '_nipkg_version_index')
+        available = {'nipkg_packages': [{'name': 'ni-viawin-labview-support', 'version': '26.3'}]}
+        for source in ({}, {'source': 'nipkg list', 'status': 'observed'},
+                       {'source': 'nipkg list-installed', 'status': 'unavailable'}):
+            manifest = dict(available, nipkg_inventory=source)
+            self.assertEqual(functions['_manifest_nipkg_packages'](manifest), [])
+            self.assertEqual(functions['_nipkg_version_index'](manifest), {})
+        installed = dict(available, nipkg_inventory={'source': 'nipkg list-installed', 'status': 'observed'})
+        self.assertEqual(functions['_manifest_nipkg_packages'](installed), available['nipkg_packages'])
+        self.assertEqual(functions['_nipkg_version_index'](installed), {'ni-viawin-labview-support': {'26.3'}})
+
+
 class DependenciesPlatformMarkupTests(unittest.TestCase):
     def test_platform_tabs_have_valid_accessible_panel_targets(self):
         elements = []
@@ -366,7 +380,7 @@ class ReconfigureLvpmTests(unittest.TestCase):
 
 
 class WorkerInventoryTests(unittest.TestCase):
-    def generate(self, inventory=None, raw='diagnostic_package 1.0', platform='windows'):
+    def generate(self, inventory=None, raw='diagnostic_package 1.0', platform='windows', native=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             raw_path = root / 'vipm-list.txt'
@@ -376,6 +390,10 @@ class WorkerInventoryTests(unittest.TestCase):
                          '--labview-version', '2026', '--labview-bitness', '64',
                          '--dependency-sha', 'd' * 40, '--vipm-list', str(raw_path),
                          '--out-dir', str(root / 'out')]
+            if native is not None:
+                native_path = root / 'nipkg-list.txt'
+                native_path.write_text(native)
+                arguments += ['--nipkg-list', str(native_path)]
             if inventory is not None:
                 path = root / 'observed.json'
                 path.write_text(json.dumps(inventory), encoding='utf-8-sig')
@@ -390,6 +408,14 @@ class WorkerInventoryTests(unittest.TestCase):
                 'target_verified': True, 'required_project': True, 'status': 'observed',
                 'raw': 'LabVIEW 2026 (64-bit)\nactual 1.2',
                 'packages': [{'name': 'actual', 'version': '1.2'}], **overrides}
+
+    def test_native_inventory_preserves_installed_provenance(self):
+        result, manifest = self.generate(native='ni-viawin-labview-support 26.3.0 x64\n')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(manifest['nipkg_inventory'], {'source': 'nipkg list-installed', 'status': 'observed'})
+        self.assertEqual(manifest['nipkg_packages'], [{'name': 'ni-viawin-labview-support', 'version': '26.3.0'}])
+        result, manifest = self.generate()
+        self.assertEqual(manifest['nipkg_inventory']['status'], 'unavailable')
 
     def test_only_structured_target_bound_evidence_is_installed(self):
         result, manifest = self.generate(self.evidence())

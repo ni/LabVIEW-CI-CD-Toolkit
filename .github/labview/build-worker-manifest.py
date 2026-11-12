@@ -70,9 +70,9 @@ def parse_vipc_packages(vipc_path: Path) -> list[str]:
 
 def parse_nipkg_list(raw: str) -> list[dict]:
     """
-    Best-effort parse of `nipkg list` output into {name, version} records.
+    Best-effort parse of `nipkg list-installed` output into {name, version} records.
 
-    The exact columns of `nipkg list` vary by NIPM version, so this is lenient:
+    The exact columns of `nipkg list-installed` vary by NIPM version, so this is lenient:
     it skips header/separator/blank lines and treats the first two whitespace
     tokens as package name and version. Later columns can include architecture
     and a wrapping description, so the final token is not a reliable version.
@@ -223,6 +223,7 @@ def build_manifest(args: argparse.Namespace) -> dict:
         "vipm_inventory": inventory,
         "vipm_packages": inventory["packages"],
         "nipkg_raw": nipkg_raw,
+        "nipkg_inventory": {"source": "nipkg list-installed", "status": "observed" if nipkg_raw.strip() else "unavailable"},
         "nipkg_packages": parse_nipkg_list(nipkg_raw),
         "dpkg_raw": dpkg_raw,
         "dpkg_packages": parse_nipkg_list(dpkg_raw),
@@ -359,7 +360,7 @@ def render_html(m: dict, pages_url: str) -> str:
             else ""
         )
         nipkg_section = (
-            f"{table}<details><summary class=\"muted\">Raw <code>nipkg list</code> output</summary>"
+            f"{table}<details><summary class=\"muted\">Raw <code>nipkg list-installed</code> output</summary>"
             f"<pre>{esc(m['nipkg_raw'])}</pre></details>"
         )
     else:
@@ -411,7 +412,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--build-date", default=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     ap.add_argument("--git-sha", default="")
     ap.add_argument("--run-url", default="")
-    ap.add_argument("--nipkg-list", default="", help="Path to captured `nipkg list` output")
+    ap.add_argument("--nipkg-list", default="", help="Path to captured `nipkg list-installed` output")
     ap.add_argument("--dpkg-list", default="", help="Path to captured Linux dpkg-query package/version output")
     ap.add_argument("--vipm-list", default="", help="Path to captured `vipm list --installed` output")
     ap.add_argument("--vipc", action="append", default=[], help="Path to an applied .vipc (repeatable)")

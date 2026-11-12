@@ -7,3 +7,5 @@ Windows also requires the complete effective tooling baseline in its final inven
 A requested Linux dependency rebuild also verifies baseline tooling when the client has no project dependencies; it no longer substitutes an uninventoried registry copy for that rebuild. Initial worker seeding remains a separate operation.
 
 Windows builds forward the client repository URL into the VIPM installation layer instead of silently falling back to the toolkit repository context.
+
+Windows native-tool coverage now reads installed NI packages instead of available feed packages. VIPM presence is established by its verified CLI; Dragon declarations no longer incorrectly require a separate Dragon application. Rebuild older workers to refresh native-package evidence.

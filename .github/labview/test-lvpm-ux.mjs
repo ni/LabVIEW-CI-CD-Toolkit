@@ -201,9 +201,21 @@ const unknownAnalyzer = hooks.nipmCell(analyzer, linuxColumn, nativeState);
 assert.match(unknownAnalyzer, /Unknown: native package not inventoried/);
 assert.doesNotMatch(unknownAnalyzer, /dep-missing|Missing dependency/);
 assert.match(hooks.nipmCell({ key:'utf', platforms:['windows'] }, linuxColumn, nativeState), /N\/A/);
-const emptyNativeState = hooks.enrichPlatformState({ tag:tag + '@' + digest }, { ...candidate, labview_version:'2026', nipkg_packages:[] });
+const emptyNativeState = hooks.enrichPlatformState({ tag:tag + '@' + digest }, { ...candidate, labview_version:'2026', dpkg_packages:[] });
 assert.equal(emptyNativeState.nipkg_ready, true);
 assert.match(hooks.nipmCell(analyzer, linuxColumn, emptyNativeState), /Missing dependency/);
+// Available feed records from older Windows manifests cannot claim installation.
+const windowsColumn = { platform:'windows' };
+const legacyNative = {platform:'windows', labview_version:'2026', nipkg_packages:[{name:'ni-viawin-labview-support',version:'26.3'}]};
+const windowsAnalyzer = {key:'via', packages:{windows:['ni-viawin-labview-support']}};
+const legacyState = hooks.enrichPlatformState({key:'windows',tag:'latest'}, legacyNative);
+assert.equal(legacyState.nipkg_ready, false);
+assert.match(hooks.nipmCell(windowsAnalyzer,windowsColumn,legacyState), /Unknown: native package not inventoried/);
+const installedNative = {...legacyNative, nipkg_inventory:{source:'nipkg list-installed',status:'observed'}};
+assert.match(hooks.nipmCell(windowsAnalyzer,windowsColumn,hooks.enrichPlatformState({key:'windows',tag:'latest'},installedNative)), /aria-label="Present"/);
+const cliNative = {...installedNative, vipm_inventory:{status:'observed',target_verified:true}};
+assert.match(hooks.nipmCell({key:'vipm'},windowsColumn,hooks.enrichPlatformState({key:'windows',tag:'latest'},cliNative)), /aria-label="Present"/);
+assert.match(hooks.nipmCell({key:'vipm'},windowsColumn,hooks.enrichPlatformState({key:'windows',tag:'latest'},{...cliNative,vipm_inventory:{status:'observed',target_verified:false}})), /Missing dependency/);
 const manifestStart = requests.length;
 assert.equal((await hooks.loadManifestFor(tag + '@' + digest, 'linux')).image_digest, digest);
 assert.ok(requests.slice(manifestStart).every(request => !request.url.includes('latest.json')));
@@ -395,7 +407,7 @@ for (const id of ['vipcWrap', 'nipmWrap', 'systemWrap', 'dragonWrap']) elements.
 for (const testCase of freshnessCases) {
   const ready = testCase.status === 'current';
   hooks.setState({ candidate, revision:testCase.revision, config:{ use:'base', linuxUse:selection }, inventory:testCase.inventory });
-  const enriched = hooks.enrichPlatformState({ key:'linux', tag:selection }, { ...candidate, labview_version:'2026', nipkg_packages:[] });
+  const enriched = hooks.enrichPlatformState({ key:'linux', tag:selection }, { ...candidate, labview_version:'2026', dpkg_packages:[] });
   assert.equal(enriched.freshness.status, testCase.status, testCase.name);
   assert.equal(enriched.ready, ready, testCase.name);
   assert.equal(hooks.pkgCellState('actual-1.2', enriched).state, ready ? 'present' : 'missing', testCase.name);

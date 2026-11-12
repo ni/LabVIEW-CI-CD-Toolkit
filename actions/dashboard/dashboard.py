@@ -4511,7 +4511,7 @@ def _manifest_failed_packages(man):
 def _manifest_nipkg_packages(man):
   packages = []
   if isinstance(man, dict):
-    for pkg in (man.get('nipkg_packages') or []) + (man.get('dpkg_packages') or []):
+    for pkg in ((man.get('nipkg_packages') or []) if man.get('nipkg_inventory', {}).get('source') == 'nipkg list-installed' and man.get('nipkg_inventory', {}).get('status') == 'observed' else []) + (man.get('dpkg_packages') or []):
       if isinstance(pkg, dict) and pkg.get('name'):
         packages.append({'name': str(pkg.get('name') or ''), 'version': str(pkg.get('version') or '')})
   return sorted(packages, key=lambda p: p['name'].lower())
@@ -4540,19 +4540,12 @@ def _known_nipm_dependencies():
       'details': 'NI UTF support package used by the Windows unit-test runner.',
     },
     {
-      'name': 'JKI Dragon',
-      'source': 'NI Package Manager',
-      'packages': {'windows': ['jki-dragon']},
-      'platforms': ['windows'],
-      'details': 'JKI Dragon dependency-management tooling installed from the LabVIEW 2026 NI Package Manager feed.',
-    },
-    {
       'key': 'vipm',
       'name': 'VI Package Manager',
-      'source': 'NI Package Manager / Debian',
+      'source': 'JKI installer / Debian',
       'packages': {'windows': ['ni-vipm'], 'linux': ['vipm']},
       'platforms': ['windows', 'linux'],
-      'details': 'NI-published Windows VIPM package that enables VIPC application during worker builds. Linux installs VIPM from the native Debian package during its worker build.',
+      'details': 'Windows installs VIPM using the JKI installer and verifies its CLI against the target LabVIEW. Linux installs the native Debian package.',
     },
   ]
 
@@ -4624,7 +4617,7 @@ def _vipm_version_index(man):
 def _nipkg_version_index(man):
   """Map nipkg package name -> installed version set from a worker manifest."""
   out = {}
-  if isinstance(man, dict):
+  if isinstance(man, dict) and man.get('nipkg_inventory', {}).get('source') == 'nipkg list-installed' and man.get('nipkg_inventory', {}).get('status') == 'observed':
     for pkg in man.get('nipkg_packages') or []:
       if isinstance(pkg, dict):
         name = str(pkg.get('name') or '').strip().lower()
@@ -5114,7 +5107,8 @@ def _build_dependencies_index():
         col['ready'] = col['ready'] and col['freshness'].get('status') == 'current'
       col['packages'] = _manifest_packages(man)
       col['failed_packages'] = _manifest_failed_packages(man)
-      col['nipkg_ready'] = isinstance(man, dict) and isinstance(man.get('nipkg_packages'), list)
+      col['nipkg_ready'] = isinstance(man, dict) and (man.get('nipkg_inventory', {}).get('status') == 'observed' and man.get('nipkg_inventory', {}).get('source') == 'nipkg list-installed' or isinstance(man.get('dpkg_packages'), list) and col['platform'] == 'linux')
+      col['vipm_verified'] = isinstance(man, dict) and man.get('vipm_inventory', {}).get('status') == 'observed' and man.get('vipm_inventory', {}).get('target_verified') is True
       col['nipkg_packages'] = _manifest_nipkg_packages(man)
       col['labview_version'] = man.get('labview_version', '') if isinstance(man, dict) else ''
       col['version'] = (man.get('tag') or man.get('version', tag)) if isinstance(man, dict) else tag

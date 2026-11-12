@@ -1601,11 +1601,12 @@ docker run --rm `
         checkbox requires saving and merging a configuration PR before reviewing a worker update. Updates remain
         restricted to the current default-branch revision.
       </div>
-      <p>After a worker image is built locally, the publish workflow captures both <code>nipkg list</code> and
+      <p>After a worker image is built locally, the publish workflow captures both <code>nipkg list-installed</code> and
         <code>vipm list --installed</code> from inside the image and writes them into the worker manifest. Fresh-install
         seed copies use a fast registry copy and do not pull the multi-GB image back just to inspect it; seed manifests
         without a captured target-verified inventory cannot establish installed package coverage. A requested dependency
         rebuild applies and verifies the tooling baseline as well as the selected project dependencies.</p>
+      <p>NI package coverage uses installed-package inventory only: <code>nipkg list</code> lists available packages and cannot establish installation. Older Windows manifests without installed-inventory provenance show unknown native coverage until rebuilt. Windows VIPM is installed through the JKI bootstrap, so a successful target-verified CLI inventory establishes its presence even without an NI package named <code>ni-vipm</code>. The separate JKI Dragon application is not required: the toolkit parses Dragon declarations and installs their packages using VIPM or LVPM.</p>
       <p>When all four committed VIPCs are selected together with <code>example/Example.dragon</code>,
         <code>experimental.vipc</code> uses Antidoc CLI <code>3.4.0.126</code>, already established by
         the authoritative Antidoc capability archive. The experimental configuration retains its ID,
