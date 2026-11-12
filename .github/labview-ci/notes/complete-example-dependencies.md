@@ -5,3 +5,5 @@ Dependency reporting recognizes verified Linux VIPM Dragon packages, respects th
 Windows also requires the complete effective tooling baseline in its final inventory. The native VIPM validation feeds actual installed inventories through the dashboard and dependency-page functions and rejects any remaining package, VIPC, Dragon, or platform warning. A fresh scratch-client installation exercises the distributed staging and LVPM planning helpers.
 
 A requested Linux dependency rebuild also verifies baseline tooling when the client has no project dependencies; it no longer substitutes an uninventoried registry copy for that rebuild. Initial worker seeding remains a separate operation.
+
+Windows builds forward the client repository URL into the VIPM installation layer instead of silently falling back to the toolkit repository context.

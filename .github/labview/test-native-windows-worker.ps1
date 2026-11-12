@@ -273,6 +273,7 @@ try {
         Invoke-Checked docker @('build', '--no-cache', '--memory', '8g', '--build-arg', "LCWC_BASE_IMAGE=$pinnedSeed",
             '--build-arg', "CI_WORKER_VERSION=$version", '--build-arg', 'LABVIEW_VERSION=2026',
             '--build-arg', 'LABVIEW_BITNESS=64', '--build-arg', 'LVCI_UNIT_TESTS_INSTALLED=true',
+            '--build-arg', 'VIPM_PUBLIC_REPO_URL=https://github.com/ni/LabVIEW-CI-CD-Toolkit.git',
             '--tag', $tag, '--file', "$context/.github/docker/labview-ci.Dockerfile", $context) "$OutputDirectory/build.log"
         Invoke-Checked docker @('image', 'inspect', $tag) "$OutputDirectory/worker-inspect.json"
         $stopped = 'lvci-native-extract-' + [guid]::NewGuid().ToString('N')

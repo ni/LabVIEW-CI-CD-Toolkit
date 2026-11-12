@@ -270,7 +270,7 @@ if ($BootstrapOnly) {
 # repo, so we run the installs from a tiny working dir whose origin remote points
 # at it. Override with VIPM_PUBLIC_REPO_URL (the build workflow passes the actual
 # building repo's clone URL so forks use their own public repo).
-$PublicRepoUrl    = if ($Env:VIPM_PUBLIC_REPO_URL) { $Env:VIPM_PUBLIC_REPO_URL } else { 'https://github.com/elijah286/LabVIEW-CI-with-Containers.git' }
+$PublicRepoUrl    = if ($Env:VIPM_PUBLIC_REPO_URL) { $Env:VIPM_PUBLIC_REPO_URL } else { 'https://github.com/ni/LabVIEW-CI-CD-Toolkit.git' }
 
 # Run VIPM non-interactively so headless installs need no prompts. We deliberately
 # do NOT set VIPM_COMMUNITY_EDITION here: forcing Community Edition mode turns ON

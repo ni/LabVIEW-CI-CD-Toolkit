@@ -20,6 +20,8 @@ ARG CI_WORKER_VERSION=dev
 ARG LABVIEW_VERSION=2026
 ARG LABVIEW_BITNESS=64
 ARG LVCI_UNIT_TESTS_INSTALLED=true
+# Forward the building repository to VIPM; clients must use their own Git context.
+ARG VIPM_PUBLIC_REPO_URL=https://github.com/ni/LabVIEW-CI-CD-Toolkit.git
 
 # VIPC automation assets. install-vipc.ps1 plus any *.vipc are staged here; the
 # build workflow also copies repo-root *.vipc (e.g. "COTC Dependencies.vipc")

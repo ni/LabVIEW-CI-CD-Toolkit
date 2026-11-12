@@ -1621,6 +1621,7 @@ docker run --rm `
         baseline. Tooling retries may continue after an initial failure to give remaining packages a chance to install.
         The final target-inventory gate still requires all effective selected packages; an incomplete toolkit cannot
         be published as a successful dependency build. Project and Dragon pins override baseline pins for VIPM; baseline UI rows check that effective project version rather than continuing to request the superseded tooling version. LVPM retains its explicit conflicting-pin rejection.
+        Windows forwards the building repository URL through the Dockerfile to VIPM, so clients use their own repository context.
         A seed-only registry copy does not run this installation; rebuild the worker to apply dependencies.</div>
       <h3 id="dependencies-platforms">Manage dependencies one platform at a time</h3>
       <p>The Dependencies page has separate <strong>Windows</strong> and <strong>Linux</strong> tabs.
