@@ -1,0 +1,1 @@
+{"passes":[{"kind":"default","config":"example/lower cyclomatic complexity.viancfg","label":"example/lower cyclomatic complexity.viancfg","paths":[],"report":"default.html"}]}
