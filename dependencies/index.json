@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "1eb4b2455a8d968383485b066e8798ba434da0c4",
+  "sha": "170870f2962400bd49667768e4187e2fe967f152",
   "revisions": [
+    {
+      "sha": "170870f2962400bd49667768e4187e2fe967f152",
+      "short": "170870f",
+      "message": "Merge pull request #150 from ni/lvci-release/release-5.0.1",
+      "author": "Elijah Kerry",
+      "date": "2026-11-12T17:10:43Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "ec3307ff0d0e15d24dc47e62d0a8bf532c01cd63",
+      "short": "ec3307f",
+      "message": "Prepare release 5.0.1",
+      "author": "github-actions[bot]",
+      "date": "2026-11-06T22:08:09Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "1eb4b2455a8d968383485b066e8798ba434da0c4",
       "short": "1eb4b24",
@@ -882,24 +900,6 @@
       "message": "Merge branch 'main' into fix/dependencies-platform-ux-20261102",
       "author": "Elijah Kerry",
       "date": "2026-11-02T21:16:06Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "661d497942c8cd75c09e9dabb48c1200e333b73a",
-      "short": "661d497",
-      "message": "Merge branch 'main' into MIpetrov-NI-enable-dependabot",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:16:04Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "7c9213101969af1970e150ecc0d97162ebba523d",
-      "short": "7c92131",
-      "message": "Merge pull request #99 from ni/lvci-release/release-4.19.1",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:15:06Z",
       "project": false,
       "dep_only": false
     },
