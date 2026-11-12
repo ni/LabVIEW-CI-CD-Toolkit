@@ -1,0 +1,2616 @@
+{
+  "schema": 2,
+  "platform": "windows",
+  "version": "win-f1763efae743",
+  "labview_version": "2026",
+  "base_image": "ghcr.io/elijah286/labview-ci-with-containers-labview-base:2026",
+  "base_digest": "sha256:0d9a5f85913654a8f788b24444feea04965aefe4f703ff0c1ca9601316633735",
+  "seed_image": "ghcr.io/elijah286/labview-ci-with-containers-labview-base:2026",
+  "seed_digest": "sha256:0d9a5f85913654a8f788b24444feea04965aefe4f703ff0c1ca9601316633735",
+  "worker_layer": "repo-vipc-layer",
+  "copied_from_base": false,
+  "image_ref": "ghcr.io/ni/labview-ci-cd-toolkit-labview:win-f1763efae743",
+  "build_date": "2026-11-12T17:00:31Z",
+  "git_sha": "1eb4b2455a8d968383485b066e8798ba434da0c4",
+  "run_url": "https://github.com/ni/LabVIEW-CI-CD-Toolkit/actions/runs/43250113441",
+  "vipc": [
+    {
+      "file": "antidoc.vipc",
+      "packages": [
+        "graphbuilder-2.3.0.7",
+        "jki_lib_state_machine-2024.0.3.23",
+        "jki_rsc_toolkits_palette-1.1-1",
+        "wiresmith_technology_lib_g_cli-3.0.1.98",
+        "wovalab_lib_antidoc-3.3.1.879",
+        "wovalab_lib_antidoc_add_on_labview_project_documentation-3.2.0.358",
+        "wovalab_lib_antidoc_add_on_labview_toolkit_documentation-3.0.0.77",
+        "wovalab_lib_antidoc_cli-3.4.0.126",
+        "wovalab_lib_asciidoc_for_labview-1.12.1.492"
+      ],
+      "present": true
+    },
+    {
+      "file": "ci-tooling.vipc",
+      "packages": [
+        "astemes_lib_lunit-2.0.13.6",
+        "astemes_lib_lunit_cli-1.7.1.32",
+        "astemes_lib_lunit_coverage_analysis_add_on-1.0.0.2",
+        "astemes_lib_lunit_global_fixture_add_on-1.0.5.4",
+        "astemes_lib_lunit_parameterized_add_on-1.1.10.8",
+        "astemes_lib_lunit_test_inheritance_add_on-1.0.5.4",
+        "dataflow_g_lib_g_image-0.5.0.1",
+        "felipefoz_lib_lv_rainbow_terminal-1.1.1.5",
+        "jki_lib_caraya-1.4.4.148",
+        "jki_lib_state_machine-2024.0.3.23",
+        "jki_rsc_toolkits_palette-1.1-1",
+        "labview_open_source_lib_epoch_datetime-1.3.0.8",
+        "labview_open_source_project_lib_labview_open_source_palette-1.0.2.7",
+        "labview_open_source_project_lib_openuri-1.4.0.13",
+        "lvos_lib_caraya_cli_extension-2.0.0.7",
+        "ni_lib_junit_results_api-1.0.1.6",
+        "ni_lib_simple_xml-1.0.0.4",
+        "ni_lib_utf_junit_report-1.0.1.43",
+        "oglib_array-6.0.1.20",
+        "oglib_error-6.0.0.26",
+        "oglib_file-6.0.2.28",
+        "oglib_lvdata-6.0.0.45",
+        "oglib_string-6.0.2.35",
+        "pnr_lib_caraya_junit_for_azure_pipelines-1.2.0.11",
+        "pnr_lib_junit_xml-1.0.0.4",
+        "sas_workshops_lib_lunit_for_g_cli-1.2.1.85",
+        "wiresmith_technology_lib_g_cli-3.0.1.98"
+      ],
+      "present": true
+    },
+    {
+      "file": "Dependencies.vipc",
+      "packages": [
+        "dataflow_g_lib_g_image-0.5.0.1",
+        "ni_lib_junit_results_api-1.0.1.6",
+        "ni_lib_simple_xml-1.0.0.4",
+        "ni_lib_utf_junit_report-1.0.1.43",
+        "oglib_appcontrol-4.1.0.7",
+        "oglib_array-6.0.1.20",
+        "oglib_error-6.0.0.26",
+        "oglib_file-6.0.2.28",
+        "oglib_lvdata-6.0.0.45",
+        "oglib_string-6.0.2.35"
+      ],
+      "present": true
+    }
+  ],
+  "vipm_raw": "Installed packages (35):\n  astemes_lib_lunit v2.0.13.6\n  astemes_lib_lunit_cli v1.7.1.32\n  astemes_lib_lunit_coverage_analysis_add_on v1.0.0.2\n  astemes_lib_lunit_global_fixture_add_on v1.0.5.4\n  astemes_lib_lunit_parameterized_add_on v1.1.10.8\n  astemes_lib_lunit_test_inheritance_add_on v1.0.5.4\n  dataflow_g_lib_g_image v0.5.0.1\n  felipefoz_lib_lv_rainbow_terminal v1.1.1.5\n  graphbuilder v2.3.0.7\n  jki_lib_caraya v1.4.4.148\n  jki_lib_state_machine v2024.0.3.23\n  jki_rsc_toolkits_palette v1.1-1\n  labview_open_source_lib_epoch_datetime v1.3.0.8\n  labview_open_source_project_lib_labview_open_source_palette v1.0.2.7\n  labview_open_source_project_lib_openuri v1.4.0.13\n  lvos_lib_caraya_cli_extension v2.0.0.7\n  ni_lib_junit_results_api v1.0.1.6\n  ni_lib_simple_xml v1.0.0.4\n  ni_lib_utf_junit_report v1.0.1.43\n  oglib_appcontrol v4.1.0.7\n  oglib_array v6.0.1.20\n  oglib_boolean v6.0.0.9\n  oglib_error v6.0.0.26\n  oglib_file v6.0.2.28\n  oglib_lvdata v6.0.0.45\n  oglib_string v6.0.2.35\n  pnr_lib_caraya_junit_for_azure_pipelines v1.2.0.11\n  pnr_lib_junit_xml v1.0.0.4\n  sas_workshops_lib_lunit_for_g_cli v1.2.1.85\n  wiresmith_technology_lib_g_cli v3.0.1.98\n  wovalab_lib_antidoc v3.3.1.879\n  wovalab_lib_antidoc_add_on_labview_project_documentation v3.2.0.358\n  wovalab_lib_antidoc_add_on_labview_toolkit_documentation v3.0.0.77\n  wovalab_lib_antidoc_cli v3.4.0.126\n  wovalab_lib_asciidoc_for_labview v1.12.1.492\n",
+  "vipm_packages": [
+    {
+      "name": "astemes_lib_lunit",
+      "version": "v2.0.13.6",
+      "label": "astemes_lib_lunit-v2.0.13.6"
+    },
+    {
+      "name": "astemes_lib_lunit_cli",
+      "version": "v1.7.1.32",
+      "label": "astemes_lib_lunit_cli-v1.7.1.32"
+    },
+    {
+      "name": "astemes_lib_lunit_coverage_analysis_add_on",
+      "version": "v1.0.0.2",
+      "label": "astemes_lib_lunit_coverage_analysis_add_on-v1.0.0.2"
+    },
+    {
+      "name": "astemes_lib_lunit_global_fixture_add_on",
+      "version": "v1.0.5.4",
+      "label": "astemes_lib_lunit_global_fixture_add_on-v1.0.5.4"
+    },
+    {
+      "name": "astemes_lib_lunit_parameterized_add_on",
+      "version": "v1.1.10.8",
+      "label": "astemes_lib_lunit_parameterized_add_on-v1.1.10.8"
+    },
+    {
+      "name": "astemes_lib_lunit_test_inheritance_add_on",
+      "version": "v1.0.5.4",
+      "label": "astemes_lib_lunit_test_inheritance_add_on-v1.0.5.4"
+    },
+    {
+      "name": "dataflow_g_lib_g_image",
+      "version": "v0.5.0.1",
+      "label": "dataflow_g_lib_g_image-v0.5.0.1"
+    },
+    {
+      "name": "felipefoz_lib_lv_rainbow_terminal",
+      "version": "v1.1.1.5",
+      "label": "felipefoz_lib_lv_rainbow_terminal-v1.1.1.5"
+    },
+    {
+      "name": "graphbuilder",
+      "version": "v2.3.0.7",
+      "label": "graphbuilder-v2.3.0.7"
+    },
+    {
+      "name": "Installed",
+      "version": "",
+      "label": "Installed"
+    },
+    {
+      "name": "jki_lib_caraya",
+      "version": "v1.4.4.148",
+      "label": "jki_lib_caraya-v1.4.4.148"
+    },
+    {
+      "name": "jki_lib_state_machine",
+      "version": "v2024.0.3.23",
+      "label": "jki_lib_state_machine-v2024.0.3.23"
+    },
+    {
+      "name": "jki_rsc_toolkits_palette",
+      "version": "v1.1-1",
+      "label": "jki_rsc_toolkits_palette-v1.1-1"
+    },
+    {
+      "name": "labview_open_source_lib_epoch_datetime",
+      "version": "v1.3.0.8",
+      "label": "labview_open_source_lib_epoch_datetime-v1.3.0.8"
+    },
+    {
+      "name": "labview_open_source_project_lib_labview_open_source_palette",
+      "version": "v1.0.2.7",
+      "label": "labview_open_source_project_lib_labview_open_source_palette-v1.0.2.7"
+    },
+    {
+      "name": "labview_open_source_project_lib_openuri",
+      "version": "v1.4.0.13",
+      "label": "labview_open_source_project_lib_openuri-v1.4.0.13"
+    },
+    {
+      "name": "lvos_lib_caraya_cli_extension",
+      "version": "v2.0.0.7",
+      "label": "lvos_lib_caraya_cli_extension-v2.0.0.7"
+    },
+    {
+      "name": "ni_lib_junit_results_api",
+      "version": "v1.0.1.6",
+      "label": "ni_lib_junit_results_api-v1.0.1.6"
+    },
+    {
+      "name": "ni_lib_simple_xml",
+      "version": "v1.0.0.4",
+      "label": "ni_lib_simple_xml-v1.0.0.4"
+    },
+    {
+      "name": "ni_lib_utf_junit_report",
+      "version": "v1.0.1.43",
+      "label": "ni_lib_utf_junit_report-v1.0.1.43"
+    },
+    {
+      "name": "oglib_appcontrol",
+      "version": "v4.1.0.7",
+      "label": "oglib_appcontrol-v4.1.0.7"
+    },
+    {
+      "name": "oglib_array",
+      "version": "v6.0.1.20",
+      "label": "oglib_array-v6.0.1.20"
+    },
+    {
+      "name": "oglib_boolean",
+      "version": "v6.0.0.9",
+      "label": "oglib_boolean-v6.0.0.9"
+    },
+    {
+      "name": "oglib_error",
+      "version": "v6.0.0.26",
+      "label": "oglib_error-v6.0.0.26"
+    },
+    {
+      "name": "oglib_file",
+      "version": "v6.0.2.28",
+      "label": "oglib_file-v6.0.2.28"
+    },
+    {
+      "name": "oglib_lvdata",
+      "version": "v6.0.0.45",
+      "label": "oglib_lvdata-v6.0.0.45"
+    },
+    {
+      "name": "oglib_string",
+      "version": "v6.0.2.35",
+      "label": "oglib_string-v6.0.2.35"
+    },
+    {
+      "name": "pnr_lib_caraya_junit_for_azure_pipelines",
+      "version": "v1.2.0.11",
+      "label": "pnr_lib_caraya_junit_for_azure_pipelines-v1.2.0.11"
+    },
+    {
+      "name": "pnr_lib_junit_xml",
+      "version": "v1.0.0.4",
+      "label": "pnr_lib_junit_xml-v1.0.0.4"
+    },
+    {
+      "name": "sas_workshops_lib_lunit_for_g_cli",
+      "version": "v1.2.1.85",
+      "label": "sas_workshops_lib_lunit_for_g_cli-v1.2.1.85"
+    },
+    {
+      "name": "wiresmith_technology_lib_g_cli",
+      "version": "v3.0.1.98",
+      "label": "wiresmith_technology_lib_g_cli-v3.0.1.98"
+    },
+    {
+      "name": "wovalab_lib_antidoc",
+      "version": "v3.3.1.879",
+      "label": "wovalab_lib_antidoc-v3.3.1.879"
+    },
+    {
+      "name": "wovalab_lib_antidoc_add_on_labview_project_documentation",
+      "version": "v3.2.0.358",
+      "label": "wovalab_lib_antidoc_add_on_labview_project_documentation-v3.2.0.358"
+    },
+    {
+      "name": "wovalab_lib_antidoc_add_on_labview_toolkit_documentation",
+      "version": "v3.0.0.77",
+      "label": "wovalab_lib_antidoc_add_on_labview_toolkit_documentation-v3.0.0.77"
+    },
+    {
+      "name": "wovalab_lib_antidoc_cli",
+      "version": "v3.4.0.126",
+      "label": "wovalab_lib_antidoc_cli-v3.4.0.126"
+    },
+    {
+      "name": "wovalab_lib_asciidoc_for_labview",
+      "version": "v1.12.1.492",
+      "label": "wovalab_lib_asciidoc_for_labview-v1.12.1.492"
+    }
+  ],
+  "nipkg_raw": "eula-ms-dotnet-4.8\t23.3.0.49243-0+f91\twindows_x64\tPackage for displaying the Microsoft .NET Framework 4.8 License Agreement\n\neula-ms-dotnet-4.8\t23.8.0.49254-0+f102\twindows_x64\tPackage for displaying the Microsoft .NET Framework 4.8 License Agreement\n\neula-ms-dotnet-4.8\t25.0.0.49255-0+f103\twindows_x64\tPackage for displaying the Microsoft .NET Framework 4.8 License Agreement\n\neula-ms-dotnet-4.8\t25.3.0.49221-0+f69\twindows_x64\tPackage for displaying the Microsoft .NET Framework 4.8 License Agreement\n\neula-ms-dotnet-4.8\t25.5.0.49240-0+f88\twindows_x64\tPackage for displaying the Microsoft .NET Framework 4.8 License Agreement\n\neula-ms-dotnet-4.8\t25.8.0.49237-0+f85\twindows_x64\tPackage for displaying the Microsoft .NET Framework 4.8 License Agreement\n\neula-ms-dotnet-4.8\t26.0.0.49245-0+f93\twindows_x64\tPackage for displaying the Microsoft .NET Framework 4.8 License Agreement\n\neula-ms-dotnet-4.8\t26.3.0.49236-0+f84\twindows_x64\tPackage for displaying the Microsoft .NET Framework 4.8 License Agreement\n\neula-ni-standard\t17.0.0.49155-0+f3\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t17.5.0.49152-0+f0\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t18.0.0.49153-0+f1\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t18.5.0.49153-0+f1\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t18.5.0.49154-0+f2\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t18.5.1.49152-0+f0\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t19.0.0.49152-0+f0\twindows_all\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t19.5.0.49152-0+f0\twindows_all\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t19.5.1.49153-0+f1\twindows_all\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t19.6.0.49152-0+f0\twindows_all\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t20.0.0.49153-0+f1\twindows_all\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t20.1.0.49153-0+f1\twindows_all\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t20.5.0.49152-0+f0\twindows_all\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t20.6.0.49316-0+f164\twindows_all\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t20.7.0.49347-0+f195\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t20.7.1.49158-0+f6\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t21.0.0.49343-0+f191\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t21.3.0.49256-0+f104\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t21.8.0.49275-0+f123\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t22.5.0.49189-0+f37\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t22.8.0.49201-0+f49\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t23.0.0.49223-0+f71\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t23.3.0.49243-0+f91\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t23.5.0.49255-0+f103\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t23.8.0.49254-0+f102\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t24.0.0.49255-0+f103\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t24.3.0.49238-0+f86\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t24.5.0.49247-0+f95\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t24.8.0.49248-0+f96\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t25.0.0.49255-0+f103\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t25.3.0.49221-0+f69\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t25.5.0.49240-0+f88\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t25.8.0.49237-0+f85\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t26.0.0.49245-0+f93\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t26.3.0.49236-0+f84\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t26.5.0.49245-0+f93\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\neula-ni-standard\t26.8.0.49231-0+f79\twindows_x64\tPackage for displaying the NI Software License Agreement for Released Products\n\nni-certificates\t2.0.0.49154-0+f2\twindows_x64\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t2.0.0.49155-0+f3\twindows_x64\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t2.0.1.49152-0+f0\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t2.0.2.49152-0+f0\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t2.0.3.49152-0+f0\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t21.0.0.49152-0+f0\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t21.5.0.49170-0+f18\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t24.5.0.49157-0+f5\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t24.5.1.49152-0+f0\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t24.8.0.49163-0+f11\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t25.3.0.49164-0+f12\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t25.5.0.49169-0+f17\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t25.8.0.49176-0+f24\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t26.0.0.49176-0+f24\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t26.3.0.49183-0+f31\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t26.5.0.49183-0+f31\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-certificates\t26.8.0.49183-0+f31\twindows_all\tNI Certificates configures Microsoft Windows to always trust software from NI. When NI Certificates are installed, no Windows security popups appear for installers that have a valid National Instruments digital signature.\n\nni-msdotnet4x\t23.3.0.49175-0+f23\twindows_x64\tInstaller for .NET Framework 4.8.0\n\nni-msdotnet4x\t23.8.0.49180-0+f28\twindows_x64\tInstaller for .NET Framework 4.8.0\n\nni-msdotnet4x\t25.0.0.49181-0+f29\twindows_x64\tInstaller for .NET Framework 4.8.0\n\nni-msdotnet4x\t25.3.0.49173-0+f21\twindows_x64\tInstaller for .NET Framework 4.8.0\n\nni-msdotnet4x\t25.5.0.49172-0+f20\twindows_x64\tInstaller for .NET Framework 4.8.0\n\nni-msdotnet4x\t25.8.0.49176-0+f24\twindows_x64\tInstaller for .NET Framework 4.8.0\n\nni-msdotnet4x\t26.0.0.49175-0+f23\twindows_x64\tInstaller for .NET Framework 4.8.0\n\nni-msdotnet4x\t26.3.0.49181-0+f29\twindows_x64\tInstaller for .NET Framework 4.8.0\n\nni-msiproperties\t23.3.0.49243-0+f91\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t23.5.0.49255-0+f103\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t23.8.0.49254-0+f102\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t24.0.0.49255-0+f103\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t24.3.0.49238-0+f86\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t24.5.0.49246-0+f94\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t24.8.0.49248-0+f96\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t25.0.0.49255-0+f103\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t25.3.0.49221-0+f69\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t25.5.0.49240-0+f88\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t25.8.0.49237-0+f85\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t26.0.0.49245-0+f93\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t26.3.0.49236-0+f84\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t26.5.0.49245-0+f93\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-msiproperties\t26.8.0.49231-0+f79\twindows_x64\tInstalls the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.\n\nni-package-manager-deployment-support\t17.5.0.49152-0+f0\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t17.5.1.49152-0+f0\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t18.0.0.49156-0+f4\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t18.0.1.49152-0+f0\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t18.0.2.49152-0+f0\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t18.5.0.49153-0+f1\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t18.5.1.49152-0+f0\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t19.0.0.49152-0+f0\twindows_all\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t19.5.0.49152-0+f0\twindows_all\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t19.5.1.49153-0+f1\twindows_all\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t19.6.0.49152-0+f0\twindows_all\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t20.0.0.49153-0+f1\twindows_all\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t20.1.0.49153-0+f1\twindows_all\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t20.5.0.49152-0+f0\twindows_all\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t20.6.0.49316-0+f164\twindows_all\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t20.7.0.49347-0+f195\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t20.7.1.49158-0+f6\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t21.0.0.49343-0+f191\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t21.3.0.49256-0+f104\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t21.8.0.49275-0+f123\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t22.5.0.49189-0+f37\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t22.8.0.49255-0+f103\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t23.0.0.49276-0+f124\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t23.3.0.49295-0+f143\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t23.5.0.49296-0+f144\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t23.8.0.49300-0+f148\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t24.0.0.49323-0+f171\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t24.3.0.49316-0+f164\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t24.5.0.49293-0+f141\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t24.8.0.49281-0+f129\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t25.0.0.49256-0+f104\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t25.3.0.49257-0+f105\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t25.5.0.49263-0+f111\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t25.5.1.49154-0+f2\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t25.8.0.49292-0+f140\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t26.0.0.49288-0+f136\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t26.0.1.49156-0+f4\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t26.3.0.49300-0+f148\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t26.5.0.49301-0+f149\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t26.8.0.49285-0+f133\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-deployment-support\t26.8.1.49153-0+f1\twindows_x64\tDeployment support for NI Package Manager.\n\nni-package-manager-released-feed\t17.0.0.49157-0+f5\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t17.5.0.49152-0+f0\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t17.5.1.49152-0+f0\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t18.0.0.49156-0+f4\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t18.0.1.49152-0+f0\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t18.0.2.49152-0+f0\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t18.5.1.49152-0+f0\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t19.0.0.49152-0+f0\twindows_all\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t19.5.0.49152-0+f0\twindows_all\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t19.5.1.49153-0+f1\twindows_all\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t19.6.0.49152-0+f0\twindows_all\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t20.0.0.49153-0+f1\twindows_all\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t20.1.0.49153-0+f1\twindows_all\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t20.5.0.49152-0+f0\twindows_all\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t20.6.0.49316-0+f164\twindows_all\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t20.7.0.49347-0+f195\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t20.7.1.49158-0+f6\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t21.0.0.49343-0+f191\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t21.3.0.49256-0+f104\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t21.8.0.49275-0+f123\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t22.5.0.49189-0+f37\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t22.8.0.49255-0+f103\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t23.0.0.49276-0+f124\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t23.3.0.49295-0+f143\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t23.5.0.49296-0+f144\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t23.8.0.49300-0+f148\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t24.0.0.49323-0+f171\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t24.3.0.49316-0+f164\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t24.5.0.49293-0+f141\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t24.8.0.49281-0+f129\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t25.0.0.49256-0+f104\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t25.3.0.49257-0+f105\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t25.5.0.49263-0+f111\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t25.5.1.49154-0+f2\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t25.8.0.49292-0+f140\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t26.0.0.49288-0+f136\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t26.0.1.49156-0+f4\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t26.3.0.49300-0+f148\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t26.5.0.49301-0+f149\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t26.8.0.49285-0+f133\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-released-feed\t26.8.1.49153-0+f1\twindows_x64\tProvides NI Package Manager released packages.\n\nni-package-manager-upgrader\t17.0.0.49157-0+f5\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t17.5.0.49152-0+f0\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t17.5.1.49152-0+f0\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t18.0.0.49156-0+f4\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t18.0.1.49152-0+f0\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t18.0.2.49152-0+f0\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t18.5.0.49153-0+f1\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t18.5.1.49152-0+f0\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t19.0.0.49152-0+f0\twindows_all\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t19.5.0.49152-0+f0\twindows_all\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t19.5.1.49153-0+f1\twindows_all\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t19.6.0.49152-0+f0\twindows_all\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t20.0.0.49153-0+f1\twindows_all\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t20.1.0.49153-0+f1\twindows_all\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t20.5.0.49152-0+f0\twindows_all\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t20.6.0.49316-0+f164\twindows_all\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t20.7.0.49347-0+f195\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t20.7.1.49158-0+f6\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t21.0.0.49343-0+f191\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t21.3.0.49256-0+f104\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t21.8.0.49275-0+f123\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t22.5.0.49189-0+f37\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t22.8.0.49255-0+f103\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t23.0.0.49276-0+f124\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t23.3.0.49295-0+f143\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t23.5.0.49296-0+f144\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t23.8.0.49300-0+f148\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t24.0.0.49323-0+f171\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t24.3.0.49316-0+f164\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t24.5.0.49293-0+f141\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t24.8.0.49281-0+f129\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t25.0.0.49256-0+f104\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t25.3.0.49257-0+f105\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t25.5.0.49263-0+f111\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t25.5.1.49154-0+f2\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t25.8.0.49292-0+f140\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t26.0.0.49288-0+f136\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t26.0.1.49156-0+f4\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t26.3.0.49300-0+f148\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t26.5.0.49301-0+f149\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t26.8.0.49285-0+f133\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager-upgrader\t26.8.1.49153-0+f1\twindows_x64\tApplication used to upgrade the package manager.\n\nni-package-manager\t17.0.0.49157-0+f5\twindows_x64\tA lightweight desktop client for .nipkg package feeds.\n\nni-package-manager\t17.5.0.49152-0+f0\twindows_x64\tA lightweight desktop client for .nipkg package feeds.\n\nni-package-manager\t17.5.1.49152-0+f0\twindows_x64\tA lightweight desktop client for .nipkg package feeds.\n\nni-package-manager\t18.0.0.49156-0+f4\twindows_x64\tA lightweight desktop client for .nipkg package feeds.\n\nni-package-manager\t18.0.1.49152-0+f0\twindows_x64\tA lightweight desktop client for .nipkg package feeds.\n\nni-package-manager\t18.0.2.49152-0+f0\twindows_x64\tA lightweight desktop client for .nipkg package feeds.\n\nni-package-manager\t18.5.0.49153-0+f1\twindows_x64\tA lightweight desktop client for .nipkg package feeds.\n\nni-package-manager\t18.5.1.49152-0+f0\twindows_x64\tA lightweight desktop client for .nipkg package feeds.\n\nni-package-manager\t19.0.0.49152-0+f0\twindows_all\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t19.5.0.49152-0+f0\twindows_all\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t19.5.1.49153-0+f1\twindows_all\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t19.6.0.49152-0+f0\twindows_all\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t20.0.0.49153-0+f1\twindows_all\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t20.1.0.49153-0+f1\twindows_all\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t20.5.0.49152-0+f0\twindows_all\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t20.6.0.49316-0+f164\twindows_all\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t20.7.0.49347-0+f195\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t20.7.1.49158-0+f6\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t21.0.0.49343-0+f191\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t21.3.0.49256-0+f104\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t21.8.0.49275-0+f123\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t22.5.0.49189-0+f37\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t22.8.0.49255-0+f103\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t23.0.0.49276-0+f124\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t23.3.0.49295-0+f143\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t23.5.0.49296-0+f144\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t23.8.0.49300-0+f148\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t24.0.0.49323-0+f171\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t24.3.0.49316-0+f164\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t24.5.0.49293-0+f141\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t24.8.0.49281-0+f129\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t25.0.0.49256-0+f104\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t25.3.0.49257-0+f105\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t25.5.0.49263-0+f111\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t25.5.1.49154-0+f2\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t25.8.0.49292-0+f140\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t26.0.0.49288-0+f136\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t26.0.1.49156-0+f4\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t26.3.0.49300-0+f148\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t26.5.0.49301-0+f149\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t26.8.0.49285-0+f133\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nni-package-manager\t26.8.1.49153-0+f1\twindows_x64\tNI Package Manager facilitates the installation, removal, and management of NI software.\n\nsystem-windows-x64\t19.0.0.49152-0+f0\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t19.5.0.49152-0+f0\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t19.5.1.49153-0+f1\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t19.6.0.49152-0+f0\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t20.0.0.49153-0+f1\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t20.1.0.49153-0+f1\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t20.5.0.49152-0+f0\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t20.6.0.49316-0+f164\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t20.7.0.49347-0+f195\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t20.7.1.49158-0+f6\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t21.0.0.49343-0+f191\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t21.3.0.49256-0+f104\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t21.8.0.49275-0+f123\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t22.5.0.49189-0+f37\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t22.8.0.49255-0+f103\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t23.0.0.49276-0+f124\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t23.3.0.49295-0+f143\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t23.5.0.49296-0+f144\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t23.8.0.49300-0+f148\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t24.0.0.49323-0+f171\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t24.3.0.49316-0+f164\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t24.5.0.49293-0+f141\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t24.8.0.49281-0+f129\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t25.0.0.49256-0+f104\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t25.3.0.49257-0+f105\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t25.5.0.49263-0+f111\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t25.5.1.49154-0+f2\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t25.8.0.49292-0+f140\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t26.0.0.49288-0+f136\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t26.0.1.49156-0+f4\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t26.3.0.49300-0+f148\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t26.5.0.49301-0+f149\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t26.8.0.49285-0+f133\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x64\t26.8.1.49153-0+f1\twindows_x64\tPackage that indicates the current system is running a 64-bit Windows operating system.\n\nsystem-windows-x86\t19.0.0.49152-0+f0\twindows_x86\tPackage that indicates the current system is running a 32-bit Windows operating system.\n\nsystem-windows-x86\t19.5.0.49152-0+f0\twindows_x86\tPackage that indicates the current system is running a 32-bit Windows operating system.\n\nsystem-windows-x86\t19.5.1.49153-0+f1\twindows_x86\tPackage that indicates the current system is running a 32-bit Windows operating system.\n\nsystem-windows-x86\t19.6.0.49152-0+f0\twindows_x86\tPackage that indicates the current system is running a 32-bit Windows operating system.\n\nsystem-windows-x86\t20.0.0.49153-0+f1\twindows_x86\tPackage that indicates the current system is running a 32-bit Windows operating system.\n\nsystem-windows-x86\t20.1.0.49153-0+f1\twindows_x86\tPackage that indicates the current system is running a 32-bit Windows operating system.\n\nsystem-windows-x86\t20.5.0.49152-0+f0\twindows_x86\tPackage that indicates the current system is running a 32-bit Windows operating system.\n\nsystem-windows-x86\t20.6.0.49316-0+f164\twindows_x86\tPackage that indicates the current system is running a 32-bit Windows operating system.\n\neula-jki-vimp\t26.5.0.49245-0+f93\twindows_x64\tPackage for displaying the JKI VIPM EULA License Agreement\n\neula-ms-dotnet-4.8\t26.5.0.49245-0+f93\twindows_x64\tPackage for displaying the Microsoft .NET Framework 4.8 License Agreement\n\njki-dragon\t2026.3.0-897\twindows_x64\tManage package dependencies directly from your LabVIEW project. Works with VIPM and NI Package Manager to provide a complete dependency management solution for LabVIEW Add-ons, NI Software and Drivers, and more.\n\nmgi-solution-explorer\t2.8.0-4\twindows_all\tEasily develop and build multi-project based LabVIEW Applications\n\nni-activex-container\t17.1.2.49154-0+f2\twindows_all\tNI ActiveX Container enables you to embed ActiveX objects on the front panel of a VI.\n\nni-aspt-labview-support\t26.3.0.49249-0+f97\twindows_x64\tThe LabVIEW Advanced Signal Processing Toolkit is a set of software tools that you can use to perform time frequency, time series, and wavelet analysis. The LabVIEW Advanced Signal Processing Toolkit is add-on software for LabVIEW that includes tools for the analysis of time frequency, time series, and wavelets. This add-on includes the LabVIEW Digital Filter Design Toolkit, which is also available separately. To extract the underlying information of a signal effectively, you need to choose an appropriate analysis tool. You can use the time frequency analysis tools for evolutionary signals with slowly varying spectral content, the time series analysis tools for stationary signals, and the wavelet analysis tools for both evolutionary signals and transient signals describing short-time events. You can also deploy your analysis code to NI real-time embedded hardware.\n\nni-assistant-framework-custom-ui-tool\t26.3.0.49793-0+f641\twindows_x64\tNI Assistant Framework Custom UI contains the custom UI files of Assistant Framework.\n\nni-assistant-framework-custom-ui-tool\t26.3.1.49171-0+f19\twindows_x64\tNI Assistant Framework Custom UI contains the custom UI files of Assistant Framework.\n\nni-assistant-framework-labview-2023-support\t26.3.0.49793-0+f641\twindows_x64\tNI Assistant Framework LabVIEW 2023 64-bit Support contains the LabVIEW project provider file for Assistant Framework.\n\nni-assistant-framework-labview-2023-support\t26.3.1.49171-0+f19\twindows_x64\tNI Assistant Framework LabVIEW 2023 64-bit Support contains the LabVIEW project provider file for Assistant Framework.\n\nni-assistant-framework-labview-2024-support\t26.3.0.49793-0+f641\twindows_x64\tNI Assistant Framework LabVIEW 2024 64-bit Support contains the LabVIEW project provider file for Assistant Framework.\n\nni-assistant-framework-labview-2024-support\t26.3.1.49171-0+f19\twindows_x64\tNI Assistant Framework LabVIEW 2024 64-bit Support contains the LabVIEW project provider file for Assistant Framework.\n\nni-assistant-framework-labview-2025-support\t26.3.0.49793-0+f641\twindows_x64\tNI Assistant Framework LabVIEW 2025 64-bit Support contains the LabVIEW project provider file for Assistant Framework.\n\nni-assistant-framework-labview-2025-support\t26.3.1.49171-0+f19\twindows_x64\tNI Assistant Framework LabVIEW 2025 64-bit Support contains the LabVIEW project provider file for Assistant Framework.\n\nni-assistant-framework-labview-2026-codegen-support\t26.3.0.49791-0+f639\twindows_x64\tNI Assistant Framework LabVIEW Code Generator 2026 (64-bit) is used to install Engine Entry Points for LabVIEW 2026 Code Generator.\n\nni-assistant-framework-labview-2026-support\t26.3.0.49793-0+f641\twindows_x64\tNI Assistant Framework LabVIEW 2026 64-bit Support contains the LabVIEW project provider file for Assistant Framework.\n\nni-assistant-framework-labview-2026-support\t26.3.1.49171-0+f19\twindows_x64\tNI Assistant Framework LabVIEW 2026 64-bit Support contains the LabVIEW project provider file for Assistant Framework.\n\nni-assistant-framework-ui-assemblies\t26.3.0.49793-0+f641\twindows_x64\tNI Assistant Framework UI Assemblies contains the UI assemblies used by Assistant Framework.\n\nni-assistant-framework-ui-assemblies\t26.3.1.49171-0+f19\twindows_x64\tNI Assistant Framework UI Assemblies contains the UI assemblies used by Assistant Framework.\n\nni-assistant-framework\t26.3.0.49793-0+f641\twindows_x64\tNI Assistant Framework (64-bit) is a toolset for making software applications, with a particular emphasis on tools needed for measurement applications.\n\nni-assistant-framework\t26.3.1.49171-0+f19\twindows_x64\tNI Assistant Framework (64-bit) is a toolset for making software applications, with a particular emphasis on tools needed for measurement applications.\n\nni-auth\t26.5.0.49329-0+f177\twindows_x64\tNI Authentication\n\nni-ceip-common\t26.5.0.49222-0+f70\twindows_x64\tProvides shared binaries for the NI Customer Experience Improvement Program.\n\nni-ceip-x86\t26.5.0.49222-0+f70\twindows_x64\tNI Customer Experience Improvement Program gives NI customers the ability to contribute to the design and development of NI products.\n\nni-ceip\t26.5.0.49222-0+f70\twindows_x64\tNI Customer Experience Improvement Program gives NI customers the ability to contribute to the design and development of NI products.\n\nni-codesignapi\t26.5.0.49246-0+f94\twindows_x64\tThis package installs the NI CodeSignAPI DLL.\n\nni-curl\t26.5.0.49176-0+f24\twindows_x64\tNI Curl provides the build of the \"C URL\" library that is an open-source command line tool and library for transferring data with URL syntax.\n\nni-cvi-2026-reflector\t26.3.0.49416-0+f264\twindows_x64\tThe LabWindows/CVI .NET Reflector Runtime provides functions that facilitate calling .NET assemblies\n\nni-cvi-activex\t26.3.0.49415-0+f263\twindows_x64\tThe LabWindows/CVI ActiveX Library Runtime provides functions for ActiveX programming. You can distribute the ActiveX Library according to your license agreement.\n\nni-cvi-analysis\t26.3.0.49419-0+f267\twindows_x64\tThe LabWindows/CVI Analysis Library Runtime provides functions for 1D and 2D array manipulation, complex operations, matrix operations, and statistics.\n\nni-cvi-codegen\t20.0.0.49154-0+f2\twindows_all\tThe LabWindows/CVI Code Generator for the NI Assistant Framework.\n\nni-cvi-datasocket\t26.3.0.49425-0+f273\twindows_x64\tThe LabWindows/CVI DataSocket Library Runtime functions simplify live data exchange between applications. You can distribute the DataSocket Library according to your license agreement.\n\nni-cvi-dotnet\t26.3.0.49416-0+f264\twindows_x64\tThe LabWindows/CVI .NET Library Runtime provides functions that facilitate calling .NET assemblies.\n\nni-cvi-instrsup\t26.3.0.49425-0+f273\twindows_x64\tInstalls run-time support only for instrument drivers and a limited set of LabWindows/CVI library functions. This package allows other applications to use instrument driver DLLs without having to load the larger LabWindows/CVI Run-Time DLL.\n\nni-cvi-internet\t26.3.0.49415-0+f263\twindows_x64\tThe LabWindows/CVI Internet Library Runtime provides functions for Internet protocols like FTP, POP3, Telnet, etc. You can distribute the Intenet Library according to your license agreement.\n\nni-cvi-labview-dll-builder-15.1.0\t15.1.1.49154-0+f2\twindows_all\tThis is an infrastructure package for NI Software.\n\nni-cvi-network-variable\t26.3.0.49425-0+f273\twindows_x64\tThe LabWindows/CVI Network Variable Library Runtime provides functions for reading and writing data to network variables. You can use the functions in this library to communicate with LabVIEW shared variables and Measurement Studio network variables. You also can use the Network Variable Library functions in real-time (RT) applications.\n\nni-cvi-networkstreams\t26.3.0.49420-0+f268\twindows_x64\tThe LabWindows/CVI Network Streams Library Runtime provides functions for reading and writing data to network streams. You also can use the Network Streams Library functions in real-time (RT) applications.\n\nni-cvi-opengl\t26.3.0.49425-0+f273\twindows_x64\tInstalls the LabWindows/CVI OpenGL Library Runtime.\n\nni-cvi-openmp\t26.3.0.49415-0+f263\twindows_x64\tInstalls the LabWindows/CVI OpenMP Library Runtime.\n\nni-cvi-rte\t26.3.0.49425-0+f273\twindows_x64\tThe LabWindows/CVI Shared Runtime Base enables you to run most executables or use most DLLs created with LabWindows/CVI on a machine without the development environment installed. The LabWindows/CVI Shared Runtime Base enables you to run executables or use DLLs created with LabWindows/CVI that do not use separate LabWindows/CVI Shared Runtime libraries, and it must be present on any target computer on which you want to run your executable program. You can distribute the Runtime according to your license agreement.  The mark LabWindows is used under a license from Microsoft Corporation. Windows is a registered trademark of Microsoft Corporation in the United States and other countries.\n\nni-cvi-runtime-core\t26.3.0.49425-0+f273\twindows_x64\tInstalls run-time support for projects built with full run-time support. This package provides support for most, but not all, of the provided libraries. You will also need to select additional library support if your application calls the corresponding library functions.\n\nni-cvi-runtime-engine\t26.3.0.49425-0+f273\twindows_x64\tThe LabWindows/CVI Shared Runtime enables you to run executables or use DLLs created with LabWindows/CVI on machines without LabWindows/CVI installed. The LabWindows/CVI Shared Runtime is backwards compatible and may be used with applications that were created with previous versions of LabWindows/CVI. You can distribute the Runtime according to your license agreement. The mark LabWindows is used under a license from Microsoft Corporation. Windows is a registered trademark of Microsoft Corporation in the United States and other countries.\n\nni-cvi-runtime-realtime\t26.3.0.49425-0+f273\twindows_x64\tInstalls run-time support for DLLs targeted for a real-time system.\n\nni-cvi-tdms\t26.3.0.49421-0+f269\twindows_x64\tThe LabWindows/CVI TDM Streaming Library Runtime contains functions that you can use to log large amounts of test data quickly.\n\nni-cvi-usi\t26.3.0.49418-0+f266\twindows_x64\tInstalls the LabWindows/CVI Diadem Connectivity Support. It contains the deprecated cviusi.dll.\n\nni-daqmx-labview-shared-docs\t26.5.0.49603-0+f451\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-data-store-service-labview-support\t26.5.0.49244-0+f92\twindows_x64\tLabVIEW API for the measurement data services.\n\nni-data-store-service\t26.5.0.49244-0+f92\twindows_x64\tProvides the measurement data services.\n\nni-datafinder-client-api\t26.5.0.49255-0+f103\twindows_all\tNI DataFinder Client provides components for connecting to DataFinder Desktop and DataFinder Server.\n\nni-datafinder-desktop-quit-dc\t26.5.0.49251-0+f99\twindows_x64\tQuit of DataFinder Desktop\n\nni-dataplugins-aop5\t26.3.0.49217-0+f65\twindows_x64\tThe ASAM Standards DataPlugin for AOP5 supports reading, writing, importing, and exporting of ASAM operational data store (ODS) data objects.\n\nni-dataplugins-python-host\t26.5.0.49251-0+f99\twindows_all\tNI DataPlugins Python Host\n\nni-datasocket\t26.3.0.49347-0+f195\twindows_x64\tSupport for built applications or shared libraries that use DataSocket. This installer includes the DataSocket Server, DataSocket Server Manager, and OPC Demo Server.\n\nni-dct-labview-support\t26.3.0.49244-0+f92\twindows_x64\tThe LabVIEW Database Connectivity Toolkit helps you connect to local and remote databases and implement common database operations. The LabVIEW Database Connectivity Toolkit is a software add-on for LabVIEW that helps you perform many database operations without using structured query language (SQL) programming. It readily connects to popular databases, such as Microsoft Access, SQL Server, and Oracle. If you need advanced database functionality and flexibility, the LabVIEW Database Connectivity Toolkit also offers complete SQL capabilities.\n\nni-deployment-framework-x86\t26.3.0.49791-0+f639\twindows_x64\tProvides a framework to support RT or assembly deployment.\n\nni-deployment-framework\t26.3.0.49791-0+f639\twindows_x64\tProvides a framework to support RT or assembly deployment.\n\nni-dett-labview-support\t26.3.0.49250-0+f98\twindows_x64\tThis installs the LabVIEW Desktop Execution Trace Toolkit support files for LabVIEW.\n\nni-dfc-labview-support\t26.3.0.49232-0+f80\twindows_x64\tLabVIEW DataFinder Connectivity Runtime enables the connection to DataFinder Server\n\nni-dfdt-labview-support\t26.3.0.49268-0+f116\twindows_x64\tThe LabVIEW Digital Filter Design Toolkit provides interactive tools for the design, analysis, and implementation of digital filters. The LabVIEW Digital Filter Design Toolkit is a software add-on for LabVIEW that helps you explore classic filter designs with its the built-in interactive design tools. It also provides a breadth of algorithms, filter topologies, and analysis tools for both fixed- and floating-point digital filters. For fixed-point filters, you can model quantization effects, optimize numeric representation/topology, and deploy the design on a digital signal processor or an FPGA using automatically generated ANSI C or LabVIEW FPGA code.\n\nni-discovery-service\t26.5.0.49706-0+f554\twindows_x64\tProvides the NI discovery service.\n\nni-distributed-system-manager-2026\t26.3.0.49794-0+f642\twindows_x64\tSupport for creating and monitoring variables, processes, I/O servers, and Web services, as well as interacting with the NI Variable Engine and managing security aliases.\n\nni-dotnetcore-interface-x86\t26.3.0.49790-0+f638\twindows_x64\tNI LabVIEW DotNet Core Interface\n\nni-dotnetcore-interface\t26.3.0.49790-0+f638\twindows_x64\tNI LabVIEW DotNet Core Interface\n\nni-error-report-x86\t25.0.0.49231-0+f79\twindows_x64\tNI Error Reporting (32-bit) enables you to send NI a crash or internal warning report.\n\nni-error-reporting-common\t26.5.0.49694-0+f542\twindows_x64\tNI Error Reporting enables you to send NI a crash or internal warning report.\n\nni-error-reporting-interface\t25.0.0.49226-0+f74\twindows_x64\tNI Error Reporting Interface provides the error reporting interface for Windows.\n\nni-error-reporting-native-x86\t26.5.0.49216-0+f64\twindows_x64\tNI Error Reporting enables you to send NI a crash or internal warning report.\n\nni-error-reporting-native\t26.5.0.49216-0+f64\twindows_x64\tNI Error Reporting enables you to send NI a crash or internal warning report.\n\nni-euladepot\t26.5.0.49245-0+f93\twindows_x64\tInstalls license and notice files.\n\nni-example-finder\t26.3.0.49794-0+f642\twindows_x64\tNI Example Finder is a utility that you can browse and search LabVIEW example VIs.\n\nni-expat1-libs\t26.5.0.49176-0+f24\twindows_x64\tExpat is a C99 library that implements a stream-oriented XML parser. Expat-NI is a build of Expat maintained by NI across its software platform. This package is built from Expat 2.8.1.\n\nni-help-assistant\t2.2.0.49154-0+f2\twindows_all\tProvides support for displaying NI HTML help files.\n\nni-help-launcher\t26.5.0.49203-0+f51\twindows_x64\tInfrastructure to launch help for NI software\n\nni-json-map\t26.3.0.49369-0+f217\twindows_x64\tNI JSON Map Files contains the information about NI Component locations for better error messaging with missing subVIs.\n\nni-labview-2025-nls-plugin\t25.8.2.49163-0+f11\twindows_x64\tProvides support for the Nigel AI Advisor in LabVIEW\n\nni-labview-2026-core-en\t26.3.0.49795-0+f643\twindows_x64\tLabVIEW is systems engineering software for applications that require test, measurement, and control with rapid access to hardware and data insights. The LabVIEW programming environment simplifies hardware integration for engineering applications so that you have a consistent way to acquire data from NI and third-party hardware. LabVIEW reduces the complexity of programming, so you can focus on your unique engineering problem. LabVIEW enables you to immediately visualize results with built-in, drag-and-drop engineering user interface creation and integrated data viewers. To turn your acquired data into real business results, you can develop algorithms for data analysis and advanced control with included math and signal processing IP or reuse your own libraries from a variety of tools. To ensure compatibility with other engineering tools, LabVIEW can interoperate with, and reuse libraries from, other software and open-source languages.\n\nni-labview-2026-core-en\t26.3.1.49171-0+f19\twindows_x64\tLabVIEW is systems engineering software for applications that require test, measurement, and control with rapid access to hardware and data insights. The LabVIEW programming environment simplifies hardware integration for engineering applications so that you have a consistent way to acquire data from NI and third-party hardware. LabVIEW reduces the complexity of programming, so you can focus on your unique engineering problem. LabVIEW enables you to immediately visualize results with built-in, drag-and-drop engineering user interface creation and integrated data viewers. To turn your acquired data into real business results, you can develop algorithms for data analysis and advanced control with included math and signal processing IP or reuse your own libraries from a variety of tools. To ensure compatibility with other engineering tools, LabVIEW can interoperate with, and reuse libraries from, other software and open-source languages.\n\nni-labview-2026-core-en\t26.3.2.49153-0+f1\twindows_x64\tLabVIEW is systems engineering software for applications that require test, measurement, and control with rapid access to hardware and data insights. The LabVIEW programming environment simplifies hardware integration for engineering applications so that you have a consistent way to acquire data from NI and third-party hardware. LabVIEW reduces the complexity of programming, so you can focus on your unique engineering problem. LabVIEW enables you to immediately visualize results with built-in, drag-and-drop engineering user interface creation and integrated data viewers. To turn your acquired data into real business results, you can develop algorithms for data analysis and advanced control with included math and signal processing IP or reuse your own libraries from a variety of tools. To ensure compatibility with other engineering tools, LabVIEW can interoperate with, and reuse libraries from, other software and open-source languages.\n\nni-labview-2026-coreother\t26.3.0.49792-0+f640\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-2026-coreother\t26.3.1.49171-0+f19\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-2026-deployable-license\t26.3.0.49792-0+f640\twindows_x64\tNI LabVIEW Deployable License contains components to support remote panel licenses.\n\nni-labview-2026-example\t26.3.0.49792-0+f640\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-2026-executable\t26.3.0.49792-0+f640\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-2026-executable\t26.3.1.49171-0+f19\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-2026-ff-runtime-engine\t26.3.0.49794-0+f642\twindows_x64\tSupport for built applications or shared libraries that use LabVIEW Datalogging and Supervisory Control Module features, including security, alarming, logging, and shared variable management.\n\nni-labview-2026-help-en\t26.3.0.49792-0+f640\twindows_x64\tNI LabVIEW (64-bit) Help is used to provide help information for LabVIEW (64-bit).\n\nni-labview-2026-license\t26.3.0.49791-0+f639\twindows_x64\tNI LabVIEW License is used to install license files for LabVIEW.\n\nni-labview-2026-manuals\t26.3.0.49792-0+f640\twindows_x64\tNI LabVIEW (64-bit) Manuals is used to provide manuals for LabVIEW (64-bit).\n\nni-labview-2026-realtime-nbfifo-x86\t26.1.0.49354-0+f202\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-2026-realtime-nbfifo\t26.1.0.49354-0+f202\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-2026-runtime-engine-resource-x64\t26.3.0.49794-0+f642\twindows_x64\tLabVIEW 64-bit Runtime Resource contains support for non-English languages to display in dialog boxes, menus, and error messages that are part of the LabVIEW Runtime.\n\nni-labview-2026-runtime-engine-resource-x64\t26.3.1.49171-0+f19\twindows_x64\tLabVIEW 64-bit Runtime Resource contains support for non-English languages to display in dialog boxes, menus, and error messages that are part of the LabVIEW Runtime.\n\nni-labview-2026-runtime-engine-resource-x64\t26.3.2.49153-0+f1\twindows_x64\tLabVIEW 64-bit Runtime Resource contains support for non-English languages to display in dialog boxes, menus, and error messages that are part of the LabVIEW Runtime.\n\nni-labview-2026-runtime-engine-resource\t26.3.0.49794-0+f642\twindows_x64\tLabVIEW 32-bit Runtime Resource contains support for non-English languages to display in dialog boxes, menus, and error messages that are part of the LabVIEW Runtime.\n\nni-labview-2026-runtime-engine-resource\t26.3.2.49153-0+f1\twindows_x64\tLabVIEW 32-bit Runtime Resource contains support for non-English languages to display in dialog boxes, menus, and error messages that are part of the LabVIEW Runtime.\n\nni-labview-2026-runtime-engine-x86\t26.3.0.49794-0+f642\twindows_x64\tThe LabVIEW Runtime is a software add-on that enables engineers to run executables on a nondevelopment machine. The LabVIEW Runtime enables you to run executables created with the LabVIEW Application Builder on machines that do not have LabVIEW installed. The LabVIEW Runtime includes the libraries and other files necessary to run basic application types built in LabVIEW.\n\nni-labview-2026-runtime-engine-x86\t26.3.1.49171-0+f19\twindows_x64\tThe LabVIEW Runtime is a software add-on that enables engineers to run executables on a nondevelopment machine. The LabVIEW Runtime enables you to run executables created with the LabVIEW Application Builder on machines that do not have LabVIEW installed. The LabVIEW Runtime includes the libraries and other files necessary to run basic application types built in LabVIEW.\n\nni-labview-2026-runtime-engine-x86\t26.3.2.49153-0+f1\twindows_x64\tThe LabVIEW Runtime is a software add-on that enables engineers to run executables on a nondevelopment machine. The LabVIEW Runtime enables you to run executables created with the LabVIEW Application Builder on machines that do not have LabVIEW installed. The LabVIEW Runtime includes the libraries and other files necessary to run basic application types built in LabVIEW.\n\nni-labview-2026-runtime-engine\t26.3.0.49794-0+f642\twindows_x64\tThe LabVIEW Runtime is a software add-on that enables engineers to run executables on a nondevelopment machine. The LabVIEW Runtime enables you to run executables created with the LabVIEW Application Builder on machines that do not have LabVIEW installed. The LabVIEW Runtime includes the libraries and other files necessary to run basic application types built in LabVIEW.\n\nni-labview-2026-runtime-engine\t26.3.1.49171-0+f19\twindows_x64\tThe LabVIEW Runtime is a software add-on that enables engineers to run executables on a nondevelopment machine. The LabVIEW Runtime enables you to run executables created with the LabVIEW Application Builder on machines that do not have LabVIEW installed. The LabVIEW Runtime includes the libraries and other files necessary to run basic application types built in LabVIEW.\n\nni-labview-2026-runtime-engine\t26.3.2.49153-0+f1\twindows_x64\tThe LabVIEW Runtime is a software add-on that enables engineers to run executables on a nondevelopment machine. The LabVIEW Runtime enables you to run executables created with the LabVIEW Application Builder on machines that do not have LabVIEW installed. The LabVIEW Runtime includes the libraries and other files necessary to run basic application types built in LabVIEW.\n\nni-labview-2026-scripting-codegen\t26.3.0.49792-0+f640\twindows_x64\tNI LabVIEW 2026 (64-bit) Scripting Code Generator installs the LabVIEW 2026 (64-bit) Scripting Code Generator Engine.\n\nni-labview-2026-simulation-x64\t26.3.0.49792-0+f640\twindows_x64\tInstalls files in the LabVIEW (64-bit) addons simulation folder\n\nni-labview-2026-vilib\t26.3.0.49792-0+f640\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-2026-vilib\t26.3.1.49171-0+f19\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-2026q3-nls-plugin\t26.5.0.49361-0+f209\twindows_x64\tProvides support for the Nigel AI in LabVIEW.\n\nni-labview-2026q3-nls-plugin\t26.5.2.49163-0+f11\twindows_x64\tProvides support for the Nigel AI in LabVIEW.\n\nni-labview-aspt-toolkit-lic\t26.3.0.49247-0+f95\twindows_x64\tNI LabVIEW 2026 Advanced Signal Processing Toolkit License provides Advanced Signal Processing Toolkit license files\n\nni-labview-broker\t22.3.0.49154-0+f2\twindows_x64\tNI LabVIEW Broker enables a C++ app to run VIs and interact with LV.\n\nni-labview-c-interface\t1.0.4.49154-0+f2\twindows_all\tThe LabVIEW C Interface to VI Server enables you to call VIs from C code. You can also call VI Server properties and methods on the Application and VI classes.\n\nni-labview-command-line-interface-x86\t26.3.0.49372-0+f220\twindows_x64\tThe NI LabVIEW Command Line Interface (CLI) helps you run operations in LabVIEW by executing commands from the command line. The NI LabVIEW Command Line Interface (CLI) is a software add-on for LabVIEW. You can use it to automate the build process of LabVIEW applications and run the VIs and custom operations you create in LabVIEW.\n\nni-labview-database-toolkit-lic\t26.3.0.49243-0+f91\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-database-toolkit-utility\t26.3.0.49242-0+f90\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-datafinder-runtime\t26.3.0.49232-0+f80\twindows_x64\tLabVIEW DataFinder Connectivity Runtime enables the connection to DataFinder Server\n\nni-labview-dett-core\t26.3.0.49250-0+f98\twindows_x64\tThis installs the NI LabVIEW Desktop Execution Trace Toolkit core part files.\n\nni-labview-dett-labview-2023-support-x86\t26.3.0.49249-0+f97\twindows_x64\tThis installs the LabVIEW Desktop Execution Trace Toolkit support files for LabVIEW 2023.\n\nni-labview-dett-labview-2023-support\t26.3.0.49249-0+f97\twindows_x64\tThis installs the LabVIEW Desktop Execution Trace Toolkit support files for LabVIEW 2023 (64-bit).\n\nni-labview-dett-labview-2024-support-x86\t26.3.0.49249-0+f97\twindows_x64\tThis installs the LabVIEW Desktop Execution Trace Toolkit support files for LabVIEW 2024.\n\nni-labview-dett-labview-2024-support\t26.3.0.49249-0+f97\twindows_x64\tThis installs the LabVIEW Desktop Execution Trace Toolkit support files for LabVIEW 2024 (64-bit).\n\nni-labview-dett-lic\t26.3.0.49248-0+f96\twindows_x64\tThis installs the NI LabVIEW Desktop Execution Trace Toolkit License.\n\nni-labview-dett\t26.3.0.49250-0+f98\twindows_x64\tThe LabVIEW Desktop Execution Trace Toolkit helps you perform dynamic code analysis for advanced debugging. The LabVIEW Desktop Execution Trace Toolkit helps you trace the execution of LabVIEW VIs on a Windows target during run time to detect and locate problems in code that could affect performance or cause unexpected behavior. It provides a chronological view of VI events, queue operations, reference leaks, memory allocation, unhandled errors, and subVI execution. With this toolkit, you can programmatically generate user-defined events from the block diagram of a LabVIEW application.\n\nni-labview-dfd-toolkit-lic\t26.3.0.49266-0+f114\twindows_x64\tThis installs the NI LabVIEW 2026 Digital Filter Design Toolkit License.\n\nni-labview-max-xml\t19.0.0.49154-0+f2\twindows_all\tNI LabVIEW MAX XML installs the XML file for defining visibility of LabVIEW in MAX.\n\nni-labview-offline-manual-en\t26.3.0.49793-0+f641\twindows_x64\tLabVIEW Offline Manual provides help services while offline\n\nni-labview-report-generation-toolkit-lic\t26.3.0.49242-0+f90\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-labview-system-state-publisher\t26.3.0.49791-0+f639\twindows_x64\tNI System State Publisher provides System State Publisher support for LabVIEW.\n\nni-labview-unit-test-framework-toolkit-lic\t26.3.0.49246-0+f94\twindows_x64\tThis installs the NI LabVIEW Unit Test Framework Toolkit License.\n\nni-labview-vi-analyzer-toolkit-lic\t26.3.0.49275-0+f123\twindows_x64\tThis installs the NI LabVIEW VI Analyzer Toolkit License.\n\nni-labview-vicompare\t26.3.0.49794-0+f642\twindows_x64\tNI LabVIEW Compare Utility (64-bit) is a utility to compare LabVIEW VIs.\n\nni-labview-vimerge\t26.3.0.49794-0+f642\twindows_x64\tNI LabVIEW Merge Utility (64-bit) is a utility to merge LabVIEW VIs.\n\nni-license-manager-compatibility-server\t26.5.0.49698-0+f546\twindows_x64\tServer to allow .NET 6+ products to interface with NI License Manager.\n\nni-license-manager\t26.5.0.49256-0+f104\twindows_x64\tNI License Manager is an application that helps you manage licensed NI software assets. NI License Manager is a tool designed to help you activate, deactivate, and transfer software products using license activation codes or license files. License administrators can use NI License Manager to automate product activation and add volume license servers.\n\nni-lm-client-26.0-x86\t26.1.0.49905-0+f753\twindows_x64\tInstalls binaries for NILM Client\n\nni-lm-client-26.0\t26.1.0.49905-0+f753\twindows_x64\tInstalls binaries for NILM Client\n\nni-lm-client-26.5-x86\t26.3.0.49792-0+f640\twindows_x64\tInstalls binaries for NILM Client\n\nni-lm-client-26.5\t26.3.0.49792-0+f640\twindows_x64\tInstalls binaries for NILM Client\n\nni-lm-clr-compatibility-client-x86\t26.3.0.49789-0+f637\twindows_x64\tInstalls binaries for NILM CLR Compatibilty Client\n\nni-lm-clr-compatibility-client\t26.3.0.49789-0+f637\twindows_x64\tInstalls binaries for NILM CLR Compatibilty Client\n\nni-logos-labview-2026-support-en\t26.3.0.49792-0+f640\twindows_x64\tNI Logos LabVIEW 2026 (64-bit) Support is used to provide LabVIEW 2026 (64-bit) Support for Logos Networking Technology.\n\nni-logos-xt\t26.5.0.49330-0+f178\twindows_x64\tNI Logos XT provides a thin layer on top of TCP/IP to simplify some common network tasks.\n\nni-logos\t26.5.0.49330-0+f178\twindows_x64\tNI Logos provides support for the network protocol that uses network-published shared variables.\n\nni-lv-2026q3-ai-addon\t26.5.0.49361-0+f209\twindows_x64\tProvides support for LabVIEW Nigel Integration\n\nni-lv-2026q3-ai-addon\t26.5.2.49163-0+f11\twindows_x64\tProvides support for LabVIEW Nigel Integration\n\nni-lv-ai-addon\t25.8.2.49163-0+f11\twindows_x64\tProvides support for LabVIEW Nigel Integration\n\nni-lv-web-server-labview-2026-runtime-engine-support\t26.5.0.49335-0+f183\twindows_x64\tNI RTE LabVIEW Web Server 64-Bit.\n\nni-lv-web-server-labview-2026-runtime-engine-x86-support\t26.5.0.49335-0+f183\twindows_x64\tInclude this component when using the Web Server for stand-alone applications and shared libraries.\n\nni-lv-web-server-labview-2026-support\t26.5.0.49335-0+f183\twindows_x64\tNI LabVIEW 2026 Q5 Web Server 64-Bit.\n\nni-lvaspt-offline-manual-en\t26.3.0.49248-0+f96\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-lvdct-offline-manual-en\t26.3.0.49244-0+f92\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-lvdett-offline-manual-en\t26.3.0.49250-0+f98\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-lvdfc-offline-manual-en\t26.3.0.49232-0+f80\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-lvdfdt-offline-manual-en\t26.3.0.49267-0+f115\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-lvrgt-offline-manual-en\t26.3.0.49243-0+f91\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-lvutf-offline-manual-en\t26.3.0.49249-0+f97\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-lvvia-offline-manual-en\t26.3.0.49277-0+f125\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-matlab-interface\t26.3.0.49370-0+f218\twindows_x64\tInterface that allows interoperability between NI Software and MATLAB.\n\nni-max-remote-provider\t26.5.0.49268-0+f116\twindows_x64\tProvides remote configuration of NI Real-Time targets in Measurement & Automation Explorer (MAX).\n\nni-max-rempxi-provider\t26.5.0.49267-0+f115\twindows_x64\tProvides remote configuration of NI Real-Time PXI targets in Measurement & Automation Explorer (MAX).\n\nni-max-software-provider\t26.5.0.49267-0+f115\twindows_x64\tProvides software configuration in Measurement & Automation Explorer (MAX).\n\nni-max\t26.5.0.49268-0+f116\twindows_x64\tUse this application to configure, test, and communicate with your NI hardware. Use Measurement & Automation Explorer (MAX) to configure, test, and communicate with your NI hardware. You must install the appropriate driver software for your hardware to appear in MAX.\n\nni-mdfsupport\t26.5.0.49246-0+f94\twindows_x64\tThis package installs the files necessary to support building deployments from NI\\x27s ADEs.\n\nni-mdnsresponder\t26.0.0.49260-0+f108\twindows_x64\tUsed by National Instruments components to advertise and discover Zeroconf devices and services. NI mDNS Responder Service advertises and discovers Zeroconf devices and services. If this service is stopped, advertisement and discovery of devices and services will no longer function. If this service is disabled, any services that explicitly depend on it will fail to start.\n\nni-mesa\t17.1.1.49154-0+f2\twindows_all\tMesa is an open-source implementation of the OpenGL specification that is a system for rendering interactive 3D graphics.\n\nni-metauninstaller\t26.5.0.49246-0+f94\twindows_x64\tThis package provides support for uninstallation of NI products.\n\nni-mkl-2020\t20.0.0.49154-0+f2\twindows_all\tMath Kernel Library (MKL) is an Intel software package that provides optimized linear algebra routines.\n\nni-msaspdotnetcore-runtime-80-x86\t26.5.0.49173-0+f21\twindows_all\tRequired by some NI products. The ASP.NET Core Runtime enables you to run existing web/server applications on Windows.  This package installs the ASP.NET Core Runtime.\n\nni-msaspdotnetcore-runtime-80\t26.5.0.49173-0+f21\twindows_x64\tRequired by some NI products. The ASP.NET Core Runtime enables you to run existing web/server applications on Windows.  This package installs the ASP.NET Core Runtime.\n\nni-msdotnet-desktop-runtime-80-x86\t26.5.0.49173-0+f21\twindows_all\tRequired by some NI products. The .NET Desktop Runtime enables you to run Windows desktop applications. This package installs the .NET Runtime.\n\nni-msdotnet-desktop-runtime-80\t26.5.0.49173-0+f21\twindows_x64\tRequired by some NI products. The .NET Desktop Runtime enables you to run Windows desktop applications. This package installs the .NET Runtime.\n\nni-msdotnet-runtime-80\t26.5.0.49173-0+f21\twindows_x64\tRequired by some NI products. The .NET Runtime enables you to run Windows console applications. This package installs the .NET Runtime.\n\nni-msdotnet4x\t26.5.0.49175-0+f23\twindows_x64\tInstaller for .NET Framework 4.8.0\n\nni-mstudio-cw3dgraph\t8.7.5.49154-0+f2\twindows_all\tThe National Instruments Measurement Studio 3DGraph ActiveX control.\n\nni-msvcrt-2015\t26.5.0.49220-0+f68\twindows_x64\tNI installer for Microsoft Visual C++ 2015-2022 Run-Time, version 14.44.35112\n\nni-mswebview2\t26.5.0.49173-0+f21\twindows_x64\tMicrosoft WebView2 Runtime 148.0.3967\n\nni-mxs\t26.0.0.49263-0+f111\twindows_x64\tProvides an internal configuration database for NI software and hardware.\n\nni-networkdiscoverysvc\t26.5.0.49267-0+f115\twindows_x64\tProvides network device and service discovery for NI services and applications. NI Network Discovery Service discovers NI Zeroconf devices and services. If this service is stopped components that rely on discovering NI Zeroconf devices and services will no longer function. If this service is disabled any services that explicitly depend on it will fail to start.\n\nni-nigel-local-service\t26.5.0.49706-0+f554\twindows_x64\tNI Nigel Local Service\n\nni-nigel-local-service\t26.5.1.49161-0+f9\twindows_x64\tNI Nigel Local Service\n\nni-nls-plugin-entitlement\t26.5.0.49360-0+f208\twindows_x64\tInstalls the NI License Manager entitlement file for NI Nigel Advanced.\n\nni-nls-plugin-entitlement\t26.5.2.49163-0+f11\twindows_x64\tInstalls the NI License Manager entitlement file for NI Nigel Advanced.\n\nni-offline-help-viewer\t26.5.0.49204-0+f52\twindows_x64\tApplication to view offline help for NI software\n\nni-opc-support\t26.5.0.49333-0+f181\twindows_x64\tNI OPC Support helps customers using OPC (OLE for process control) to add advanced analysis and control functionality to their system.\n\nni-opcenum\t5.6.3.49154-0+f2\twindows_all\tOPCEnum application runs locally on the serving computer and exposes available OPC servers to the remotely connecting clients.\n\nni-openssl3-libs-x86\t26.5.0.49224-0+f72\twindows_all\tOpenSSL is a robust, commercial-grade, full-featured toolkit for general-purpose cryptography and secure communication. OpenSSL-NI is a build of OpenSSL maintained by NI across its software platform. This package is built from OpenSSL 3.5.7.\n\nni-openssl3-libs\t26.5.0.49224-0+f72\twindows_x64\tOpenSSL is a robust, commercial-grade, full-featured toolkit for general-purpose cryptography and secure communication. OpenSSL-NI is a build of OpenSSL maintained by NI across its software platform. This package is built from OpenSSL 3.5.7.\n\nni-package-builder-labview-2026-support\t26.3.0.49792-0+f640\twindows_x64\tAllows building packages from LabVIEW 2026 (64-bit)\n\nni-portable-configuration\t26.5.0.49267-0+f115\twindows_x64\tUsed by National Instruments components to archive and deploy configuration settings.\n\nni-python-interface\t26.3.0.49370-0+f218\twindows_x64\tNI Python Interface is a common Python interface for all NI products.\n\nni-realtime-error-dialog-x64\t26.1.0.49356-0+f204\twindows_x64\tLabVIEW Real-Time Error Dialog enables you to view error logs and generate error reports for sessions of a LabVIEW Real-Time target.\n\nni-realtime-error-dialog-x86\t26.1.0.49358-0+f206\twindows_x64\tLabVIEW Real-Time Error Dialog enables you to view error logs and generate error reports for sessions of a LabVIEW Real-Time target.\n\nni-registration-wizard\t25.3.0.49219-0+f67\twindows_x64\tThe NI Registration Wizard is designed to assist in the registration of National Instruments products by using a secure internet connection.\n\nni-remote-configuration\t26.5.0.49267-0+f115\twindows_x64\tProvides remote configuration of NI Real-Time targets.\n\nni-resetniconfig\t26.0.0.49263-0+f111\twindows_x64\tNI Reset Configuration is a utility used to reset all NI device configuration settings.\n\nni-rgt-labview-support\t26.3.0.49243-0+f91\twindows_x64\tThe LabVIEW Report Generation Toolkit provides VIs for programmatically creating and editing Microsoft Word and Excel reports from LabVIEW. The LabVIEW Report Generation Toolkit is a software add-on for LabVIEW that can generate reports on manufacturing test results or compile process statistics to improve your production yields. With this toolkit, you can easily populate report templates, email reports, execute macros, and manage report layout and appearance.\n\nni-rpc\t26.5.0.49394-0+f242\twindows_x64\tNI Remote Procedure Call library (infrastructure) Provides rpc services to NI software.\n\nni-search-labview-2026-support\t26.3.0.49790-0+f638\twindows_x64\tNI Search LabVIEW 2026 (64-bit) Support provides libraries and other files necessary to run search in LabVIEW 2026 (64-bit).\n\nni-search\t26.3.0.49790-0+f638\twindows_x64\tNI Search Shared Engine (64-bit) provides libraries and other files necessary to run search in NI applications.\n\nni-securityupdate-kb67l8lcqw-killbits\t2.1.0.49154-0+f2\twindows_all\tThis is an infrastructure package for NI Software.\n\nni-skyline-alarminstance-service\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink Alarm Instance Service\n\nni-skyline-core-services\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink Core Services\n\nni-skyline-file-service\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink File Service\n\nni-skyline-license-webservice\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink License Web Service\n\nni-skyline-notification-service\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink Notification Service\n\nni-skyline-openssl\t26.5.0.49273-0+f121\twindows_x64\tNI SystemLink Shared OpenSSL\n\nni-skyline-redis-support\t26.5.0.49276-0+f124\twindows_x64\tInstalls and configures the SystemLink KeyValue Database Service.\n\nni-skyline-service-manager\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink Service Manager\n\nni-skyline-smtp-service\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink SMTP Service\n\nni-skyline-tag-service\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink Tag Service\n\nni-skyline-tagruleengine-service\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink Tag Rule Engine Service\n\nni-skyline-tdmreader-service\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink TDM Reader Service\n\nni-skyline-user-service\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink Security Service\n\nni-skyline-wif-webservice\t26.5.0.49273-0+f121\twindows_x64\tNI SystemLink Web Interface Framework Web Service\n\nni-skyline-wif-webui\t26.5.0.49273-0+f121\twindows_x64\tNI SystemLink Web Interface Framework Web UI\n\nni-slcp-common\t26.5.0.49220-0+f68\twindows_x64\tProvides shared binaries for the NI Software License Compliance Program.\n\nni-slcp-x86\t26.5.0.49220-0+f68\twindows_x64\tThe NI Software License Compliance Program is a mechanism that records and sends to NI only the critical information necessary to validate legal compliance with NI licensing policies.\n\nni-slcp\t26.5.0.49220-0+f68\twindows_x64\tThe NI Software License Compliance Program is a mechanism that records and sends to NI only the critical information necessary to validate legal compliance with NI licensing policies.\n\nni-ssl-labview-2026-runtime-engine-support\t26.3.0.49339-0+f187\twindows_x64\tInstalls LabVIEW 2026 Q3 64-bit runtime support files for SSL technologies.\n\nni-ssl-labview-2026-runtime-engine-x86-support\t26.3.0.49339-0+f187\twindows_x64\tInstalls LabVIEW 2026 Q3 runtime support files for SSL technologies.\n\nni-ssl-labview-2026-support\t26.3.0.49339-0+f187\twindows_x64\tInstalls LabVIEW 2026 Q3 64-bit support files for SSL technologies.\n\nni-svcloc\t26.5.0.49327-0+f175\twindows_x64\tNI Service Locator 2026 Q5 The NI Service Locator facilitates communication between National Instruments support programs and services that use local, dynamic TCP ports to communicate with each other.\n\nni-sysapi-webservice\t26.3.0.49279-0+f127\twindows_x64\tProvides 32-bit web service components for the NI System API Framework.\n\nni-sysapi\t26.5.0.49267-0+f115\twindows_x64\tProvides an internal interface for enumerating and configuring devices.\n\nni-syscfg-dotnet-runtime\t26.5.0.49267-0+f115\twindows_x64\tEnables you to run applications that use the NI System Configuration .NET API.\n\nni-syscfg-labview-support-common\t26.5.0.49267-0+f115\twindows_x64\tProvides files required to create applications using the NI System Configuration API within LabVIEW.\n\nni-syscfg-labview-support\t26.5.0.49267-0+f115\twindows_x64\tProvides files required to create applications using the NI System Configuration API within LabVIEW.\n\nni-syscfg-runtime\t26.5.0.49267-0+f115\twindows_x64\tRun-time components required to deploy applications that use the NI System Configuration API.\n\nni-sysdetails-webservice\t26.3.0.49279-0+f127\twindows_x64\tProvides a web service for querying system details.\n\nni-sysmgmt-common\t26.5.0.49278-0+f126\twindows_x64\tNI SystemLink Systems Management Common Components\n\nni-sysmgmt-salt-master-support\t26.5.0.49278-0+f126\twindows_x64\tNI SystemLink Systems Management Salt Master Service\n\nni-system-webserver-appserver\t26.5.0.49335-0+f183\twindows_x64\tInclude this component when using Web Services built with LabVIEW.\n\nni-system-webserver-base\t26.5.0.49335-0+f183\twindows_x64\tNI System Web Server Base 2026 Q5\n\nni-system-webserver\t26.5.0.49335-0+f183\twindows_x64\tSupport for using Web services to communicate between National Instruments software, such as LabVIEW and NI Measurement & Automation Explorer.\n\nni-systemlink-message-broker\t26.5.0.49271-0+f119\twindows_x64\tBroker for AMQP messages\n\nni-systemlink-nosqldatabase-4.2\t26.5.0.49276-0+f124\twindows_x64\tInstalls and configures the SystemLink NoSQL Database Service.\n\nni-systemlink-repository-webservice\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink Package Repository Web Service\n\nni-systemlink-system-webservice\t26.5.0.49278-0+f126\twindows_x64\tNI SystemLink Systems Management Web Service\n\nni-systemlink-user-data-service\t26.5.0.49276-0+f124\twindows_x64\tNI SystemLink User Data Service\n\nni-systemlogging-utils\t26.5.0.49329-0+f177\twindows_x64\tNI System Logging Utilities\n\nni-targetdiscoverywizard\t26.5.0.49268-0+f116\twindows_x64\tDiagnoses problems adding a remote system to NI MAX. NI Remote System Discovery Troubleshooting Wizard diagnoses problems with adding a system to Measurement & Automation Explorer (MAX).\n\nni-tdm-excel-addin\t26.5.0.49251-0+f99\twindows_x64\tExtends the capabilities of Microsoft Excel by adding the ability to load TDM or TDMS files written with NI hardware and application software.\n\nni-tdms\t26.5.0.49332-0+f180\twindows_x64\tNI TDM Streaming provides functions to read and write waveforms and waveform properties to binary measurement files (.tdms).\n\nni-teststand-2025-nls-plugin\t25.5.1.49161-0+f9\twindows_x64\tProvides support for the Nigel AI Advisor in TestStand.\n\nni-traceengine\t26.5.0.49327-0+f175\twindows_x64\tNI Trace Engine\n\nni-update-service\t26.5.0.49246-0+f94\twindows_x64\tNI Update Service checks for and electronically delivers software updates for NI software and drivers.\n\nni-usi-core\t26.5.0.49251-0+f99\twindows_all\tNI USI Core provides components for NI TDM software NI USI Core provides components for NI TDM software and allows access to any file format using DataPlugins.\n\nni-utf-labview-support\t26.3.0.49249-0+f97\twindows_x64\tThe LabVIEW Unit Test Framework Toolkit helps you automate LabVIEW VI unit testing to perform functional validation. The LabVIEW Unit Test Framework Toolkit is a software add-on for LabVIEW that helps you automate functional validation and demonstrate whether an application behaves properly. You can generate a unit test or import test parameters from a text document created in an editor such as Microsoft Excel. Tests can encompass multiple test cases, which define input values and the expected output for any data type, including arrays and clusters. You can identify the source of incorrect outputs, track code coverage, and generate validation documents in HTML, ATML/XML, or ASCII formats.\n\nni-variable-engine-labview-2026-support-en\t26.3.0.49792-0+f640\twindows_x64\tNI Variable Engine LabVIEW 2026 (64-bit) Support is used to provide LabVIEW 2026 (64-bit) Support for Variable Engine.\n\nni-variable-engine\t26.5.0.49333-0+f181\twindows_x64\tNI Variable Engine supports applications that read and write live data using shared variables. You must install this engine if you host, configure, or create shared variables in your application.\n\nni-viawin-labview-support\t26.3.0.49277-0+f125\twindows_x64\tThe LabVIEW VI Analyzer Toolkit helps you perform static code analysis to improve the quality and readability of your LabVIEW code. The LabVIEW VI Analyzer Toolkit is a software add-on for LabVIEW that helps you improve graphical code developed in LabVIEW. With this toolkit, you can configure more than 90 included tests for automated code review and static code analysis of all VIs in an application, or you can create your own using the test creation wizard. The LabVIEW VI Analyzer Toolkit provides debugging tools that help you avoid improper coding techniques that could impact an application\\x27s performance, functionality, or maintainability. In addition, you can enforce effective programming practices and coding styles within teams of developers to ensure code readability and functionality.\n\nni-vipm-helper\t26.3.0.49161-0+f9\twindows_x64\tDiscover and install LabVIEW add-ons from the LabVIEW Tools Network. Package your own reusable code and share it with others.\n\nni-vipm\t26.3.0.49161-0+f9\twindows_x64\tVI Package Manager helps you discover, create, and install LabVIEW add-ons. VI Package Manager helps you discover and install LabVIEW add-ons from the LabVIEW Tools Network. VI Package Manager can also help you work smarter by building reusable code libraries and tools for your developers and customers.\n\nni-web-based-configuration\t26.3.0.49276-0+f124\twindows_x64\tEnables remote configuration of the system from a web browser. Use NI Web-Based Configuration and Monitoring to configure and monitor NI web servers from a web browser.\n\nni-web-pipeline-26.5\t26.5.0.49225-0+f73\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-web-services-labview-2026-support\t26.5.0.49335-0+f183\twindows_x64\tInstalls Web Services Runtime Components 64-Bit.\n\nni-webserver-webservices-amqp\t26.5.0.49246-0+f94\twindows_x64\tProvides support for the NI Web Server to host AMQP web services.\n\nni-webserver-webservices\t26.5.0.49246-0+f94\twindows_x64\tProvides support for the NI Web Server to host web services.\n\nni-webserver\t26.5.0.49248-0+f96\twindows_x64\tThe NI Web Server hosts web applications and web UIs.\n\nni-webservices-amqp-deployment-support-x86\t26.5.0.49330-0+f178\twindows_x64\tProvides support for hosting Web services built in LabVIEW 2026 (32-bit) on NI Web Server.\n\nni-webservices-amqp-deployment-support\t26.5.0.49330-0+f178\twindows_x64\tProvides support for hosting Web services built in LabVIEW 2026 (64-bit) on NI Web Server.\n\nni-webservices-amqp-labview-2026-support\t26.5.0.49330-0+f178\twindows_x64\tProvides support for developing Web services in LabVIEW 2026 (64-bit) hosted by NI Web Server.\n\nni-wif-landingpage\t26.3.0.49279-0+f127\twindows_x64\tA web landing page that provides a read only overview of the system. Use NI Web Landing Page to view the system\\x27s hostname, model, serial number, status, and network adapter information in a web browser.\n\nni-xerces-3.3\t26.3.0.49218-0+f66\twindows_all\tNI Xerces Software provides the XML parsing and transforming functionality to user applications.\n\nni-zlib1-libs\t26.5.0.49231-0+f79\twindows_x64\tZLib is a general purpose data compression library. ZLib-NI is a build of ZLib maintained by NI across its software platform. This package is built from ZLib 1.3.2.\n\nni-ceip-common\t25.0.0.49234-0+f82\twindows_x64\tProvides shared binaries for the NI Customer Experience Improvement Program.\n\nni-ceip-x86\t25.0.0.49234-0+f82\twindows_x64\tNI Customer Experience Improvement Program gives NI customers the ability to contribute to the design and development of NI products.\n\nni-ceip\t25.0.0.49234-0+f82\twindows_x64\tNI Customer Experience Improvement Program gives NI customers the ability to contribute to the design and development of NI products.\n\nni-curl\t25.0.0.49165-0+f13\twindows_x64\tNI Curl provides the build of the \"C URL\" library that is an open-source command line tool and library for transferring data with URL syntax.\n\nni-error-reporting-interface\t25.0.0.49225-0+f73\twindows_x64\tNI Error Reporting Interface provides the error reporting interface for Windows.\n\nni-euladepot\t25.0.0.49255-0+f103\twindows_x64\tInstalls license and notice files.\n\nni-expat1-libs\t25.0.0.49160-0+f8\twindows_x64\tExpat is a C99 library that implements a stream-oriented XML parser. Expat-NI is a build of Expat maintained by NI across its software platform. This package is built from Expat 2.6.3.\n\nni-labview-unit-test-framework-toolkit-lic\t25.1.0.49238-0+f86\twindows_x64\tThis installs the NI LabVIEW Unit Test Framework Toolkit License.\n\nni-license-manager-compatibility-server\t25.0.0.49676-0+f524\twindows_x64\tServer to allow .NET 6+ products to interface with NI License Manager.\n\nni-license-manager\t25.0.0.49339-0+f187\twindows_x64\tNI License Manager is an application that helps you manage licensed NI software assets. NI License Manager is a tool designed to help you activate, deactivate, and transfer software products using license activation codes or license files. License administrators can use NI License Manager to automate product activation and add volume license servers.\n\nni-lvutf-offline-manual-en\t25.1.0.49238-0+f86\twindows_x64\tThis is an infrastructure package for NI Software.\n\nni-mdfsupport\t25.0.0.49255-0+f103\twindows_x64\tThis package installs the files necessary to support building deployments from NI's ADEs.\n\nni-mdnsresponder\t25.0.0.49276-0+f124\twindows_x64\tUsed by National Instruments components to advertise and discover Zeroconf devices and services. NI mDNS Responder Service advertises and discovers Zeroconf devices and services. If this service is stopped, advertisement and discovery of devices and services will no longer function. If this service is disabled, any services that explicitly depend on it will fail to start.\n\nni-metauninstaller\t25.0.0.49255-0+f103\twindows_x64\tThis package provides support for uninstallation of NI products.\n\nni-msdotnet-desktop-runtime-80\t25.0.0.49181-0+f29\twindows_x64\tRequired by some NI products. The .NET Desktop Runtime enables you to run Windows desktop applications. This package installs the .NET Runtime.\n\nni-msvcrt-2015\t25.0.0.49176-0+f24\twindows_x64\tNI installer for Microsoft Visual C++ 2015-2022 Run-Time, version 14.42.34433\n\nni-mswebview2\t25.0.0.49177-0+f25\twindows_x64\tMicrosoft WebView2 Runtime 131.0.2903\n\nni-networkdiscoverysvc\t25.0.0.49281-0+f129\twindows_x64\tProvides network device and service discovery for NI services and applications. NI Network Discovery Service discovers NI Zeroconf devices and services. If this service is stopped components that rely on discovering NI Zeroconf devices and services will no longer function. If this service is disabled any services that explicitly depend on it will fail to start.\n\nni-offline-help-viewer\t25.0.0.49202-0+f50\twindows_x64\tApplication to view offline help for NI software\n\nni-openssl3-libs-x86\t25.0.0.49166-0+f14\twindows_all\tOpenSSL is a robust, commercial-grade, full-featured toolkit for general-purpose cryptography and secure communication. OpenSSL-NI is a build of OpenSSL maintained by NI across its software platform. This package is built from OpenSSL 3.0.15.\n\nni-openssl3-libs\t25.0.0.49166-0+f14\twindows_x64\tOpenSSL is a robust, commercial-grade, full-featured toolkit for general-purpose cryptography and secure communication. OpenSSL-NI is a build of OpenSSL maintained by NI across its software platform. This package is built from OpenSSL 3.0.15.\n\nni-portable-configuration\t25.0.0.49280-0+f128\twindows_x64\tUsed by National Instruments components to archive and deploy configuration settings.\n\nni-remote-configuration\t25.0.0.49281-0+f129\twindows_x64\tProvides remote configuration of NI Real-Time targets.\n\nni-rpc\t25.0.0.49262-0+f110\twindows_x64\tNI Remote Procedure Call library (infrastructure) Provides rpc services to NI software.\n\nni-securityupdate-kb67l8lcqw-killbits\t2.1.0.49153-0+f1\twindows_all\tThis is an infrastructure package for NI Software.\n\nni-svcloc\t25.1.0.49319-0+f167\twindows_x64\tNI Service Locator 2025 Q1 The NI Service Locator facilitates communication between National Instruments support programs and services that use local, dynamic TCP ports to communicate with each other.\n\nni-sysapi\t25.0.0.49281-0+f129\twindows_x64\tProvides an internal interface for enumerating and configuring devices.\n\nni-syscfg-dotnet-runtime\t25.0.0.49281-0+f129\twindows_x64\tEnables you to run applications that use the NI System Configuration .NET API.\n\nni-syscfg-runtime\t25.0.0.49281-0+f129\twindows_x64\tRun-time components required to deploy applications that use the NI System Configuration API.\n\nni-utf-labview-support\t25.1.0.49239-0+f87\twindows_x64\tThe LabVIEW Unit Test Framework Toolkit helps you automate LabVIEW VI unit testing to perform functional validation. The LabVIEW Unit Test Framework Toolkit is a software add-on for LabVIEW that helps you automate functional validation and demonstrate whether an application behaves properly. You can generate a unit test or import test parameters from a text document created in an editor such as Microsoft Excel. Tests can encompass multiple test cases, which define input values and the expected output for any data type, including arrays and clusters. You can identify the source of incorrect outputs, track code coverage, and generate validation documents in HTML, ATML/XML, or ASCII formats.\n\n",
+  "nipkg_packages": [
+    {
+      "name": "eula-jki-vimp",
+      "version": "26.5.0.49245-0+f93"
+    },
+    {
+      "name": "eula-ms-dotnet-4.8",
+      "version": "23.3.0.49243-0+f91"
+    },
+    {
+      "name": "eula-ms-dotnet-4.8",
+      "version": "23.8.0.49254-0+f102"
+    },
+    {
+      "name": "eula-ms-dotnet-4.8",
+      "version": "25.0.0.49255-0+f103"
+    },
+    {
+      "name": "eula-ms-dotnet-4.8",
+      "version": "25.3.0.49221-0+f69"
+    },
+    {
+      "name": "eula-ms-dotnet-4.8",
+      "version": "25.5.0.49240-0+f88"
+    },
+    {
+      "name": "eula-ms-dotnet-4.8",
+      "version": "25.8.0.49237-0+f85"
+    },
+    {
+      "name": "eula-ms-dotnet-4.8",
+      "version": "26.0.0.49245-0+f93"
+    },
+    {
+      "name": "eula-ms-dotnet-4.8",
+      "version": "26.3.0.49236-0+f84"
+    },
+    {
+      "name": "eula-ms-dotnet-4.8",
+      "version": "26.5.0.49245-0+f93"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "17.0.0.49155-0+f3"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "17.5.0.49152-0+f0"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "18.0.0.49153-0+f1"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "18.5.0.49153-0+f1"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "18.5.0.49154-0+f2"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "18.5.1.49152-0+f0"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "19.0.0.49152-0+f0"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "19.5.0.49152-0+f0"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "19.5.1.49153-0+f1"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "19.6.0.49152-0+f0"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "20.0.0.49153-0+f1"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "20.1.0.49153-0+f1"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "20.5.0.49152-0+f0"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "20.6.0.49316-0+f164"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "20.7.0.49347-0+f195"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "20.7.1.49158-0+f6"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "21.0.0.49343-0+f191"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "21.3.0.49256-0+f104"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "21.8.0.49275-0+f123"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "22.5.0.49189-0+f37"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "22.8.0.49201-0+f49"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "23.0.0.49223-0+f71"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "23.3.0.49243-0+f91"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "23.5.0.49255-0+f103"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "23.8.0.49254-0+f102"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "24.0.0.49255-0+f103"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "24.3.0.49238-0+f86"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "24.5.0.49247-0+f95"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "24.8.0.49248-0+f96"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "25.0.0.49255-0+f103"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "25.3.0.49221-0+f69"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "25.5.0.49240-0+f88"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "25.8.0.49237-0+f85"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "26.0.0.49245-0+f93"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "26.3.0.49236-0+f84"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "26.5.0.49245-0+f93"
+    },
+    {
+      "name": "eula-ni-standard",
+      "version": "26.8.0.49231-0+f79"
+    },
+    {
+      "name": "jki-dragon",
+      "version": "2026.3.0-897"
+    },
+    {
+      "name": "mgi-solution-explorer",
+      "version": "2.8.0-4"
+    },
+    {
+      "name": "ni-activex-container",
+      "version": "17.1.2.49154-0+f2"
+    },
+    {
+      "name": "ni-aspt-labview-support",
+      "version": "26.3.0.49249-0+f97"
+    },
+    {
+      "name": "ni-assistant-framework",
+      "version": "26.3.0.49793-0+f641"
+    },
+    {
+      "name": "ni-assistant-framework",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-assistant-framework-custom-ui-tool",
+      "version": "26.3.0.49793-0+f641"
+    },
+    {
+      "name": "ni-assistant-framework-custom-ui-tool",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-assistant-framework-labview-2023-support",
+      "version": "26.3.0.49793-0+f641"
+    },
+    {
+      "name": "ni-assistant-framework-labview-2023-support",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-assistant-framework-labview-2024-support",
+      "version": "26.3.0.49793-0+f641"
+    },
+    {
+      "name": "ni-assistant-framework-labview-2024-support",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-assistant-framework-labview-2025-support",
+      "version": "26.3.0.49793-0+f641"
+    },
+    {
+      "name": "ni-assistant-framework-labview-2025-support",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-assistant-framework-labview-2026-codegen-support",
+      "version": "26.3.0.49791-0+f639"
+    },
+    {
+      "name": "ni-assistant-framework-labview-2026-support",
+      "version": "26.3.0.49793-0+f641"
+    },
+    {
+      "name": "ni-assistant-framework-labview-2026-support",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-assistant-framework-ui-assemblies",
+      "version": "26.3.0.49793-0+f641"
+    },
+    {
+      "name": "ni-assistant-framework-ui-assemblies",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-auth",
+      "version": "26.5.0.49329-0+f177"
+    },
+    {
+      "name": "ni-ceip",
+      "version": "26.5.0.49222-0+f70"
+    },
+    {
+      "name": "ni-ceip",
+      "version": "25.0.0.49234-0+f82"
+    },
+    {
+      "name": "ni-ceip-common",
+      "version": "26.5.0.49222-0+f70"
+    },
+    {
+      "name": "ni-ceip-common",
+      "version": "25.0.0.49234-0+f82"
+    },
+    {
+      "name": "ni-ceip-x86",
+      "version": "26.5.0.49222-0+f70"
+    },
+    {
+      "name": "ni-ceip-x86",
+      "version": "25.0.0.49234-0+f82"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "2.0.0.49154-0+f2"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "2.0.0.49155-0+f3"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "2.0.1.49152-0+f0"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "2.0.2.49152-0+f0"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "2.0.3.49152-0+f0"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "21.0.0.49152-0+f0"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "21.5.0.49170-0+f18"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "24.5.0.49157-0+f5"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "24.5.1.49152-0+f0"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "24.8.0.49163-0+f11"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "25.3.0.49164-0+f12"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "25.5.0.49169-0+f17"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "25.8.0.49176-0+f24"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "26.0.0.49176-0+f24"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "26.3.0.49183-0+f31"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "26.5.0.49183-0+f31"
+    },
+    {
+      "name": "ni-certificates",
+      "version": "26.8.0.49183-0+f31"
+    },
+    {
+      "name": "ni-codesignapi",
+      "version": "26.5.0.49246-0+f94"
+    },
+    {
+      "name": "ni-curl",
+      "version": "26.5.0.49176-0+f24"
+    },
+    {
+      "name": "ni-curl",
+      "version": "25.0.0.49165-0+f13"
+    },
+    {
+      "name": "ni-cvi-2026-reflector",
+      "version": "26.3.0.49416-0+f264"
+    },
+    {
+      "name": "ni-cvi-activex",
+      "version": "26.3.0.49415-0+f263"
+    },
+    {
+      "name": "ni-cvi-analysis",
+      "version": "26.3.0.49419-0+f267"
+    },
+    {
+      "name": "ni-cvi-codegen",
+      "version": "20.0.0.49154-0+f2"
+    },
+    {
+      "name": "ni-cvi-datasocket",
+      "version": "26.3.0.49425-0+f273"
+    },
+    {
+      "name": "ni-cvi-dotnet",
+      "version": "26.3.0.49416-0+f264"
+    },
+    {
+      "name": "ni-cvi-instrsup",
+      "version": "26.3.0.49425-0+f273"
+    },
+    {
+      "name": "ni-cvi-internet",
+      "version": "26.3.0.49415-0+f263"
+    },
+    {
+      "name": "ni-cvi-labview-dll-builder-15.1.0",
+      "version": "15.1.1.49154-0+f2"
+    },
+    {
+      "name": "ni-cvi-network-variable",
+      "version": "26.3.0.49425-0+f273"
+    },
+    {
+      "name": "ni-cvi-networkstreams",
+      "version": "26.3.0.49420-0+f268"
+    },
+    {
+      "name": "ni-cvi-opengl",
+      "version": "26.3.0.49425-0+f273"
+    },
+    {
+      "name": "ni-cvi-openmp",
+      "version": "26.3.0.49415-0+f263"
+    },
+    {
+      "name": "ni-cvi-rte",
+      "version": "26.3.0.49425-0+f273"
+    },
+    {
+      "name": "ni-cvi-runtime-core",
+      "version": "26.3.0.49425-0+f273"
+    },
+    {
+      "name": "ni-cvi-runtime-engine",
+      "version": "26.3.0.49425-0+f273"
+    },
+    {
+      "name": "ni-cvi-runtime-realtime",
+      "version": "26.3.0.49425-0+f273"
+    },
+    {
+      "name": "ni-cvi-tdms",
+      "version": "26.3.0.49421-0+f269"
+    },
+    {
+      "name": "ni-cvi-usi",
+      "version": "26.3.0.49418-0+f266"
+    },
+    {
+      "name": "ni-daqmx-labview-shared-docs",
+      "version": "26.5.0.49603-0+f451"
+    },
+    {
+      "name": "ni-data-store-service",
+      "version": "26.5.0.49244-0+f92"
+    },
+    {
+      "name": "ni-data-store-service-labview-support",
+      "version": "26.5.0.49244-0+f92"
+    },
+    {
+      "name": "ni-datafinder-client-api",
+      "version": "26.5.0.49255-0+f103"
+    },
+    {
+      "name": "ni-datafinder-desktop-quit-dc",
+      "version": "26.5.0.49251-0+f99"
+    },
+    {
+      "name": "ni-dataplugins-aop5",
+      "version": "26.3.0.49217-0+f65"
+    },
+    {
+      "name": "ni-dataplugins-python-host",
+      "version": "26.5.0.49251-0+f99"
+    },
+    {
+      "name": "ni-datasocket",
+      "version": "26.3.0.49347-0+f195"
+    },
+    {
+      "name": "ni-dct-labview-support",
+      "version": "26.3.0.49244-0+f92"
+    },
+    {
+      "name": "ni-deployment-framework",
+      "version": "26.3.0.49791-0+f639"
+    },
+    {
+      "name": "ni-deployment-framework-x86",
+      "version": "26.3.0.49791-0+f639"
+    },
+    {
+      "name": "ni-dett-labview-support",
+      "version": "26.3.0.49250-0+f98"
+    },
+    {
+      "name": "ni-dfc-labview-support",
+      "version": "26.3.0.49232-0+f80"
+    },
+    {
+      "name": "ni-dfdt-labview-support",
+      "version": "26.3.0.49268-0+f116"
+    },
+    {
+      "name": "ni-discovery-service",
+      "version": "26.5.0.49706-0+f554"
+    },
+    {
+      "name": "ni-distributed-system-manager-2026",
+      "version": "26.3.0.49794-0+f642"
+    },
+    {
+      "name": "ni-dotnetcore-interface",
+      "version": "26.3.0.49790-0+f638"
+    },
+    {
+      "name": "ni-dotnetcore-interface-x86",
+      "version": "26.3.0.49790-0+f638"
+    },
+    {
+      "name": "ni-error-report-x86",
+      "version": "25.0.0.49231-0+f79"
+    },
+    {
+      "name": "ni-error-reporting-common",
+      "version": "26.5.0.49694-0+f542"
+    },
+    {
+      "name": "ni-error-reporting-interface",
+      "version": "25.0.0.49226-0+f74"
+    },
+    {
+      "name": "ni-error-reporting-interface",
+      "version": "25.0.0.49225-0+f73"
+    },
+    {
+      "name": "ni-error-reporting-native",
+      "version": "26.5.0.49216-0+f64"
+    },
+    {
+      "name": "ni-error-reporting-native-x86",
+      "version": "26.5.0.49216-0+f64"
+    },
+    {
+      "name": "ni-euladepot",
+      "version": "26.5.0.49245-0+f93"
+    },
+    {
+      "name": "ni-euladepot",
+      "version": "25.0.0.49255-0+f103"
+    },
+    {
+      "name": "ni-example-finder",
+      "version": "26.3.0.49794-0+f642"
+    },
+    {
+      "name": "ni-expat1-libs",
+      "version": "26.5.0.49176-0+f24"
+    },
+    {
+      "name": "ni-expat1-libs",
+      "version": "25.0.0.49160-0+f8"
+    },
+    {
+      "name": "ni-help-assistant",
+      "version": "2.2.0.49154-0+f2"
+    },
+    {
+      "name": "ni-help-launcher",
+      "version": "26.5.0.49203-0+f51"
+    },
+    {
+      "name": "ni-json-map",
+      "version": "26.3.0.49369-0+f217"
+    },
+    {
+      "name": "ni-labview-2025-nls-plugin",
+      "version": "25.8.2.49163-0+f11"
+    },
+    {
+      "name": "ni-labview-2026-core-en",
+      "version": "26.3.0.49795-0+f643"
+    },
+    {
+      "name": "ni-labview-2026-core-en",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-labview-2026-core-en",
+      "version": "26.3.2.49153-0+f1"
+    },
+    {
+      "name": "ni-labview-2026-coreother",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-labview-2026-coreother",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-labview-2026-deployable-license",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-labview-2026-example",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-labview-2026-executable",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-labview-2026-executable",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-labview-2026-ff-runtime-engine",
+      "version": "26.3.0.49794-0+f642"
+    },
+    {
+      "name": "ni-labview-2026-help-en",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-labview-2026-license",
+      "version": "26.3.0.49791-0+f639"
+    },
+    {
+      "name": "ni-labview-2026-manuals",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-labview-2026-realtime-nbfifo",
+      "version": "26.1.0.49354-0+f202"
+    },
+    {
+      "name": "ni-labview-2026-realtime-nbfifo-x86",
+      "version": "26.1.0.49354-0+f202"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine",
+      "version": "26.3.0.49794-0+f642"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine",
+      "version": "26.3.2.49153-0+f1"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine-resource",
+      "version": "26.3.0.49794-0+f642"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine-resource",
+      "version": "26.3.2.49153-0+f1"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine-resource-x64",
+      "version": "26.3.0.49794-0+f642"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine-resource-x64",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine-resource-x64",
+      "version": "26.3.2.49153-0+f1"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine-x86",
+      "version": "26.3.0.49794-0+f642"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine-x86",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-labview-2026-runtime-engine-x86",
+      "version": "26.3.2.49153-0+f1"
+    },
+    {
+      "name": "ni-labview-2026-scripting-codegen",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-labview-2026-simulation-x64",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-labview-2026-vilib",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-labview-2026-vilib",
+      "version": "26.3.1.49171-0+f19"
+    },
+    {
+      "name": "ni-labview-2026q3-nls-plugin",
+      "version": "26.5.0.49361-0+f209"
+    },
+    {
+      "name": "ni-labview-2026q3-nls-plugin",
+      "version": "26.5.2.49163-0+f11"
+    },
+    {
+      "name": "ni-labview-aspt-toolkit-lic",
+      "version": "26.3.0.49247-0+f95"
+    },
+    {
+      "name": "ni-labview-broker",
+      "version": "22.3.0.49154-0+f2"
+    },
+    {
+      "name": "ni-labview-c-interface",
+      "version": "1.0.4.49154-0+f2"
+    },
+    {
+      "name": "ni-labview-command-line-interface-x86",
+      "version": "26.3.0.49372-0+f220"
+    },
+    {
+      "name": "ni-labview-database-toolkit-lic",
+      "version": "26.3.0.49243-0+f91"
+    },
+    {
+      "name": "ni-labview-database-toolkit-utility",
+      "version": "26.3.0.49242-0+f90"
+    },
+    {
+      "name": "ni-labview-datafinder-runtime",
+      "version": "26.3.0.49232-0+f80"
+    },
+    {
+      "name": "ni-labview-dett",
+      "version": "26.3.0.49250-0+f98"
+    },
+    {
+      "name": "ni-labview-dett-core",
+      "version": "26.3.0.49250-0+f98"
+    },
+    {
+      "name": "ni-labview-dett-labview-2023-support",
+      "version": "26.3.0.49249-0+f97"
+    },
+    {
+      "name": "ni-labview-dett-labview-2023-support-x86",
+      "version": "26.3.0.49249-0+f97"
+    },
+    {
+      "name": "ni-labview-dett-labview-2024-support",
+      "version": "26.3.0.49249-0+f97"
+    },
+    {
+      "name": "ni-labview-dett-labview-2024-support-x86",
+      "version": "26.3.0.49249-0+f97"
+    },
+    {
+      "name": "ni-labview-dett-lic",
+      "version": "26.3.0.49248-0+f96"
+    },
+    {
+      "name": "ni-labview-dfd-toolkit-lic",
+      "version": "26.3.0.49266-0+f114"
+    },
+    {
+      "name": "ni-labview-max-xml",
+      "version": "19.0.0.49154-0+f2"
+    },
+    {
+      "name": "ni-labview-offline-manual-en",
+      "version": "26.3.0.49793-0+f641"
+    },
+    {
+      "name": "ni-labview-report-generation-toolkit-lic",
+      "version": "26.3.0.49242-0+f90"
+    },
+    {
+      "name": "ni-labview-system-state-publisher",
+      "version": "26.3.0.49791-0+f639"
+    },
+    {
+      "name": "ni-labview-unit-test-framework-toolkit-lic",
+      "version": "26.3.0.49246-0+f94"
+    },
+    {
+      "name": "ni-labview-unit-test-framework-toolkit-lic",
+      "version": "25.1.0.49238-0+f86"
+    },
+    {
+      "name": "ni-labview-vi-analyzer-toolkit-lic",
+      "version": "26.3.0.49275-0+f123"
+    },
+    {
+      "name": "ni-labview-vicompare",
+      "version": "26.3.0.49794-0+f642"
+    },
+    {
+      "name": "ni-labview-vimerge",
+      "version": "26.3.0.49794-0+f642"
+    },
+    {
+      "name": "ni-license-manager",
+      "version": "26.5.0.49256-0+f104"
+    },
+    {
+      "name": "ni-license-manager",
+      "version": "25.0.0.49339-0+f187"
+    },
+    {
+      "name": "ni-license-manager-compatibility-server",
+      "version": "26.5.0.49698-0+f546"
+    },
+    {
+      "name": "ni-license-manager-compatibility-server",
+      "version": "25.0.0.49676-0+f524"
+    },
+    {
+      "name": "ni-lm-client-26.0",
+      "version": "26.1.0.49905-0+f753"
+    },
+    {
+      "name": "ni-lm-client-26.0-x86",
+      "version": "26.1.0.49905-0+f753"
+    },
+    {
+      "name": "ni-lm-client-26.5",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-lm-client-26.5-x86",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-lm-clr-compatibility-client",
+      "version": "26.3.0.49789-0+f637"
+    },
+    {
+      "name": "ni-lm-clr-compatibility-client-x86",
+      "version": "26.3.0.49789-0+f637"
+    },
+    {
+      "name": "ni-logos",
+      "version": "26.5.0.49330-0+f178"
+    },
+    {
+      "name": "ni-logos-labview-2026-support-en",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-logos-xt",
+      "version": "26.5.0.49330-0+f178"
+    },
+    {
+      "name": "ni-lv-2026q3-ai-addon",
+      "version": "26.5.0.49361-0+f209"
+    },
+    {
+      "name": "ni-lv-2026q3-ai-addon",
+      "version": "26.5.2.49163-0+f11"
+    },
+    {
+      "name": "ni-lv-ai-addon",
+      "version": "25.8.2.49163-0+f11"
+    },
+    {
+      "name": "ni-lv-web-server-labview-2026-runtime-engine-support",
+      "version": "26.5.0.49335-0+f183"
+    },
+    {
+      "name": "ni-lv-web-server-labview-2026-runtime-engine-x86-support",
+      "version": "26.5.0.49335-0+f183"
+    },
+    {
+      "name": "ni-lv-web-server-labview-2026-support",
+      "version": "26.5.0.49335-0+f183"
+    },
+    {
+      "name": "ni-lvaspt-offline-manual-en",
+      "version": "26.3.0.49248-0+f96"
+    },
+    {
+      "name": "ni-lvdct-offline-manual-en",
+      "version": "26.3.0.49244-0+f92"
+    },
+    {
+      "name": "ni-lvdett-offline-manual-en",
+      "version": "26.3.0.49250-0+f98"
+    },
+    {
+      "name": "ni-lvdfc-offline-manual-en",
+      "version": "26.3.0.49232-0+f80"
+    },
+    {
+      "name": "ni-lvdfdt-offline-manual-en",
+      "version": "26.3.0.49267-0+f115"
+    },
+    {
+      "name": "ni-lvrgt-offline-manual-en",
+      "version": "26.3.0.49243-0+f91"
+    },
+    {
+      "name": "ni-lvutf-offline-manual-en",
+      "version": "26.3.0.49249-0+f97"
+    },
+    {
+      "name": "ni-lvutf-offline-manual-en",
+      "version": "25.1.0.49238-0+f86"
+    },
+    {
+      "name": "ni-lvvia-offline-manual-en",
+      "version": "26.3.0.49277-0+f125"
+    },
+    {
+      "name": "ni-matlab-interface",
+      "version": "26.3.0.49370-0+f218"
+    },
+    {
+      "name": "ni-max",
+      "version": "26.5.0.49268-0+f116"
+    },
+    {
+      "name": "ni-max-remote-provider",
+      "version": "26.5.0.49268-0+f116"
+    },
+    {
+      "name": "ni-max-rempxi-provider",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-max-software-provider",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-mdfsupport",
+      "version": "26.5.0.49246-0+f94"
+    },
+    {
+      "name": "ni-mdfsupport",
+      "version": "25.0.0.49255-0+f103"
+    },
+    {
+      "name": "ni-mdnsresponder",
+      "version": "26.0.0.49260-0+f108"
+    },
+    {
+      "name": "ni-mdnsresponder",
+      "version": "25.0.0.49276-0+f124"
+    },
+    {
+      "name": "ni-mesa",
+      "version": "17.1.1.49154-0+f2"
+    },
+    {
+      "name": "ni-metauninstaller",
+      "version": "26.5.0.49246-0+f94"
+    },
+    {
+      "name": "ni-metauninstaller",
+      "version": "25.0.0.49255-0+f103"
+    },
+    {
+      "name": "ni-mkl-2020",
+      "version": "20.0.0.49154-0+f2"
+    },
+    {
+      "name": "ni-msaspdotnetcore-runtime-80",
+      "version": "26.5.0.49173-0+f21"
+    },
+    {
+      "name": "ni-msaspdotnetcore-runtime-80-x86",
+      "version": "26.5.0.49173-0+f21"
+    },
+    {
+      "name": "ni-msdotnet-desktop-runtime-80",
+      "version": "26.5.0.49173-0+f21"
+    },
+    {
+      "name": "ni-msdotnet-desktop-runtime-80",
+      "version": "25.0.0.49181-0+f29"
+    },
+    {
+      "name": "ni-msdotnet-desktop-runtime-80-x86",
+      "version": "26.5.0.49173-0+f21"
+    },
+    {
+      "name": "ni-msdotnet-runtime-80",
+      "version": "26.5.0.49173-0+f21"
+    },
+    {
+      "name": "ni-msdotnet4x",
+      "version": "23.3.0.49175-0+f23"
+    },
+    {
+      "name": "ni-msdotnet4x",
+      "version": "23.8.0.49180-0+f28"
+    },
+    {
+      "name": "ni-msdotnet4x",
+      "version": "25.0.0.49181-0+f29"
+    },
+    {
+      "name": "ni-msdotnet4x",
+      "version": "25.3.0.49173-0+f21"
+    },
+    {
+      "name": "ni-msdotnet4x",
+      "version": "25.5.0.49172-0+f20"
+    },
+    {
+      "name": "ni-msdotnet4x",
+      "version": "25.8.0.49176-0+f24"
+    },
+    {
+      "name": "ni-msdotnet4x",
+      "version": "26.0.0.49175-0+f23"
+    },
+    {
+      "name": "ni-msdotnet4x",
+      "version": "26.3.0.49181-0+f29"
+    },
+    {
+      "name": "ni-msdotnet4x",
+      "version": "26.5.0.49175-0+f23"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "23.3.0.49243-0+f91"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "23.5.0.49255-0+f103"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "23.8.0.49254-0+f102"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "24.0.0.49255-0+f103"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "24.3.0.49238-0+f86"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "24.5.0.49246-0+f94"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "24.8.0.49248-0+f96"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "25.0.0.49255-0+f103"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "25.3.0.49221-0+f69"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "25.5.0.49240-0+f88"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "25.8.0.49237-0+f85"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "26.0.0.49245-0+f93"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "26.3.0.49236-0+f84"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "26.5.0.49245-0+f93"
+    },
+    {
+      "name": "ni-msiproperties",
+      "version": "26.8.0.49231-0+f79"
+    },
+    {
+      "name": "ni-mstudio-cw3dgraph",
+      "version": "8.7.5.49154-0+f2"
+    },
+    {
+      "name": "ni-msvcrt-2015",
+      "version": "26.5.0.49220-0+f68"
+    },
+    {
+      "name": "ni-msvcrt-2015",
+      "version": "25.0.0.49176-0+f24"
+    },
+    {
+      "name": "ni-mswebview2",
+      "version": "26.5.0.49173-0+f21"
+    },
+    {
+      "name": "ni-mswebview2",
+      "version": "25.0.0.49177-0+f25"
+    },
+    {
+      "name": "ni-mxs",
+      "version": "26.0.0.49263-0+f111"
+    },
+    {
+      "name": "ni-networkdiscoverysvc",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-networkdiscoverysvc",
+      "version": "25.0.0.49281-0+f129"
+    },
+    {
+      "name": "ni-nigel-local-service",
+      "version": "26.5.0.49706-0+f554"
+    },
+    {
+      "name": "ni-nigel-local-service",
+      "version": "26.5.1.49161-0+f9"
+    },
+    {
+      "name": "ni-nls-plugin-entitlement",
+      "version": "26.5.0.49360-0+f208"
+    },
+    {
+      "name": "ni-nls-plugin-entitlement",
+      "version": "26.5.2.49163-0+f11"
+    },
+    {
+      "name": "ni-offline-help-viewer",
+      "version": "26.5.0.49204-0+f52"
+    },
+    {
+      "name": "ni-offline-help-viewer",
+      "version": "25.0.0.49202-0+f50"
+    },
+    {
+      "name": "ni-opc-support",
+      "version": "26.5.0.49333-0+f181"
+    },
+    {
+      "name": "ni-opcenum",
+      "version": "5.6.3.49154-0+f2"
+    },
+    {
+      "name": "ni-openssl3-libs",
+      "version": "26.5.0.49224-0+f72"
+    },
+    {
+      "name": "ni-openssl3-libs",
+      "version": "25.0.0.49166-0+f14"
+    },
+    {
+      "name": "ni-openssl3-libs-x86",
+      "version": "26.5.0.49224-0+f72"
+    },
+    {
+      "name": "ni-openssl3-libs-x86",
+      "version": "25.0.0.49166-0+f14"
+    },
+    {
+      "name": "ni-package-builder-labview-2026-support",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "17.0.0.49157-0+f5"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "17.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "17.5.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "18.0.0.49156-0+f4"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "18.0.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "18.0.2.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "18.5.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "18.5.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "19.0.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "19.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "19.5.1.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "19.6.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "20.0.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "20.1.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "20.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "20.6.0.49316-0+f164"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "20.7.0.49347-0+f195"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "20.7.1.49158-0+f6"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "21.0.0.49343-0+f191"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "21.3.0.49256-0+f104"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "21.8.0.49275-0+f123"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "22.5.0.49189-0+f37"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "22.8.0.49255-0+f103"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "23.0.0.49276-0+f124"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "23.3.0.49295-0+f143"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "23.5.0.49296-0+f144"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "23.8.0.49300-0+f148"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "24.0.0.49323-0+f171"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "24.3.0.49316-0+f164"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "24.5.0.49293-0+f141"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "24.8.0.49281-0+f129"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "25.0.0.49256-0+f104"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "25.3.0.49257-0+f105"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "25.5.0.49263-0+f111"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "25.5.1.49154-0+f2"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "25.8.0.49292-0+f140"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "26.0.0.49288-0+f136"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "26.0.1.49156-0+f4"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "26.3.0.49300-0+f148"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "26.5.0.49301-0+f149"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "26.8.0.49285-0+f133"
+    },
+    {
+      "name": "ni-package-manager",
+      "version": "26.8.1.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "17.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "17.5.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "18.0.0.49156-0+f4"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "18.0.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "18.0.2.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "18.5.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "18.5.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "19.0.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "19.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "19.5.1.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "19.6.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "20.0.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "20.1.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "20.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "20.6.0.49316-0+f164"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "20.7.0.49347-0+f195"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "20.7.1.49158-0+f6"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "21.0.0.49343-0+f191"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "21.3.0.49256-0+f104"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "21.8.0.49275-0+f123"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "22.5.0.49189-0+f37"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "22.8.0.49255-0+f103"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "23.0.0.49276-0+f124"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "23.3.0.49295-0+f143"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "23.5.0.49296-0+f144"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "23.8.0.49300-0+f148"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "24.0.0.49323-0+f171"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "24.3.0.49316-0+f164"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "24.5.0.49293-0+f141"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "24.8.0.49281-0+f129"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "25.0.0.49256-0+f104"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "25.3.0.49257-0+f105"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "25.5.0.49263-0+f111"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "25.5.1.49154-0+f2"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "25.8.0.49292-0+f140"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "26.0.0.49288-0+f136"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "26.0.1.49156-0+f4"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "26.3.0.49300-0+f148"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "26.5.0.49301-0+f149"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "26.8.0.49285-0+f133"
+    },
+    {
+      "name": "ni-package-manager-deployment-support",
+      "version": "26.8.1.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "17.0.0.49157-0+f5"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "17.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "17.5.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "18.0.0.49156-0+f4"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "18.0.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "18.0.2.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "18.5.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "19.0.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "19.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "19.5.1.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "19.6.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "20.0.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "20.1.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "20.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "20.6.0.49316-0+f164"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "20.7.0.49347-0+f195"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "20.7.1.49158-0+f6"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "21.0.0.49343-0+f191"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "21.3.0.49256-0+f104"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "21.8.0.49275-0+f123"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "22.5.0.49189-0+f37"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "22.8.0.49255-0+f103"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "23.0.0.49276-0+f124"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "23.3.0.49295-0+f143"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "23.5.0.49296-0+f144"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "23.8.0.49300-0+f148"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "24.0.0.49323-0+f171"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "24.3.0.49316-0+f164"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "24.5.0.49293-0+f141"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "24.8.0.49281-0+f129"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "25.0.0.49256-0+f104"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "25.3.0.49257-0+f105"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "25.5.0.49263-0+f111"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "25.5.1.49154-0+f2"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "25.8.0.49292-0+f140"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "26.0.0.49288-0+f136"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "26.0.1.49156-0+f4"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "26.3.0.49300-0+f148"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "26.5.0.49301-0+f149"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "26.8.0.49285-0+f133"
+    },
+    {
+      "name": "ni-package-manager-released-feed",
+      "version": "26.8.1.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "17.0.0.49157-0+f5"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "17.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "17.5.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "18.0.0.49156-0+f4"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "18.0.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "18.0.2.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "18.5.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "18.5.1.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "19.0.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "19.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "19.5.1.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "19.6.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "20.0.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "20.1.0.49153-0+f1"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "20.5.0.49152-0+f0"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "20.6.0.49316-0+f164"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "20.7.0.49347-0+f195"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "20.7.1.49158-0+f6"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "21.0.0.49343-0+f191"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "21.3.0.49256-0+f104"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "21.8.0.49275-0+f123"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "22.5.0.49189-0+f37"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "22.8.0.49255-0+f103"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "23.0.0.49276-0+f124"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "23.3.0.49295-0+f143"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "23.5.0.49296-0+f144"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "23.8.0.49300-0+f148"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "24.0.0.49323-0+f171"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "24.3.0.49316-0+f164"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "24.5.0.49293-0+f141"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "24.8.0.49281-0+f129"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "25.0.0.49256-0+f104"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "25.3.0.49257-0+f105"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "25.5.0.49263-0+f111"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "25.5.1.49154-0+f2"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "25.8.0.49292-0+f140"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "26.0.0.49288-0+f136"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "26.0.1.49156-0+f4"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "26.3.0.49300-0+f148"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "26.5.0.49301-0+f149"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "26.8.0.49285-0+f133"
+    },
+    {
+      "name": "ni-package-manager-upgrader",
+      "version": "26.8.1.49153-0+f1"
+    },
+    {
+      "name": "ni-portable-configuration",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-portable-configuration",
+      "version": "25.0.0.49280-0+f128"
+    },
+    {
+      "name": "ni-python-interface",
+      "version": "26.3.0.49370-0+f218"
+    },
+    {
+      "name": "ni-realtime-error-dialog-x64",
+      "version": "26.1.0.49356-0+f204"
+    },
+    {
+      "name": "ni-realtime-error-dialog-x86",
+      "version": "26.1.0.49358-0+f206"
+    },
+    {
+      "name": "ni-registration-wizard",
+      "version": "25.3.0.49219-0+f67"
+    },
+    {
+      "name": "ni-remote-configuration",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-remote-configuration",
+      "version": "25.0.0.49281-0+f129"
+    },
+    {
+      "name": "ni-resetniconfig",
+      "version": "26.0.0.49263-0+f111"
+    },
+    {
+      "name": "ni-rgt-labview-support",
+      "version": "26.3.0.49243-0+f91"
+    },
+    {
+      "name": "ni-rpc",
+      "version": "26.5.0.49394-0+f242"
+    },
+    {
+      "name": "ni-rpc",
+      "version": "25.0.0.49262-0+f110"
+    },
+    {
+      "name": "ni-search",
+      "version": "26.3.0.49790-0+f638"
+    },
+    {
+      "name": "ni-search-labview-2026-support",
+      "version": "26.3.0.49790-0+f638"
+    },
+    {
+      "name": "ni-securityupdate-kb67l8lcqw-killbits",
+      "version": "2.1.0.49154-0+f2"
+    },
+    {
+      "name": "ni-securityupdate-kb67l8lcqw-killbits",
+      "version": "2.1.0.49153-0+f1"
+    },
+    {
+      "name": "ni-skyline-alarminstance-service",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-core-services",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-file-service",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-license-webservice",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-notification-service",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-openssl",
+      "version": "26.5.0.49273-0+f121"
+    },
+    {
+      "name": "ni-skyline-redis-support",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-service-manager",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-smtp-service",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-tag-service",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-tagruleengine-service",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-tdmreader-service",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-user-service",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-skyline-wif-webservice",
+      "version": "26.5.0.49273-0+f121"
+    },
+    {
+      "name": "ni-skyline-wif-webui",
+      "version": "26.5.0.49273-0+f121"
+    },
+    {
+      "name": "ni-slcp",
+      "version": "26.5.0.49220-0+f68"
+    },
+    {
+      "name": "ni-slcp-common",
+      "version": "26.5.0.49220-0+f68"
+    },
+    {
+      "name": "ni-slcp-x86",
+      "version": "26.5.0.49220-0+f68"
+    },
+    {
+      "name": "ni-ssl-labview-2026-runtime-engine-support",
+      "version": "26.3.0.49339-0+f187"
+    },
+    {
+      "name": "ni-ssl-labview-2026-runtime-engine-x86-support",
+      "version": "26.3.0.49339-0+f187"
+    },
+    {
+      "name": "ni-ssl-labview-2026-support",
+      "version": "26.3.0.49339-0+f187"
+    },
+    {
+      "name": "ni-svcloc",
+      "version": "26.5.0.49327-0+f175"
+    },
+    {
+      "name": "ni-svcloc",
+      "version": "25.1.0.49319-0+f167"
+    },
+    {
+      "name": "ni-sysapi",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-sysapi",
+      "version": "25.0.0.49281-0+f129"
+    },
+    {
+      "name": "ni-sysapi-webservice",
+      "version": "26.3.0.49279-0+f127"
+    },
+    {
+      "name": "ni-syscfg-dotnet-runtime",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-syscfg-dotnet-runtime",
+      "version": "25.0.0.49281-0+f129"
+    },
+    {
+      "name": "ni-syscfg-labview-support",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-syscfg-labview-support-common",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-syscfg-runtime",
+      "version": "26.5.0.49267-0+f115"
+    },
+    {
+      "name": "ni-syscfg-runtime",
+      "version": "25.0.0.49281-0+f129"
+    },
+    {
+      "name": "ni-sysdetails-webservice",
+      "version": "26.3.0.49279-0+f127"
+    },
+    {
+      "name": "ni-sysmgmt-common",
+      "version": "26.5.0.49278-0+f126"
+    },
+    {
+      "name": "ni-sysmgmt-salt-master-support",
+      "version": "26.5.0.49278-0+f126"
+    },
+    {
+      "name": "ni-system-webserver",
+      "version": "26.5.0.49335-0+f183"
+    },
+    {
+      "name": "ni-system-webserver-appserver",
+      "version": "26.5.0.49335-0+f183"
+    },
+    {
+      "name": "ni-system-webserver-base",
+      "version": "26.5.0.49335-0+f183"
+    },
+    {
+      "name": "ni-systemlink-message-broker",
+      "version": "26.5.0.49271-0+f119"
+    },
+    {
+      "name": "ni-systemlink-nosqldatabase-4.2",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-systemlink-repository-webservice",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-systemlink-system-webservice",
+      "version": "26.5.0.49278-0+f126"
+    },
+    {
+      "name": "ni-systemlink-user-data-service",
+      "version": "26.5.0.49276-0+f124"
+    },
+    {
+      "name": "ni-systemlogging-utils",
+      "version": "26.5.0.49329-0+f177"
+    },
+    {
+      "name": "ni-targetdiscoverywizard",
+      "version": "26.5.0.49268-0+f116"
+    },
+    {
+      "name": "ni-tdm-excel-addin",
+      "version": "26.5.0.49251-0+f99"
+    },
+    {
+      "name": "ni-tdms",
+      "version": "26.5.0.49332-0+f180"
+    },
+    {
+      "name": "ni-teststand-2025-nls-plugin",
+      "version": "25.5.1.49161-0+f9"
+    },
+    {
+      "name": "ni-traceengine",
+      "version": "26.5.0.49327-0+f175"
+    },
+    {
+      "name": "ni-update-service",
+      "version": "26.5.0.49246-0+f94"
+    },
+    {
+      "name": "ni-usi-core",
+      "version": "26.5.0.49251-0+f99"
+    },
+    {
+      "name": "ni-utf-labview-support",
+      "version": "26.3.0.49249-0+f97"
+    },
+    {
+      "name": "ni-utf-labview-support",
+      "version": "25.1.0.49239-0+f87"
+    },
+    {
+      "name": "ni-variable-engine",
+      "version": "26.5.0.49333-0+f181"
+    },
+    {
+      "name": "ni-variable-engine-labview-2026-support-en",
+      "version": "26.3.0.49792-0+f640"
+    },
+    {
+      "name": "ni-viawin-labview-support",
+      "version": "26.3.0.49277-0+f125"
+    },
+    {
+      "name": "ni-vipm",
+      "version": "26.3.0.49161-0+f9"
+    },
+    {
+      "name": "ni-vipm-helper",
+      "version": "26.3.0.49161-0+f9"
+    },
+    {
+      "name": "ni-web-based-configuration",
+      "version": "26.3.0.49276-0+f124"
+    },
+    {
+      "name": "ni-web-pipeline-26.5",
+      "version": "26.5.0.49225-0+f73"
+    },
+    {
+      "name": "ni-web-services-labview-2026-support",
+      "version": "26.5.0.49335-0+f183"
+    },
+    {
+      "name": "ni-webserver",
+      "version": "26.5.0.49248-0+f96"
+    },
+    {
+      "name": "ni-webserver-webservices",
+      "version": "26.5.0.49246-0+f94"
+    },
+    {
+      "name": "ni-webserver-webservices-amqp",
+      "version": "26.5.0.49246-0+f94"
+    },
+    {
+      "name": "ni-webservices-amqp-deployment-support",
+      "version": "26.5.0.49330-0+f178"
+    },
+    {
+      "name": "ni-webservices-amqp-deployment-support-x86",
+      "version": "26.5.0.49330-0+f178"
+    },
+    {
+      "name": "ni-webservices-amqp-labview-2026-support",
+      "version": "26.5.0.49330-0+f178"
+    },
+    {
+      "name": "ni-wif-landingpage",
+      "version": "26.3.0.49279-0+f127"
+    },
+    {
+      "name": "ni-xerces-3.3",
+      "version": "26.3.0.49218-0+f66"
+    },
+    {
+      "name": "ni-zlib1-libs",
+      "version": "26.5.0.49231-0+f79"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "19.0.0.49152-0+f0"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "19.5.0.49152-0+f0"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "19.5.1.49153-0+f1"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "19.6.0.49152-0+f0"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "20.0.0.49153-0+f1"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "20.1.0.49153-0+f1"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "20.5.0.49152-0+f0"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "20.6.0.49316-0+f164"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "20.7.0.49347-0+f195"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "20.7.1.49158-0+f6"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "21.0.0.49343-0+f191"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "21.3.0.49256-0+f104"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "21.8.0.49275-0+f123"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "22.5.0.49189-0+f37"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "22.8.0.49255-0+f103"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "23.0.0.49276-0+f124"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "23.3.0.49295-0+f143"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "23.5.0.49296-0+f144"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "23.8.0.49300-0+f148"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "24.0.0.49323-0+f171"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "24.3.0.49316-0+f164"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "24.5.0.49293-0+f141"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "24.8.0.49281-0+f129"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "25.0.0.49256-0+f104"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "25.3.0.49257-0+f105"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "25.5.0.49263-0+f111"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "25.5.1.49154-0+f2"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "25.8.0.49292-0+f140"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "26.0.0.49288-0+f136"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "26.0.1.49156-0+f4"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "26.3.0.49300-0+f148"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "26.5.0.49301-0+f149"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "26.8.0.49285-0+f133"
+    },
+    {
+      "name": "system-windows-x64",
+      "version": "26.8.1.49153-0+f1"
+    },
+    {
+      "name": "system-windows-x86",
+      "version": "19.0.0.49152-0+f0"
+    },
+    {
+      "name": "system-windows-x86",
+      "version": "19.5.0.49152-0+f0"
+    },
+    {
+      "name": "system-windows-x86",
+      "version": "19.5.1.49153-0+f1"
+    },
+    {
+      "name": "system-windows-x86",
+      "version": "19.6.0.49152-0+f0"
+    },
+    {
+      "name": "system-windows-x86",
+      "version": "20.0.0.49153-0+f1"
+    },
+    {
+      "name": "system-windows-x86",
+      "version": "20.1.0.49153-0+f1"
+    },
+    {
+      "name": "system-windows-x86",
+      "version": "20.5.0.49152-0+f0"
+    },
+    {
+      "name": "system-windows-x86",
+      "version": "20.6.0.49316-0+f164"
+    }
+  ]
+}
