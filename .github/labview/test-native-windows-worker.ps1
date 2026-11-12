@@ -117,7 +117,7 @@ config:
     if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
     $functionNames = @('Get-VipcPackageSpecs', 'Split-VipmPackageSpec', 'Find-VipmExecutable',
         'Test-VipmSpecsInstalled', 'Test-VipmPackageVersion', 'Get-NumericVersionKey', 'Assert-FinalWindowsProjectInventory',
-        'New-PublicRepoWorkdir', 'Get-WindowsDragonPlan')
+        'New-PublicRepoWorkdir', 'Get-WindowsDragonPlan', 'Resolve-WindowsSelectedSpecs')
     $functions = @($installerAst.FindAll({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in $functionNames

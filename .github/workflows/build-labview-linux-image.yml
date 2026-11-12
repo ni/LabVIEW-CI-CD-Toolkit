@@ -269,46 +269,35 @@ jobs:
           python3 - <<'PY'
           import hashlib, json, pathlib, os, re, subprocess
           is_source = os.environ.get('IS_SOURCE', '') == 'true'
-          vipc_count = int(os.environ.get('VIPC_COUNT', '0') or '0')
           year = os.environ['LABVIEW_VERSION']
-          release_id = default_release = ni_tag = ''
-          if (not is_source) and vipc_count == 0:
-            # Client install/seed: the worker is a registry COPY of the shared LCWC Linux
-            # base, so the immutable version reflects that base image + its digest (mirrors
-            # the Windows copy path) -- deterministic and tied to the copied content.
-            base = os.environ['LCWC_LINUX_BASE_IMAGE']
-            digest = subprocess.check_output(['crane', 'digest', base], text=True).strip()
-            parts = [f'lcwc-linux-base-image={base}', f'lcwc-linux-base-digest={digest}', 'vipc-count=0']
-            print('Copy path: worker version derived from the LCWC Linux base digest.')
-          else:
-            catalog = json.loads(pathlib.Path('.github/labview-ci/catalog.json').read_text())['containers']
-            release_id = (os.environ.get('RELEASE_ID') if is_source else '') or catalog['default']
-            default_release = catalog['default']
-            release = next(entry for entry in catalog['supported'] if entry['id'] == release_id)
-            if release['status'] != 'qualified' or str(release['labviewYear']) != year:
-              raise ValueError('The selected Linux base must be qualified for the configured LabVIEW year')
-            base = release['linuxTag']
-            if not re.fullmatch(r'nationalinstruments/labview:[a-z0-9.-]+-linux', base) or ':latest' in base:
-              raise ValueError('The Linux base must be an explicit NI release tag')
-            digest = subprocess.check_output(['crane', 'digest', base], text=True).strip()
-            ni_tag = base.split(':', 1)[1] + '@' + digest
-            files = [
-                pathlib.Path('.github/docker/labview-ci-linux.Dockerfile'),
-                pathlib.Path('.github/labview/vipm/install-vipc-linux.sh'),
+          catalog = json.loads(pathlib.Path('.github/labview-ci/catalog.json').read_text())['containers']
+          release_id = (os.environ.get('RELEASE_ID') if is_source else '') or catalog['default']
+          default_release = catalog['default']
+          release = next(entry for entry in catalog['supported'] if entry['id'] == release_id)
+          if release['status'] != 'qualified' or str(release['labviewYear']) != year:
+            raise ValueError('The selected Linux base must be qualified for the configured LabVIEW year')
+          base = release['linuxTag']
+          if not re.fullmatch(r'nationalinstruments/labview:[a-z0-9.-]+-linux', base) or ':latest' in base:
+            raise ValueError('The Linux base must be an explicit NI release tag')
+          digest = subprocess.check_output(['crane', 'digest', base], text=True).strip()
+          ni_tag = base.split(':', 1)[1] + '@' + digest
+          files = [
+              pathlib.Path('.github/docker/labview-ci-linux.Dockerfile'),
+              pathlib.Path('.github/labview/vipm/install-vipc-linux.sh'),
               pathlib.Path('.github/labview/vipm/linux-worker.py'),
               pathlib.Path('ci-out/linux-vipc-inputs.json'),
-            ]
-            files += sorted(pathlib.Path('.github/labview/vipm').glob('*.vipc'), key=lambda p: p.name.lower())
-            # The VI Browser render engine (lvctl + runner) is baked into this
-            # worker, so its source must factor into the version -- an engine change
-            # must yield a new worker image so clients pick it up on the next copy.
-            toimages = pathlib.Path('.github/labview/toimages')
-            if toimages.is_dir():
-              files += sorted((p for p in toimages.rglob('*') if p.is_file()), key=lambda p: p.as_posix().lower())
-            parts = []
-            for path in files:
-              if path.exists():
-                parts.append(f'{path.as_posix()}={hashlib.sha256(path.read_bytes()).hexdigest()}')
+          ]
+          files += sorted(pathlib.Path('.github/labview/vipm').glob('*.vipc'), key=lambda p: p.name.lower())
+          # The VI Browser render engine (lvctl + runner) is baked into this
+          # worker, so its source must factor into the version -- an engine change
+          # must yield a new worker image on the next dependency build.
+          toimages = pathlib.Path('.github/labview/toimages')
+          if toimages.is_dir():
+            files += sorted((p for p in toimages.rglob('*') if p.is_file()), key=lambda p: p.as_posix().lower())
+          parts = []
+          for path in files:
+            if path.exists():
+              parts.append(f'{path.as_posix()}={hashlib.sha256(path.read_bytes()).hexdigest()}')
           if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest):
             raise ValueError('Cannot resolve the Linux base digest')
           parts += [f'base-image={base}', f'base-digest={digest}', f'labview-version={year}']
@@ -334,26 +323,6 @@ jobs:
           tag="${{ env.DEFAULT_TAG }}"
           date_tag="${{ steps.date.outputs.date }}"
           worker_version="${{ steps.ver.outputs.version }}"
-          lcwc_base="${LCWC_LINUX_BASE_IMAGE}@${{ steps.ver.outputs.base_digest }}"
-
-          if [ "${IS_SOURCE}" != "true" ] && [ "${VIPC_COUNT:-0}" = "0" ]; then
-            # NO-DEPENDENCIES FALLBACK: a client dispatched a bake but declares no project
-            # VIPC, so there is nothing to install -- duplicate the shared LCWC Linux base
-            # into this repository's own GHCR package with crane (a registry-to-registry
-            # copy, no rebuild). The fresh-install SEED is the separate
-            # copy-labview-linux-image.yml; this branch only handles a dependency-less bake.
-            echo "::notice::No project VIPC to bake -- copying the shared LCWC Linux base (${lcwc_base}) into ${base} with crane instead of rebuilding."
-            immutable="${base}:${worker_version}"
-            crane copy "${lcwc_base}" "${immutable}"
-            if [ "${UPDATE_MODE:-replace}" = "new" ]; then
-              copy_tags=("${tag}-deps-${date_tag}")
-            else
-              copy_tags=("${tag}" "${tag}-${date_tag}" "linux-latest")
-            fi
-            printf '%s\n' "${copy_tags[@]}" > ci-out/linux-publish-tags.txt
-            exit 0
-          fi
-
           # SOURCE base build, or a deliberate client dependency bake: docker buildx build.
           if [ "${{ github.event.inputs.push_latest }}" = "true" ]; then
             echo "push_latest is kept for compatibility; :linux-latest is always published."
@@ -437,27 +406,18 @@ jobs:
           base_image="${{ steps.ver.outputs.base_image }}"
           base_digest="${{ steps.ver.outputs.base_digest }}"
 
-          if [ "${IS_SOURCE}" != "true" ] && [ "${VIPC_COUNT:-0}" = "0" ]; then
-            # Seed-only copy: the worker mirrors the LCWC Linux base byte-for-byte and is
-            # NOT present locally (copied at the registry level), so read the base metadata
-            # from the registry with crane instead of pulling multiple gigabytes.
-            layer_args=(--worker-layer seed-only-copy --seed-image "$base_image" --seed-digest "$base_digest")
-            python3 .github/labview/vipm/linux-worker.py observe --year "$LABVIEW_VERSION" \
-              --raw ci-out/worker/vipm-list.txt --failed --output ci-out/worker/observed-inventory.json
-          else
-            container=$(docker create --entrypoint /bin/true "$image_ref")
-            trap 'docker rm "$container" >/dev/null' EXIT
-            docker cp "$container:/opt/lvci/vipm/observed-inventory.json" ci-out/worker/observed-inventory.json
-            required_args=(--required)
-            python3 .github/labview/vipm/linux-worker.py validate --year "$LABVIEW_VERSION" \
-              --output ci-out/worker/observed-inventory.json --vipc-dir .github/labview/vipm "${required_args[@]}"
-            docker cp "$container:/opt/lvci/vipm/vipm-list.txt" ci-out/worker/vipm-list.txt
-            docker run --rm --entrypoint /usr/bin/dpkg-query "$image_ref" -W '-f=${Package} ${Version}\n' > ci-out/worker/dpkg-list.txt
-            test -s ci-out/worker/dpkg-list.txt
-            while IFS= read -r -d '' vipc_file; do
-              vipc_args+=(--vipc "$vipc_file")
-            done < <(find .github/labview/vipm -maxdepth 1 -type f -iname '*.vipc' -print0 | sort -z)
-          fi
+          container=$(docker create --entrypoint /bin/true "$image_ref")
+          trap 'docker rm "$container" >/dev/null' EXIT
+          docker cp "$container:/opt/lvci/vipm/observed-inventory.json" ci-out/worker/observed-inventory.json
+          required_args=(--required)
+          python3 .github/labview/vipm/linux-worker.py validate --year "$LABVIEW_VERSION" \
+            --output ci-out/worker/observed-inventory.json --vipc-dir .github/labview/vipm "${required_args[@]}"
+          docker cp "$container:/opt/lvci/vipm/vipm-list.txt" ci-out/worker/vipm-list.txt
+          docker run --rm --entrypoint /usr/bin/dpkg-query "$image_ref" -W '-f=${Package} ${Version}\n' > ci-out/worker/dpkg-list.txt
+          test -s ci-out/worker/dpkg-list.txt
+          while IFS= read -r -d '' vipc_file; do
+            vipc_args+=(--vipc "$vipc_file")
+          done < <(find .github/labview/vipm -maxdepth 1 -type f -iname '*.vipc' -print0 | sort -z)
           cp ci-out/worker/observed-inventory.json "$out_dir/observed-inventory.json"
           cp ci-out/linux-vipc-inputs.json "$out_dir/dependency-inputs.json"
 

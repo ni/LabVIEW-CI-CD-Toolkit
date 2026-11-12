@@ -1192,18 +1192,20 @@ function Install-RequiredWindowsDragon {
 function Assert-FinalWindowsProjectInventory {
     param([object[]] $VipcFiles, [string[]] $DragonSpecs)
     $specs = @($DragonSpecs)
+    $tooling = @()
     foreach ($vipc in $VipcFiles) {
-        if ($vipc.Name -ieq 'ci-tooling.vipc') { continue }
         $required = @(Get-VipcPackageSpecs $vipc.FullName)
         if (-not $required.Count) { throw "Required VIPC '$($vipc.Name)' has no readable package declarations." }
-        $specs += $required
+        if ($vipc.Name -ieq 'ci-tooling.vipc') { $tooling += $required }
+        else { $specs += $required }
     }
+    $specs += @(Resolve-WindowsSelectedSpecs -Specs $tooling -VipcFiles $VipcFiles -DragonSpecs $DragonSpecs)
     $verified = Test-VipmSpecsInstalled -Specs $specs -RequireTarget
     if (-not $verified -and $specs.Count) {
-        throw 'FINAL required Windows project target inventory is missing, unreadable, wrong-target, or has missing/wrong-version packages. VIPM_ALLOW_MISSING_PACKAGES cannot bypass project requirements.'
+        throw 'FINAL required Windows tooling/project target inventory is missing, unreadable, wrong-target, or has missing/wrong-version packages. VIPM_ALLOW_MISSING_PACKAGES cannot bypass selected requirements.'
     }
     if (-not $script:ObservedVipmInventory) {
-        Write-Warning 'Best-effort baseline inventory is unavailable; no installed packages will be claimed.'
+        Write-Warning 'Inventory is unavailable for this build with no selected requirements; no installed packages will be claimed.'
         $script:ObservedVipmInventory = [ordered]@{
             schema = 1; platform = 'windows'
             labview_version = $LabVIEWVersion; labview_bitness = $LabVIEWBitness

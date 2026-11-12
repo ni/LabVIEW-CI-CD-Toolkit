@@ -220,10 +220,10 @@
     }
     const NIPM_DEPS = [
       { key:"labview", name:"LabVIEW", source:"NI Package Manager", labview:true, platforms:["windows","linux"] },
-      { key:"via", name:"VI Analyzer support", source:"NI Package Manager", packages:{ windows:["ni-viawin-labview-support"], linux:["ni-vialin-labview-support"] }, platforms:["windows","linux"] },
+      { key:"via", name:"VI Analyzer support", source:"NI Package Manager", packages:{ windows:["ni-viawin-labview-support"], linux:["ni-vialinux-labview-support"] }, platforms:["windows","linux"] },
       { key:"utf", name:"NI Unit Test Framework", source:"NI Package Manager", packages:{ windows:["ni-utf-labview-support"] }, platforms:["windows"] },
       { key:"dragon", name:"JKI Dragon", source:"NI Package Manager", packages:{ windows:["jki-dragon"] }, platforms:["windows"] },
-      { key:"vipm", name:"VI Package Manager", source:"NI Package Manager", packages:{ windows:["ni-vipm"], linux:["ni-vipm"] }, platforms:["windows","linux"] }
+      { key:"vipm", name:"VI Package Manager", source:"NI Package Manager / Debian", packages:{ windows:["ni-vipm"], linux:["vipm"] }, platforms:["windows","linux"] }
     ];
     const $ = id => document.getElementById(id);
     const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
@@ -635,7 +635,7 @@
       if (man && man.vipm_inventory && man.vipm_inventory.status !== "observed") st.ready = false;
       st.packages = packagesInManifest(man);
       st.nipkg = nipkgInManifest(man);
-      st.nipkg_ready = Array.isArray(man && man.nipkg_packages);
+      st.nipkg_ready = Array.isArray(man && man.nipkg_packages) || Array.isArray(man && man.dpkg_packages);
       st.nipkgNames = new Set(st.nipkg.map(p => String(p.name || "").toLowerCase()).filter(Boolean));
       st.labview = man && man.labview_version ? String(man.labview_version) : "";
       if (man && (man.tag || man.version)) st.label = man.tag || man.version;
@@ -1892,6 +1892,30 @@
     // Single source of truth for a package's status in one worker column. Returns
     // { state:'present'|'missing'|'na'|'', title }. statusCell renders it and the
     // per-file header pill rolls it up, so the cells and the pill never disagree.
+    function effectiveToolingPin(pkg, vipc, col){
+      if (!vipc || vipc.role !== "core" || !col) return pkg;
+      const identity = value => String(value).match(/^(.+?)-v?(\d+(?:\.\d+)+[\w.+-]*)$/i);
+      const baseline = identity(pkg);
+      if (!baseline) return pkg;
+      const selected = file => file.monitored !== false && file.configured !== false
+        && (!Array.isArray(file.monitorOn) || file.monitorOn.includes(col.key));
+      const pins = new Set();
+      for (const file of currentVipcs.filter(file => file.role !== "core" && selected(file))) {
+        for (const value of file.packages || []) {
+          const match = identity(value);
+          if (match && match[1].toLowerCase() === baseline[1].toLowerCase()) pins.add(match[1].toLowerCase() + "-" + match[2]);
+        }
+      }
+      const section = generatedInventory && generatedInventory.sha === selectedRevision && generatedInventory.dragon;
+      for (const file of section && section.files || []) {
+        if (!selected(file) || file.error) continue;
+        for (const dep of file.dependencies || []) {
+          if ((dep.manager || "vipm") === "vipm" && String(dep.package_id).toLowerCase() === baseline[1].toLowerCase() && dep.declared_version)
+            pins.add(baseline[1].toLowerCase() + "-" + dep.declared_version);
+        }
+      }
+      return pins.size === 1 ? [...pins][0] : pkg;
+    }
     function pkgCellState(pkg, colState, vipc, col){
       if (!pkg) return { state:"" };
       if (vipc && col && Array.isArray(vipc.monitorOn) && vipc.monitorOn.indexOf(col.key) === -1) return { state:"na", title:'Not monitored for ' + (MONITOR_LABELS[col.key] || col.key) };
@@ -1901,7 +1925,9 @@
       if (freshness && freshness.status !== "current") return { state:"missing", title:localFreshnessText(colState) };
       if (colState.label === "base" || colState.label === "none") return { state:"missing", title:'No dependency worker is baked for this platform yet -- run the container update' };
       if (!colState.ready) return { state:"missing", title:'Worker dependency manifest has not been published yet -- run the container update' };
-      if (colState.installer === "lvpm" ? colState.packages.has(pkg) : pkgInSet(pkg, colState.packages)) return { state:"present", title:colState.label };
+      const effective = colState.installer === "lvpm" ? pkg : effectiveToolingPin(pkg, vipc, col);
+      if (colState.installer === "lvpm" ? colState.packages.has(effective) : pkgInSet(effective, colState.packages))
+        return { state:"present", title:effective === pkg ? colState.label : 'Project-selected version installed: ' + effective };
       return { state:"missing", title:'Not baked into this worker yet -- run the container update' };
     }
     function statusCell(pkg, colState, vipc, col){

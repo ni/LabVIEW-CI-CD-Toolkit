@@ -4528,7 +4528,7 @@ def _known_nipm_dependencies():
     {
       'name': 'VI Analyzer support',
       'source': 'NI Package Manager',
-      'packages': {'windows': ['ni-viawin-labview-support'], 'linux': ['ni-vialin-labview-support']},
+      'packages': {'windows': ['ni-viawin-labview-support'], 'linux': ['ni-vialinux-labview-support']},
       'platforms': ['windows', 'linux'],
       'details': 'NI VI Analyzer support package used by the analyzer runners.',
     },
@@ -4547,10 +4547,11 @@ def _known_nipm_dependencies():
       'details': 'JKI Dragon dependency-management tooling installed from the LabVIEW 2026 NI Package Manager feed.',
     },
     {
+      'key': 'vipm',
       'name': 'VI Package Manager',
-      'source': 'NI Package Manager',
-      'packages': {'windows': ['ni-vipm']},
-      'platforms': ['windows'],
+      'source': 'NI Package Manager / Debian',
+      'packages': {'windows': ['ni-vipm'], 'linux': ['vipm']},
+      'platforms': ['windows', 'linux'],
       'details': 'NI-published Windows VIPM package that enables VIPC application during worker builds. Linux installs VIPM from the native Debian package during its worker build.',
     },
   ]

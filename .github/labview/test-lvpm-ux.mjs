@@ -193,7 +193,7 @@ assert.equal(hooks.pkgCellState('actual-1.2', state).state, 'present');
 assert.equal(hooks.pkgCellState('actual-9.0', state).state, 'missing');
 const linuxColumn = { platform:'linux' };
 const nativeState = hooks.enrichPlatformState({ tag:tag + '@' + digest }, { ...candidate, labview_version:'2026' });
-const analyzer = { key:'via', platforms:['windows', 'linux'], packages:{ linux:['ni-vialin-labview-support'] } };
+const analyzer = { key:'via', platforms:['windows', 'linux'], packages:{ linux:['ni-vialinux-labview-support'] } };
 assert.equal(nativeState.nipkg_ready, false);
 assert.match(hooks.nipmCell({ key:'labview', labview:true }, linuxColumn, nativeState), /aria-label="Present"/);
 assert.match(hooks.nipmCell({ key:'vipm' }, linuxColumn, nativeState), /N\/A/);
@@ -451,6 +451,14 @@ assert.equal(hooks.pkgCellState('declared-only-1.0', vipmState).state, 'missing'
 assert.deepEqual([...hooks.packagesInManifest({vipc:[{packages:['actual-1.2']}],copied_from_base:true})], []);
 assert.equal(hooks.enrichPlatformState({key:'windows'}, {vipm_inventory:{status:'unavailable'}}).ready, false);
 assert.equal(hooks.lvpmFreshness(vipmState), null);
+const coreFixture = {role:'core',monitorOn:['linux'],packages:['actual-1.0']};
+hooks.setState({vipcs:[coreFixture,{role:'project',configured:true,monitored:true,monitorOn:['linux'],packages:['actual-1.2']}]});
+assert.equal(hooks.pkgCellState('actual-1.0', vipmState, coreFixture, {key:'linux'}).state, 'present');
+assert.equal(hooks.pkgCellState('actual-1.0', {...vipmState,packages:new Set(['actual-1.0'])}, coreFixture, {key:'linux'}).state, 'missing');
+hooks.setState({vipcs:[coreFixture,{role:'project',configured:true,monitored:true,monitorOn:['windows'],packages:['actual-1.2']}]});
+assert.equal(hooks.pkgCellState('actual-1.0', vipmState, coreFixture, {key:'linux'}).state, 'missing');
+hooks.setState({vipcs:[]});
+
 const dragonPath = 'project.dragon';
 const monitoredDragon = { path:dragonPath, monitored:true, monitorOn:['linux'] };
 function dragonInventory(file, available = true){

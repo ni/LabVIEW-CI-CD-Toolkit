@@ -190,6 +190,30 @@ class LinuxWorkerTests(unittest.TestCase):
         self.assertIn('"${tag}-deps-${date_tag}"', build["run"])
         self.assertNotIn("labview-target.txt", manifest["run"])
 
+    def test_baseline_only_client_build_uses_qualified_base(self):
+        workflow = yaml.safe_load((ROOT / ".github/workflows/build-labview-linux-image.yml").read_text())
+        steps = workflow["jobs"]["build-and-push"]["steps"]
+        step = next(step for step in steps if step.get("name") == "Compute worker version")
+        script = step["run"].split("<<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
+        script = script.replace("import hashlib, json, pathlib, os, re, subprocess",
+            "import hashlib, json, pathlib, os, re, subprocess\n"
+            "subprocess.check_output = lambda *a, **k: 'sha256:' + 'b' * 64")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / '.github/labview-ci').mkdir(parents=True)
+            (root / '.github/labview-ci/catalog.json').write_bytes((ROOT / '.github/labview-ci/catalog.json').read_bytes())
+            output = root / 'output'
+            result = subprocess.run([sys.executable, '-c', script], cwd=root,
+                env={**os.environ, 'IS_SOURCE': 'false', 'VIPC_COUNT': '0',
+                     'LABVIEW_VERSION': '2026', 'GITHUB_OUTPUT': str(output)}, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            values = dict(line.split('=', 1) for line in output.read_text().splitlines())
+            self.assertTrue(values['base_image'].startswith('nationalinstruments/labview:'))
+            self.assertTrue(values['ni_tag'].endswith('@sha256:' + 'b' * 64))
+            self.assertEqual(values['release_id'], values['default_release'])
+        build = next(step for step in steps if step.get('name') == 'Build and push LabVIEW Linux CI image')
+        self.assertNotIn('crane copy', build['run'])
+
     def test_parent_manifest_cli_accepts_linux_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -200,6 +224,8 @@ class LinuxWorkerTests(unittest.TestCase):
             raw.write_text(inventory["raw"])
             nipkg = root / "nipkg-list.txt"
             nipkg.write_text("")
+            dpkg = root / "dpkg-list.txt"
+            dpkg.write_text("ni-vialinux-labview-support 26.1.0\n")
             vipc = root / "project-test.vipc"
             with zipfile.ZipFile(vipc, "w") as archive:
                 archive.writestr("config.xml", "<Root><Package><Name>package_id-1.1-1</Name></Package></Root>")
@@ -207,7 +233,7 @@ class LinuxWorkerTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(ROOT / ".github/labview/build-worker-manifest.py"),
                 "--platform", "linux", "--version", "linux-fixture", "--labview-version", "2026",
                 "--labview-bitness", "64", "--observed-inventory", str(evidence),
-                "--nipkg-list", str(nipkg), "--vipm-list", str(raw), "--vipc", str(vipc),
+                "--nipkg-list", str(nipkg), "--dpkg-list", str(dpkg), "--vipm-list", str(raw), "--vipc", str(vipc),
                 "--worker-layer", "repo-vipc-layer", "--base-image", "example.test/base:2026",
                 "--base-digest", "sha256:" + "b" * 64,
                 "--image-ref", "example.test/worker:linux-fixture@sha256:" + "c" * 64,
@@ -216,6 +242,7 @@ class LinuxWorkerTests(unittest.TestCase):
                 "--out-dir", str(output)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             manifest = json.loads((output / "manifest.json").read_text())
+            self.assertEqual(manifest["dpkg_packages"], [{"name": "ni-vialinux-labview-support", "version": "26.1.0"}])
             self.assertEqual(manifest["schema"], 3)
             self.assertEqual(manifest["platform"], "linux")
             self.assertEqual(manifest["labview_version"], "2026")

@@ -9,6 +9,7 @@ import io
 import json
 from pathlib import Path
 import shlex
+import shutil
 import sys
 import tempfile
 import unittest
@@ -34,6 +35,32 @@ PLATFORMS = (("linux",), ("windows", "linux"), ("windows",))
 
 
 class DistributionTests(unittest.TestCase):
+    def test_fresh_client_installs_and_stages_the_full_example(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / 'client'
+            (target / 'example').mkdir(parents=True)
+            for name in ('Dependencies.vipc', 'Example.dragon'):
+                shutil.copyfile(ROOT / 'example' / name, target / 'example' / name)
+            result = INSTALLER.subprocess.run([
+                sys.executable, '-I', str(ROOT / '.github/labview-ci/install.py'),
+                '--source', str(ROOT), '--target', str(target), '--repo', 'client-owner/client-project',
+                '--activities', 'dashboard,custom-image,unit-tests,vi-analyzer',
+                '--os', 'windows,linux', '--labview-version', '2026', '--no-vars'],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertFalse((target / '.github/workflows/release.yml').exists())
+            helper = target / '.github/labview/vipm/linux-worker.py'
+            for mode in ('stage', 'plan'):
+                output = target / (mode + '.json')
+                arguments = ['--destination', str(target / '.github/labview/vipm'),
+                             '--dependency-sha', 'a' * 40] if mode == 'stage' else []
+                result = INSTALLER.subprocess.run([sys.executable, '-I', str(helper), mode,
+                    '--root', str(target), '--output', str(output), *arguments],
+                    cwd=target, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                sources = {item['path'] for item in json.loads(output.read_text())['files']}
+                self.assertTrue({'example/Dependencies.vipc', 'example/Example.dragon'}.issubset(sources))
+
     def test_linux_only_install_contains_inventory_and_staging_helper(self):
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary)

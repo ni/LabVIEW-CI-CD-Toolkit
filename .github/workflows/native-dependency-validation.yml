@@ -37,6 +37,11 @@ jobs:
       - name: Build candidate and recheck installed project pins
         shell: pwsh
         run: ./.github/labview/test-native-windows-worker.ps1 -Python python
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Verify Windows dependency warnings clear
+        run: python .github/labview/test-native-dependency-coverage.py --platform windows --evidence ci-out/native-windows
       - name: Retain Windows native evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -78,6 +83,9 @@ jobs:
         env:
           NATIVE_LINUX_INSTALLER: ${{ matrix.installer }}
         run: bash .github/labview/test-native-linux-worker.sh
+      - name: Verify Linux VIPM dependency warnings clear
+        if: matrix.installer == 'vipm'
+        run: python .github/labview/test-native-dependency-coverage.py --platform linux --evidence ci-out/native-linux-vipm
       - name: Retain Linux native evidence
         if: always()
         uses: actions/upload-artifact@v7

@@ -53,12 +53,22 @@ try {
         }
     }
     'PASS: observed target-bound project inventory fixtures (9 cases)'
+    $baseline = @([pscustomobject]@{ Name = 'ci-tooling.vipc'; FullName = 'baseline.vipc' })
+    foreach ($version in @('1.1-1', '1.1-2', '')) {
+        $script:InventoryExit = 0
+        $script:Inventory = @('Using LabVIEW 2026 (64-bit)', "package_id v$version")
+        $accepted = $true
+        try { Assert-FinalWindowsProjectInventory -VipcFiles $baseline -DragonSpecs @() }
+        catch { $accepted = $false }
+        if ($accepted -ne ($version -eq '1.1-1')) { throw "Incomplete baseline accepted: '$version'" }
+    }
+    'PASS: tooling baseline requires final installed inventory (3 cases)'
     $script:InventoryExit = 8
     Assert-FinalWindowsProjectInventory -VipcFiles @() -DragonSpecs @()
     $unavailable = Get-Content (Join-Path $VipcDir 'observed-inventory.json') -Raw | ConvertFrom-Json
     if ($unavailable.status -ne 'unavailable' -or $unavailable.target_verified -or
         $unavailable.packages.Count -or $unavailable.required_project) { throw 'Baseline failure claimed packages' }
-    'PASS: baseline-only failure remains best-effort with unavailable observation'
+    'PASS: empty selection records unavailable observation without claiming packages'
     $workflow = Get-Content (Join-Path $Root '.github/workflows/build-labview-image.yml') -Raw
     $validation = [regex]::Match($workflow, '(?s)            if \(\$observed -isnot \[pscustomobject\].*?(?=            docker push \$immutable)')
     if (-not $validation.Success) { throw 'Candidate inventory validation block not found' }
