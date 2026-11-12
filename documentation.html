@@ -1042,7 +1042,7 @@ mass-compile:
       <p>The standalone <code>actions/worker-image</code> composite builds only a client worker layer.
         Callers explicitly supply a readable, qualified Windows <code>base-image</code> and matching LabVIEW year;
         the action never builds or promotes the shared base. It resolves that reference to a digest and uses
-        the same digest for hashing, Docker <code>FROM</code>, and dependency-free registry copies. It verifies
+        the same digest for hashing, Docker <code>FROM</code>, and the dependency build. Even a client without project declarations builds and verifies its selected baseline tooling. It verifies
         that the resolved base provides <code>windows/amd64</code> before building or copying.
         A fresh isolated context contains the current source VIPM installer, optional source
         <code>ci-tooling.vipc</code>, and the caller's dependency files at the source worker's
@@ -1100,10 +1100,10 @@ mass-compile:
           The dashboard compares those declarations against what is baked into the current worker manifest; if any are
           missing it shows a persistent <em>&ldquo;dependencies need to be installed&rdquo;</em> banner, and the
           Dependencies page&rsquo;s update panel itemizes exactly which files and packages are pending. The comparison is
-          <strong>version-tolerant</strong>: a VIPC pins a specific build (e.g.
-          <code>wovalab_lib_antidoc_cli-3.3.0.117</code>), but VIPM installs one version per package, so a baked
-          <code>&hellip;-3.4.0.126</code> satisfies the request &mdash; matching is on the versionless base identifier, so a
-          present-but-different build reads as installed instead of a false <em>missing</em>. Applying it is
+          <strong>exact-version</strong>: a VIPC pin such as
+          <code>wovalab_lib_antidoc_cli-3.3.0.117</code> is not satisfied by a different installed build.
+          Only observed installed packages count; requested VIPC declarations and copied seed-image assumptions
+          never establish satisfaction. A leading <code>v</code> in an observed VIPM version is normalized. Applying it is
           <strong>opt-in</strong>: from the Dependencies page you dispatch the dependency build
           (<code>build-labview-image.yml</code>, &ldquo;Build LabVIEW CI Image&rdquo;), which runs on a Windows runner and
           this time starts <code>FROM</code> the base and applies a thin dependency layer
@@ -1185,9 +1185,9 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         VIPM packages baked in, so a worker image is fully auditable.</p>
       <p>The machine-readable <code>manifest.json</code> records installed VIPM packages in
         <code>vipm_packages</code> (<code>name</code>, <code>version</code>, and VIPC-style <code>label</code>) plus
-        the raw <code>vipm list --installed</code> output in <code>vipm_raw</code>. The Dependencies page unions that
-        installed-package inventory with the manifest&rsquo;s own <code>vipc[].packages</code> list when deciding what is
-        baked. Because VIPM records versions with a leading <code>v</code> (e.g. <code>v0.5.0.1</code>) while VIPC files
+        the raw <code>vipm list --installed</code> output in <code>vipm_raw</code>. The Dependencies page compares the requested pins against this observed inventory.
+        The manifest&rsquo;s <code>vipc[].packages</code> records requirements, not proof of installation.
+        Linux manifests also preserve <code>dpkg_packages</code> and raw <code>dpkg-query</code> output for native package status, including the installed <code>ni-vialinux-labview-support</code> VI Analyzer package. Because VIPM records versions with a leading <code>v</code> (e.g. <code>v0.5.0.1</code>) while VIPC files
         declare the bare form (<code>0.5.0.1</code>), the comparison normalizes that <code>v</code> prefix &mdash; without
         it, correctly-baked packages would be reported as missing and the &ldquo;dependencies need to be installed&rdquo;
         banner would never clear.</p>
@@ -1196,10 +1196,25 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         rebuilt by <code>build-labview-image.yml</code>). If a manifest has not yet published a dedicated
         <code>dragon.items</code> status block, the dashboard falls back to the installed-package inventories
         (<code>vipm_packages</code> / <code>nipkg_packages</code>) so already-baked dependencies are marked installed
-        instead of staying stuck at <code>not_attempted</code>. Linux declarations require the selected
-        digest-pinned LVPM inventory and locally current freshness, with exact VIPM name/version matches.
+        instead of staying stuck at <code>not_attempted</code>. Linux declarations use the selected target-verified VIPM inventory, or the selected
+        digest-pinned LVPM inventory with locally current freshness. Both require exact name/version matches.
         Unsupported native/NIPM dependencies and stale or unavailable Linux evidence remain unknown/pending.
         Files monitored on both platforms are satisfied only when both platforms are satisfied.</p>
+
+      <h3>Complete dependency verification</h3>
+      <p>The Linux VIPM worker uses the official 26.3.2 (4056) Debian installer, matching the legacy
+        OGP compatibility fix required on Windows. Selected Dragon files with exact public VIPM pins are
+        converted into deterministic VIPCs by the trusted staging helper. The input record preserves both
+        the original source hash and generated VIPC hash. Unsupported NIPM requirements, custom feeds,
+        embedded VIPC references, conflicting project pins, and mismatched LabVIEW targets fail before the build.</p>
+      <p>VIPC XML is parsed structurally, including compact single-line exports. The final Windows and Linux inventories must
+        satisfy every effective tooling and project pin; explicit project pins take precedence over the tooling
+        baseline. A successful install command alone is insufficient. The native validation workflow covers
+        both example dependency files, the tooling baseline, and installed Antidoc dependencies on Windows.
+        The captured VIPM inventories also pass through the production dashboard and Dependencies-page
+        functions: every package cell, VIPC/Dragon status pill, and pending indicator must clear.
+        It retains build and fresh-container evidence without publishing worker images. Its result does not
+        establish that a published worker is active; publication and dashboard verification are separate steps.</p>
 
       <h3>When images rebuild</h3>
       <p>A worker rebuild is a heavy, opt-in operation. It runs when you apply a dependency update from the dashboard's
@@ -1356,6 +1371,38 @@ docker run --rm `
 
       <!-- 15 ──────────────────────────────────────────────────────────────── -->
       <h2 id="vipm">15. VIPM dependency baking — lessons from the trenches <a class="anchor" href="#vipm">#</a></h2>
+      <p>Windows and Linux builds keep trusted tooling at reviewed HEAD while optionally reading committed dependency
+        inputs from <code>dependency_sha</code>, a full ancestor SHA. The <code>expected_sha</code> guard rejects a moved
+        reviewed HEAD. Selected configuration and dependency bytes participate in worker identity; staging rejects
+        escaping paths, symlinks and collisions. Linux uses <code>vipm/linux-worker.py</code> with the existing LVPM
+        planner for selection and safe input validation. The catalog explicitly ships this helper to Linux-only clients;
+        Windows helpers ship in the existing VIPM directory payload. These are installer/update payload changes, not
+        machine-local repairs.</p>
+      <p>Both VIPM installers capture structured, target-bound installed inventory and verify required project pins before
+        publishing active worker aliases. A requested file or a successful command alone is not installed-package
+        evidence. Every selected tooling and project requirement must be observed at its effective version;
+        only an empty dependency set can retain unavailable inventory without failing.
+        Separately tagged <code>new</code> workers do not move active aliases or the default Pages pointer. Registry
+        alias updates are not atomic; Windows attempts rollback on failure. Native Windows/Linux LabVIEW, VIPM,
+        registry publication and activity checks still require CI qualification; local fixtures do not establish them.</p>
+      <p>The revision picker compares that revision's declarations and monitoring choices with its selected worker.
+        Saving in a client submits a configuration proposal; it is not applied until reviewed and merged.
+        Windows and Linux checkboxes preserve the other platform's selection. The tooling source intentionally disables
+        client Save on both platforms and explains that monitoring changes require a source PR; forks remain ineligible
+        for the client installer. Existing LVPM candidate verification, digest pins and explicit activation are unchanged.</p>
+      <p><code>native-dependency-validation.yml</code> runs only on its dedicated validation branch or manual dispatch.
+        Windows x64 VIPM and Linux x64 VIPM/LVPM jobs build the candidate with the real example VIPC and Dragon files,
+        the tooling baseline, and the Windows Antidoc capability. They retain source
+        hashes, build logs and installed-inventory evidence as artifacts. The jobs have read-only repository/package
+        permissions and never publish images, active aliases or Pages pointers. A passed native build verifies the
+        selected fixture and recorded scope, not every project or LabVIEW activity; failures retain diagnostic artifacts.</p>
+      <p>The fresh Windows container creates a genuine public Git checkout at the exact candidate commit before
+        invoking VIPM Community Edition, verifies the staged VIPC hash, and deletes the baked inventory before
+        querying again. Linux installation does not treat the original LabVIEW process exiting as proof of failure:
+        after successful install commands, target-bound inventory must still verify every required exact package pin.
+        Failed queries, missing packages, wrong versions and wrong LabVIEW targets remain fatal.</p>
+      <p>Windows best-effort tooling retries preserve project VIPC and Dragon version overrides, so a failed
+        initial attempt cannot reinstall an older baseline pin over a required project dependency.</p>
       <p class="lead-in">This section is the single hardest part of the whole stack, and it is documented in detail
         precisely because it was painful to get right. If you ever fork the worker build or debug a baking failure,
         read it carefully — every numbered point below is a real problem that was hit and solved.</p>
@@ -1468,12 +1515,10 @@ docker run --rm `
           qualification.</li>
         <li><strong>Require final Windows runtime evidence</strong> — static payload inspection and
           AST/mock tests do not prove legacy OGP installation. A reviewed real bake must verify required
-          Antidoc/palette and the final target inventory. Later best-effort tooling can upgrade earlier
-          project pins, so recovered-batch validation is not a final-image pin guarantee. Required Dragon roots now
-          have a separate exact-version final target-inventory gate after those later installs; this does not extend
-          that guarantee to every VIPC root. Package
-          archives, required/optional policy, integrity verification, target identity, and exact/minimum
-          pin semantics are not relaxed.</li>
+          Antidoc/palette and the final target inventory. Recovered-batch validation alone is insufficient:
+          the final gate verifies every selected project, Dragon and effective tooling requirement after all installs.
+          Project pins override baseline pins consistently during retries and final verification. Package archives,
+          integrity verification, target identity, and exact/minimum pin semantics are preserved.</li>
         <li><strong>Seed <code>Settings.ini</code></strong> before installing — a fresh image lacks
           <code>C:\ProgramData\JKI\VIPM\Settings.ini</code>, without which the CLI aborts with an IO error.</li>
         <li><strong>Run LabVIEW headless first</strong> — the modern CLI installs <em>into a running LabVIEW</em> over
@@ -1531,7 +1576,7 @@ docker run --rm `
           requested package ID and version. A recovered set no longer fails solely because an earlier transitive
           file failed. Missing or wrong-version requested packages, an unreadable inventory, or an exhausted
           engine recovery still fail the install; required project dependencies and UTF/Caraya essentials remain
-          fail-closed, and best-effort tooling remains best-effort.</li>
+          fail-closed; tooling retries may continue, but the final complete-inventory gate still applies.</li>
         <li><strong>Batch recovery is not a final-image pin guarantee</strong> — a later best-effort tooling
           install can change versions already verified for a project VIPC. Validate the final target inventory
           as well as each recovered batch before claiming that all project pins hold in the completed image.</li>
@@ -1556,11 +1601,12 @@ docker run --rm `
         checkbox requires saving and merging a configuration PR before reviewing a worker update. Updates remain
         restricted to the current default-branch revision.
       </div>
-      <p>After a worker image is built locally, the publish workflow captures both <code>nipkg list</code> and
+      <p>After a worker image is built locally, the publish workflow captures both <code>nipkg list-installed</code> and
         <code>vipm list --installed</code> from inside the image and writes them into the worker manifest. Fresh-install
         seed copies use a fast registry copy and do not pull the multi-GB image back just to inspect it; seed manifests
-        without a captured VIPM list are treated conservatively by the dashboard, with only the known
-        Windows core tooling VIPC inferred as installed.</p>
+        without a captured target-verified inventory cannot establish installed package coverage. A requested dependency
+        rebuild applies and verifies the tooling baseline as well as the selected project dependencies.</p>
+      <p>NI package coverage uses installed-package inventory only: <code>nipkg list</code> lists available packages and cannot establish installation. Older Windows manifests without installed-inventory provenance show unknown native coverage until rebuilt. Windows VIPM is installed through the JKI bootstrap, so a successful target-verified CLI inventory establishes its presence even without an NI package named <code>ni-vipm</code>. The separate JKI Dragon application is not required: the toolkit parses Dragon declarations and installs their packages using VIPM or LVPM.</p>
       <p>When all four committed VIPCs are selected together with <code>example/Example.dragon</code>,
         <code>experimental.vipc</code> uses Antidoc CLI <code>3.4.0.126</code>, already established by
         the authoritative Antidoc capability archive. The experimental configuration retains its ID,
@@ -1571,16 +1617,13 @@ docker run --rm `
         Archive identity and source-membership tests guard the alignment. Planning success is not
         qualification of package installation, post-install hooks, a Linux worker bake, runtime
         relinking or final inventory.</p>
-      <div class="note"><span class="lbl">Required essentials vs. best-effort tooling</span>
-        <code>install-vipc.ps1</code> installs Caraya <code>1.4.4.148</code> and the UTF JUnit essentials
-        (<code>ni_lib_utf_junit_report</code> + its <code>ni_lib_junit_results_api</code> /
-        <code>ni_lib_simple_xml</code> deps) <strong>first</strong> as <em>required</em>, then applies project
-        <code>.vipc</code> files (also required). Other tooling VIPCs (<code>ci-tooling*.vipc</code>, e.g. Antidoc /
-        VI Tester / LUnit) are <em>best-effort</em>: if a heavy add-on wedges the headless VIPM engine it is logged as a warning
-        and the build still publishes an image only if the required dependency bake succeeded.
-        The Docker hook propagates a failed installer exit rather than silently publishing an incomplete worker.
-        Override the required set with <code>VIPM_REQUIRED_PACKAGES</code>. A seed-only registry copy does not
-        apply these dependencies: rebuild the project worker before relying on Caraya being present.</div>
+      <div class="note"><span class="lbl">Installation retries and final verification</span>
+        Windows installs Caraya and UTF essentials first, then project and capability VIPCs, then the tooling
+        baseline. Tooling retries may continue after an initial failure to give remaining packages a chance to install.
+        The final target-inventory gate still requires all effective selected packages; an incomplete toolkit cannot
+        be published as a successful dependency build. Project and Dragon pins override baseline pins for VIPM; baseline UI rows check that effective project version rather than continuing to request the superseded tooling version. LVPM retains its explicit conflicting-pin rejection.
+        Windows forwards the building repository URL through the Dockerfile to VIPM, so clients use their own repository context.
+        A seed-only registry copy does not run this installation; rebuild the worker to apply dependencies.</div>
       <h3 id="dependencies-platforms">Manage dependencies one platform at a time</h3>
       <p>The Dependencies page has separate <strong>Windows</strong> and <strong>Linux</strong> tabs.
         Windows keeps its VIPM workflow and never offers an LVPM installer choice. Linux offers VIPM or
@@ -1850,9 +1893,7 @@ jobs:
         files directly: nested dependency files, links, duplicate names and reserved <code>ci-tooling*</code>
         names fail rather than being silently skipped or overwritten. Exact <code>.vip</code> extensions are
         hashed separately from <code>.vipc</code>. Loose VIPs are used only when a VIPC references them;
-        a VIP-only directory without a VIPC fails. Project VIPCs are required; bundled optional framework
-        packages retain the source installer's best-effort behavior. Verify the framework in the finished
-        image before relying on it. <code>include-ci-tooling: 'false'</code> omits the tooling VIPC and disables
+        a VIP-only directory without a VIPC fails. Project VIPCs and the effective included tooling baseline are required in the final target inventory. <code>include-ci-tooling: 'false'</code> omits the tooling VIPC and disables
         default UTF/JUnit/early framework packages. Supported exact Dragon VIPM declarations use the shared
         host-generated target plan and verified VIPM installer, including Dragon-only builds; no separate Dragon CLI
         is needed. The isolated action entry and content fingerprint include the trusted parser, normalized plan,
@@ -1884,6 +1925,11 @@ jobs:
         <code>Composite Action Checks</code> runs portable regressions on Linux and Windows plus real Windows
         PowerShell runner tests without LabVIEW; an actual Windows container bake/test remains a separate
         acceptance check.</p>
+      <p>VIPM bootstrap contract checks read the catalog, workflows, Dockerfiles, and installer source as
+        UTF-8 rather than the Windows host's legacy code page. A portable regression exercises the affected
+        catalog/bootstrap assertion with simulated Windows-1252 defaults (<code>None</code> and
+        <code>locale</code>), confirming implicit reads fail and explicit UTF-8 preserves Unicode notes.
+        This validates source contracts, not a native Windows VIPM install or container bake.</p>
       <p class="lead-in">Every capability is built to the same template, so once you understand one you understand them
         all. <a href="#cap-unittests">§16.4 (Unit Tests)</a> is documented end-to-end as the fully worked example you can
         copy from.</p>
@@ -2516,6 +2562,8 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
           <tr><td><code>dragon.files[].dependencies[].platform_status</code> / <code>dragon.install_set[].platform_status</code></td><td>Monitored Windows inventory and selected, locally current Linux LVPM inventory</td><td>Per-platform status, installed_version and message; Linux scope is package-files. Aggregate status cannot be installed when an applicable platform is missing or unknown.</td></tr>
           <tr><td><code>deps-pending.json</code></td><td>Dashboard publisher</td><td>Persistent pending banner, including local LVPM freshness under <code>linux_lvpm</code> and monitored Dragon inspection failures as <code>dragon[].status: unknown</code></td></tr>
           <tr><td><code>workers/&lt;platform&gt;/&lt;version&gt;/manifest.json</code></td><td>Worker image workflows</td><td>Dependencies page installed-package status</td></tr>
+          <tr><td><code>manifest.json</code> schema 3: <code>vipm_inventory</code>, <code>vipm_packages</code>, <code>dependency_sha</code>, <code>labview_bitness</code></td><td>Shared worker manifest producer</td><td>Target-verified observed packages, explicit unavailable/unverified evidence, and separate tooling/input revisions. Raw lists and <code>vipc[].packages</code> remain diagnostic/declaration data, never installed inventory.</td></tr>
+          <tr><td><code>workers/&lt;platform&gt;/&lt;version&gt;/observed-inventory.json</code></td><td>VIPM worker builds</td><td>Schema 1 evidence: platform, LabVIEW year/bitness, boolean target verification and required-project flags, source, status, raw output, and exact package names/versions. Malformed or wrong-target evidence blocks manifest generation.</td></tr>
           <tr><td><code>workers/linux-lvpm/&lt;tag&gt;/manifest.json</code></td><td>LVPM candidate build</td><td>Digest-bound candidate inventory, activation and Linux runtime freshness checks</td></tr>
           <tr><td><code>workers/linux-lvpm/latest.json</code></td><td>LVPM candidate build</td><td>Alternative candidate discovery only; never selects an active worker</td></tr>
           <tr><td><code>catalog.json</code> (root)</td><td>Installer / integrate-deploy</td><td>Version badge, What's New</td></tr>
