@@ -59,7 +59,8 @@ try {
     Copy-Item -LiteralPath "$Root/.github/labview" -Destination "$context/.github/labview" -Recurse
     Copy-Item -LiteralPath "$Root/.github/docker/labview-ci.Dockerfile" -Destination "$context/.github/docker/labview-ci.Dockerfile"
     Copy-Item -LiteralPath "$Root/.github/workflows/build-labview-image.yml" -Destination "$context/.github/workflows/build-labview-image.yml"
-    Copy-Item -LiteralPath "$Root/example/Dependencies.vipc" -Destination "$context/.fixture/example/Dependencies.vipc"
+    Copy-Item -LiteralPath "$Root/.github/workflows/run-antidoc-windows-container.yml" -Destination "$context/.github/workflows/run-antidoc-windows-container.yml"
+    Copy-Item -LiteralPath "$Root/example/Dependencies.vipc", "$Root/example/Example.dragon" -Destination "$context/.fixture/example"
     Copy-Item -LiteralPath "$Root/.github/labview-ci.yml" -Destination "$OutputDirectory/source-labview-ci.yml"
     $fixture = @'
 schemaVersion: 1
@@ -71,7 +72,10 @@ config:
       - path: example/Dependencies.vipc
         monitor: true
         monitorOn: [windows]
-    dragon: []
+    dragon:
+      - path: example/Example.dragon
+        monitor: true
+        monitorOn: [windows]
 '@
     $fixture | Set-Content -LiteralPath "$context/.fixture/.github/labview-ci.yml" -Encoding utf8NoBOM
     $fixture | Set-Content -LiteralPath "$OutputDirectory/fixture-labview-ci.yml" -Encoding utf8NoBOM
@@ -97,11 +101,11 @@ config:
     }
     $vipm = Join-Path $context '.github/labview/vipm'
     $selected = Get-Content -LiteralPath "$vipm/selected-stage.json" -Raw | ConvertFrom-Json
-    if (@($selected.PSObject.Properties).Count -ne 1 -or
+    if (@($selected.PSObject.Properties).Count -ne 2 -or
         $selected.'dependencies.vipc' -cne '.fixture/example/Dependencies.vipc' -or
-        @(Get-ChildItem -LiteralPath $vipm -Filter '*.dragon' -Recurse).Count -or
+        @(Get-ChildItem -LiteralPath $vipm -Filter '*.dragon' -Recurse).Count -ne 1 -or
         -not (Test-Path -LiteralPath "$vipm/ci-tooling.vipc")) {
-        throw 'Staging must select only example/Dependencies.vipc, no Dragon, and preserve ci-tooling.vipc.'
+        throw 'Staging must include the example VIPC, Dragon, Antidoc, and preserved tooling baseline.'
     }
     if ((Get-FileHash "$Root/example/Dependencies.vipc").Hash -ne (Get-FileHash "$vipm/Dependencies.vipc").Hash -or
         (Get-FileHash "$Root/.github/labview/vipm/ci-tooling.vipc").Hash -ne (Get-FileHash "$vipm/ci-tooling.vipc").Hash) {
@@ -113,27 +117,31 @@ config:
     if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
     $functionNames = @('Get-VipcPackageSpecs', 'Split-VipmPackageSpec', 'Find-VipmExecutable',
         'Test-VipmSpecsInstalled', 'Test-VipmPackageVersion', 'Get-NumericVersionKey', 'Assert-FinalWindowsProjectInventory',
-        'New-PublicRepoWorkdir')
+        'New-PublicRepoWorkdir', 'Get-WindowsDragonPlan')
     $functions = @($installerAst.FindAll({
         param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in $functionNames
     }, $true))
     if ($functions.Count -ne $functionNames.Count) { throw 'Required trusted installer functions were not found.' }
     foreach ($definition in $functions) { . ([scriptblock]::Create($definition.Extent.Text)) }
-    $specs = @(Get-VipcPackageSpecs "$vipm/Dependencies.vipc")
+    $dragon = Get-WindowsDragonPlan -Directory $vipm -TargetYear '2026' -TargetBitness '64'
+    $specs = @(@(Get-ChildItem $vipm -Filter '*.vipc' -File | ForEach-Object {
+        Get-VipcPackageSpecs $_.FullName
+    }) + @($dragon.Specs) | Sort-Object -Unique)
     if (-not $specs.Count) { throw 'Selected example VIPC has no required packages.' }
     $specs | Set-Content -LiteralPath "$OutputDirectory/required-pins.txt" -Encoding utf8NoBOM
     Write-Host ('Exact required project pins: ' + ($specs -join ', '))
     $sourcePaths = @('.github/docker/labview-ci.Dockerfile', '.github/workflows/build-labview-image.yml',
         '.github/labview-ci.yml', '.github/labview/dragon_deps.py', '.github/labview/build-worker-manifest.py',
         '.github/labview/test-native-windows-worker.ps1', '.github/labview/vipm/install-vipc.ps1',
-        '.github/labview/vipm/ci-tooling.vipc', 'example/Dependencies.vipc')
+        '.github/labview/vipm/ci-tooling.vipc', '.github/labview/antidoc/antidoc.vipc',
+        'example/Dependencies.vipc', 'example/Example.dragon')
     $hashes = [ordered]@{}
     foreach ($path in $sourcePaths) { $hashes[$path] = (Get-FileHash -LiteralPath (Join-Path $Root $path) -Algorithm SHA256).Hash.ToLowerInvariant() }
     $evidence = [ordered]@{
         commit = $sha; mode = $(if ($FixtureOnly) { 'synthetic-fixture-only' } else { 'native-build' })
         selected_source = 'example/Dependencies.vipc'; selected_platforms = @('windows')
-        dragons = @(); tooling_baseline_preserved = $true; source_sha256 = $hashes
+        dragons = @('example/Example.dragon'); tooling_baseline_preserved = $true; source_sha256 = $hashes
         fixture_config_sha256 = (Get-FileHash "$OutputDirectory/fixture-labview-ci.yml").Hash.ToLowerInvariant()
         staging_python_sha256 = (Get-FileHash $stagePath).Hash.ToLowerInvariant()
     }
@@ -184,7 +192,8 @@ try {
         throw 'Public checkout does not contain the trusted staged dependency fixture.'
     }
     Write-Host "Runtime public context: $origin at $head"
-    Assert-FinalWindowsProjectInventory -VipcFiles @(Get-Item "$VipcDir/Dependencies.vipc") -DragonSpecs @()
+    $dragon = Get-WindowsDragonPlan -Directory $VipcDir -TargetYear '2026' -TargetBitness '64'
+    Assert-FinalWindowsProjectInventory -VipcFiles @(Get-ChildItem $VipcDir -Filter '*.vipc' -File) -DragonSpecs $dragon.Specs
 } finally {
     $script:LastVipmInventoryRaw | Set-Content -LiteralPath "$VipcDir/runtime-inventory-raw.txt" -Encoding UTF8
     Set-Location $previousLocation
@@ -292,7 +301,7 @@ try {
         '--version', $version, '--labview-version', '2026', '--labview-bitness', '64',
         '--git-sha', $sha, '--dependency-sha', $sha, '--observed-inventory', $inventoryPath,
         '--worker-layer', 'repo-vipc-layer', '--image-ref', $tag, '--out-dir', $OutputDirectory,
-        '--vipc', "$vipm/Dependencies.vipc", '--vipc', "$vipm/ci-tooling.vipc")
+        '--vipc', "$vipm/Dependencies.vipc", '--vipc', "$vipm/ci-tooling.vipc", '--vipc', "$vipm/antidoc.vipc")
     if ($baseImage) { $manifestArguments += @('--base-image', $baseImage, '--seed-image', $baseImage) }
     if ($seedDigest) { $manifestArguments += @('--base-digest', $seedDigest, '--seed-digest', $seedDigest) }
     if ($env:GITHUB_SERVER_URL -and $env:GITHUB_REPOSITORY -and $env:GITHUB_RUN_ID) {

@@ -20,6 +20,48 @@ SPEC.loader.exec_module(WORKER)
 
 
 class LinuxWorkerTests(unittest.TestCase):
+    def test_real_example_stages_vipc_and_dragon_reproducibly(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory)
+            plan = WORKER.stage(ROOT, destination, 'a' * 40)
+            self.assertEqual({item['path'] for item in plan['files']},
+                             {'example/Dependencies.vipc', 'example/Example.dragon'})
+            dragon = next(item for item in plan['files'] if item['path'].endswith('.dragon'))
+            staged = destination / dragon['staged_name']
+            before = staged.read_bytes()
+            self.assertIn(('oglib_boolean', '6.0.0.9'), WORKER.vipc_specs(staged))
+            self.assertEqual(plan, WORKER.stage(ROOT, destination, 'a' * 40))
+            self.assertEqual(before, staged.read_bytes())
+
+    def test_tooling_packages_cannot_disappear_from_verified_inventory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for filename, labels in [('ci-tooling.vipc', ['palette-1.1-1', 'shared-1.0']),
+                                     ('project-example.vipc', ['shared-2.0'])]:
+                with zipfile.ZipFile(root / filename, 'w') as archive:
+                    archive.writestr('config.xml', '<Root>' + ''.join(
+                        '<Package><Name>' + label + '</Name></Package>' for label in labels) + '</Root>')
+            value = WORKER.observation('Using LabVIEW 2026 (64-bit)\nshared v2.0\n', '2026', True)
+            with self.assertRaisesRegex(ValueError, 'palette-1.1-1'):
+                WORKER.verify_project_pins(value, root)
+            value['packages'].append({'name': 'palette', 'version': '1.1-1'})
+            WORKER.verify_project_pins(value, root)
+
+    def test_dragon_conflicts_and_unsupported_dependencies_fail_before_staging(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / '.github').mkdir()
+            (root / '.github/labview-ci.yml').write_text('config: {labviewVersion: "2026"}\n')
+            with zipfile.ZipFile(root / 'test.vipc', 'w') as archive:
+                archive.writestr('config.xml', '<Root><Package><Name>shared-1.0</Name></Package></Root>')
+            for declaration in ('[vipm.dependencies]\nshared="2.0"',
+                                '[nipm.dependencies]\nunsupported="1.0"',
+                                '[project]\nlabview-version=2025',
+                                '[vipm.feeds]\nprivate="https://example.test"'):
+                (root / 'test.dragon').write_text(declaration)
+                with self.assertRaises(ValueError):
+                    WORKER.stage(root, root / 'out', 'a' * 40)
+
     def test_inventory(self):
         for banner in ("Using LabVIEW 2026 (64-bit)", "LabVIEW 2026 (64-bit)"):
             value = WORKER.observation(banner + "\npackage_id v1.1-1\n", "2026", True)

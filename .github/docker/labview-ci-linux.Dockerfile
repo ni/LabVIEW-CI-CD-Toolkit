@@ -8,7 +8,7 @@
 # with no separate image to build -- a client just copies this worker.
 # =============================================================================
 
-ARG VIPM_DEB_URL=https://traffic.libsyn.com/secure/jkinc/vipm_26.3.0-3954_amd64.deb
+ARG VIPM_DEB_URL=https://traffic.libsyn.com/secure/jkinc/vipm_26.3.2-4056_amd64.deb
 ARG LV_CONTAINER_TAG=2026q1patch2-linux
 
 # ---- build stage: compile the VI Browser render engine (lvctl + runner) ---

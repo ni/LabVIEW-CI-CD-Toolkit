@@ -170,6 +170,8 @@ def observed_inventory(args: argparse.Namespace) -> dict:
 
 def build_manifest(args: argparse.Namespace) -> dict:
     inventory = observed_inventory(args)
+    dpkg_path = getattr(args, 'dpkg_list', '')
+    dpkg_raw = Path(dpkg_path).read_text(encoding='utf-8') if dpkg_path else ''
     if args.dependency_sha and not re.fullmatch(r"[a-fA-F0-9]{40}", args.dependency_sha):
         raise ValueError("Dependency revision must be a full commit SHA")
     nipkg_raw = ""
@@ -222,6 +224,8 @@ def build_manifest(args: argparse.Namespace) -> dict:
         "vipm_packages": inventory["packages"],
         "nipkg_raw": nipkg_raw,
         "nipkg_packages": parse_nipkg_list(nipkg_raw),
+        "dpkg_raw": dpkg_raw,
+        "dpkg_packages": parse_nipkg_list(dpkg_raw),
     }
 
 
@@ -408,6 +412,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--git-sha", default="")
     ap.add_argument("--run-url", default="")
     ap.add_argument("--nipkg-list", default="", help="Path to captured `nipkg list` output")
+    ap.add_argument("--dpkg-list", default="", help="Path to captured Linux dpkg-query package/version output")
     ap.add_argument("--vipm-list", default="", help="Path to captured `vipm list --installed` output")
     ap.add_argument("--vipc", action="append", default=[], help="Path to an applied .vipc (repeatable)")
     ap.add_argument("--pages-url", default="", help="Base Pages URL for nav links")

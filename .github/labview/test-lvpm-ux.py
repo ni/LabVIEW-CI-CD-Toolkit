@@ -647,6 +647,24 @@ class DashboardLvpmTests(unittest.TestCase):
 
 
 class DashboardDragonInspectionTests(unittest.TestCase):
+    def test_linux_vipm_exact_dragon_inventory_clears_pending(self):
+        inventory = {'platform': 'linux', 'status': 'observed', 'target_verified': True,
+                     'labview_version': '2026', 'labview_bitness': '64',
+                     'source': 'vipm list --installed', 'packages': [{'name': 'actual', 'version': '1.2'}]}
+        manifest = {'platform': 'linux', 'labview_version': '2026', 'vipm_inventory': inventory}
+        result = self.inspect(linux_manifest=manifest, selection='latest')
+        self.assertTrue(result['dragon']['ready'])
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'installed')
+        self.assertFalse(result['pending']['pending'])
+        inventory['packages'][0]['version'] = '1.3'
+        result = self.inspect(linux_manifest=manifest, selection='latest')
+        self.assertTrue(result['pending']['pending'])
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'wrong_version')
+        inventory['target_verified'] = False
+        result = self.inspect(linux_manifest=manifest, selection='latest')
+        self.assertTrue(result['pending']['pending'])
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'unknown')
+
     def test_actual_example_parser_output_reaches_actual_ui_renderer(self):
         result = self.inspect(declarations=(ROOT / 'example/Example.dragon').read_text())
         dependencies = result['dragon']['files'][0]['dependencies']

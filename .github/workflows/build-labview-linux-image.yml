@@ -17,6 +17,7 @@ on:
       # gate then rebuilds solely when a changed *.vipc is monitored. Tooling / base
       # changes rebuild via the monthly cron or an explicit dispatch, not a push.
       - '**.vipc'
+      - '**.dragon'
       - '!.github/**'
   schedule:
     # Monthly rebuild to pick up NI base image security updates
@@ -142,10 +143,10 @@ jobs:
                   emit(False, 'git diff failed -> skip (opt-in)')
               files = [f for f in diff.stdout.splitlines() if f.strip()]
               dep_changed = [f for f in files
-                             if f.lower().endswith('.vipc')
+                             if f.lower().endswith(('.vipc', '.dragon'))
                              and not f.replace(os.sep, '/').startswith('.github/')]
               if not dep_changed:
-                  emit(False, 'no project .vipc changed -> skip')
+                  emit(False, 'no project dependency changed -> skip')
 
               # Per-file monitor flags from config.container.vipc (default OFF).
               # This (Linux) worker only auto-rebuilds for a file that is
@@ -155,7 +156,7 @@ jobs:
               cfg = pathlib.Path('.github/labview-ci.yml')
               data = yaml.safe_load(cfg.read_text(encoding='utf-8')) if cfg.exists() else {}
               container = (data.get('config') or {}).get('container', {})
-              for entry in container.get('vipc', []):
+              for entry in container.get('vipc', []) + container.get('dragon', []):
                   on = entry.get('monitorOn')
                   if isinstance(on, str):
                       on = on.split('+')
@@ -163,8 +164,8 @@ jobs:
                       raise ValueError('monitorOn must be a platform list or + separated string')
                   if (entry.get('monitor') is True and (on is None or PLATFORM in on)
                           and entry.get('path') in dep_changed):
-                      emit(True, 'monitored .vipc changed: ' + entry['path'])
-              emit(False, 'changed .vipc are not monitored for ' + PLATFORM + ' -> skip')
+                      emit(True, 'monitored dependency changed: ' + entry['path'])
+              emit(False, 'changed dependencies are not monitored for ' + PLATFORM + ' -> skip')
           except SystemExit:
               raise
           except Exception as e:
@@ -447,8 +448,7 @@ jobs:
             container=$(docker create --entrypoint /bin/true "$image_ref")
             trap 'docker rm "$container" >/dev/null' EXIT
             docker cp "$container:/opt/lvci/vipm/observed-inventory.json" ci-out/worker/observed-inventory.json
-            required_args=()
-            if [ "${VIPC_COUNT:-0}" != "0" ]; then required_args+=(--required); fi
+            required_args=(--required)
             python3 .github/labview/vipm/linux-worker.py validate --year "$LABVIEW_VERSION" \
               --output ci-out/worker/observed-inventory.json --vipc-dir .github/labview/vipm "${required_args[@]}"
             docker cp "$container:/opt/lvci/vipm/vipm-list.txt" ci-out/worker/vipm-list.txt
@@ -465,6 +465,7 @@ jobs:
             --platform linux \
             --version "$worker_version" \
             --nipkg-list ci-out/worker/nipkg-list.txt \
+            --dpkg-list ci-out/worker/dpkg-list.txt \
             --vipm-list ci-out/worker/vipm-list.txt \
             --observed-inventory ci-out/worker/observed-inventory.json \
             --labview-version "${LABVIEW_VERSION}" \

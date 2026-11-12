@@ -599,7 +599,7 @@
       for (const installed of set) if (key(installed) === wanted) return true;
       return false;
     }
-    function nipkgInManifest(man){ return Array.isArray(man && man.nipkg_packages) ? man.nipkg_packages : []; }
+    function nipkgInManifest(man){ return [...(Array.isArray(man && man.nipkg_packages) ? man.nipkg_packages : []), ...(Array.isArray(man && man.dpkg_packages) ? man.dpkg_packages : [])]; }
     function lvpmFreshness(st){
       if (!st || st.key === "windows" || (st.installer !== "lvpm" && !String(st.tag || "").startsWith("linux-lvpm-"))) return null;
       const unknown = reason => ({ status:"unknown", reason });

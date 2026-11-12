@@ -4511,7 +4511,7 @@ def _manifest_failed_packages(man):
 def _manifest_nipkg_packages(man):
   packages = []
   if isinstance(man, dict):
-    for pkg in man.get('nipkg_packages') or []:
+    for pkg in (man.get('nipkg_packages') or []) + (man.get('dpkg_packages') or []):
       if isinstance(pkg, dict) and pkg.get('name'):
         packages.append({'name': str(pkg.get('name') or ''), 'version': str(pkg.get('version') or '')})
   return sorted(packages, key=lambda p: p['name'].lower())
@@ -4732,6 +4732,27 @@ def _annotate_dragon_status(dep, status_index, have_manifest, baked_packages, vi
       dep.setdefault('message', '')
 
 def _linux_dragon_status(dep, selection, manifest, freshness):
+  if isinstance(manifest, dict) and manifest.get('installer', 'vipm') == 'vipm':
+    inventory = manifest.get('vipm_inventory') or {}
+    unknown_vipm = {'status': 'unknown', 'installed_version': '', 'scope': 'installed-packages',
+                    'message': 'Verified Linux VIPM inventory is unavailable; rebuild the selected worker.'}
+    if (manifest.get('platform') != 'linux' or inventory.get('platform') != 'linux'
+        or inventory.get('status') != 'observed' or inventory.get('target_verified') is not True
+        or inventory.get('labview_version') != manifest.get('labview_version')
+        or inventory.get('labview_bitness') != '64'
+        or inventory.get('source') != 'vipm list --installed'):
+      return unknown_vipm
+    if str(dep.get('manager') or 'vipm').lower() != 'vipm':
+      return {**unknown_vipm, 'message': 'NIPM dependencies cannot be installed by Linux VIPM.'}
+    name = str(dep.get('package_id') or '').lower()
+    declared = str(dep.get('declared_version') or '')
+    versions = sorted({str(package.get('version') or '') for package in inventory.get('packages') or []
+                       if isinstance(package, dict) and str(package.get('name') or '').lower() == name})
+    if not name or not declared:
+      return {**unknown_vipm, 'message': 'An exact VIPM name/version declaration is required.'}
+    return {'status': 'installed' if declared in versions else 'wrong_version' if versions else 'missing',
+            'installed_version': declared if declared in versions else versions[0] if versions else '',
+            'scope': 'installed-packages', 'message': 'Exact version checked against the selected Linux VIPM target inventory.'}
   unknown = {'status': 'unknown', 'installed_version': '', 'scope': 'package-files',
              'message': 'Current digest-bound Linux LVPM package-file evidence is unavailable. Rebuild, reverify, and explicitly re-activate the candidate.'}
   if str(dep.get('manager') or 'vipm').lower() != 'vipm':
@@ -4815,17 +4836,16 @@ def _build_dragon_section(config=None):
       'conflicts': inv.get('conflicts') or [],
     }
   platforms = sorted({platform for file in files if file['monitored'] for platform in file['monitorOn']})
-  win_man = _worker_manifest('windows', 'latest') if 'windows' in platforms else None
+  win_man = _worker_manifest('windows', config.get('use') or 'latest') if 'windows' in platforms else None
   have_manifest = isinstance(win_man, dict)
   status_index = _dragon_status_index(win_man)
   win_dragon = win_man.get('dragon') if have_manifest else None
   baked_packages = {str(p).lower() for p in _manifest_packages(win_man)} if have_manifest else set()
   vipm_index = _vipm_version_index(win_man) if have_manifest else {}
   nipkg_index = _nipkg_version_index(win_man) if have_manifest else {}
-  selection = config.get('linuxUse') or config.get('use') or ''
-  canonical = re.fullmatch(r'linux-lvpm-[a-f0-9]{64}@sha256:[a-f0-9]{64}', selection)
-  linux_man = _worker_manifest('linux', selection) if 'linux' in platforms and canonical else None
-  freshness = _lvpm_local_freshness(selection, linux_man) if isinstance(linux_man, dict) else {}
+  selection = config.get('linuxUse') or config.get('use') or 'latest'
+  linux_man = _worker_manifest('linux', selection) if 'linux' in platforms else None
+  freshness = _lvpm_local_freshness(selection, linux_man) if isinstance(linux_man, dict) and linux_man.get('installer') == 'lvpm' else {}
   for f in files:
     for dep in f.get('dependencies') or []:
       evidence = {}
@@ -4854,10 +4874,10 @@ def _build_dragon_section(config=None):
   inspected = all(not f['monitored'] or f['inspection']['status'] == 'parsed' for f in files)
   health = win_dragon.get('health', '') if isinstance(win_dragon, dict) else ''
   measured = ('windows' not in platforms or have_manifest) and (
-      'linux' not in platforms or (isinstance(linux_man, dict) and linux_man.get('installer') == 'lvpm'
-      and linux_man.get('platform') == 'linux' and linux_man.get('architecture') == 'amd64'
-      and freshness.get('status') == 'current' and freshness.get('selection') == selection
-      and bool(os.environ.get('GITHUB_SHA')) and freshness.get('revision') == os.environ.get('GITHUB_SHA')))
+      'linux' not in platforms or (isinstance(linux_man, dict) and all(
+          dep.get('platform_status', {}).get('linux', {}).get('status') not in (None, 'unknown')
+          for file in files if file['monitored'] and 'linux' in file['monitorOn']
+          for dep in file.get('dependencies') or [])))
   return {
     'available': inv.get('available', False),
     'column': 'windows',

@@ -74,28 +74,6 @@ find_vipm() {
   find /usr/local /usr /opt -type f \( -name vipm -o -name vipm-cli \) -perm -111 2>/dev/null | head -n 1
 }
 
-vipc_package_specs() {
-  local vipc_file="$1"
-  unzip -p "$vipc_file" config.xml | awk '
-    /<Package([[:space:]>])/ { in_package = 1; next }
-    /<\/Package>/ { in_package = 0; next }
-    in_package && /<Name>/ {
-      sub(/.*<Name>/, "")
-      sub(/<\/Name>.*/, "")
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
-      if (length) print
-    }
-  '
-}
-
-package_install_spec() {
-  local package_name="$1"
-  if [[ "$package_name" =~ ^(.+)-([0-9]+(\.[0-9]+)+)(-[0-9]+)?$ ]]; then
-    printf '%s@%s%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]}"
-  else
-    printf '%s\n' "$package_name"
-  fi
-}
 
 install_package_specs() {
   run_vipm --show-progress --verbose --labview-version "$LABVIEW_VERSION" --labview-bitness 64 install "$@"
@@ -165,9 +143,11 @@ fi
 for vipc_file in "${vipc_files[@]}"; do
   echo "Applying VIPC: $vipc_file"
   package_specs=()
-  while IFS= read -r package_name; do
-    package_specs+=("$(package_install_spec "$package_name")")
-  done < <(vipc_package_specs "$vipc_file")
+  # Parse XML structurally; VIPCs do not require one element per line.
+  specs=$(python3 "$(dirname "$0")/linux-worker.py" specs --vipc "$vipc_file")
+  while IFS= read -r package_spec; do
+    if [ -n "$package_spec" ]; then package_specs+=("$package_spec"); fi
+  done <<< "$specs"
   if [ "${#package_specs[@]}" -eq 0 ]; then
     echo "No package names could be read from $vipc_file" >&2
     exit 1
@@ -187,13 +167,7 @@ if ! kill -0 "$LABVIEW_PID" 2>/dev/null; then
   echo "Initial LabVIEW process exited; verifying installed packages for LabVIEW ${LABVIEW_VERSION} (64-bit)."
 fi
 mkdir -p "$INVENTORY_DIR"
-inventory_args=(--vipc-dir "$VIPC_DIR")
-for vipc_file in "${vipc_files[@]}"; do
-  if [[ "$(basename "$vipc_file")" == project-* ]]; then
-    inventory_args+=(--required)
-    break
-  fi
-done
+inventory_args=(--vipc-dir "$VIPC_DIR" --required)
 if ! run_vipm --labview-version "$LABVIEW_VERSION" --labview-bitness 64 list --installed > "$INVENTORY_DIR/vipm-list.txt" 2>&1; then
   inventory_args+=(--failed)
 fi

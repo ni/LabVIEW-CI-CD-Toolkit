@@ -42,29 +42,48 @@ def stage(root, destination, revision):
     policy = adapter()
     safe_path(root, ".github/labview-ci.yml")
     config, year = policy.container_config(root)
-    selected = sorted(set(policy.selected_files(root, config, "vipc")))
-    dragons = policy.selected_files(root, config, "dragon")
-    if dragons:
-        raise ValueError("Native Linux VIPM cannot apply Dragon sources; select the LVPM worker")
+    selected = sorted(set(policy.selected_files(root, config, "vipc")
+                          + policy.selected_files(root, config, "dragon")))
     sources = []
     requirements = {}
     for relative in selected:
         path = safe_path(root, relative)
-        if path.suffix.lower() != ".vipc":
-            raise ValueError("Selected VIPC must have the .vipc extension")
-        for package in policy.declarations(path, relative):
+        if path.suffix.lower() not in (".vipc", ".dragon"):
+            raise ValueError("Selected dependency must have the .vipc or .dragon extension")
+        if path.suffix.lower() == ".dragon":
+            dragon = policy.tomllib.loads(path.read_text(encoding="utf-8"))
+            target = (dragon.get("project") or {}).get("labview-version")
+            if target is not None and str(target) != year:
+                raise ValueError(f"Dragon LabVIEW target differs from configured year: {relative}")
+            if (dragon.get("vipm") or {}).get("feeds"):
+                raise ValueError(f"Custom Dragon VIPM feeds are not supported: {relative}")
+        packages = policy.declarations(path, relative)
+        for package in packages:
             previous = requirements.setdefault(package["name"], package["version"])
             if previous != package["version"]:
                 raise ValueError(f"Conflicting dependency versions: {package['name']}")
         sources.append({"path": relative, "sha256": policy.digest(path.read_bytes()),
-                        "staged_name": "project-" + policy.digest(relative.encode()) + ".vipc"})
+                        "staged_name": "project-" + policy.digest(relative.encode()) + ".vipc",
+                        "requirements": packages})
     destination.mkdir(parents=True, exist_ok=True)
     for old in destination.glob("project-*.vipc"):
         old.unlink()
     for source in sources:
-        shutil.copyfile(safe_path(root, source["path"]), destination / source["staged_name"])
-        if policy.digest((destination / source["staged_name"]).read_bytes()) != source["sha256"]:
+        original = safe_path(root, source["path"])
+        staged = destination / source["staged_name"]
+        if policy.digest(original.read_bytes()) != source["sha256"]:
             raise ValueError("Dependency bytes changed during staging")
+        if original.suffix.lower() == ".dragon":
+            tree = ElementTree.Element("VI_Package_Configuration")
+            for package in source["requirements"]:
+                item = ElementTree.SubElement(tree, "Package")
+                ElementTree.SubElement(item, "Name").text = package["name"] + "-" + package["version"]
+            with zipfile.ZipFile(staged, "w") as archive:
+                # Fixed metadata keeps the generated build input reproducible.
+                archive.writestr(zipfile.ZipInfo("config.xml"), ElementTree.tostring(tree, encoding="utf-8"))
+        else:
+            shutil.copyfile(original, staged)
+        source["staged_sha256"] = policy.digest(staged.read_bytes())
     config_path = safe_path(root, ".github/labview-ci.yml")
     return {"schema": 1, "dependency_sha": revision.lower(), "labview_version": year,
             "config_sha256": policy.digest(config_path.read_bytes()), "files": sources}
@@ -117,24 +136,38 @@ def validate(value, year, required):
         raise ValueError("Project inventory requires a verified LabVIEW target")
 
 
+def vipc_specs(path):
+    with zipfile.ZipFile(path) as archive:
+        tree = ElementTree.fromstring(archive.read("config.xml"))
+    packages = list(tree.iter("Package"))
+    if not packages:
+        raise ValueError(f"No declared project packages: {path.name}")
+    result = []
+    for package in packages:
+        label = (package.findtext("Name") or "").strip()
+        match = re.fullmatch(r"([A-Za-z0-9_][A-Za-z0-9_.-]*)-([0-9]+(?:\.[0-9]+)+(?:[A-Za-z0-9_.+-]*))", label)
+        if not match:
+            raise ValueError(f"Invalid or unpinned VIPC package: {label}")
+        result.append((match[1].lower(), match[2]))
+    return result
+
+
 def verify_project_pins(value, directory):
     installed = {package["name"]: package["version"] for package in value["packages"]}
-    for path in directory.glob("project-*.vipc"):
-        with zipfile.ZipFile(path) as archive:
-            tree = ElementTree.fromstring(archive.read("config.xml"))
-        packages = list(tree.iter("Package"))
-        if not packages:
-            raise ValueError(f"No declared project packages: {path.name}")
-        for package in packages:
-            label = (package.findtext("Name") or "").strip()
-            match = re.fullmatch(r"([A-Za-z0-9_][A-Za-z0-9_.-]*)-([0-9]+(?:\.[0-9]+)+(?:[A-Za-z0-9_.+-]*))", label)
-            if not match or installed.get(match[1].lower()) != match[2]:
-                raise ValueError(f"Selected project package was not observed exactly: {label}")
+    # Project pins override the tooling baseline, but every effective requirement
+    # must be present, including baseline-only packages.
+    required = {}
+    for path in sorted(directory.glob("*.vipc"), key=lambda p: (p.name != "ci-tooling.vipc", p.name)):
+        required.update(vipc_specs(path))
+    for name, version in required.items():
+        if installed.get(name) != version:
+            raise ValueError(f"Selected package was not observed exactly: {name}-{version}")
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("stage", "plan", "observe", "validate"))
+    parser.add_argument("mode", choices=("stage", "plan", "observe", "validate", "specs"))
+    parser.add_argument("--vipc", type=Path)
     parser.add_argument("--root", type=Path)
     parser.add_argument("--destination", type=Path)
     parser.add_argument("--dependency-sha")
@@ -143,8 +176,16 @@ def main():
     parser.add_argument("--failed", action="store_true")
     parser.add_argument("--raw", type=Path)
     parser.add_argument("--vipc-dir", type=Path)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    if args.mode == "specs":
+        if not args.vipc:
+            parser.error("specs requires --vipc")
+        for name, version in vipc_specs(args.vipc):
+            print(name + "@" + version)
+        return
+    if not args.output:
+        parser.error("--output is required")
     if args.mode == "validate":
         value = json.loads(args.output.read_text(encoding="utf-8-sig"))
         validate(value, args.year, args.required)

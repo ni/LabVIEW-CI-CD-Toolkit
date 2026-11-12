@@ -91,7 +91,8 @@ config_path = root / '.github/labview-ci.yml'
 original_config = hashlib.sha256(config_path.read_bytes()).hexdigest()
 fixture = {'schemaVersion': 1, 'config': {'labviewVersion': year, 'os': ['linux'],
            'container': {'vipc': [{'path': 'example/Dependencies.vipc', 'monitor': True,
-                                   'monitorOn': ['linux']}], 'dragon': []}}}
+                                   'monitorOn': ['linux']}], 'dragon': [{'path': 'example/Example.dragon',
+           'monitor': True, 'monitorOn': ['linux']}]}}}
 config_path.write_text(yaml.safe_dump(fixture, sort_keys=False))
 (output / 'fixture-config.yml').write_bytes(config_path.read_bytes())
 paths = sorted(path for path in root.rglob('*') if path.is_file())
@@ -153,6 +154,7 @@ PY
     docker buildx build "${build_args[@]}" "$context"
     docker image inspect "$image" > "$out/image-inspect.json"
     [[ "$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}}')" == linux/amd64 ]]
+    docker run --rm --network none --entrypoint /usr/bin/dpkg-query "$image" -W '-f=${Package} ${Version}\n' > "$out/dpkg-list.txt"
     container=$(docker create --network none --entrypoint /bin/sh "$image" -c true)
     if [[ "$mode" == vipm ]]; then
         docker cp "$container:/opt/lvci/vipm/observed-inventory.json" "$out/observed-inventory.json"
@@ -169,7 +171,7 @@ PY
             --platform linux --version "native-$revision" --labview-version "$year" \
             --labview-bitness 64 --base-image "$base" --base-digest "$base_digest" \
             --image-ref "$image" --git-sha "$revision" --dependency-sha "$revision" \
-            --observed-inventory "$out/observed-inventory.json" \
+            --observed-inventory "$out/observed-inventory.json" --dpkg-list "$out/dpkg-list.txt" \
             --out-dir "$out/manifest" "${manifest_args[@]}"
     else
         docker cp "$container:/opt/lvci/lvpm/inventory.json" "$out/inventory.json"

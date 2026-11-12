@@ -3,7 +3,7 @@ run-name: Native dependency validation at ${{ github.sha }}
 
 on:
   push:
-    branches: [validation/native-dependencies-20261109]
+    branches: [validation/native-dependencies-20261109, codex/dependency-reliability]
   workflow_dispatch:
 
 permissions:

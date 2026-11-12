@@ -1185,9 +1185,9 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         VIPM packages baked in, so a worker image is fully auditable.</p>
       <p>The machine-readable <code>manifest.json</code> records installed VIPM packages in
         <code>vipm_packages</code> (<code>name</code>, <code>version</code>, and VIPC-style <code>label</code>) plus
-        the raw <code>vipm list --installed</code> output in <code>vipm_raw</code>. The Dependencies page unions that
-        installed-package inventory with the manifest&rsquo;s own <code>vipc[].packages</code> list when deciding what is
-        baked. Because VIPM records versions with a leading <code>v</code> (e.g. <code>v0.5.0.1</code>) while VIPC files
+        the raw <code>vipm list --installed</code> output in <code>vipm_raw</code>. The Dependencies page compares the requested pins against this observed inventory.
+        The manifest&rsquo;s <code>vipc[].packages</code> records requirements, not proof of installation.
+        Linux manifests also preserve <code>dpkg_packages</code> and raw <code>dpkg-query</code> output for native package status. Because VIPM records versions with a leading <code>v</code> (e.g. <code>v0.5.0.1</code>) while VIPC files
         declare the bare form (<code>0.5.0.1</code>), the comparison normalizes that <code>v</code> prefix &mdash; without
         it, correctly-baked packages would be reported as missing and the &ldquo;dependencies need to be installed&rdquo;
         banner would never clear.</p>
@@ -1196,10 +1196,23 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         rebuilt by <code>build-labview-image.yml</code>). If a manifest has not yet published a dedicated
         <code>dragon.items</code> status block, the dashboard falls back to the installed-package inventories
         (<code>vipm_packages</code> / <code>nipkg_packages</code>) so already-baked dependencies are marked installed
-        instead of staying stuck at <code>not_attempted</code>. Linux declarations require the selected
-        digest-pinned LVPM inventory and locally current freshness, with exact VIPM name/version matches.
+        instead of staying stuck at <code>not_attempted</code>. Linux declarations use the selected target-verified VIPM inventory, or the selected
+        digest-pinned LVPM inventory with locally current freshness. Both require exact name/version matches.
         Unsupported native/NIPM dependencies and stale or unavailable Linux evidence remain unknown/pending.
         Files monitored on both platforms are satisfied only when both platforms are satisfied.</p>
+
+      <h3>Complete dependency verification</h3>
+      <p>The Linux VIPM worker uses the official 26.3.2 (4056) Debian installer, matching the legacy
+        OGP compatibility fix required on Windows. Selected Dragon files with exact public VIPM pins are
+        converted into deterministic VIPCs by the trusted staging helper. The input record preserves both
+        the original source hash and generated VIPC hash. Unsupported NIPM requirements, custom feeds,
+        embedded VIPC references, conflicting project pins, and mismatched LabVIEW targets fail before the build.</p>
+      <p>VIPC XML is parsed structurally, including compact single-line exports. The final Linux inventory must
+        satisfy every effective tooling and project pin; explicit project pins take precedence over the tooling
+        baseline. A successful install command alone is insufficient. The native validation workflow covers
+        both example dependency files, the tooling baseline, and installed Antidoc dependencies on Windows.
+        It retains build and fresh-container evidence without publishing worker images. Its result does not
+        establish that a published worker is active; publication and dashboard verification are separate steps.</p>
 
       <h3>When images rebuild</h3>
       <p>A worker rebuild is a heavy, opt-in operation. It runs when you apply a dependency update from the dashboard's
