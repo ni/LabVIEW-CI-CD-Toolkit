@@ -1,1 +1,0 @@
-Windows VIPM bootstrap contract checks now read repository text explicitly as UTF-8, preventing Unicode catalog notes from failing CI under legacy Windows code pages. A portable regression verifies both legacy encoding defaults without changing the catalog or VIPM runtime behavior.
