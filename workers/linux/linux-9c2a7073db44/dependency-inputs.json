@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "dependency_sha": "a7eca2b324bd5578ea3fea216768f6e0dc872949",
+  "labview_version": "2026",
+  "config_sha256": "deed3cd80255772352bc5d6d9e140e3fbc437c2cbeff247195a6781a076b5088",
+  "files": [
+    {
+      "path": "example/Dependencies.vipc",
+      "sha256": "d48245e69cd866e955c67ad4feaf53065544555b50b18227b7aefb77e944cbdb",
+      "staged_name": "project-62a52e750646129337e0e814fb4223ab50965ab658102e69fca2a59ee797a79f.vipc",
+      "requirements": [
+        {
+          "name": "oglib_file",
+          "version": "6.0.2.28",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "dataflow_g_lib_g_image",
+          "version": "0.5.0.1",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_string",
+          "version": "6.0.2.35",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_lvdata",
+          "version": "6.0.0.45",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_error",
+          "version": "6.0.0.26",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_array",
+          "version": "6.0.1.20",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_appcontrol",
+          "version": "4.1.0.7",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "ni_lib_utf_junit_report",
+          "version": "1.0.1.43",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "ni_lib_junit_results_api",
+          "version": "1.0.1.6",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "ni_lib_simple_xml",
+          "version": "1.0.0.4",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        }
+      ],
+      "staged_sha256": "d48245e69cd866e955c67ad4feaf53065544555b50b18227b7aefb77e944cbdb"
+    },
+    {
+      "path": "example/Example.dragon",
+      "sha256": "3c9b874dbec14697c544a796588a32d640ce3a939f73e0445f28535868fed953",
+      "staged_name": "project-8c12a7b57710b1ef77db52006871641b0a9d9718a258f184d10c17ac95e4c267.vipc",
+      "requirements": [
+        {
+          "name": "oglib_boolean",
+          "version": "6.0.0.9",
+          "source_files": [
+            "example/Example.dragon"
+          ]
+        },
+        {
+          "name": "oglib_array",
+          "version": "6.0.1.20",
+          "source_files": [
+            "example/Example.dragon"
+          ]
+        }
+      ],
+      "staged_sha256": "2bb6c29e68bb1e29374d413df0a370bc248744678ca02e2c5fffc32122207605"
+    }
+  ]
+}

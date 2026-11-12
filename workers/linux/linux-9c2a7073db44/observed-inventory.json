@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "platform": "linux",
+  "labview_version": "2026",
+  "labview_bitness": "64",
+  "source": "vipm list --installed",
+  "target_verified": true,
+  "required_project": true,
+  "status": "observed",
+  "raw": "Using LabVIEW 2026 (64-bit)\nListing installed packages\nInstalled packages (29):\n  astemes_lib_lunit v2.0.13.6\n  astemes_lib_lunit_cli v1.7.1.32\n  astemes_lib_lunit_coverage_analysis_add_on v1.0.0.2\n  astemes_lib_lunit_global_fixture_add_on v1.0.5.4\n  astemes_lib_lunit_parameterized_add_on v1.1.10.8\n  astemes_lib_lunit_test_inheritance_add_on v1.0.5.4\n  dataflow_g_lib_g_image v0.5.0.1\n  felipefoz_lib_lv_rainbow_terminal v1.1.1.5\n  jki_lib_caraya v1.4.4.148\n  jki_lib_state_machine v2024.0.3.23\n  jki_rsc_toolkits_palette v1.1-1\n  labview_open_source_lib_epoch_datetime v1.3.0.8\n  labview_open_source_project_lib_labview_open_source_palette v1.0.2.7\n  labview_open_source_project_lib_openuri v1.4.0.13\n  lvos_lib_caraya_cli_extension v2.0.0.7\n  ni_lib_junit_results_api v1.0.1.6\n  ni_lib_simple_xml v1.0.0.4\n  ni_lib_utf_junit_report v1.0.1.43\n  oglib_appcontrol v4.1.0.7\n  oglib_array v6.0.1.20\n  oglib_boolean v6.0.0.9\n  oglib_error v6.0.0.26\n  oglib_file v6.0.2.28\n  oglib_lvdata v6.0.0.45\n  oglib_string v6.0.2.35\n  pnr_lib_caraya_junit_for_azure_pipelines v1.2.0.11\n  pnr_lib_junit_xml v1.0.0.4\n  sas_workshops_lib_lunit_for_g_cli v1.2.1.85\n  wiresmith_technology_lib_g_cli v3.0.1.98\n",
+  "packages": [
+    {
+      "name": "astemes_lib_lunit",
+      "version": "2.0.13.6"
+    },
+    {
+      "name": "astemes_lib_lunit_cli",
+      "version": "1.7.1.32"
+    },
+    {
+      "name": "astemes_lib_lunit_coverage_analysis_add_on",
+      "version": "1.0.0.2"
+    },
+    {
+      "name": "astemes_lib_lunit_global_fixture_add_on",
+      "version": "1.0.5.4"
+    },
+    {
+      "name": "astemes_lib_lunit_parameterized_add_on",
+      "version": "1.1.10.8"
+    },
+    {
+      "name": "astemes_lib_lunit_test_inheritance_add_on",
+      "version": "1.0.5.4"
+    },
+    {
+      "name": "dataflow_g_lib_g_image",
+      "version": "0.5.0.1"
+    },
+    {
+      "name": "felipefoz_lib_lv_rainbow_terminal",
+      "version": "1.1.1.5"
+    },
+    {
+      "name": "jki_lib_caraya",
+      "version": "1.4.4.148"
+    },
+    {
+      "name": "jki_lib_state_machine",
+      "version": "2024.0.3.23"
+    },
+    {
+      "name": "jki_rsc_toolkits_palette",
+      "version": "1.1-1"
+    },
+    {
+      "name": "labview_open_source_lib_epoch_datetime",
+      "version": "1.3.0.8"
+    },
+    {
+      "name": "labview_open_source_project_lib_labview_open_source_palette",
+      "version": "1.0.2.7"
+    },
+    {
+      "name": "labview_open_source_project_lib_openuri",
+      "version": "1.4.0.13"
+    },
+    {
+      "name": "lvos_lib_caraya_cli_extension",
+      "version": "2.0.0.7"
+    },
+    {
+      "name": "ni_lib_junit_results_api",
+      "version": "1.0.1.6"
+    },
+    {
+      "name": "ni_lib_simple_xml",
+      "version": "1.0.0.4"
+    },
+    {
+      "name": "ni_lib_utf_junit_report",
+      "version": "1.0.1.43"
+    },
+    {
+      "name": "oglib_appcontrol",
+      "version": "4.1.0.7"
+    },
+    {
+      "name": "oglib_array",
+      "version": "6.0.1.20"
+    },
+    {
+      "name": "oglib_boolean",
+      "version": "6.0.0.9"
+    },
+    {
+      "name": "oglib_error",
+      "version": "6.0.0.26"
+    },
+    {
+      "name": "oglib_file",
+      "version": "6.0.2.28"
+    },
+    {
+      "name": "oglib_lvdata",
+      "version": "6.0.0.45"
+    },
+    {
+      "name": "oglib_string",
+      "version": "6.0.2.35"
+    },
+    {
+      "name": "pnr_lib_caraya_junit_for_azure_pipelines",
+      "version": "1.2.0.11"
+    },
+    {
+      "name": "pnr_lib_junit_xml",
+      "version": "1.0.0.4"
+    },
+    {
+      "name": "sas_workshops_lib_lunit_for_g_cli",
+      "version": "1.2.1.85"
+    },
+    {
+      "name": "wiresmith_technology_lib_g_cli",
+      "version": "3.0.1.98"
+    }
+  ]
+}
