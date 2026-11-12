@@ -1445,7 +1445,7 @@ try {
                     # Code 42 etc. mean the engine is up but rejected the .vipc-FILE
                     # apply path; the by-name + local-file fallback can still succeed.
                     Write-Host "  install from file failed (exit $rc); falling back to per-package names ..."
-                    $specs = @(Get-VipcPackageSpecs $vipc.FullName)
+                    $specs = if ($bestEffort) { @($effectiveSpecs) } else { @(Get-VipcPackageSpecs $vipc.FullName) }
                     if ($specs.Count -eq 0) {
                         Write-Warning "VIPM could not install from '$($vipc.Name)' (exit $rc) and no package names could be parsed."
                         $vipcFailed = $true

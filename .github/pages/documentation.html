@@ -1384,6 +1384,8 @@ docker run --rm `
         querying again. Linux installation does not treat the original LabVIEW process exiting as proof of failure:
         after successful install commands, target-bound inventory must still verify every required exact package pin.
         Failed queries, missing packages, wrong versions and wrong LabVIEW targets remain fatal.</p>
+      <p>Windows best-effort tooling retries preserve project VIPC and Dragon version overrides, so a failed
+        initial attempt cannot reinstall an older baseline pin over a required project dependency.</p>
       <p class="lead-in">This section is the single hardest part of the whole stack, and it is documented in detail
         precisely because it was painful to get right. If you ever fork the worker build or debug a baking failure,
         read it carefully — every numbered point below is a real problem that was hit and solved.</p>

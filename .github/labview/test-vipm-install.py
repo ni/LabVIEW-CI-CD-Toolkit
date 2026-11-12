@@ -507,6 +507,57 @@ if (($resolved -join ',') -ne 'jki_labs_tool_vi_tester@1.1-1') {{ throw 'Baselin
 """)
             self.assertIn('SELECTED-EXACT=True', output)
 
+    def test_tooling_retry_preserves_selected_pin_and_project_fallback(self):
+        for source in ('dragon', 'project', 'project-fallback'):
+            with self.subTest(source=source):
+                output = self.run_script(f"""
+$dragonPlan = [pscustomobject]@{{ Specs = @() }}
+$project = [pscustomobject]@{{ Name = 'Project.vipc'; FullName = 'Project.vipc' }}
+$tooling = [pscustomobject]@{{ Name = 'ci-tooling.vipc'; FullName = 'ci-tooling.vipc' }}
+$vipcFiles = @($tooling)
+if ('{source}' -eq 'dragon') {{ $dragonPlan.Specs = @('oglib_boolean@6.0.0.10') }}
+if ('{source}' -eq 'project') {{ $vipcFiles = @($project, $tooling) }}
+if ('{source}' -eq 'project-fallback') {{ $vipcFiles = @($project) }}
+$script:Attempts = @()
+$script:FileAttempts = @()
+$script:ToolingAttempts = 0
+$script:LastVipmOutput = ''
+$script:bestEffortFailed = $false
+$applyFailed = $false
+function Get-VipcPackageSpecs {{
+    param($Path)
+    if ($Path -eq 'Project.vipc') {{ 'oglib_boolean@6.0.0.10' }}
+    else {{ 'oglib_boolean@6.0.0.9' }}
+}}
+function Install-VipmSpecs {{
+    param($Specs)
+    $script:Attempts += ($Specs -join ',')
+    if ($vipc.Name -eq 'Project.vipc') {{ return $true }}
+    $script:ToolingAttempts++
+    return ($script:ToolingAttempts -gt 1)
+}}
+function Invoke-VipmInstall {{
+    param($Flag, $Path)
+    $script:FileAttempts += $Path
+    return 42
+}}
+$loop = $ast.Find({{
+    param($node)
+    $node -is [System.Management.Automation.Language.ForEachStatementAst] -and
+    $node.Extent.Text.StartsWith('foreach ($vipc in $vipcFiles)') -and
+    $node.Extent.Text.Contains('$effectiveSpecs = ')
+}}, $true)
+if (-not $loop) {{ throw 'VIPC install loop not found' }}
+. ([scriptblock]::Create($loop.Extent.Text))
+Write-Output "ATTEMPTS=$($script:Attempts -join ';')"
+Write-Output "FILE-ATTEMPTS=$($script:FileAttempts -join ';')"
+if ($applyFailed -or $script:bestEffortFailed) {{ throw 'Fallback did not recover' }}
+""")
+                expected_count = {'dragon': 2, 'project': 3, 'project-fallback': 1}[source]
+                self.assertIn('ATTEMPTS=' + ';'.join(['oglib_boolean@6.0.0.10'] * expected_count), output)
+                expected_files = '' if source == 'dragon' else 'Project.vipc'
+                self.assertIn(f'FILE-ATTEMPTS={expected_files}\n', output)
+
     def test_selected_vipc_rejects_unsafe_cli_package_declarations(self):
         for package in ('--force', 'pkg;command', 'pkg@--option', 'pkg/../../other'):
             with self.subTest(package=package), tempfile.TemporaryDirectory() as directory:

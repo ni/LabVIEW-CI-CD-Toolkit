@@ -9,3 +9,5 @@ Local regression fixtures do not qualify real LabVIEW/VIPM installations, Docker
 A dedicated read-only validation workflow builds the real example VIPC on Windows x64 and Linux x64 using VIPM and LVPM. It retains build and installed-inventory evidence without publishing images or changing active workers. Its results qualify only the recorded fixture and validation scope.
 
 Linux VIPM builds no longer reject an otherwise verified installation solely because the original LabVIEW process exited. Exact target-bound inventory remains mandatory. Fresh Windows validation supplies the public Git context required by VIPM Community Edition and discards baked inventory before querying.
+
+Windows tooling retries preserve project-selected package versions instead of reverting to older baseline pins after an initial installation failure.
