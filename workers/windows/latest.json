@@ -1,7 +1,7 @@
 {
-  "version": "win-cb53ae4ad228",
+  "version": "win-982773c5fc86",
   "platform": "windows",
-  "manifest_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit/workers/windows/win-cb53ae4ad228/manifest.html",
-  "build_date": "2026-11-13T00:39:31Z",
-  "git_sha": "a7eca2b324bd5578ea3fea216768f6e0dc872949"
+  "manifest_url": "https://ni.github.io/LabVIEW-CI-CD-Toolkit/workers/windows/win-982773c5fc86/manifest.html",
+  "build_date": "2026-11-13T16:06:27Z",
+  "git_sha": "8ad4aaf6945c2f16512229ea5e4718bf3106b707"
 }

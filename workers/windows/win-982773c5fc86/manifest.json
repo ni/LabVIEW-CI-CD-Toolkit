@@ -1,8 +1,9 @@
 {
-  "schema": 2,
+  "schema": 3,
   "platform": "windows",
   "version": "win-982773c5fc86",
   "labview_version": "2026",
+  "labview_bitness": "64",
   "base_image": "ghcr.io/elijah286/labview-ci-with-containers-labview-base:2026",
   "base_digest": "sha256:0d9a5f85913654a8f788b24444feea04965aefe4f703ff0c1ca9601316633735",
   "seed_image": "ghcr.io/elijah286/labview-ci-with-containers-labview-base:2026",
@@ -10,12 +11,24 @@
   "worker_layer": "seed-only-copy",
   "copied_from_base": true,
   "image_ref": "ghcr.io/ni/labview-ci-cd-toolkit-labview:win-982773c5fc86",
-  "build_date": "2026-11-06T19:24:42Z",
-  "git_sha": "7d0ffd29483942a6cdeaff9e5aba2e499ad8683c",
-  "run_url": "https://github.com/ni/LabVIEW-CI-CD-Toolkit/actions/runs/42279343803",
+  "build_date": "2026-11-13T16:06:27Z",
+  "git_sha": "8ad4aaf6945c2f16512229ea5e4718bf3106b707",
+  "dependency_sha": "8ad4aaf6945c2f16512229ea5e4718bf3106b707",
+  "run_url": "https://github.com/ni/LabVIEW-CI-CD-Toolkit/actions/runs/43459298549",
   "vipc": [],
   "vipm_raw": "",
+  "vipm_inventory": {
+    "status": "unverified",
+    "target_verified": false,
+    "packages": []
+  },
   "vipm_packages": [],
   "nipkg_raw": "",
-  "nipkg_packages": []
+  "nipkg_inventory": {
+    "source": "nipkg list-installed",
+    "status": "unavailable"
+  },
+  "nipkg_packages": [],
+  "dpkg_raw": "",
+  "dpkg_packages": []
 }
