@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check real native VIPM evidence through the dashboard and Dependencies renderer."""
+"""Check native installed evidence through the dashboard and Dependencies renderer."""
 import argparse
 import ast
 import importlib.util
@@ -13,17 +13,41 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 
-def check(root, evidence, platform):
-    manifest_path = evidence / ('manifest.json' if platform == 'windows' else 'manifest/manifest.json')
-    manifest = json.loads(manifest_path.read_text(encoding='utf-8-sig'))
-    inventory = manifest['vipm_inventory']
-    if (inventory.get('status') != 'observed' or inventory.get('target_verified') is not True
-            or inventory.get('platform') != platform or inventory.get('labview_bitness') != '64'):
-        raise ValueError('Native coverage requires target-verified observed inventory')
+def check(root, evidence, platform, installer="vipm"):
+    selection, freshness = 'latest', {}
+    if installer == 'lvpm':
+        if platform != 'linux':
+            raise ValueError('LVPM native coverage requires Linux')
+        spec = importlib.util.spec_from_file_location('native_worker', root / '.github/labview/lvpm/worker.py')
+        worker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(worker)
+        manifest = json.loads((evidence / 'inventory.json').read_text())
+        plan = json.loads((evidence / 'requirements.json').read_text())
+        worker.verify_packages(manifest, plan)
+        passed = json.loads((evidence / 'passed.json').read_text())
+        if passed.get('status') != 'passed':
+            raise ValueError('Native offline verification must pass before UI coverage')
+        manifest['dpkg_packages'] = worker.native_packages((evidence / 'dpkg-status.tsv').read_text())
+        manifest['git_sha'] = passed['source_revision']
+        # This local-only selection exercises renderer identity checks. The image ID
+        # is not claimed to be a registry manifest digest or an activated candidate.
+        selection = 'linux-lvpm-' + plan['requirements_fingerprint'] + '@' + passed['image_id']
+        freshness = {'status': 'current', 'revision': manifest['git_sha'], 'selection': selection,
+                     'reason': 'Native fixture package requirements and offline files verified; local UI replay only.'}
+        inventory = manifest
+    else:
+        manifest_path = evidence / ('manifest.json' if platform == 'windows' else 'manifest/manifest.json')
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8-sig'))
+        inventory = manifest['vipm_inventory']
+        if (inventory.get('status') != 'observed' or inventory.get('target_verified') is not True
+                or inventory.get('platform') != platform or inventory.get('labview_bitness') != '64'):
+            raise ValueError('Native coverage requires target-verified observed inventory')
     names = {'_manifest_packages', '_vipm_version_index', '_nipkg_version_index',
              '_infer_dragon_status', '_linux_dragon_status', '_compute_deps_pending', '_known_nipm_dependencies'}
     tree = ast.parse((root / 'actions/dashboard/dashboard.py').read_text(encoding='utf-8'))
-    namespace = {'os': os, 're': re, 'json': json}
+    # Bind the production function to the recorded fixture revision without changing the host environment.
+    from types import SimpleNamespace
+    namespace = {'os': SimpleNamespace(environ={**os.environ, 'GITHUB_SHA': manifest['git_sha']}), 're': re, 'json': json}
     exec(compile(ast.Module(body=[node for node in tree.body if isinstance(node, ast.FunctionDef)
                                  and node.name in names], type_ignores=[]), 'dashboard.py', 'exec'), namespace)
     packages = namespace['_manifest_packages'](manifest)
@@ -49,7 +73,7 @@ def check(root, evidence, platform):
                   inspection={'status': 'parsed', 'reason': 'Trusted native fixture declaration'})
     for dependency in record['dependencies']:
         if platform == 'linux':
-            measured = namespace['_linux_dragon_status'](dependency, 'latest', manifest, {})
+            measured = namespace['_linux_dragon_status'](dependency, selection, manifest, freshness)
         else:
             measured = namespace['_infer_dragon_status'](dependency, True, installed,
                 namespace['_vipm_version_index'](manifest), namespace['_nipkg_version_index'](manifest))
@@ -57,7 +81,8 @@ def check(root, evidence, platform):
             raise ValueError(f'{platform} Dragon package {dependency["package_id"]}: {measured}')
         dependency.update(measured, platform_status={platform: measured})
     index = {'sha': manifest['git_sha'], 'repo': 'native/validation', 'vipc': vipcs,
-             'columns': [{'key': platform, 'tag': 'latest', 'ready': True, 'packages': packages}],
+             'columns': [{'key': platform, 'tag': selection, 'ready': True, 'packages': packages,
+                          'installer': installer, 'freshness': freshness}],
              'nipm': namespace['_known_nipm_dependencies'](),
              'dragon': {'available': True, 'files': [record], 'install_set': record['dependencies']}}
     pending = namespace['_compute_deps_pending'](index)
@@ -69,7 +94,7 @@ def check(root, evidence, platform):
     if result.returncode:
         raise ValueError(result.stdout + result.stderr)
     report = {'status': 'passed', 'platform': platform, 'commit': manifest['git_sha'],
-              'observed_packages': len(inventory['packages']), 'vipcs_checked': paths,
+              'installer': installer, 'observed_packages': len(inventory['packages']), 'vipcs_checked': paths,
               'dragon': 'example/Example.dragon', 'dashboard_pending': False,
               'ui': result.stdout.strip(), 'scope': 'local native evidence through production dashboard functions; publication not tested'}
     (evidence / 'dashboard-coverage.json').write_text(json.dumps(report, indent=2) + '\n')
@@ -81,5 +106,6 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--platform', choices=['windows', 'linux'], required=True)
+    parser.add_argument('--installer', choices=['vipm', 'lvpm'], default='vipm')
     args = parser.parse_args()
-    check(args.root, args.evidence, args.platform)
+    check(args.root, args.evidence, args.platform, args.installer)

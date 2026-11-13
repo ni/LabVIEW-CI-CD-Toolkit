@@ -91,9 +91,10 @@ jobs:
         env:
           NATIVE_LINUX_INSTALLER: ${{ matrix.installer }}
         run: bash .github/labview/test-native-linux-worker.sh
-      - name: Verify Linux VIPM dependency warnings clear
-        if: matrix.installer == 'vipm'
-        run: python .github/labview/test-native-dependency-coverage.py --platform linux --evidence ci-out/native-linux-vipm
+      - name: Verify Linux dependency warnings clear
+        env:
+          INSTALLER: ${{ matrix.installer }}
+        run: python .github/labview/test-native-dependency-coverage.py --platform linux --installer "$INSTALLER" --evidence "ci-out/native-linux-$INSTALLER"
       - name: Retain Linux native evidence
         if: always()
         uses: actions/upload-artifact@v7
