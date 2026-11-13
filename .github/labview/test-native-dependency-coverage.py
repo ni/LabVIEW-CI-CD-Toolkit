@@ -30,8 +30,9 @@ def check(root, evidence, platform):
     installed = {value.lower() for value in packages}
     vipcs = []
     paths = ['.github/labview/vipm/ci-tooling.vipc', 'example/Dependencies.vipc']
-    if platform == 'windows':
-        paths.append('.github/labview/antidoc/antidoc.vipc')
+    paths.append('.github/labview/antidoc/antidoc.vipc')
+    if platform == 'linux':
+        paths.append('.github/labview/experimental.vipc')
     for relative in paths:
         with zipfile.ZipFile(root / relative) as archive:
             declared = [node.text.strip() for node in ET.fromstring(archive.read('config.xml')).findall('.//Package/Name')]

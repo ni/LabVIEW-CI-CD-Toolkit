@@ -272,11 +272,42 @@ class ReconfigurePreservationTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(text, initial)
 
-    def apply_settings(self, initial=MANIFEST, **inputs):
+    def test_source_monitoring_changes_only_requested_lists(self):
+        original = self.preservation_fixture()
+        result, text = self.apply_settings(initial=yaml.safe_dump(original), source=True,
+            IN_MONITORING_ONLY='true', IN_EXPECTED_SHA='HEAD',
+            IN_CONTAINER_VIPC='.github/labview/antidoc/antidoc.vipc::windows+linux;.github/labview/experimental.vipc::linux')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        actual = yaml.safe_load(text)
+        entries = actual['config']['container']['vipc']
+        self.assertEqual([entry.get('monitorOn', 'windows+linux') for entry in entries], ['windows+linux', 'linux'])
+        original['config']['container']['vipc'] = entries
+        self.assert_preserved(actual, original)
+
+    def test_source_save_rejects_unscoped_or_stale_requests_without_changes(self):
+        for inputs in ({}, {'IN_MONITORING_ONLY':'true'},
+                       {'IN_MONITORING_ONLY':'true','IN_EXPECTED_SHA':'a'*40},
+                       {'IN_MONITORING_ONLY':'true','IN_EXPECTED_SHA':'HEAD','IN_LINUX_WORKER':'reset'},
+                       {'IN_MONITORING_ONLY':'true','IN_EXPECTED_SHA':'HEAD','IN_ACTS':'dashboard'},
+                       {'IN_MONITORING_ONLY':'true','IN_EXPECTED_SHA':'HEAD','IN_VERSION':'2025'}):
+            result, text = self.apply_settings(source=True, **inputs)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(text, MANIFEST)
+
+    def apply_settings(self, initial=MANIFEST, source=False, **inputs):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / '.github/labview-ci.yml'
             config.parent.mkdir()
             config.write_text(initial)
+            if source:
+                for name in ('.github/workflows/release.yml', '.github/labview-ci/catalog.json'):
+                    path = Path(directory) / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text('source-only sentinel')
+                for arguments in (['init','-q'], ['add','.'], ['-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','fixture']):
+                    subprocess.run(['git', *arguments], cwd=directory, check=True, capture_output=True)
+                if inputs.get('IN_EXPECTED_SHA') == 'HEAD':
+                    inputs['IN_EXPECTED_SHA'] = subprocess.check_output(['git','rev-parse','HEAD'], cwd=directory, text=True).strip()
             environment = {key: value for key, value in os.environ.items() if not key.startswith('IN_') and key != 'GITHUB_ENV'}
             environment.update({key: '' for key in APPLY['env']})
             environment.update(inputs)

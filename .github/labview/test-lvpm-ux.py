@@ -49,6 +49,26 @@ def dashboard_functions(*names):
     return namespace
 
 
+class ExplicitVipcMonitoringTests(unittest.TestCase):
+    def test_explicit_internal_and_capability_choices_override_defaults(self):
+        functions = dashboard_functions('_vipc_role', '_monitor_on', '_parse_container_config',
+                                        '_capability_for_vipc', '_capability_enabled')
+        functions.update(TOOLING_CORE_VIPC='.github/labview/vipm/ci-tooling.vipc',
+                         MONITOR_PLATFORMS=['windows', 'linux'],
+                         _CAPABILITY_WORKFLOW={'antidoc': '.github/workflows/run-antidoc-windows-container.yml'})
+        config = functions['_parse_container_config'](str(ROOT / '.github/labview-ci.yml'))
+        entries = {entry['path']: entry for entry in config['vipc']}
+        for path in ['.github/labview/antidoc/antidoc.vipc', '.github/labview/experimental.vipc']:
+            role, _, configured, monitored, locked = functions['_vipc_role'](path, entries, True)
+            self.assertEqual((role, configured, monitored, locked), ('project', True, True, False))
+            self.assertIn('linux', functions['_monitor_on'](entries[path], True, False))
+            entries[path] = {'path': path, 'monitor': False}
+            self.assertEqual(functions['_vipc_role'](path, entries, True), ('project', '', False, False, False))
+            self.assertEqual(functions['_monitor_on'](entries[path], True, False), [])
+        self.assertEqual(functions['_vipc_role']('.github/labview/experimental.vipc', {}, False),
+                         ('capability', '', False, False, False))
+
+
 class NativeInventoryTests(unittest.TestCase):
     def test_available_packages_cannot_establish_installed_coverage(self):
         functions = dashboard_functions('_manifest_nipkg_packages', '_nipkg_version_index')
@@ -129,7 +149,7 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
         page = (ROOT / '.github/pages/dependencies.html').read_text()
         save = page.split('async function dispatchMonitor(){', 1)[1].split('async function linuxSaveRestriction()', 1)[0]
         self.assertLess(save.index('await linuxSaveRestriction()'), save.index('method:"POST"'))
-        self.assertIn('linuxMonitoringContextCurrent(request)', save)
+        self.assertIn('monitoringRequestCurrent(request)', save)
         compare = page.split('function committedMonitoringMatches(', 1)[1].split('async function checkLinuxMonitoringHead()', 1)[0]
         for required in ('config.hasVipcList', 'config.hasDragonList', 'workerSelectionSettings(config)',
                          'normalizedMonitorInputs(JSON.parse(context.inputs))', 'Duplicate declaration paths',

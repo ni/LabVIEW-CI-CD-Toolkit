@@ -278,7 +278,7 @@
     const CAP_VIPC_PLATFORMS = { antidoc: ["windows"] };
     function vipcCapability(path){ const m = /^\.github\/labview\/([^/]+)\/[^/]+\.vipc$/.exec(normPath(path || "")); return (m && CAP_VIPC_PLATFORMS[m[1]]) ? m[1] : ""; }
     function normPath(path){ path = String(path || "").replace(/\\/g, "/"); return path.replace(/^\.\//, ""); }
-    function classifyVipc(path, configured, hasConfigList){ path = normPath(path); const entry = configured.get(path); const core = path === CORE_VIPC; const cap = core ? "" : vipcCapability(path); if (core) return { role:"core", capability:"", configured:true, monitored:true, monitorOn:MONITOR_PLATFORMS.slice(), locked:true }; if (cap){ const monitorOn = MONITOR_PLATFORMS.filter(p => (CAP_VIPC_PLATFORMS[cap] || []).indexOf(p) !== -1); return { role:"capability", capability:cap, configured:true, monitored:monitorOn.length > 0, monitorOn, locked:false }; } const monitorOn = monitorOnFrom(entry, hasConfigList); const monitored = monitorOn.length > 0; return { role:"project", capability:"", configured:monitored, monitored, monitorOn, locked:false }; }
+    function classifyVipc(path, configured, hasConfigList){ path = normPath(path); const entry = configured.get(path); const core = path === CORE_VIPC; const cap = core ? "" : vipcCapability(path); if (core) return { role:"core", capability:"", configured:true, monitored:true, monitorOn:MONITOR_PLATFORMS.slice(), locked:true }; if (cap && !entry){ const monitorOn = MONITOR_PLATFORMS.filter(p => (CAP_VIPC_PLATFORMS[cap] || []).indexOf(p) !== -1); return { role:"capability", capability:cap, configured:true, monitored:monitorOn.length > 0, monitorOn, locked:false }; } const monitorOn = !entry && path.startsWith(".github/") ? [] : monitorOnFrom(entry, hasConfigList); const monitored = monitorOn.length > 0; return { role:"project", capability:"", configured:monitored, monitored, monitorOn, locked:false }; }
     async function fetchJson(url){ const r = await fetch(url, { cache:"no-cache" }); if (!r.ok) throw new Error(url + " -> " + r.status); return r.json(); }
     async function fetchText(url){ const r = await fetch(url, { cache:"no-cache" }); if (!r.ok) throw new Error(url + " -> " + r.status); return r.text(); }
     function selectDependencyTab(key){
@@ -803,7 +803,10 @@
       return { repo, platform:activePlatform, tooling:linuxToolingView, revision:selectedRevision, epoch:linuxContextEpoch, inputs:JSON.stringify(monitorInputs()), selection:workerSelectionSettings(selectedConfig), token:token() };
     }
     function linuxMonitoringContextCurrent(context){
-      return activePlatform === "linux" && context.repo === repo && context.platform === activePlatform && context.tooling === linuxToolingView && context.selection === workerSelectionSettings(selectedConfig) && context.revision === selectedRevision && context.epoch === linuxContextEpoch
+      return activePlatform === "linux" && monitoringRequestCurrent(context);
+    }
+    function monitoringRequestCurrent(context){
+      return context.repo === repo && context.platform === activePlatform && context.tooling === linuxToolingView && context.selection === workerSelectionSettings(selectedConfig) && context.revision === selectedRevision && context.epoch === linuxContextEpoch
         && context.inputs === JSON.stringify(monitorInputs()) && context.token === token();
     }
     function matchingLinuxMonitoringRequest(){
@@ -930,7 +933,7 @@
       try {
         if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo) || !["vipm", "lvpm"].includes(intent.context.tooling) || !["replace", "new"].includes(intent.context.mode)) throw new Error("Invalid update context; no update submitted.");
         const monitoring = matchingLinuxMonitoringRequest();
-        if (monitorDirty && (!monitoring || !["accepted", "uncertain"].includes(monitoring.status))) throw new Error("Monitoring choices are unsaved. Review and commit them before updating; choices are preserved. The tooling source and its forks require a reviewed source PR, not client Save.");
+        if (monitorDirty && (!monitoring || !["accepted", "uncertain"].includes(monitoring.status))) throw new Error("Monitoring choices are unsaved. Review and commit them before updating; choices are preserved. Save monitored files opens a configuration PR. Review and merge it, then load the committed settings.");
         intent.target = await verifiedLinuxUpdateTarget(intent);
         if (!linuxUpdateIntentCurrent(intent)) return;
         intent.message = "Reviewed committed target " + intent.target.sha + ". The inspected revision and your choices stay unchanged.";
@@ -1335,14 +1338,13 @@
       const counts = monitorCounts();
       if (monitorDirty) ["lvpmBuild", "lvpmActivate", "lvpmReset"].forEach(id => { if ($(id)) $(id).disabled = true; });
       const sourceRepository = repo.toLowerCase() === "ni/labview-ci-cd-toolkit";
-      if (btn) { btn.hidden = false; btn.disabled = !monitorDirty || counts.total === 0 || sourceRepository; }
-      if (sourceRepository) { setMonitorStatus("The tooling source cannot use client Save. Change monitoring through a reviewed source PR. Your local choices have not been saved."); return; }
-      const request = activePlatform === "linux" && matchingLinuxMonitoringRequest();
+      if (btn) { btn.hidden = false; btn.disabled = !monitorDirty || counts.total === 0; }
+      const request = matchingLinuxMonitoringRequest();
       if (request && ["submitting", "accepted", "uncertain"].includes(request.status) && btn) btn.disabled = true;
       if (!counts.total) { setMonitorStatus("No dependency files found."); return; }
       if (request && request.status === "accepted" && monitorDirty) { setMonitorStatus("Save request accepted, not applied. Review workflow runs and proposals, merge the intended changes, then open committed settings."); return; }
       if (request && ["submitting", "uncertain"].includes(request.status) && monitorDirty) { setMonitorStatus("Monitoring request pending or uncertain. Check workflow runs before submitting again."); return; }
-      if (monitorDirty) setMonitorStatus("Save to update monitored files (" + counts.monitored + " of " + counts.total + " checked).");
+      if (monitorDirty) setMonitorStatus((sourceRepository ? "Save opens a reviewed source PR for monitoring only (" : "Save to update monitored files (") + counts.monitored + " of " + counts.total + " checked).");
       else setMonitorStatus(counts.monitored + " of " + counts.total + " dependency files monitored.", "ok");
     }
     function token(){ try { return localStorage.getItem(TOK_KEY) || ""; } catch (_) { return ""; } }
@@ -1383,12 +1385,11 @@
     function hideTokenPanel(){ const p = $("tokPanel"); if (p) p.hidden = true; }
     function monitorInputs(){ return { container_vipc:encodeMonitorList(currentVipcs), container_dragon:encodeMonitorList(currentDragons) }; }
     async function dispatchMonitor(){
-      if (repo.toLowerCase() === "ni/labview-ci-cd-toolkit") { updateMonitorUi(); return; }
-      const previous = activePlatform === "linux" && matchingLinuxMonitoringRequest();
+      const previous = matchingLinuxMonitoringRequest();
       if (previous && ["submitting", "accepted", "uncertain"].includes(previous.status)) return;
       if (!repo.includes("/")) { setMonitorStatus("Could not determine repository.", "err"); return; }
       if (!token()) { pendingTokenAction = dispatchMonitor; showTokenPanel(); setMonitorStatus("Paste a token to queue Reconfigure."); return; }
-      const request = activePlatform === "linux" ? { ...linuxMonitoringContext(), status:"submitting" } : null;
+      const request = { ...linuxMonitoringContext(), status:"submitting", submitted:false };
       if (request) { linuxMonitoringRequest = request; renderLinuxPrerequisites(); }
       const btn = $("saveMonitor");
       if (btn) { btn.disabled = true; btn.textContent = "Queuing..."; }
@@ -1396,15 +1397,17 @@
       try {
         if (request) {
           const reason = await linuxSaveRestriction();
-          if (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request) return;
-          if (reason) { request.status = "blocked"; request.reason = reason; setMonitorStatus(reason, "err"); return; }
+          if (!monitoringRequestCurrent(request) || linuxMonitoringRequest !== request) return;
+          if (typeof reason === "string" && reason) { request.status = "blocked"; request.reason = reason; setMonitorStatus(reason, "err"); return; }
+          request.target = reason || null;
         }
+        request.submitted = true;
         const r = await fetch("https://api.github.com/repos/" + repo + "/actions/workflows/reconfigure.yml/dispatches", {
           method:"POST",
           headers:{ "Authorization":"Bearer " + token(), "Accept":"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28", "Content-Type":"application/json" },
-          body:JSON.stringify({ ref:workflowRef(), inputs:monitorInputs() })
+          body:JSON.stringify({ ref:request.target ? request.target.ref : workflowRef(), inputs:{...monitorInputs(), ...(request.target ? request.target.inputs : {})} })
         });
-        if (request && (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request)) return;
+        if (request && (!monitoringRequestCurrent(request) || linuxMonitoringRequest !== request)) return;
         if (btn) { btn.textContent = "Save monitored files"; }
         if (r.status === 204) {
           if (request) request.status = "accepted";
@@ -1423,7 +1426,7 @@
         if (r.status === 403) { showTokenPanel("The saved token cannot dispatch workflows here. Grant <strong>Actions: Read and write</strong> for <code>" + esc(repo) + "</code>."); setMonitorStatus("Dispatch forbidden (403).", "err"); return; }
         if (r.status === 404) {
           const unregistered = await explainDispatch404("reconfigure.yml");
-          if (request && (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request)) return;
+          if (request && (!monitoringRequestCurrent(request) || linuxMonitoringRequest !== request)) return;
           if (unregistered) { hideTokenPanel(); setMonitorStatus(unregistered, "err"); return; }
           showTokenPanel("The saved token cannot see <code>" + esc(repo) + "</code>, or this repo does not have <code>reconfigure.yml</code> installed.");
           setMonitorStatus("Workflow not found or repo not accessible (404).", "err");
@@ -1431,31 +1434,42 @@
         }
         setMonitorStatus("Dispatch failed (HTTP " + r.status + ").", "err");
       } catch (e) {
-        if (request && (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request)) return;
+        if (request && (!monitoringRequestCurrent(request) || linuxMonitoringRequest !== request)) return;
         if (request) {
-          request.status = "uncertain";
-          if (btn) { btn.disabled = true; btn.textContent = "Save monitored files"; }
-          setMonitorStatus("Monitoring request outcome uncertain after a network error. Inspect workflow runs before retrying.", "err");
+          request.status = request.submitted ? "uncertain" : "blocked";
+          if (btn) { btn.disabled = request.submitted; btn.textContent = "Save monitored files"; }
+          setMonitorStatus(request.submitted ? "Monitoring request outcome uncertain after a network error. Inspect workflow runs before retrying." : "Could not verify the monitoring workflow. Nothing was submitted; retry Save.", "err");
           return;
         }
         if (btn) { btn.disabled = false; btn.textContent = "Save monitored files"; }
         setMonitorStatus("Network error: " + esc(String(e && e.message || e)), "err");
       } finally {
-        if (request && linuxMonitoringContextCurrent(request) && linuxMonitoringRequest === request) renderLinuxPrerequisites();
+        if (request && monitoringRequestCurrent(request) && linuxMonitoringRequest === request) {
+          if (btn && ["blocked", "rejected"].includes(request.status)) { btn.disabled = false; btn.textContent = "Save monitored files"; }
+          renderLinuxPrerequisites();
+        }
       }
     }
     async function linuxSaveRestriction(){
       const canonical = "ni/labview-ci-cd-toolkit";
-      if (repo.toLowerCase() === canonical) return "The tooling source cannot use client Reconfigure or the installer. Change monitoring through a reviewed source PR.";
       try {
         const response = await fetch(api(""), { cache:"no-cache", headers:updHeaders() });
         if (!response.ok) return "Cannot verify repository eligibility; no monitoring request submitted.";
         const metadata = await response.json();
-        if (String(metadata.full_name || "").toLowerCase() === canonical) return "The tooling source cannot use client Reconfigure or the installer. Change monitoring through a reviewed source PR.";
         if (String(metadata.full_name || "").toLowerCase() !== repo.toLowerCase()) return "Repository identity is unknown; no monitoring request submitted.";
         if (typeof metadata.fork !== "boolean") return "Repository ancestry is unknown; no monitoring request submitted.";
         if (metadata.fork && [metadata.parent, metadata.source].some(item => !item || typeof item.full_name !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(item.full_name))) return "Fork ancestry is incomplete; no monitoring request submitted.";
-        if ([metadata.parent, metadata.source].some(item => item && String(item.full_name || "").toLowerCase() === canonical)) return "This is a fork of the tooling source. Use a reviewed source PR, not client Reconfigure or the installer.";
+        const sourceRepository = repo.toLowerCase() === canonical || [metadata.parent, metadata.source].some(item => item && String(item.full_name || "").toLowerCase() === canonical);
+        if (sourceRepository) {
+          if (typeof metadata.default_branch !== "string" || !metadata.default_branch) return "Cannot verify the source default branch; nothing submitted.";
+          const headResponse = await fetch(api("/commits/" + encodeURIComponent(metadata.default_branch)), {cache:"no-cache", headers:updHeaders()});
+          const head = headResponse.ok && await headResponse.json();
+          if (!head || !/^[a-f0-9]{40}$/.test(head.sha || "")) return "Cannot verify the source revision; nothing submitted.";
+          const workflowResponse = await fetch(api("/contents/.github/workflows/reconfigure.yml?ref=" + head.sha), {cache:"no-cache", headers:{...updHeaders(), Accept:"application/vnd.github.raw+json"}});
+          const workflow = workflowResponse.ok ? await workflowResponse.text() : "";
+          if (!workflow.includes("# source-monitoring-only-v1") || !workflow.includes("IN_MONITORING_ONLY: ${{ inputs.monitoring_only }}") || !workflow.includes("IN_EXPECTED_SHA: ${{ inputs.expected_sha }}")) return "The tooling source needs the monitoring-only Save update before it can open a reviewed source PR. Nothing submitted.";
+          return {ref:metadata.default_branch, inputs:{monitoring_only:"true", expected_sha:head.sha}};
+        }
         return "";
       } catch (_) { return "Cannot verify repository eligibility; no monitoring request submitted."; }
     }
@@ -2215,7 +2229,7 @@
       const generatedVipcs = (data.vipc || []).map(v => {
         const cls = classifyVipc(v.path, vipcConfig, vipcHasConfig);
         const tooling = v.tooling === true || cls.role === 'core';
-        const cap = v.role === 'capability' || cls.role === 'capability';
+        const cap = !vipcConfig.has(normPath(v.path)) && (v.role === 'capability' || cls.role === 'capability');
         return { path:v.path, role:v.role || cls.role || (tooling ? 'core' : 'project'), tooling, configured:tooling ? true : (cap ? (v.configured !== false) : cls.configured), monitored:tooling ? true : (cap ? (v.monitored !== false) : cls.monitored), monitorOn:tooling ? MONITOR_PLATFORMS.slice() : (cap ? (Array.isArray(v.monitorOn) ? v.monitorOn : cls.monitorOn) : cls.monitorOn), locked:tooling || cls.locked, packages:v.packages || [], error:v.error || "", open:false };
       });
       const dragonFiles = Array.isArray(data.dragon)

@@ -9,6 +9,24 @@ source:
 config:
   labviewVersion: "2026"
   os: [windows, linux]
+  container:
+    vipc:
+      - path: .github/labview/antidoc/antidoc.vipc
+        monitor: true
+        monitorOn: windows+linux
+      - path: .github/labview/experimental.vipc
+        monitor: true
+        monitorOn: linux
+      - path: .github/labview/vipm/ci-tooling.vipc
+        monitor: true
+        monitorOn: windows+linux
+      - path: example/Dependencies.vipc
+        monitor: true
+        monitorOn: windows+linux
+    dragon:
+      - path: example/Example.dragon
+        monitor: true
+        monitorOn: windows+linux
   viAnalyzer:
     default: builtin
 activities:

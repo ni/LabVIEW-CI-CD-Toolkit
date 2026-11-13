@@ -5,6 +5,12 @@ on:
   push:
     branches: [validation/native-dependencies-20261109, codex/dependency-reliability]
   workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Native platforms to validate'
+        type: choice
+        options: [all, linux, windows]
+        default: all
 
 permissions:
   contents: read
@@ -16,6 +22,7 @@ concurrency:
 
 jobs:
   windows:
+    if: inputs.platform != 'linux'
     name: Windows x64 VIPM build and runtime inventory
     runs-on: windows-2022
     timeout-minutes: 180
@@ -52,6 +59,7 @@ jobs:
           retention-days: 14
 
   linux:
+    if: inputs.platform != 'windows'
     name: Linux x64 ${{ matrix.installer }} build and installed-file verification
     runs-on: ubuntu-24.04
     timeout-minutes: 180

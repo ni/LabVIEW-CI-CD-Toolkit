@@ -25,7 +25,10 @@ class LinuxWorkerTests(unittest.TestCase):
             destination = Path(directory)
             plan = WORKER.stage(ROOT, destination, 'a' * 40)
             self.assertEqual({item['path'] for item in plan['files']},
-                             {'example/Dependencies.vipc', 'example/Example.dragon'})
+                             {'example/Dependencies.vipc', 'example/Example.dragon',
+                              '.github/labview/antidoc/antidoc.vipc', '.github/labview/experimental.vipc',
+                              '.github/labview/vipm/ci-tooling.vipc'})
+            self.assertEqual(len(WORKER.safe_plan(ROOT)['requirements']), 35)
             dragon = next(item for item in plan['files'] if item['path'].endswith('.dragon'))
             staged = destination / dragon['staged_name']
             before = staged.read_bytes()

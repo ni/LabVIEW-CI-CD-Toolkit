@@ -1387,12 +1387,14 @@ docker run --rm `
         registry publication and activity checks still require CI qualification; local fixtures do not establish them.</p>
       <p>The revision picker compares that revision's declarations and monitoring choices with its selected worker.
         Saving in a client submits a configuration proposal; it is not applied until reviewed and merged.
-        Windows and Linux checkboxes preserve the other platform's selection. The tooling source intentionally disables
-        client Save on both platforms and explains that monitoring changes require a source PR; forks remain ineligible
-        for the client installer. Existing LVPM candidate verification, digest pins and explicit activation are unchanged.</p>
+        Windows and Linux checkboxes preserve the other platform's selection. In the tooling source and its forks,
+        Save opens a monitoring-only source PR through Reconfigure. The workflow verifies the reviewed default-branch
+        SHA and rejects unrelated settings; only the dependency lists in <code>.github/labview-ci.yml</code> change.
+        The client installer remains forbidden. Explicit per-file selections override capability defaults, including
+        selecting Antidoc or an internal VIPC for Linux. Existing LVPM candidate verification, digest pins and explicit activation are unchanged.</p>
       <p><code>native-dependency-validation.yml</code> runs only on its dedicated validation branch or manual dispatch.
         Windows x64 VIPM and Linux x64 VIPM/LVPM jobs build the candidate with the real example VIPC and Dragon files,
-        the tooling baseline, and the Windows Antidoc capability. They retain source
+        the tooling baseline, and Antidoc. Linux also includes the explicitly selected experimental VIPC, matching the source example monitoring configuration (35 unique package requirements). They retain source
         hashes, build logs and installed-inventory evidence as artifacts. The jobs have read-only repository/package
         permissions and never publish images, active aliases or Pages pointers. A passed native build verifies the
         selected fixture and recorded scope, not every project or LabVIEW activity; failures retain diagnostic artifacts.</p>
@@ -1664,7 +1666,7 @@ docker run --rm `
         matching settings can proceed. Reconfigure&rsquo;s omitted <code>monitorOn</code> with
         <code>monitor: true</code> means both platforms; false remains an opt-out. There are no Find/Open
         navigation stages, automatic updates on page load, or background retries. Source repositories and
-        their forks must change monitoring through reviewed source PRs, not client Save or the installer.</p>
+        their forks use the monitoring-only Save path to propose a reviewed source PR. Save does not invoke the client installer or automatically build or activate a worker.</p>
       <p>Legacy implicit monitoring (omitted lists, not explicit empty lists) retains a clean-current path:
         authenticated HEAD must equal the fully loaded revision, with unchanged complete discovery inputs,
         worker settings, and no pending Save. Generated inventory requires exact repository/revision provenance;
