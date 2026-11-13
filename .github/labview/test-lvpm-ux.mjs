@@ -75,6 +75,17 @@ const context = vm.createContext({
     }
     if (url.includes('latest.json')) return { ok:true, json:async () => ({ tag, manifest_path:candidate.manifest_path, image_digest:digest }) };
     if (url.includes('manifest.json')) return { ok:true, json:async () => responseCandidate };
+    if (new URL(url).hostname === 'raw.githubusercontent.com' && (options.headers?.Authorization || options.headers?.['X-GitHub-Api-Version'])) throw new TypeError('Load failed');
+    if (url.includes('/contents/.github/') && new URL(url).searchParams.has('ref')) {
+      assert.equal(new URL(url).hostname, 'api.github.com');
+      assert.match(new URL(url).searchParams.get('ref'), /^[a-f0-9]{40}$/);
+      assert.equal(options.headers.Authorization, 'Bearer test-token');
+      assert.equal(options.headers.Accept, 'application/vnd.github.raw+json');
+      return { ok:rawConfigStatus === 200, status:rawConfigStatus, text:async () => {
+        if (rawTextBarrier) await rawTextBarrier;
+        return url.includes('/.github/workflows/') ? reviewedWorkflowOverride ?? fs.readFileSync(new URL('workflows/' + new URL(url).pathname.split('/').at(-1),root),'utf8') : activeConfig;
+      }};
+    }
     if (new URL(url).hostname === 'raw.githubusercontent.com') return { ok:rawConfigStatus === 200, status:rawConfigStatus, text:async () => { if (rawTextBarrier) await rawTextBarrier; return url.includes('/.github/workflows/') ? reviewedWorkflowOverride ?? fs.readFileSync(new URL('workflows/' + url.split('/').at(-1),root),'utf8') : activeConfig; } };
     if (options.method === 'POST') {
       if (postBarrier) await postBarrier;
@@ -1408,6 +1419,51 @@ for (const path of ['generated','live']) {
     prerequisiteCases++;
   }
 }
+// A published catalog can advance HEAD while Pages still displays the project
+// revision. Only proven release bookkeeping may bridge implicit monitoring.
+for (const tooling of ['vipm', 'lvpm']) {
+  for (const change of ['release-only', 'dependency-file', 'catalog-runtime', 'renamed', 'diverged', 'truncated-commits', 'truncated-files', 'missing-history', 'dirty']) {
+    start = prerequisiteFixture();
+    activeConfig = actualImplicitManifest;
+    hooks.setModal(modal);
+    const inspected = 'e'.repeat(40);
+    const view = installerView();
+    hooks.renderGenerated({schema:1,repo:'owner/project',sha:inspected,config:implicitConfig,
+      vipc:[{path:'project.vipc',packages:[]}],dragon:{files:[]},columns:[],system:[]});
+    if (tooling === 'lvpm') view.inputs.find(input => input.value === 'lvpm').listener();
+    if (change === 'dirty') hooks.setFileMonitor('vipc', 'project.vipc', 'linux', false);
+    const originalFetch = context.fetch;
+    context.fetch = async (url, options) => {
+      if (url.includes('/compare/')) {
+        assert.equal(url, 'https://api.github.com/repos/owner/project/compare/' + inspected + '...' + revision + '?per_page=100');
+        const files = [{filename:'.github/labview-ci/catalog.json',status:'modified'}, {filename:'.github/labview-ci/notes/fix.md',status:'removed'}];
+        if (change === 'dependency-file') files.push({filename:'project.vipc',status:'modified'});
+        if (change === 'renamed') files[0].status = 'renamed';
+        if (change === 'truncated-files') while (files.length < 300) files.push({filename:'.github/labview-ci/notes/n.md',status:'removed'});
+        return {ok:true,json:async () => ({status:change === 'diverged' ? 'diverged' : 'ahead',base_commit:{sha:inspected},merge_base_commit:{sha:inspected},
+          total_commits:change === 'truncated-commits' ? 200 : 1,commits:change === 'missing-history' ? [] : [{sha:revision}],files})};
+      }
+      if (url.includes('/contents/.github/labview-ci/catalog.json?ref=')) {
+        assert.equal(options.headers.Accept,'application/vnd.github.raw+json');
+        const isHead = new URL(url).searchParams.get('ref') === revision;
+        return {ok:true,text:async () => JSON.stringify({version:isHead ? '5.0.3' : '5.0.2',history:{notes:isHead ? 'new notes' : 'old notes'},containers:{base:isHead && change === 'catalog-runtime' ? 'different-image' : 'same-image'}})};
+      }
+      return originalFetch(url, options);
+    };
+    const before = plain(hooks.monitorInputs());
+    await hooks.runLinuxPrimaryAction();
+    if (hooks.updateIntent().phase === 'approval') await modalFields.get('#updConfirmApprove').onclick();
+    context.fetch = originalFetch;
+    assert.equal(postCount(start), change === 'release-only' ? 1 : 0, tooling + '/' + change + ': ' + hooks.updateIntent().message);
+    assert.deepEqual(plain(hooks.monitorInputs()), before);
+    if (change === 'release-only') {
+      assert.equal(hooks.updateIntent().context.revision, inspected);
+      assert.equal(JSON.parse(requests.slice(start).find(r => r.options.method === 'POST').options.body).inputs.expected_sha, revision);
+    }
+    hooks.invalidateLinuxOperation();
+    prerequisiteCases++;
+  }
+}
 const actualSourceFiles = fs.readdirSync(new URL('../',root),{recursive:true}).filter(path => /\.(?:vipc|dragon)$/i.test(path));
 for (const tooling of ['vipm','lvpm']) {
   start = prerequisiteFixture();
@@ -1474,6 +1530,25 @@ for (const failure of ['dirty','mismatch','other-platform','worker-selection','p
   assert.ok(['blocked','rejected'].includes(hooks.updateIntent().phase),failure);
   assert.deepEqual(plain(hooks.monitorInputs()),before,failure);
   assert.doesNotMatch(prerequisiteMarkup(), /Find current|Open matching/,failure);
+  prerequisiteCases++;
+}
+for (const failedPath of ['/contents/.github/labview-ci.yml', '/contents/.github/workflows/']) {
+  const start = prerequisiteFixture();
+  const realFetch = context.fetch;
+  context.fetch = async (url, options) => {
+    if (url.includes(failedPath)) throw new TypeError('Load failed');
+    return realFetch(url, options);
+  };
+  await hooks.runLinuxPrimaryAction();
+  context.fetch = realFetch;
+  assert.equal(postCount(start), 0);
+  assert.equal(hooks.updateIntent().busy, false);
+  assert.match(hooks.updateIntent().message, /Cannot load (committed settings|reviewed workflow) from GitHub/);
+  assert.match(hooks.updateIntent().message, /No update submitted/);
+  // A failed read is safe to retry; it must not leave the update button stuck.
+  await hooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start), 1);
+  hooks.invalidateLinuxOperation();
   prerequisiteCases++;
 }
 for (const tooling of ['lvpm','vipm']) {
@@ -1591,7 +1666,7 @@ for (const stage of ['repository','head','settings','workflow','actor','workflow
     if (stage === 'repository') return url === 'https://api.github.com/repos/owner/project';
     if (stage === 'head' || stage === 'revalidate-head') return url.includes('/commits/') && ++headReads === (stage === 'head' ? 1 : 2);
     if (stage === 'settings') return url.includes('/.github/labview-ci.yml');
-    if (stage === 'workflow') return url.includes('raw.githubusercontent.com') && url.endsWith('/build-labview-lvpm-image.yml');
+    if (stage === 'workflow') return url.includes('/contents/.github/workflows/build-labview-lvpm-image.yml?ref=');
     if (stage === 'actor') return url.endsWith('/user');
     if (stage === 'workflow-metadata') return url === 'https://api.github.com/repos/owner/project/actions/workflows/build-labview-lvpm-image.yml';
     return false;
@@ -1643,7 +1718,7 @@ for (const bodyStage of ['repository','HEAD','settings','workflow','actor','work
       : bodyStage === 'HEAD' ? url.includes('/commits/')
       : bodyStage === 'settings' ? settings && settingsBodies === 1
       : bodyStage === 'revalidated-settings' ? settings && settingsBodies === 2
-      : bodyStage === 'workflow' ? url.includes('raw.githubusercontent.com') && url.endsWith('.yml') && !settings
+      : bodyStage === 'workflow' ? url.includes('/contents/.github/workflows/') && !settings
       : bodyStage === 'actor' ? url.endsWith('/user') : url.endsWith('/actions/workflows/build-labview-lvpm-image.yml');
     if (!selected) return response;
     const kind = response.text ? 'text' : 'json';

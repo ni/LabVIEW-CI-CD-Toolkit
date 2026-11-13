@@ -1,0 +1,1 @@
+Linux container updates no longer fail with “Load failed” when checking committed settings in the browser. Updates also handle release-only version changes without requiring a different project revision. Connection and permission failures now explain what could not be checked and allow a safe retry.

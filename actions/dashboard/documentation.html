@@ -1652,7 +1652,10 @@ docker run --rm `
         Dependency banners render text and navigation with DOM nodes, not parsed HTML; review links allow only
         HTTP(S) destinations.</p>
       <p>The Linux tooling card has one primary action: <strong>Update container image</strong>. Clicking it
-        checks authenticated current-HEAD configuration and the installed workflow, comparing complete
+        checks authenticated current-HEAD configuration and the installed workflow through GitHub’s Contents
+        API, pinned to the reviewed commit. API credentials and headers are never sent to the raw-file host,
+        which rejects their browser preflight. Failed reads identify the stage and permit an explicit retry;
+        no build request is sent or automatically retried. The check compares complete
         monitoring choices (including opt-outs and the other platform), defaults, and activity overrides.
         A historical view with equivalent committed settings can update the current committed SHA without
         changing the inspected revision, URL, or choices. Unmerged choices, mismatches, unknown evidence,
@@ -1667,8 +1670,12 @@ docker run --rm `
         worker settings, and no pending Save. Generated inventory requires exact repository/revision provenance;
         live loading requires successful manifest and file discovery. Overlapping revision loads publish
         inventory and provenance only from the still-current load; stale responses cannot replace newer choices.
-        Historical or edited implicit settings
-        cannot use this path. Unsupported or malformed configuration shapes remain unverified and do not dispatch.</p>
+        A release-bookkeeping-only advance may reuse a clean loaded revision: an authenticated comparison
+        must establish ancestry and a complete change list containing only release notes and the catalog,
+        whose fields other than version and history must remain identical. Any dependency, workflow,
+        runtime catalog, or other source change still requires a current revision; incomplete comparisons
+        fail closed. Edited implicit settings cannot use this path. Unsupported or malformed configuration
+        shapes remain unverified and do not dispatch.</p>
       <p>The explicit update intent retains its page context across authentication, reads, VIPM approval,
         and submission. Changes to platform, inspected revision, monitoring, or tooling invalidate it.
         VIPM approval names the exact committed target and revalidates it before dispatch; LVPM builds
