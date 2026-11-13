@@ -36,7 +36,8 @@ RUN apt-get update \
 # AsciiDoc 1.12.1 invokes its native Ruby tools through `cmd /c` on Linux too.
 # Restrict the bridge to Asciidoctor rendering and the package's gem checks.
 COPY .github/labview/asciidoc-linux-command.py /opt/lvci/asciidoc-compat/cmd
-RUN chmod +x /opt/lvci/asciidoc-compat/cmd
+RUN chmod +x /opt/lvci/asciidoc-compat/cmd \
+ && printf ":sources: []\n" > /opt/lvci/asciidoc-compat/gemrc
 ENV PATH="/opt/lvci/asciidoc-compat:${PATH}"
 
 # AsciiDoc's Linux post-install VI otherwise opens a sudo-configuration dialog.
@@ -50,6 +51,9 @@ RUN gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.24 asciidoc
  && cmd /c asciidoctor-pdf -o /tmp/lvci-asciidoctor.pdf /tmp/lvci-asciidoctor.adoc \
  && test -s /tmp/lvci-asciidoctor.html && test -s /tmp/lvci-asciidoctor.pdf \
  && rm /tmp/lvci-asciidoctor.adoc /tmp/lvci-asciidoctor.html /tmp/lvci-asciidoctor.pdf
+# Prove the package's optional update query stays offline and finds no unpinned upgrades.
+RUN --network=none cmd /c gem outdated > /tmp/lvci-pinned-gem-updates \
+ && test ! -s /tmp/lvci-pinned-gem-updates && rm /tmp/lvci-pinned-gem-updates
 
 COPY --from=lvpm-builder /src/lvpm/target/release/lvpm /usr/local/bin/lvpm
 COPY --from=lvpm-builder /src/lvpm/LICENSE-MIT /src/lvpm/LICENSE-APACHE /usr/share/licenses/lvpm/

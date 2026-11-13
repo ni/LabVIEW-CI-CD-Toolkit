@@ -1781,7 +1781,10 @@ docker run --rm `
           <code>container.use</code> and existing overrides without assuming the fallback uses VIPM. Reconfigure applies
           only explicitly requested settings to the parsed existing manifest: activation/reset preserves separate
           VIPC and Dragon lists, explicit dependency-policy values, platform settings, provenance, and unknown
-          client fields. A no-op keeps the file byte-identical; an actual update may normalize YAML formatting.</li>
+          client fields. The tooling source and its forks also support these configuration-only activation/reset
+          PRs: the request may change only the Linux selection, and activation retains the same server-side
+          candidate verification. The client installer is never invoked. A no-op keeps the file byte-identical;
+          an actual update may normalize YAML formatting.</li>
       </ol>
       <p>Project declarations that intentionally duplicate CI-tooling roots (for example
         <code>example/Dependencies.vipc</code>) must keep shared roots pinned to the exact same versions;
@@ -1807,11 +1810,11 @@ docker run --rm `
         two supported <code>gem which</code> checks, plus the read-only <code>gem outdated</code> query,
         to the real native executables, preserving output and
         failure status. During the package hook, the optional outdated query uses RubyGems' own
-        <code>--local --clear-sources</code> options: the pinned CI toolchain must not discover and install
+        command-specific <code>gemrc</code> with an empty remote-source list: the pinned CI toolchain must not discover and install
         arbitrary newer gems or open an interactive upgrade dialog. Normal <code>gem outdated</code>
         outside this bridge is unchanged. The bridge does not emulate a Windows shell, evaluate shell text,
         or install gems.
-        The image smoke checks exercise this same command path. This lets the package check the installed
+        The image smoke checks exercise this same command path, including the update query with networking disabled. This lets the package check the installed
         toolchain before considering its interactive Linux sudo-configuration dialog; no sudoers permissions
         are added. The bridge ships in the client tooling payload and is included in both worker build hashes.
         See the pinned <a href="https://gitlab.com/wovalab/open-source/asciidoc-toolkit/-/tree/e0eaf44f7a05990d1b20e7174d359dc98d1f6ff3/Sources/Toolchain">upstream toolchain source</a>.</p>

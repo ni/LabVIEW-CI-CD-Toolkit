@@ -19,6 +19,9 @@ class CommandTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.bin = Path(self.temporary.name)
         self.environment = {**os.environ, "PATH": str(self.bin)}
+        self.bridge = self.bin / "cmd"
+        self.bridge.write_bytes(BRIDGE.read_bytes())
+        (self.bin / "gemrc").write_text(":sources: []\n")
         for tool in ("asciidoctor", "asciidoctor-pdf", "gem"):
             path = self.bin / tool
             path.write_text(f"#!{sys.executable}\n"
@@ -29,7 +32,7 @@ class CommandTests(unittest.TestCase):
             path.chmod(0o755)
 
     def invoke(self, *arguments):
-        return subprocess.run([sys.executable, str(BRIDGE), *arguments],
+        return subprocess.run([sys.executable, str(self.bridge), *arguments],
                               env=self.environment, capture_output=True, text=True)
 
     def test_observed_package_checks_execute_native_tools(self):
@@ -44,7 +47,7 @@ class CommandTests(unittest.TestCase):
     def test_optional_update_query_cannot_upgrade_the_pinned_toolchain(self):
         result = self.invoke("/c", "gem", "outdated")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout), ["outdated", "--local", "--clear-sources"])
+        self.assertEqual(json.loads(result.stdout), ["outdated", "--config-file", str((self.bin / "gemrc").resolve())])
         self.assertIn("remote Ruby upgrade discovery is disabled", result.stderr)
         self.assertIn("native diagnostic", result.stderr)
 

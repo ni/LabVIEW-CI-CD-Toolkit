@@ -284,6 +284,30 @@ class ReconfigurePreservationTests(unittest.TestCase):
         original['config']['container']['vipc'] = entries
         self.assert_preserved(actual, original)
 
+    def test_source_worker_selection_retains_config_only_activation_and_reset(self):
+        original = self.preservation_fixture()
+        candidate = 'linux-lvpm-' + 'a' * 64 + '@sha256:' + 'b' * 64
+        result, text = self.apply_settings(initial=yaml.safe_dump(original), source=True,
+                                           IN_LINUX_WORKER=candidate)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expected = copy.deepcopy(original)
+        expected['config']['container']['linuxUse'] = candidate
+        self.assert_preserved(yaml.safe_load(text), expected)
+        result, reset = self.apply_settings(initial=text, source=True, IN_LINUX_WORKER='reset')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_preserved(yaml.safe_load(reset), original)
+        steps = WORKFLOW['jobs']['reconfigure']['steps']
+        verify = next(step for step in steps if 'worker.py verify' in step.get('run', ''))
+        self.assertLess(steps.index(verify), steps.index(APPLY))
+        self.assertIn("inputs.linux_worker != 'reset'", verify['if'])
+
+    def test_source_worker_selection_rejects_unrelated_changes(self):
+        for other in ({'IN_VERSION': '2025'}, {'IN_CONTAINER_VIPC': 'project.vipc::linux'},
+                      {'IN_ACTS': 'dashboard'}, {'IN_EXPECTED_SHA': 'a' * 40}):
+            result, text = self.apply_settings(source=True, IN_LINUX_WORKER='reset', **other)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(text, MANIFEST)
+
     def test_client_with_its_own_release_workflow_remains_reconfigurable(self):
         result, text = self.apply_settings(client_release=True, IN_RUNNERS='3')
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -296,7 +320,7 @@ class ReconfigurePreservationTests(unittest.TestCase):
             subprocess.run([sys.executable, '-c', script], cwd=directory, check=True,
                            env={**os.environ, 'GITHUB_REPOSITORY':'owner/source-fork',
                                 'BASELINE':'v5.0.3', 'TARGET':'v5.0.4'})
-            body = (Path(directory) / 'source-monitoring-pr.md').read_text()
+            body = (Path(directory) / 'source-configuration-pr.md').read_text()
         self.assertIn('v5.0.4 (projected), incremental (patch)', body)
         self.assertIn('https://github.com/ni/LabVIEW-CI-CD-Toolkit/releases/tag/v5.0.3', body)
         self.assertNotIn('owner/source-fork/releases', body)

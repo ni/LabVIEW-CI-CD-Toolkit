@@ -171,23 +171,25 @@ jobs:
                                and pathlib.Path('.github/labview/release-catalog-pr.py').is_file()
                                and pathlib.Path('.github/labview-ci/catalog.json').is_file())
           monitoring_only = os.environ.get('IN_MONITORING_ONLY', '').lower() == 'true'
-          if source_repository and not monitoring_only:
-              raise ValueError('The tooling source requires monitoring-only Save; the client installer remains forbidden')
-          if monitoring_only:
-              allowed = {'IN_MONITORING_ONLY', 'IN_EXPECTED_SHA', 'IN_CONTAINER_VIPC', 'IN_CONTAINER_DRAGON'}
+          source_worker_only = source_repository and not monitoring_only and bool(os.environ.get('IN_LINUX_WORKER', ''))
+          if source_repository and not (monitoring_only or source_worker_only):
+              raise ValueError('The tooling source requires monitoring-only Save or a verified Linux worker selection; the client installer remains forbidden')
+          if monitoring_only or source_worker_only:
+              allowed = {'IN_MONITORING_ONLY', 'IN_EXPECTED_SHA'}
+              allowed |= {'IN_CONTAINER_VIPC', 'IN_CONTAINER_DRAGON'} if monitoring_only else {'IN_LINUX_WORKER'}
               forbidden = [key for key, value in os.environ.items()
                            if key.startswith('IN_') and key not in allowed and value.strip() not in ('', 'keep')]
               if forbidden:
-                  raise ValueError('Monitoring-only Save cannot change other settings: ' + ', '.join(sorted(forbidden)))
+                  raise ValueError('Scoped source configuration cannot change other settings: ' + ', '.join(sorted(forbidden)))
               expected = os.environ.get('IN_EXPECTED_SHA', '')
-              if not re.fullmatch(r'[a-f0-9]{40}', expected):
+              if monitoring_only and not re.fullmatch(r'[a-f0-9]{40}', expected):
                   raise ValueError('Monitoring-only Save requires an exact reviewed default-branch SHA')
               actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
-              if actual != expected:
+              if (monitoring_only or expected) and actual != expected:
                   raise ValueError('The default branch changed. Refresh and retry Save; nothing was modified.')
               if source_repository and os.environ.get('GITHUB_ENV'):
                   with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
-                      output.write('RECONFIGURE_SOURCE_MONITORING=true\n')
+                      output.write('RECONFIGURE_SOURCE_CONFIGURATION=true\n')
 
           class ManifestDumper(yaml.SafeDumper):
               def increase_indent(self, flow=False, indentless=False):
@@ -833,7 +835,7 @@ jobs:
           git checkout -b "$BRANCH"
 
           git add .github/labview-ci.yml
-          if [ "${{ inputs.monitoring_only }}" != true ]; then
+          if [ "${{ inputs.monitoring_only }}" != true ] && [ "${RECONFIGURE_SOURCE_CONFIGURATION:-}" != true ]; then
             [ -f .github/labview/vipm/ci-tooling.packages.json ] && git add .github/labview/vipm/ci-tooling.packages.json || true
             [ -f .github/labview/vipm/ci-tooling.vipc ] && git add .github/labview/vipm/ci-tooling.vipc || true
           fi
@@ -846,7 +848,7 @@ jobs:
           git commit -m "ci: reconfigure LabVIEW CI settings"
           git push -u origin "$BRANCH"
 
-          if [ "${RECONFIGURE_SOURCE_MONITORING:-}" = true ]; then
+          if [ "${RECONFIGURE_SOURCE_CONFIGURATION:-}" = true ]; then
             BASELINE=$(gh release view --repo ni/LabVIEW-CI-CD-Toolkit --json tagName --jq .tagName)
             TARGET=$(python3 -c 'import re,sys; m=re.fullmatch(r"v([0-9]+)\.([0-9]+)\.([0-9]+)",sys.argv[1]); assert m, "Expected a published semantic version"; print(f"v{m[1]}.{m[2]}.{int(m[3])+1}")' "$BASELINE")
             export BASELINE TARGET
@@ -855,7 +857,7 @@ jobs:
           from pathlib import Path
           repo = os.environ['GITHUB_REPOSITORY']
           baseline, target = os.environ['BASELINE'], os.environ['TARGET']
-          Path('source-monitoring-pr.md').write_text(f"""Updates the source example's dependency monitoring selections. Only `.github/labview-ci.yml` changes; review the per-platform selections in the diff before merging. The client installer is never invoked.
+          Path('source-configuration-pr.md').write_text(f"""Updates the source repository's dependency configuration. Only `.github/labview-ci.yml` changes; review the monitoring or Linux worker selection in the diff before merging. The client installer is never invoked.
 
           ## Release impact
 
@@ -863,10 +865,10 @@ jobs:
 
           ## Validation
 
-          The workflow restricts this request to VIPC and Dragon monitoring and verifies the reviewed default-branch SHA. Merging saves configuration only. Build the selected platform's container afterward and verify its installed inventory before expecting missing-dependency warnings to clear.
+          The workflow restricts source requests to either dependency monitoring or Linux worker selection. Monitoring verifies the reviewed default-branch SHA; candidate activation verifies provenance, image digest and current inputs before proposing a change. Merging changes configuration only. Missing-dependency warnings clear only when the selected worker has verified matching inventory.
           """, encoding='utf-8')
           PY
-            gh pr create --title "$RECONFIGURE_PR_TITLE" --base "$RECONFIGURE_BASE" --head "$BRANCH" --body-file source-monitoring-pr.md --label release:patch
+            gh pr create --title "$RECONFIGURE_PR_TITLE" --base "$RECONFIGURE_BASE" --head "$BRANCH" --body-file source-configuration-pr.md --label release:patch
             exit 0
           fi
 

@@ -20,9 +20,11 @@ def native_command(arguments):
     if command == ["gem", "outdated"]:
         # The hook otherwise upgrades the pinned toolchain (and opens a sudo
         # dialog), even when all required tools passed their native checks.
-        # Use RubyGems' own source controls: no remote update discovery during
-        # an immutable worker build. Normal `gem outdated` remains unchanged.
-        return ["gem", "outdated", "--local", "--clear-sources"]
+        # Use a command-specific gemrc with an empty source list. --local is
+        # ignored by outdated in RubyGems 3.3; --clear-sources restores defaults.
+        # Normal `gem outdated` outside this bridge remains unchanged.
+        return ["gem", "outdated", "--config-file",
+                os.path.join(os.path.dirname(os.path.realpath(__file__)), "gemrc")]
     if command in (["gem", "which", "asciidoctor-kroki"],
                    ["gem", "which", "asciimath"]):
         return command

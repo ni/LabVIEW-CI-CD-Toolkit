@@ -61,7 +61,8 @@ RUN set -eux; \
 # AsciiDoc 1.12.1 invokes its native Ruby tools through `cmd /c` on Linux too.
 # Restrict the bridge to Asciidoctor rendering and the package's gem checks.
 COPY .github/labview/asciidoc-linux-command.py /opt/lvci/asciidoc-compat/cmd
-RUN chmod +x /opt/lvci/asciidoc-compat/cmd
+RUN chmod +x /opt/lvci/asciidoc-compat/cmd \
+ && printf ":sources: []\n" > /opt/lvci/asciidoc-compat/gemrc
 ENV PATH="/opt/lvci/asciidoc-compat:${PATH}"
 
 # AsciiDoc's Linux post-install VI otherwise opens a sudo-configuration dialog.
@@ -75,6 +76,9 @@ RUN gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.24 asciidoc
  && cmd /c asciidoctor-pdf -o /tmp/lvci-asciidoctor.pdf /tmp/lvci-asciidoctor.adoc \
  && test -s /tmp/lvci-asciidoctor.html && test -s /tmp/lvci-asciidoctor.pdf \
  && rm /tmp/lvci-asciidoctor.adoc /tmp/lvci-asciidoctor.html /tmp/lvci-asciidoctor.pdf
+# Prove the package's optional update query stays offline and finds no unpinned upgrades.
+RUN --network=none cmd /c gem outdated > /tmp/lvci-pinned-gem-updates \
+ && test ! -s /tmp/lvci-pinned-gem-updates && rm /tmp/lvci-pinned-gem-updates
 
 RUN --mount=type=secret,id=vipm_serial,required=false \
       --mount=type=secret,id=vipm_full_name,required=false \
