@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "repository": "ni/LabVIEW-CI-CD-Toolkit",
+  "tag": "linux-lvpm-89287e60180bc1194c0d148ded8930a6e8bb4d2d145a231b91b6565e2b74a16b",
+  "manifest_path": "workers/linux-lvpm/linux-lvpm-89287e60180bc1194c0d148ded8930a6e8bb4d2d145a231b91b6565e2b74a16b/manifest.json",
+  "image_ref": "ghcr.io/ni/labview-ci-cd-toolkit-labview:linux-lvpm-89287e60180bc1194c0d148ded8930a6e8bb4d2d145a231b91b6565e2b74a16b@sha256:444b52c7d4121d1f2b89b618c398fdeb5b2ea397446e02c418f3650e8a81fa96",
+  "image_digest": "sha256:444b52c7d4121d1f2b89b618c398fdeb5b2ea397446e02c418f3650e8a81fa96",
+  "requirements_fingerprint": "67d3c458d4f2451de18fcefd8afdc81c38040b225e9e042d774bb5c965b35c02",
+  "verification": {
+    "status": "passed",
+    "scope": "package-files",
+    "activity_checks": "not_run",
+    "hook_error_output": "not_observable_by_upstream"
+  },
+  "workflow_run": {
+    "id": 43452731551,
+    "attempt": 1,
+    "head_sha": "73d2c415aa07403ed5f4025d02fef41e5f223400",
+    "workflow_path": ".github/workflows/build-labview-lvpm-image.yml"
+  }
+}
