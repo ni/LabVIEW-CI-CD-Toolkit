@@ -14,11 +14,13 @@ cat > /usr/local/bin/cmd <<'PYPROBE'
 import json, os, pathlib, sys
 with open('/evidence/cmd-invocation.jsonl', 'a') as out:
     out.write(json.dumps({'args': sys.argv, 'cwd': os.getcwd()}) + '\n')
-    for arg in sys.argv[1:]:
-        path = pathlib.Path(arg.strip('"'))
-        if path.is_file():
-            out.write(json.dumps({'path': str(path), 'content': path.read_text(errors='replace')[:10000]}) + '\n')
-sys.exit(127)
+args = sys.argv[1:]
+if not args or args.pop(0).lower() != '/c' or not args:
+    sys.exit('Unsupported AsciiDoc command wrapper invocation')
+if args[0] not in ('asciidoctor', 'asciidoctor-pdf') and args not in (
+        ['gem', 'which', 'asciidoctor-kroki'], ['gem', 'which', 'asciimath']):
+    sys.exit('Unsupported AsciiDoc command: ' + repr(args))
+os.execvp(args[0], args)
 PYPROBE
 chmod +x /usr/local/bin/cmd
 unset LV_RTE_HEADLESS

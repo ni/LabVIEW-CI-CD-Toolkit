@@ -27,9 +27,9 @@ jobs:
             --mount "type=bind,src=$PWD/ci-out/hook-diagnostic,dst=/evidence" \
             ghcr.io/ni/labview-ci-cd-toolkit-labview:linux-lvpm-89287e60180bc1194c0d148ded8930a6e8bb4d2d145a231b91b6565e2b74a16b@sha256:444b52c7d4121d1f2b89b618c398fdeb5b2ea397446e02c418f3650e8a81fa96 \
             /input/.github/labview/diagnostics/asciidoc-hook.sh
-      - name: Capture first five minutes
+      - name: Capture first two minutes
         run: |
-          for i in $(seq 1 60); do
+          for i in $(seq 1 24); do
             if [ "$(docker inspect hook-diagnostic --format '{{.State.Running}}')" != true ]; then break; fi
             sleep 5
           done
