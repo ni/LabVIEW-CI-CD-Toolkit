@@ -75,6 +75,24 @@ def verify_registry(image, tag, digest):
                 raise ValueError("GHCR candidate tag or immutable digest has changed")
 
 
+def native_packages(raw):
+    """Only installed dpkg records establish native package coverage."""
+    packages = set()
+    for line in raw.splitlines():
+        fields = line.split('\t')
+        if len(fields) != 3:
+            raise ValueError('Malformed dpkg status inventory')
+        status, name, version = fields
+        if status != 'installed':
+            continue
+        if not re.fullmatch(r'[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?', name) or not version or re.search(r'\s', version):
+            raise ValueError('Invalid installed dpkg package record')
+        packages.add((name, version))
+    if not packages:
+        raise ValueError('Installed native package inventory is empty')
+    return [{'name': name, 'version': version} for name, version in sorted(packages)]
+
+
 def verify_image_platform(image, inventory):
     if (not isinstance(image, dict) or not isinstance(inventory, dict)
             or image.get("Os") != "linux" or image.get("Architecture") != "amd64"

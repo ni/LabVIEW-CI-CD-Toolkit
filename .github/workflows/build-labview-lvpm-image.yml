@@ -157,6 +157,8 @@ jobs:
           image_ref="$IMAGE:$TAG@$digest"
           docker pull "$image_ref"
           docker image inspect "$image_ref" > ci-out/lvpm-image.json
+          docker run --rm --network none --entrypoint /usr/bin/dpkg-query "$image_ref" \
+            -W '-f=${db:Status-Status}\t${Package}\t${Version}\n' > ci-out/lvpm-dpkg-status.tsv
           container=$(docker create --entrypoint /bin/true "$image_ref")
           trap 'docker rm "$container" >/dev/null' EXIT
           docker cp "$container:/opt/lvci/lvpm/inventory.json" ci-out/lvpm-inventory.json
@@ -183,7 +185,10 @@ jobs:
           worker.verify_packages(inventory, plan)
           tag = os.environ['TAG']
           manifest_path = f'workers/linux-lvpm/{tag}/manifest.json'
+          native = worker.native_packages(pathlib.Path('ci-out/lvpm-dpkg-status.tsv').read_text())
           manifest = {**inventory, 'platform': 'linux', 'repository': os.environ['GITHUB_REPOSITORY'],
+                      'dpkg_packages': native,
+                      'dpkg_inventory': {'source': 'dpkg-query installed status', 'status': 'observed'},
                       'tag': tag, 'manifest_path': manifest_path,
                       'image_ref': os.environ['IMAGE_REF'], 'image_digest': os.environ['IMAGE_DIGEST'],
                       'base_image': os.environ['BASE'], 'base_digest': os.environ['BASE_DIGEST'],
@@ -216,6 +221,7 @@ jobs:
           path: |
             ci-out/lvpm-plan/
             ci-out/lvpm-inventory.json
+            ci-out/lvpm-dpkg-status.tsv
             ci-out/lvpm-image.json
             ci-out/lvpm-build.json
             ci-out/lvpm-pages/

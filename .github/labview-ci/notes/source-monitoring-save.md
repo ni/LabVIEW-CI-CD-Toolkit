@@ -1,3 +1,5 @@
 - Save dependency selections in the toolkit source through a configuration-only pull request.
 - Honor explicit Linux selections for Antidoc and internal VIPCs.
 - Validate the source example’s expanded Linux package set with both VIPM and LVPM.
+- Record installed native packages in LVPM candidates so NI-package status can be verified.
+- Prevent the optional Wovalab donation prompt from blocking unattended Linux package installs.

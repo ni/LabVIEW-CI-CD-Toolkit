@@ -1391,7 +1391,10 @@ docker run --rm `
         Save opens a monitoring-only source PR through Reconfigure. The workflow verifies the reviewed default-branch
         SHA and rejects unrelated settings; only the dependency lists in <code>.github/labview-ci.yml</code> change.
         The client installer remains forbidden. Explicit per-file selections override capability defaults, including
-        selecting Antidoc or an internal VIPC for Linux. Existing LVPM candidate verification, digest pins and explicit activation are unchanged.</p>
+        selecting Antidoc or an internal VIPC for Linux. LVPM publication also queries installed native packages from the exact candidate image,
+        retaining the dpkg status output and excluding removed or incompletely configured packages. This supplies the
+        NI-package inventory needed by the Dependencies page. Older candidates require rebuilding to obtain it.
+        Existing LVPM candidate verification, digest pins and explicit activation are unchanged.</p>
       <p><code>native-dependency-validation.yml</code> runs only on its dedicated validation branch or manual dispatch.
         Windows x64 VIPM and Linux x64 VIPM/LVPM jobs build the candidate with the real example VIPC and Dragon files,
         the tooling baseline, and Antidoc. Linux also includes the explicitly selected experimental VIPC, matching the source example monitoring configuration (35 unique package requirements). They retain source
@@ -1795,6 +1798,14 @@ docker run --rm `
         compile, test, build, and rendering activities before depending on it. Conditional file groups the adapter
         cannot safely validate are rejected conservatively. Private package feeds, embedded Dragon VIPC references,
         and NIPM installation are not supported by this initial LVPM adapter.</div>
+      <p>Linux VIPM and LVPM builds pre-create <code>~/natinst/LabVIEW Data/wovalab-post-install-dialog</code>,
+        the opt-out used by the Wovalab donation dialog's “Do not show this window again” checkbox.
+        This prevents AsciiDoc's post-install action from waiting for a click in unattended builds.
+        All package hooks still run, and a hook failure still rejects the image. The path follows the standard
+        NI Linux image's default data directory; customized base images must preserve that setting or provide
+        the same marker in their configured data directory.
+        The mechanism is defined in Wovalab's
+        <a href="https://gitlab.com/wovalab/open-source/post-install-dialog/-/tree/11078cefaebfd36e6de2781c83009500e55d00b9">post-install dialog source</a>.</p>
       <p>These are <strong>global installs inside isolated containers</strong>, not developer virtual environments.
         Snapshots retain their existing <code>TOIMAGES_IMAGE</code> or repository Linux-latest selection when
         <code>linuxUse</code> is absent. After opting in, explicit snapshot action overrides precede
@@ -1806,7 +1817,8 @@ docker run --rm `
         a fresh candidate is built, verified, and explicitly activated. A failed candidate leaves the previous image
         available but does not make stale requirements current. The selected environment drives Linux inventory;
         an unused candidate does not create missing-dependency warnings for the active pipeline. LVPM inventories
-        VIP packages, not native NI packages: unmeasured native package coverage is unknown, not evidence of absence.</p>
+        VIP packages. The candidate workflow separately queries installed native NI packages with
+        <code>dpkg-query</code> from the exact published image digest; unmeasured native package coverage remains unknown.</p>
       <p>The dashboard separately reports <strong>local freshness</strong> for the exact inspected revision and
         digest-pinned selection. It uses trusted action-distributed helper code, treating the client checkout only as
         input data. Optional pinned Python prerequisites are installed in an isolated temporary environment only when

@@ -157,6 +157,8 @@ PY
     docker image inspect "$image" > "$out/image-inspect.json"
     [[ "$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}}')" == linux/amd64 ]]
     docker run --rm --network none --entrypoint /usr/bin/dpkg-query "$image" -W '-f=${Package} ${Version}\n' > "$out/dpkg-list.txt"
+    docker run --rm --network none --entrypoint /usr/bin/dpkg-query "$image" \
+        -W '-f=${db:Status-Status}\t${Package}\t${Version}\n' > "$out/dpkg-status.tsv"
     container=$(docker create --network none --entrypoint /bin/sh "$image" -c true)
     if [[ "$mode" == vipm ]]; then
         docker cp "$container:/opt/lvci/vipm/observed-inventory.json" "$out/observed-inventory.json"

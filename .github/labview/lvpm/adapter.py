@@ -485,6 +485,15 @@ def supported_architecture():
     return "amd64"
 
 
+def prepare_unattended_hooks():
+    # Same opt-out as Wovalab's "Do not show this window again" checkbox.
+    # The standard NI Linux image uses this default LabVIEW data directory.
+    data_directory = Path.home() / "natinst/LabVIEW Data"
+    data_directory.mkdir(parents=True, exist_ok=True)
+    (data_directory / "wovalab-post-install-dialog").touch(exist_ok=True)
+    print(f"Disabled the optional Wovalab post-install donation prompt: {data_directory}", file=sys.stderr)
+
+
 def install(plan_path, output):
     architecture = supported_architecture()
     plan = json.loads(plan_path.read_text())
@@ -521,6 +530,7 @@ def install(plan_path, output):
     expected = {package["name"]: package["version"] for package in records}
     if {package["name"]: package["version"] for package in resolved_packages(verified)} != expected:
         raise ValueError("The local install plan does not match the complete verified package closure")
+    prepare_unattended_hooks()
     run_lvpm([*flags, "install", "--manifest", str(frozen), "--no-deps", "--hooks", "--relink"], environment)
     installed_plan = {**plan, "labview_target": target[0]}
     inventory = verify_inventory(installed_plan, records, Path(f'/var/lib/lvpm/LabVIEW-{plan["labview_version"]}-64bit/installed'))
