@@ -1,5 +1,7 @@
 name: Diagnose AsciiDoc Linux Hook
 on:
+  push:
+    branches: [codex/diagnose-asciidoc-postinstall]
   workflow_dispatch:
 permissions:
   contents: read
