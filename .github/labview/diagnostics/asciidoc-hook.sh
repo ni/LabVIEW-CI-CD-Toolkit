@@ -9,6 +9,18 @@ asciidoctor --version
 asciidoctor-pdf --version
 gem which asciidoctor-kroki
 gem which asciimath
+cat > /usr/local/bin/cmd <<'PYPROBE'
+#!/usr/bin/python3
+import json, os, pathlib, sys
+with open('/evidence/cmd-invocation.jsonl', 'a') as out:
+    out.write(json.dumps({'args': sys.argv, 'cwd': os.getcwd()}) + '\n')
+    for arg in sys.argv[1:]:
+        path = pathlib.Path(arg.strip('"'))
+        if path.is_file():
+            out.write(json.dumps({'path': str(path), 'content': path.read_text(errors='replace')[:10000]}) + '\n')
+sys.exit(127)
+PYPROBE
+chmod +x /usr/local/bin/cmd
 unset LV_RTE_HEADLESS
 export DISPLAY=:99
 Xvfb "$DISPLAY" -screen 0 1440x1000x24 -ac +extension GLX +render -noreset >/evidence/xvfb.log 2>&1 &
@@ -30,14 +42,6 @@ for i in $(seq 1 100); do
   date -u >> /evidence/windows.txt
   xwininfo -root -tree >> /evidence/windows.txt 2>&1 || true
   ps -eo pid,ppid,stat,args > /evidence/processes.txt
-  if (( i == 6 )); then
-    tools='/usr/local/natinst/LabVIEW-2026-64/vi.lib/Wovalab/AsciiDoc for LabVIEW/Toolchain'
-    for command in 'asciidoctor --version' 'asciidoctor-pdf --version' 'gem which asciidoctor-kroki' 'gem which asciimath'; do
-      printf '\nCommand: %s\n' "$command" >> /evidence/labview-tool-check.txt
-      timeout 30s /app/lvctl run "$tools/Send Ruby Command.vi" -s "Command=$command" -g Output -g 'error out' --timeout 20s >> /evidence/labview-tool-check.txt 2>&1 || true
-    done
-    timeout 30s /app/lvctl run "$tools/Check Asciidoctor Toolchain Installation.vi" -g 'Installation Ok?' -g 'Installation Details' -g 'error out' --timeout 20s >> /evidence/labview-tool-check.txt 2>&1 || true
-  fi
   if (( i % 3 == 0 )); then
     import -window root "/evidence/screen-$i.png" 2>/evidence/screenshot-error.txt || true
   fi
