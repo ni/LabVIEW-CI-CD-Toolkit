@@ -168,6 +168,7 @@ jobs:
           # source-monitoring-only-v1
           # This config-only path never invokes the client installer/configurator.
           source_repository = (pathlib.Path('.github/workflows/release.yml').is_file()
+                               and pathlib.Path('.github/labview/release-catalog-pr.py').is_file()
                                and pathlib.Path('.github/labview-ci/catalog.json').is_file())
           monitoring_only = os.environ.get('IN_MONITORING_ONLY', '').lower() == 'true'
           if source_repository and not monitoring_only:

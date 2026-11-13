@@ -284,6 +284,11 @@ class ReconfigurePreservationTests(unittest.TestCase):
         original['config']['container']['vipc'] = entries
         self.assert_preserved(actual, original)
 
+    def test_client_with_its_own_release_workflow_remains_reconfigurable(self):
+        result, text = self.apply_settings(client_release=True, IN_RUNNERS='3')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(yaml.safe_load(text)['config']['concurrency']['maxParallel'], 3)
+
     def test_source_monitoring_pr_metadata_works_for_forks_without_releases(self):
         step = next(step for step in WORKFLOW['jobs']['reconfigure']['steps'] if step['name'] == 'Open pull request')
         script = step['run'].split("python3 - <<'PY'\n", 1)[1].split('\nPY', 1)[0]
@@ -308,16 +313,20 @@ class ReconfigurePreservationTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(text, MANIFEST)
 
-    def apply_settings(self, initial=MANIFEST, source=False, **inputs):
+    def apply_settings(self, initial=MANIFEST, source=False, client_release=False, **inputs):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / '.github/labview-ci.yml'
             config.parent.mkdir()
             config.write_text(initial)
-            if source:
+            if source or client_release:
                 for name in ('.github/workflows/release.yml', '.github/labview-ci/catalog.json'):
                     path = Path(directory) / name
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text('source-only sentinel')
+            if source:
+                helper = Path(directory) / '.github/labview/release-catalog-pr.py'
+                helper.parent.mkdir(parents=True, exist_ok=True)
+                helper.write_text('source-only release helper')
                 for arguments in (['init','-q'], ['add','.'], ['-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','fixture']):
                     subprocess.run(['git', *arguments], cwd=directory, check=True, capture_output=True)
                 if inputs.get('IN_EXPECTED_SHA') == 'HEAD':
