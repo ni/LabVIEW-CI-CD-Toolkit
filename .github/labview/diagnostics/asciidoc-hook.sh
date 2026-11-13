@@ -11,7 +11,7 @@ gem which asciidoctor-kroki
 gem which asciimath
 cat > /usr/local/bin/cmd <<'PYPROBE'
 #!/usr/bin/python3
-import json, os, pathlib, sys
+import json, os, pathlib, subprocess, sys
 with open('/evidence/cmd-invocation.jsonl', 'a') as out:
     out.write(json.dumps({'args': sys.argv, 'cwd': os.getcwd()}) + '\n')
 args = sys.argv[1:]
@@ -22,7 +22,12 @@ if args[0] not in ('asciidoctor', 'asciidoctor-pdf') and args not in (
     sys.exit('Unsupported AsciiDoc command: ' + repr(args))
 if args == ['gem', 'outdated']:
     args += ['--local', '--clear-sources']
-os.execvp(args[0], args)
+result = subprocess.run(args, capture_output=True, text=True)
+with open('/evidence/cmd-results.jsonl', 'a') as out:
+    out.write(json.dumps({'args': args, 'exit': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr}) + '\n')
+sys.stdout.write(result.stdout)
+sys.stderr.write(result.stderr)
+sys.exit(result.returncode)
 PYPROBE
 chmod +x /usr/local/bin/cmd
 unset LV_RTE_HEADLESS
