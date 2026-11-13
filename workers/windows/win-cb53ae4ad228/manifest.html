@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CI Worker win-cb53ae4ad228 — windows</title>
+<script>window.LVCI={"context": "worker-manifest", "pagesUrl": "https://ni.github.io/LabVIEW-CI-CD-Toolkit"};</script>
+<script src="../../../lvci-header.js" defer></script>
+<style>
+  :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--fg:#e6edf3;--fg-muted:#8b949e;--row-border:#21262d;--link:#58a6ff;--accent:#2ea043}
+  @media(prefers-color-scheme:light){:root{--bg:#fff;--surface:#f6f8fa;--border:#d0d7de;--fg:#1f2328;--fg-muted:#57606a;--row-border:#eaeef2;--link:#0969da;--accent:#1a7f37}}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--fg);line-height:1.5}
+  .wrap{max-width:980px;margin:0 auto;padding:24px}
+  h1{font-size:1.4em;margin:0 0 4px}
+  h2{font-size:1.05em;margin:28px 0 8px;border-bottom:1px solid var(--border);padding-bottom:6px}
+  .sub{color:var(--fg-muted);font-size:.85em;margin-bottom:18px}
+  .ver{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--accent);color:#fff;padding:2px 8px;border-radius:5px;font-size:.85em}
+  .nav{margin:14px 0;font-size:.9em} .nav a{margin-right:16px;color:var(--link);text-decoration:none} .nav a:hover{text-decoration:underline}
+  table{border-collapse:collapse;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:4px}
+  th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--fg-muted);font-size:.78em}
+  td{padding:7px 10px;border-bottom:1px solid var(--row-border);font-size:.86em;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.k{color:var(--fg-muted);white-space:nowrap;width:1%}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  pre{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;overflow:auto;font-size:.8em;max-height:460px}
+  .pill{display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1px 9px;margin:2px 3px 2px 0;font-size:.8em;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .muted{color:var(--fg-muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CI Worker Manifest</h1>
+  <div class="sub">Version <span class="ver">win-cb53ae4ad228</span> &nbsp;|&nbsp; windows &nbsp;|&nbsp; LabVIEW 2026</div>
+  <div class="nav"><a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/">&larr; CI Dashboard</a><a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/workers/windows/latest.json">latest.json</a><a href="manifest.json">manifest.json</a></div>
+
+  <h2>Provenance</h2>
+  <table>
+    <tr><td class="k">Platform</td><td>windows</td></tr>
+    <tr><td class="k">LabVIEW</td><td>2026</td></tr>
+    <tr><td class="k">Image</td><td><code>ghcr.io/ni/labview-ci-cd-toolkit-labview:win-cb53ae4ad228</code></td></tr>
+    <tr><td class="k">Base image</td><td><code>ghcr.io/elijah286/labview-ci-with-containers-labview-base:2026</code></td></tr>
+    <tr><td class="k">Base digest</td><td><code>sha256:0d9a5f85913654a8f788b24444feea04965aefe4f703ff0c1ca9601316633735</code></td></tr>
+    <tr><td class="k">LCWC seed image</td><td><code>ghcr.io/elijah286/labview-ci-with-containers-labview-base:2026</code></td></tr>
+    <tr><td class="k">LCWC seed digest</td><td><code>sha256:0d9a5f85913654a8f788b24444feea04965aefe4f703ff0c1ca9601316633735</code></td></tr>
+    <tr><td class="k">Worker layer</td><td>repo-vipc-layer</td></tr>
+    <tr><td class="k">Built</td><td>2026-11-13T00:39:31Z</td></tr>
+    <tr><td class="k">Tooling commit</td><td><code>a7eca2b324bd5578ea3fea216768f6e0dc872949</code></td></tr>
+    <tr><td class="k">Dependency commit</td><td><code>a7eca2b324bd5578ea3fea216768f6e0dc872949</code></td></tr>
+    <tr><td class="k">Build run</td><td><a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit/actions/runs/43329128104" style="color:var(--link)">https://github.com/ni/LabVIEW-CI-CD-Toolkit/actions/runs/43329128104</a></td></tr>
+  </table>
+
+    <h2>Declared VI Package Configurations (.vipc)</h2>
+  <p><code>antidoc.vipc</code></p><div><span class="pill">graphbuilder-2.3.0.7</span><span class="pill">jki_lib_state_machine-2024.0.3.23</span><span class="pill">jki_rsc_toolkits_palette-1.1-1</span><span class="pill">wiresmith_technology_lib_g_cli-3.0.1.98</span><span class="pill">wovalab_lib_antidoc-3.3.1.879</span><span class="pill">wovalab_lib_antidoc_add_on_labview_project_documentation-3.2.0.358</span><span class="pill">wovalab_lib_antidoc_add_on_labview_toolkit_documentation-3.0.0.77</span><span class="pill">wovalab_lib_antidoc_cli-3.4.0.126</span><span class="pill">wovalab_lib_asciidoc_for_labview-1.12.1.492</span></div>
+<p><code>ci-tooling.vipc</code></p><div><span class="pill">astemes_lib_lunit-2.0.13.6</span><span class="pill">astemes_lib_lunit_cli-1.7.1.32</span><span class="pill">astemes_lib_lunit_coverage_analysis_add_on-1.0.0.2</span><span class="pill">astemes_lib_lunit_global_fixture_add_on-1.0.5.4</span><span class="pill">astemes_lib_lunit_parameterized_add_on-1.1.10.8</span><span class="pill">astemes_lib_lunit_test_inheritance_add_on-1.0.5.4</span><span class="pill">dataflow_g_lib_g_image-0.5.0.1</span><span class="pill">felipefoz_lib_lv_rainbow_terminal-1.1.1.5</span><span class="pill">jki_lib_caraya-1.4.4.148</span><span class="pill">jki_lib_state_machine-2024.0.3.23</span><span class="pill">jki_rsc_toolkits_palette-1.1-1</span><span class="pill">labview_open_source_lib_epoch_datetime-1.3.0.8</span><span class="pill">labview_open_source_project_lib_labview_open_source_palette-1.0.2.7</span><span class="pill">labview_open_source_project_lib_openuri-1.4.0.13</span><span class="pill">lvos_lib_caraya_cli_extension-2.0.0.7</span><span class="pill">ni_lib_junit_results_api-1.0.1.6</span><span class="pill">ni_lib_simple_xml-1.0.0.4</span><span class="pill">ni_lib_utf_junit_report-1.0.1.43</span><span class="pill">oglib_array-6.0.1.20</span><span class="pill">oglib_error-6.0.0.26</span><span class="pill">oglib_file-6.0.2.28</span><span class="pill">oglib_lvdata-6.0.0.45</span><span class="pill">oglib_string-6.0.2.35</span><span class="pill">pnr_lib_caraya_junit_for_azure_pipelines-1.2.0.11</span><span class="pill">pnr_lib_junit_xml-1.0.0.4</span><span class="pill">sas_workshops_lib_lunit_for_g_cli-1.2.1.85</span><span class="pill">wiresmith_technology_lib_g_cli-3.0.1.98</span></div>
+<p><code>Dependencies.vipc</code></p><div><span class="pill">dataflow_g_lib_g_image-0.5.0.1</span><span class="pill">ni_lib_junit_results_api-1.0.1.6</span><span class="pill">ni_lib_simple_xml-1.0.0.4</span><span class="pill">ni_lib_utf_junit_report-1.0.1.43</span><span class="pill">oglib_appcontrol-4.1.0.7</span><span class="pill">oglib_array-6.0.1.20</span><span class="pill">oglib_error-6.0.0.26</span><span class="pill">oglib_file-6.0.2.28</span><span class="pill">oglib_lvdata-6.0.0.45</span><span class="pill">oglib_string-6.0.2.35</span></div>
+
+    <h2>Installed packages (VIPM)</h2>
+    <p>Inventory: <strong>observed</strong> &middot; LabVIEW 2026 (64-bit)</p><table><tr><th>Package</th><th>Version</th></tr><tr><td><code>astemes_lib_lunit</code></td><td><code>2.0.13.6</code></td></tr><tr><td><code>astemes_lib_lunit_cli</code></td><td><code>1.7.1.32</code></td></tr><tr><td><code>astemes_lib_lunit_coverage_analysis_add_on</code></td><td><code>1.0.0.2</code></td></tr><tr><td><code>astemes_lib_lunit_global_fixture_add_on</code></td><td><code>1.0.5.4</code></td></tr><tr><td><code>astemes_lib_lunit_parameterized_add_on</code></td><td><code>1.1.10.8</code></td></tr><tr><td><code>astemes_lib_lunit_test_inheritance_add_on</code></td><td><code>1.0.5.4</code></td></tr><tr><td><code>dataflow_g_lib_g_image</code></td><td><code>0.5.0.1</code></td></tr><tr><td><code>felipefoz_lib_lv_rainbow_terminal</code></td><td><code>1.1.1.5</code></td></tr><tr><td><code>graphbuilder</code></td><td><code>2.3.0.7</code></td></tr><tr><td><code>jki_lib_caraya</code></td><td><code>1.4.4.148</code></td></tr><tr><td><code>jki_lib_state_machine</code></td><td><code>2024.0.3.23</code></td></tr><tr><td><code>jki_rsc_toolkits_palette</code></td><td><code>1.1-1</code></td></tr><tr><td><code>labview_open_source_lib_epoch_datetime</code></td><td><code>1.3.0.8</code></td></tr><tr><td><code>labview_open_source_project_lib_labview_open_source_palette</code></td><td><code>1.0.2.7</code></td></tr><tr><td><code>labview_open_source_project_lib_openuri</code></td><td><code>1.4.0.13</code></td></tr><tr><td><code>lvos_lib_caraya_cli_extension</code></td><td><code>2.0.0.7</code></td></tr><tr><td><code>ni_lib_junit_results_api</code></td><td><code>1.0.1.6</code></td></tr><tr><td><code>ni_lib_simple_xml</code></td><td><code>1.0.0.4</code></td></tr><tr><td><code>ni_lib_utf_junit_report</code></td><td><code>1.0.1.43</code></td></tr><tr><td><code>oglib_appcontrol</code></td><td><code>4.1.0.7</code></td></tr><tr><td><code>oglib_array</code></td><td><code>6.0.1.20</code></td></tr><tr><td><code>oglib_boolean</code></td><td><code>6.0.0.9</code></td></tr><tr><td><code>oglib_error</code></td><td><code>6.0.0.26</code></td></tr><tr><td><code>oglib_file</code></td><td><code>6.0.2.28</code></td></tr><tr><td><code>oglib_lvdata</code></td><td><code>6.0.0.45</code></td></tr><tr><td><code>oglib_string</code></td><td><code>6.0.2.35</code></td></tr><tr><td><code>pnr_lib_caraya_junit_for_azure_pipelines</code></td><td><code>1.2.0.11</code></td></tr><tr><td><code>pnr_lib_junit_xml</code></td><td><code>1.0.0.4</code></td></tr><tr><td><code>sas_workshops_lib_lunit_for_g_cli</code></td><td><code>1.2.1.85</code></td></tr><tr><td><code>wiresmith_technology_lib_g_cli</code></td><td><code>3.0.1.98</code></td></tr><tr><td><code>wovalab_lib_antidoc</code></td><td><code>3.3.1.879</code></td></tr><tr><td><code>wovalab_lib_antidoc_add_on_labview_project_documentation</code></td><td><code>3.2.0.358</code></td></tr><tr><td><code>wovalab_lib_antidoc_add_on_labview_toolkit_documentation</code></td><td><code>3.0.0.77</code></td></tr><tr><td><code>wovalab_lib_antidoc_cli</code></td><td><code>3.4.0.126</code></td></tr><tr><td><code>wovalab_lib_asciidoc_for_labview</code></td><td><code>1.12.1.492</code></td></tr></table><details><summary class="muted">Raw <code>vipm list --installed</code> output</summary><pre>astemes_lib_lunit 2.0.13.6
+astemes_lib_lunit_cli 1.7.1.32
+astemes_lib_lunit_coverage_analysis_add_on 1.0.0.2
+astemes_lib_lunit_global_fixture_add_on 1.0.5.4
+astemes_lib_lunit_parameterized_add_on 1.1.10.8
+astemes_lib_lunit_test_inheritance_add_on 1.0.5.4
+dataflow_g_lib_g_image 0.5.0.1
+felipefoz_lib_lv_rainbow_terminal 1.1.1.5
+graphbuilder 2.3.0.7
+jki_lib_caraya 1.4.4.148
+jki_lib_state_machine 2024.0.3.23
+jki_rsc_toolkits_palette 1.1-1
+labview_open_source_lib_epoch_datetime 1.3.0.8
+labview_open_source_project_lib_labview_open_source_palette 1.0.2.7
+labview_open_source_project_lib_openuri 1.4.0.13
+lvos_lib_caraya_cli_extension 2.0.0.7
+ni_lib_junit_results_api 1.0.1.6
+ni_lib_simple_xml 1.0.0.4
+ni_lib_utf_junit_report 1.0.1.43
+oglib_appcontrol 4.1.0.7
+oglib_array 6.0.1.20
+oglib_boolean 6.0.0.9
+oglib_error 6.0.0.26
+oglib_file 6.0.2.28
+oglib_lvdata 6.0.0.45
+oglib_string 6.0.2.35
+pnr_lib_caraya_junit_for_azure_pipelines 1.2.0.11
+pnr_lib_junit_xml 1.0.0.4
+sas_workshops_lib_lunit_for_g_cli 1.2.1.85
+wiresmith_technology_lib_g_cli 3.0.1.98
+wovalab_lib_antidoc 3.3.1.879
+wovalab_lib_antidoc_add_on_labview_project_documentation 3.2.0.358
+wovalab_lib_antidoc_add_on_labview_toolkit_documentation 3.0.0.77
+wovalab_lib_antidoc_cli 3.4.0.126
+wovalab_lib_asciidoc_for_labview 1.12.1.492
+</pre></details>
+
+  <h2>Installed packages (nipkg)</h2>
+  <table><tr><th>Package</th><th>Version</th></tr><tr><td><code>ni-activex-container</code></td><td><code>17.1.2.49154-0+f2</code></td></tr><tr><td><code>ni-assistant-framework</code></td><td><code>26.3.0.49793-0+f641</code></td></tr><tr><td><code>ni-assistant-framework-custom-ui-tool</code></td><td><code>26.3.0.49793-0+f641</code></td></tr><tr><td><code>ni-assistant-framework-labview-2023-support</code></td><td><code>26.3.0.49793-0+f641</code></td></tr><tr><td><code>ni-assistant-framework-labview-2024-support</code></td><td><code>26.3.0.49793-0+f641</code></td></tr><tr><td><code>ni-assistant-framework-labview-2025-support</code></td><td><code>26.3.0.49793-0+f641</code></td></tr><tr><td><code>ni-assistant-framework-labview-2026-codegen-support</code></td><td><code>26.3.0.49791-0+f639</code></td></tr><tr><td><code>ni-assistant-framework-labview-2026-support</code></td><td><code>26.3.0.49793-0+f641</code></td></tr><tr><td><code>ni-assistant-framework-ui-assemblies</code></td><td><code>26.3.0.49793-0+f641</code></td></tr><tr><td><code>ni-auth</code></td><td><code>26.5.0.49329-0+f177</code></td></tr><tr><td><code>ni-ceip</code></td><td><code>26.5.0.49222-0+f70</code></td></tr><tr><td><code>ni-ceip-common</code></td><td><code>26.5.0.49222-0+f70</code></td></tr><tr><td><code>ni-ceip-x86</code></td><td><code>26.5.0.49222-0+f70</code></td></tr><tr><td><code>ni-codesignapi</code></td><td><code>26.5.0.49246-0+f94</code></td></tr><tr><td><code>ni-curl</code></td><td><code>26.5.0.49176-0+f24</code></td></tr><tr><td><code>ni-cvi-2026-reflector</code></td><td><code>26.3.0.49416-0+f264</code></td></tr><tr><td><code>ni-cvi-activex</code></td><td><code>26.3.0.49415-0+f263</code></td></tr><tr><td><code>ni-cvi-analysis</code></td><td><code>26.3.0.49419-0+f267</code></td></tr><tr><td><code>ni-cvi-codegen</code></td><td><code>20.0.0.49154-0+f2</code></td></tr><tr><td><code>ni-cvi-datasocket</code></td><td><code>26.3.0.49425-0+f273</code></td></tr><tr><td><code>ni-cvi-dotnet</code></td><td><code>26.3.0.49416-0+f264</code></td></tr><tr><td><code>ni-cvi-instrsup</code></td><td><code>26.3.0.49425-0+f273</code></td></tr><tr><td><code>ni-cvi-internet</code></td><td><code>26.3.0.49415-0+f263</code></td></tr><tr><td><code>ni-cvi-labview-dll-builder-15.1.0</code></td><td><code>15.1.1.49154-0+f2</code></td></tr><tr><td><code>ni-cvi-network-variable</code></td><td><code>26.3.0.49425-0+f273</code></td></tr><tr><td><code>ni-cvi-networkstreams</code></td><td><code>26.3.0.49420-0+f268</code></td></tr><tr><td><code>ni-cvi-opengl</code></td><td><code>26.3.0.49425-0+f273</code></td></tr><tr><td><code>ni-cvi-openmp</code></td><td><code>26.3.0.49415-0+f263</code></td></tr><tr><td><code>ni-cvi-rte</code></td><td><code>26.3.0.49425-0+f273</code></td></tr><tr><td><code>ni-cvi-runtime-core</code></td><td><code>26.3.0.49425-0+f273</code></td></tr><tr><td><code>ni-cvi-runtime-engine</code></td><td><code>26.3.0.49425-0+f273</code></td></tr><tr><td><code>ni-cvi-runtime-realtime</code></td><td><code>26.3.0.49425-0+f273</code></td></tr><tr><td><code>ni-cvi-tdms</code></td><td><code>26.3.0.49421-0+f269</code></td></tr><tr><td><code>ni-cvi-usi</code></td><td><code>26.3.0.49418-0+f266</code></td></tr><tr><td><code>ni-daqmx-labview-shared-docs</code></td><td><code>26.5.0.49603-0+f451</code></td></tr><tr><td><code>ni-datafinder-client-api</code></td><td><code>26.5.0.49255-0+f103</code></td></tr><tr><td><code>ni-datafinder-desktop-quit-dc</code></td><td><code>26.5.0.49251-0+f99</code></td></tr><tr><td><code>ni-dataplugins-aop5</code></td><td><code>26.3.0.49217-0+f65</code></td></tr><tr><td><code>ni-dataplugins-python-host</code></td><td><code>26.5.0.49251-0+f99</code></td></tr><tr><td><code>ni-datasocket</code></td><td><code>26.3.0.49347-0+f195</code></td></tr><tr><td><code>ni-deployment-framework</code></td><td><code>26.3.0.49791-0+f639</code></td></tr><tr><td><code>ni-deployment-framework-x86</code></td><td><code>26.3.0.49791-0+f639</code></td></tr><tr><td><code>ni-dfc-labview-support</code></td><td><code>26.3.0.49232-0+f80</code></td></tr><tr><td><code>ni-dotnetcore-interface</code></td><td><code>26.3.0.49790-0+f638</code></td></tr><tr><td><code>ni-dotnetcore-interface-x86</code></td><td><code>26.3.0.49790-0+f638</code></td></tr><tr><td><code>ni-error-report-x86</code></td><td><code>25.0.0.49231-0+f79</code></td></tr><tr><td><code>ni-error-reporting-common</code></td><td><code>26.5.0.49694-0+f542</code></td></tr><tr><td><code>ni-error-reporting-interface</code></td><td><code>25.0.0.49226-0+f74</code></td></tr><tr><td><code>ni-error-reporting-native</code></td><td><code>26.5.0.49216-0+f64</code></td></tr><tr><td><code>ni-error-reporting-native-x86</code></td><td><code>26.5.0.49216-0+f64</code></td></tr><tr><td><code>ni-euladepot</code></td><td><code>26.5.0.49245-0+f93</code></td></tr><tr><td><code>ni-example-finder</code></td><td><code>26.3.0.49794-0+f642</code></td></tr><tr><td><code>ni-expat1-libs</code></td><td><code>26.5.0.49176-0+f24</code></td></tr><tr><td><code>ni-help-assistant</code></td><td><code>2.2.0.49154-0+f2</code></td></tr><tr><td><code>ni-help-launcher</code></td><td><code>26.5.0.49203-0+f51</code></td></tr><tr><td><code>ni-json-map</code></td><td><code>26.3.0.49369-0+f217</code></td></tr><tr><td><code>ni-labview-2026-core-en</code></td><td><code>26.3.0.49795-0+f643</code></td></tr><tr><td><code>ni-labview-2026-coreother</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-labview-2026-deployable-license</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-labview-2026-example</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-labview-2026-executable</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-labview-2026-help-en</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-labview-2026-license</code></td><td><code>26.3.0.49791-0+f639</code></td></tr><tr><td><code>ni-labview-2026-manuals</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-labview-2026-realtime-nbfifo</code></td><td><code>26.1.0.49354-0+f202</code></td></tr><tr><td><code>ni-labview-2026-realtime-nbfifo-x86</code></td><td><code>26.1.0.49354-0+f202</code></td></tr><tr><td><code>ni-labview-2026-runtime-engine</code></td><td><code>26.3.0.49794-0+f642</code></td></tr><tr><td><code>ni-labview-2026-runtime-engine-resource</code></td><td><code>26.3.0.49794-0+f642</code></td></tr><tr><td><code>ni-labview-2026-runtime-engine-resource-x64</code></td><td><code>26.3.0.49794-0+f642</code></td></tr><tr><td><code>ni-labview-2026-runtime-engine-x86</code></td><td><code>26.3.0.49794-0+f642</code></td></tr><tr><td><code>ni-labview-2026-scripting-codegen</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-labview-2026-simulation-x64</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-labview-2026-vilib</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-labview-broker</code></td><td><code>22.3.0.49154-0+f2</code></td></tr><tr><td><code>ni-labview-c-interface</code></td><td><code>1.0.4.49154-0+f2</code></td></tr><tr><td><code>ni-labview-command-line-interface-x86</code></td><td><code>26.3.0.49372-0+f220</code></td></tr><tr><td><code>ni-labview-datafinder-runtime</code></td><td><code>26.3.0.49232-0+f80</code></td></tr><tr><td><code>ni-labview-max-xml</code></td><td><code>19.0.0.49154-0+f2</code></td></tr><tr><td><code>ni-labview-system-state-publisher</code></td><td><code>26.3.0.49791-0+f639</code></td></tr><tr><td><code>ni-labview-unit-test-framework-toolkit-lic</code></td><td><code>26.3.0.49246-0+f94</code></td></tr><tr><td><code>ni-labview-vi-analyzer-toolkit-lic</code></td><td><code>26.3.0.49275-0+f123</code></td></tr><tr><td><code>ni-labview-vicompare</code></td><td><code>26.3.0.49794-0+f642</code></td></tr><tr><td><code>ni-labview-vimerge</code></td><td><code>26.3.0.49794-0+f642</code></td></tr><tr><td><code>ni-license-manager</code></td><td><code>26.5.0.49256-0+f104</code></td></tr><tr><td><code>ni-license-manager-compatibility-server</code></td><td><code>26.5.0.49698-0+f546</code></td></tr><tr><td><code>ni-lm-client-26.0</code></td><td><code>26.1.0.49905-0+f753</code></td></tr><tr><td><code>ni-lm-client-26.0-x86</code></td><td><code>26.1.0.49905-0+f753</code></td></tr><tr><td><code>ni-lm-client-26.5</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-lm-client-26.5-x86</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-lm-clr-compatibility-client</code></td><td><code>26.3.0.49789-0+f637</code></td></tr><tr><td><code>ni-lm-clr-compatibility-client-x86</code></td><td><code>26.3.0.49789-0+f637</code></td></tr><tr><td><code>ni-logos</code></td><td><code>26.5.0.49330-0+f178</code></td></tr><tr><td><code>ni-logos-labview-2026-support-en</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-logos-xt</code></td><td><code>26.5.0.49330-0+f178</code></td></tr><tr><td><code>ni-lv-web-server-labview-2026-runtime-engine-support</code></td><td><code>26.5.0.49335-0+f183</code></td></tr><tr><td><code>ni-lv-web-server-labview-2026-runtime-engine-x86-support</code></td><td><code>26.5.0.49335-0+f183</code></td></tr><tr><td><code>ni-lv-web-server-labview-2026-support</code></td><td><code>26.5.0.49335-0+f183</code></td></tr><tr><td><code>ni-lvdfc-offline-manual-en</code></td><td><code>26.3.0.49232-0+f80</code></td></tr><tr><td><code>ni-lvutf-offline-manual-en</code></td><td><code>26.3.0.49249-0+f97</code></td></tr><tr><td><code>ni-lvvia-offline-manual-en</code></td><td><code>26.3.0.49277-0+f125</code></td></tr><tr><td><code>ni-matlab-interface</code></td><td><code>26.3.0.49370-0+f218</code></td></tr><tr><td><code>ni-max</code></td><td><code>26.5.0.49268-0+f116</code></td></tr><tr><td><code>ni-max-remote-provider</code></td><td><code>26.5.0.49268-0+f116</code></td></tr><tr><td><code>ni-max-rempxi-provider</code></td><td><code>26.5.0.49267-0+f115</code></td></tr><tr><td><code>ni-max-software-provider</code></td><td><code>26.5.0.49267-0+f115</code></td></tr><tr><td><code>ni-mdfsupport</code></td><td><code>26.5.0.49246-0+f94</code></td></tr><tr><td><code>ni-mesa</code></td><td><code>17.1.1.49154-0+f2</code></td></tr><tr><td><code>ni-metauninstaller</code></td><td><code>26.5.0.49246-0+f94</code></td></tr><tr><td><code>ni-mkl-2020</code></td><td><code>20.0.0.49154-0+f2</code></td></tr><tr><td><code>ni-msaspdotnetcore-runtime-80</code></td><td><code>26.5.0.49173-0+f21</code></td></tr><tr><td><code>ni-msaspdotnetcore-runtime-80-x86</code></td><td><code>26.5.0.49173-0+f21</code></td></tr><tr><td><code>ni-msdotnet-desktop-runtime-80</code></td><td><code>26.5.0.49173-0+f21</code></td></tr><tr><td><code>ni-msdotnet-desktop-runtime-80-x86</code></td><td><code>26.5.0.49173-0+f21</code></td></tr><tr><td><code>ni-msdotnet-runtime-80</code></td><td><code>26.5.0.49173-0+f21</code></td></tr><tr><td><code>ni-msdotnet4x</code></td><td><code>26.5.0.49175-0+f23</code></td></tr><tr><td><code>ni-msiproperties</code></td><td><code>26.8.0.7-0+d7</code></td></tr><tr><td><code>ni-mstudio-cw3dgraph</code></td><td><code>8.7.5.49154-0+f2</code></td></tr><tr><td><code>ni-msvcrt-2015</code></td><td><code>26.5.0.49220-0+f68</code></td></tr><tr><td><code>ni-mswebview2</code></td><td><code>26.5.0.49173-0+f21</code></td></tr><tr><td><code>ni-mxs</code></td><td><code>26.0.0.49263-0+f111</code></td></tr><tr><td><code>ni-networkdiscoverysvc</code></td><td><code>26.5.0.49267-0+f115</code></td></tr><tr><td><code>ni-offline-help-viewer</code></td><td><code>26.5.0.49204-0+f52</code></td></tr><tr><td><code>ni-opc-support</code></td><td><code>26.5.0.49333-0+f181</code></td></tr><tr><td><code>ni-opcenum</code></td><td><code>5.6.3.49154-0+f2</code></td></tr><tr><td><code>ni-openssl3-libs</code></td><td><code>26.5.0.49224-0+f72</code></td></tr><tr><td><code>ni-openssl3-libs-x86</code></td><td><code>26.5.0.49224-0+f72</code></td></tr><tr><td><code>ni-package-builder-labview-2026-support</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-package-manager</code></td><td><code>26.8.0.14-0+d14</code></td></tr><tr><td><code>ni-package-manager-deployment-support</code></td><td><code>26.8.0.14-0+d14</code></td></tr><tr><td><code>ni-package-manager-released-feed</code></td><td><code>26.8.0.14-0+d14</code></td></tr><tr><td><code>ni-package-manager-upgrader</code></td><td><code>26.8.0.14-0+d14</code></td></tr><tr><td><code>ni-portable-configuration</code></td><td><code>26.5.0.49267-0+f115</code></td></tr><tr><td><code>ni-python-interface</code></td><td><code>26.3.0.49370-0+f218</code></td></tr><tr><td><code>ni-realtime-error-dialog-x64</code></td><td><code>26.1.0.49356-0+f204</code></td></tr><tr><td><code>ni-realtime-error-dialog-x86</code></td><td><code>26.1.0.49358-0+f206</code></td></tr><tr><td><code>ni-registration-wizard</code></td><td><code>25.3.0.49219-0+f67</code></td></tr><tr><td><code>ni-remote-configuration</code></td><td><code>26.5.0.49267-0+f115</code></td></tr><tr><td><code>ni-resetniconfig</code></td><td><code>26.0.0.49263-0+f111</code></td></tr><tr><td><code>ni-rpc</code></td><td><code>26.5.0.49394-0+f242</code></td></tr><tr><td><code>ni-search</code></td><td><code>26.3.0.49790-0+f638</code></td></tr><tr><td><code>ni-search-labview-2026-support</code></td><td><code>26.3.0.49790-0+f638</code></td></tr><tr><td><code>ni-securityupdate-kb67l8lcqw-killbits</code></td><td><code>2.1.0.49154-0+f2</code></td></tr><tr><td><code>ni-slcp</code></td><td><code>26.5.0.49220-0+f68</code></td></tr><tr><td><code>ni-slcp-common</code></td><td><code>26.5.0.49220-0+f68</code></td></tr><tr><td><code>ni-slcp-x86</code></td><td><code>26.5.0.49220-0+f68</code></td></tr><tr><td><code>ni-ssl-labview-2026-runtime-engine-support</code></td><td><code>26.3.0.49339-0+f187</code></td></tr><tr><td><code>ni-ssl-labview-2026-runtime-engine-x86-support</code></td><td><code>26.3.0.49339-0+f187</code></td></tr><tr><td><code>ni-ssl-labview-2026-support</code></td><td><code>26.3.0.49339-0+f187</code></td></tr><tr><td><code>ni-svcloc</code></td><td><code>26.5.0.49327-0+f175</code></td></tr><tr><td><code>ni-sysapi</code></td><td><code>26.5.0.49267-0+f115</code></td></tr><tr><td><code>ni-sysapi-webservice</code></td><td><code>26.3.0.49279-0+f127</code></td></tr><tr><td><code>ni-syscfg-dotnet-runtime</code></td><td><code>26.5.0.49267-0+f115</code></td></tr><tr><td><code>ni-syscfg-runtime</code></td><td><code>26.5.0.49267-0+f115</code></td></tr><tr><td><code>ni-sysdetails-webservice</code></td><td><code>26.3.0.49279-0+f127</code></td></tr><tr><td><code>ni-system-webserver</code></td><td><code>26.5.0.49335-0+f183</code></td></tr><tr><td><code>ni-system-webserver-appserver</code></td><td><code>26.5.0.49335-0+f183</code></td></tr><tr><td><code>ni-system-webserver-base</code></td><td><code>26.5.0.49335-0+f183</code></td></tr><tr><td><code>ni-systemlogging-utils</code></td><td><code>26.5.0.49329-0+f177</code></td></tr><tr><td><code>ni-targetdiscoverywizard</code></td><td><code>26.5.0.49268-0+f116</code></td></tr><tr><td><code>ni-tdms</code></td><td><code>26.5.0.49332-0+f180</code></td></tr><tr><td><code>ni-traceengine</code></td><td><code>26.5.0.49327-0+f175</code></td></tr><tr><td><code>ni-update-service</code></td><td><code>26.5.0.49246-0+f94</code></td></tr><tr><td><code>ni-usi-core</code></td><td><code>26.5.0.49251-0+f99</code></td></tr><tr><td><code>ni-utf-labview-support</code></td><td><code>26.3.0.49249-0+f97</code></td></tr><tr><td><code>ni-variable-engine</code></td><td><code>26.5.0.49333-0+f181</code></td></tr><tr><td><code>ni-variable-engine-labview-2026-support-en</code></td><td><code>26.3.0.49792-0+f640</code></td></tr><tr><td><code>ni-viawin-labview-support</code></td><td><code>26.3.0.49277-0+f125</code></td></tr><tr><td><code>ni-vipm-helper</code></td><td><code>26.3.0.49161-0+f9</code></td></tr><tr><td><code>ni-web-based-configuration</code></td><td><code>26.3.0.49276-0+f124</code></td></tr><tr><td><code>ni-web-pipeline-26.5</code></td><td><code>26.5.0.49225-0+f73</code></td></tr><tr><td><code>ni-web-services-labview-2026-support</code></td><td><code>26.5.0.49335-0+f183</code></td></tr><tr><td><code>ni-webserver</code></td><td><code>26.5.0.49248-0+f96</code></td></tr><tr><td><code>ni-wif-landingpage</code></td><td><code>26.3.0.49279-0+f127</code></td></tr><tr><td><code>ni-xerces-3.3</code></td><td><code>26.3.0.49218-0+f66</code></td></tr><tr><td><code>ni-zlib1-libs</code></td><td><code>26.5.0.49231-0+f79</code></td></tr><tr><td><code>system-windows-x64</code></td><td><code>26.8.0.14-0+d14</code></td></tr></table><details><summary class="muted">Raw <code>nipkg list-installed</code> output</summary><pre>ni-package-manager-upgrader	26.8.0.14-0+d14	windows_x64	Application used to upgrade the package manager.
+
+ni-package-manager-released-feed	26.8.0.14-0+d14	windows_x64	Provides NI Package Manager released packages.
+
+system-windows-x64	26.8.0.14-0+d14	windows_x64	Package that indicates the current system is running a 64-bit Windows operating system.
+
+ni-wif-landingpage	26.3.0.49279-0+f127	windows_x64	A web landing page that provides a read only overview of the system. Use NI Web Landing Page to view the system\x27s hostname, model, serial number, status, and network adapter information in a web browser.
+
+ni-web-based-configuration	26.3.0.49276-0+f124	windows_x64	Enables remote configuration of the system from a web browser. Use NI Web-Based Configuration and Monitoring to configure and monitor NI web servers from a web browser.
+
+ni-msiproperties	26.8.0.7-0+d7	windows_x64	Installs the files necessary for Package Manager to resolve NI properties (e.g. the NI Program Files installation directory) and evaluate MSI conditions.
+
+ni-package-manager-deployment-support	26.8.0.14-0+d14	windows_x64	Deployment support for NI Package Manager.
+
+ni-package-manager	26.8.0.14-0+d14	windows_x64	NI Package Manager facilitates the installation, removal, and management of NI software.
+
+ni-euladepot	26.5.0.49245-0+f93	windows_x64	Installs license and notice files.
+
+ni-securityupdate-kb67l8lcqw-killbits	2.1.0.49154-0+f2	windows_all	This is an infrastructure package for NI Software.
+
+ni-metauninstaller	26.5.0.49246-0+f94	windows_x64	This package provides support for uninstallation of NI products.
+
+ni-mdfsupport	26.5.0.49246-0+f94	windows_x64	This package installs the files necessary to support building deployments from NI\x27s ADEs.
+
+ni-error-reporting-interface	25.0.0.49226-0+f74	windows_x64	NI Error Reporting Interface provides the error reporting interface for Windows.
+
+ni-msdotnet-desktop-runtime-80-x86	26.5.0.49173-0+f21	windows_all	Required by some NI products. The .NET Desktop Runtime enables you to run Windows desktop applications. This package installs the .NET Runtime.
+
+ni-mswebview2	26.5.0.49173-0+f21	windows_x64	Microsoft WebView2 Runtime 148.0.3967
+
+ni-license-manager-compatibility-server	26.5.0.49698-0+f546	windows_x64	Server to allow .NET 6+ products to interface with NI License Manager.
+
+ni-msvcrt-2015	26.5.0.49220-0+f68	windows_x64	NI installer for Microsoft Visual C++ 2015-2022 Run-Time, version 14.44.35112
+
+ni-msdotnet-desktop-runtime-80	26.5.0.49173-0+f21	windows_x64	Required by some NI products. The .NET Desktop Runtime enables you to run Windows desktop applications. This package installs the .NET Runtime.
+
+ni-rpc	26.5.0.49394-0+f242	windows_x64	NI Remote Procedure Call library (infrastructure) Provides rpc services to NI software.
+
+ni-openssl3-libs-x86	26.5.0.49224-0+f72	windows_all	OpenSSL is a robust, commercial-grade, full-featured toolkit for general-purpose cryptography and secure communication. OpenSSL-NI is a build of OpenSSL maintained by NI across its software platform. This package is built from OpenSSL 3.5.7.
+
+ni-expat1-libs	26.5.0.49176-0+f24	windows_x64	Expat is a C99 library that implements a stream-oriented XML parser. Expat-NI is a build of Expat maintained by NI across its software platform. This package is built from Expat 2.8.1.
+
+ni-zlib1-libs	26.5.0.49231-0+f79	windows_x64	ZLib is a general purpose data compression library. ZLib-NI is a build of ZLib maintained by NI across its software platform. This package is built from ZLib 1.3.2.
+
+ni-svcloc	26.5.0.49327-0+f175	windows_x64	NI Service Locator 2026 Q5 The NI Service Locator facilitates communication between National Instruments support programs and services that use local, dynamic TCP ports to communicate with each other.
+
+ni-openssl3-libs	26.5.0.49224-0+f72	windows_x64	OpenSSL is a robust, commercial-grade, full-featured toolkit for general-purpose cryptography and secure communication. OpenSSL-NI is a build of OpenSSL maintained by NI across its software platform. This package is built from OpenSSL 3.5.7.
+
+ni-portable-configuration	26.5.0.49267-0+f115	windows_x64	Used by National Instruments components to archive and deploy configuration settings.
+
+ni-curl	26.5.0.49176-0+f24	windows_x64	NI Curl provides the build of the &quot;C URL&quot; library that is an open-source command line tool and library for transferring data with URL syntax.
+
+ni-sysapi	26.5.0.49267-0+f115	windows_x64	Provides an internal interface for enumerating and configuring devices.
+
+ni-remote-configuration	26.5.0.49267-0+f115	windows_x64	Provides remote configuration of NI Real-Time targets.
+
+ni-networkdiscoverysvc	26.5.0.49267-0+f115	windows_x64	Provides network device and service discovery for NI services and applications. NI Network Discovery Service discovers NI Zeroconf devices and services. If this service is stopped components that rely on discovering NI Zeroconf devices and services will no longer function. If this service is disabled any services that explicitly depend on it will fail to start.
+
+ni-syscfg-runtime	26.5.0.49267-0+f115	windows_x64	Run-time components required to deploy applications that use the NI System Configuration API.
+
+ni-syscfg-dotnet-runtime	26.5.0.49267-0+f115	windows_x64	Enables you to run applications that use the NI System Configuration .NET API.
+
+ni-ceip-common	26.5.0.49222-0+f70	windows_x64	Provides shared binaries for the NI Customer Experience Improvement Program.
+
+ni-ceip	26.5.0.49222-0+f70	windows_x64	NI Customer Experience Improvement Program gives NI customers the ability to contribute to the design and development of NI products.
+
+ni-offline-help-viewer	26.5.0.49204-0+f52	windows_x64	Application to view offline help for NI software
+
+ni-msdotnet4x	26.5.0.49175-0+f23	windows_x64	Installer for .NET Framework 4.8.0
+
+ni-assistant-framework-labview-2026-codegen-support	26.3.0.49791-0+f639	windows_x64	NI Assistant Framework LabVIEW Code Generator 2026 (64-bit) is used to install Engine Entry Points for LabVIEW 2026 Code Generator.
+
+ni-codesignapi	26.5.0.49246-0+f94	windows_x64	This package installs the NI CodeSignAPI DLL.
+
+ni-daqmx-labview-shared-docs	26.5.0.49603-0+f451	windows_x64	This is an infrastructure package for NI Software.
+
+ni-help-launcher	26.5.0.49203-0+f51	windows_x64	Infrastructure to launch help for NI software
+
+ni-json-map	26.3.0.49369-0+f217	windows_x64	NI JSON Map Files contains the information about NI Component locations for better error messaging with missing subVIs.
+
+ni-labview-2026-coreother	26.3.0.49792-0+f640	windows_x64	This is an infrastructure package for NI Software.
+
+ni-labview-2026-example	26.3.0.49792-0+f640	windows_x64	This is an infrastructure package for NI Software.
+
+ni-labview-2026-executable	26.3.0.49792-0+f640	windows_x64	This is an infrastructure package for NI Software.
+
+ni-labview-2026-help-en	26.3.0.49792-0+f640	windows_x64	NI LabVIEW (64-bit) Help is used to provide help information for LabVIEW (64-bit).
+
+ni-labview-2026-manuals	26.3.0.49792-0+f640	windows_x64	NI LabVIEW (64-bit) Manuals is used to provide manuals for LabVIEW (64-bit).
+
+ni-labview-2026-scripting-codegen	26.3.0.49792-0+f640	windows_x64	NI LabVIEW 2026 (64-bit) Scripting Code Generator installs the LabVIEW 2026 (64-bit) Scripting Code Generator Engine.
+
+ni-labview-2026-simulation-x64	26.3.0.49792-0+f640	windows_x64	Installs files in the LabVIEW (64-bit) addons simulation folder
+
+ni-labview-2026-vilib	26.3.0.49792-0+f640	windows_x64	This is an infrastructure package for NI Software.
+
+ni-labview-c-interface	1.0.4.49154-0+f2	windows_all	The LabVIEW C Interface to VI Server enables you to call VIs from C code. You can also call VI Server properties and methods on the Application and VI classes.
+
+ni-labview-max-xml	19.0.0.49154-0+f2	windows_all	NI LabVIEW MAX XML installs the XML file for defining visibility of LabVIEW in MAX.
+
+ni-mkl-2020	20.0.0.49154-0+f2	windows_all	Math Kernel Library (MKL) is an Intel software package that provides optimized linear algebra routines.
+
+ni-opc-support	26.5.0.49333-0+f181	windows_x64	NI OPC Support helps customers using OPC (OLE for process control) to add advanced analysis and control functionality to their system.
+
+ni-package-builder-labview-2026-support	26.3.0.49792-0+f640	windows_x64	Allows building packages from LabVIEW 2026 (64-bit)
+
+ni-python-interface	26.3.0.49370-0+f218	windows_x64	NI Python Interface is a common Python interface for all NI products.
+
+ni-ssl-labview-2026-support	26.3.0.49339-0+f187	windows_x64	Installs LabVIEW 2026 Q3 64-bit support files for SSL technologies.
+
+ni-systemlogging-utils	26.5.0.49329-0+f177	windows_x64	NI System Logging Utilities
+
+ni-web-pipeline-26.5	26.5.0.49225-0+f73	windows_x64	This is an infrastructure package for NI Software.
+
+ni-assistant-framework-labview-2023-support	26.3.0.49793-0+f641	windows_x64	NI Assistant Framework LabVIEW 2023 64-bit Support contains the LabVIEW project provider file for Assistant Framework.
+
+ni-assistant-framework-labview-2024-support	26.3.0.49793-0+f641	windows_x64	NI Assistant Framework LabVIEW 2024 64-bit Support contains the LabVIEW project provider file for Assistant Framework.
+
+ni-assistant-framework-labview-2025-support	26.3.0.49793-0+f641	windows_x64	NI Assistant Framework LabVIEW 2025 64-bit Support contains the LabVIEW project provider file for Assistant Framework.
+
+ni-assistant-framework-labview-2026-support	26.3.0.49793-0+f641	windows_x64	NI Assistant Framework LabVIEW 2026 64-bit Support contains the LabVIEW project provider file for Assistant Framework.
+
+ni-cvi-codegen	20.0.0.49154-0+f2	windows_all	The LabWindows/CVI Code Generator for the NI Assistant Framework.
+
+ni-labview-broker	22.3.0.49154-0+f2	windows_x64	NI LabVIEW Broker enables a C++ app to run VIs and interact with LV.
+
+ni-tdms	26.5.0.49332-0+f180	windows_x64	NI TDM Streaming provides functions to read and write waveforms and waveform properties to binary measurement files (.tdms).
+
+ni-mesa	17.1.1.49154-0+f2	windows_all	Mesa is an open-source implementation of the OpenGL specification that is a system for rendering interactive 3D graphics.
+
+ni-opcenum	5.6.3.49154-0+f2	windows_all	OPCEnum application runs locally on the serving computer and exposes available OPC servers to the remotely connecting clients.
+
+ni-lvdfc-offline-manual-en	26.3.0.49232-0+f80	windows_x64	This is an infrastructure package for NI Software.
+
+ni-error-reporting-common	26.5.0.49694-0+f542	windows_x64	NI Error Reporting enables you to send NI a crash or internal warning report.
+
+ni-activex-container	17.1.2.49154-0+f2	windows_all	NI ActiveX Container enables you to embed ActiveX objects on the front panel of a VI.
+
+ni-dotnetcore-interface-x86	26.3.0.49790-0+f638	windows_x64	NI LabVIEW DotNet Core Interface
+
+ni-labview-2026-realtime-nbfifo-x86	26.1.0.49354-0+f202	windows_x64	This is an infrastructure package for NI Software.
+
+ni-labview-2026-runtime-engine-resource	26.3.0.49794-0+f642	windows_x64	LabVIEW 32-bit Runtime Resource contains support for non-English languages to display in dialog boxes, menus, and error messages that are part of the LabVIEW Runtime.
+
+ni-lm-client-26.0-x86	26.1.0.49905-0+f753	windows_x64	Installs binaries for NILM Client
+
+ni-lm-client-26.5-x86	26.3.0.49792-0+f640	windows_x64	Installs binaries for NILM Client
+
+ni-lm-clr-compatibility-client-x86	26.3.0.49789-0+f637	windows_x64	Installs binaries for NILM CLR Compatibilty Client
+
+ni-matlab-interface	26.3.0.49370-0+f218	windows_x64	Interface that allows interoperability between NI Software and MATLAB.
+
+ni-mstudio-cw3dgraph	8.7.5.49154-0+f2	windows_all	The National Instruments Measurement Studio 3DGraph ActiveX control.
+
+ni-traceengine	26.5.0.49327-0+f175	windows_x64	NI Trace Engine
+
+ni-xerces-3.3	26.3.0.49218-0+f66	windows_all	NI Xerces Software provides the XML parsing and transforming functionality to user applications.
+
+ni-dotnetcore-interface	26.3.0.49790-0+f638	windows_x64	NI LabVIEW DotNet Core Interface
+
+ni-labview-2026-realtime-nbfifo	26.1.0.49354-0+f202	windows_x64	This is an infrastructure package for NI Software.
+
+ni-labview-2026-runtime-engine-resource-x64	26.3.0.49794-0+f642	windows_x64	LabVIEW 64-bit Runtime Resource contains support for non-English languages to display in dialog boxes, menus, and error messages that are part of the LabVIEW Runtime.
+
+ni-lm-client-26.0	26.1.0.49905-0+f753	windows_x64	Installs binaries for NILM Client
+
+ni-lm-client-26.5	26.3.0.49792-0+f640	windows_x64	Installs binaries for NILM Client
+
+ni-lm-clr-compatibility-client	26.3.0.49789-0+f637	windows_x64	Installs binaries for NILM CLR Compatibilty Client
+
+ni-dataplugins-aop5	26.3.0.49217-0+f65	windows_x64	The ASAM Standards DataPlugin for AOP5 supports reading, writing, importing, and exporting of ASAM operational data store (ODS) data objects.
+
+ni-logos-xt	26.5.0.49330-0+f178	windows_x64	NI Logos XT provides a thin layer on top of TCP/IP to simplify some common network tasks.
+
+ni-msdotnet-runtime-80	26.5.0.49173-0+f21	windows_x64	Required by some NI products. The .NET Runtime enables you to run Windows console applications. This package installs the .NET Runtime.
+
+ni-search	26.3.0.49790-0+f638	windows_x64	NI Search Shared Engine (64-bit) provides libraries and other files necessary to run search in NI applications.
+
+ni-slcp-common	26.5.0.49220-0+f68	windows_x64	Provides shared binaries for the NI Software License Compliance Program.
+
+ni-datafinder-desktop-quit-dc	26.5.0.49251-0+f99	windows_x64	Quit of DataFinder Desktop
+
+ni-dataplugins-python-host	26.5.0.49251-0+f99	windows_all	NI DataPlugins Python Host
+
+ni-ceip-x86	26.5.0.49222-0+f70	windows_x64	NI Customer Experience Improvement Program gives NI customers the ability to contribute to the design and development of NI products.
+
+ni-lv-web-server-labview-2026-support	26.5.0.49335-0+f183	windows_x64	NI LabVIEW 2026 Q5 Web Server 64-Bit.
+
+ni-assistant-framework-ui-assemblies	26.3.0.49793-0+f641	windows_x64	NI Assistant Framework UI Assemblies contains the UI assemblies used by Assistant Framework.
+
+ni-help-assistant	2.2.0.49154-0+f2	windows_all	Provides support for displaying NI HTML help files.
+
+ni-max-rempxi-provider	26.5.0.49267-0+f115	windows_x64	Provides remote configuration of NI Real-Time PXI targets in Measurement &amp; Automation Explorer (MAX).
+
+ni-registration-wizard	25.3.0.49219-0+f67	windows_x64	The NI Registration Wizard is designed to assist in the registration of National Instruments products by using a secure internet connection.
+
+ni-resetniconfig	26.0.0.49263-0+f111	windows_x64	NI Reset Configuration is a utility used to reset all NI device configuration settings.
+
+ni-webserver	26.5.0.49248-0+f96	windows_x64	The NI Web Server hosts web applications and web UIs.
+
+ni-cvi-2026-reflector	26.3.0.49416-0+f264	windows_x64	The LabWindows/CVI .NET Reflector Runtime provides functions that facilitate calling .NET assemblies
+
+ni-cvi-instrsup	26.3.0.49425-0+f273	windows_x64	Installs run-time support only for instrument drivers and a limited set of LabWindows/CVI library functions. This package allows other applications to use instrument driver DLLs without having to load the larger LabWindows/CVI Run-Time DLL.
+
+ni-cvi-internet	26.3.0.49415-0+f263	windows_x64	The LabWindows/CVI Internet Library Runtime provides functions for Internet protocols like FTP, POP3, Telnet, etc. You can distribute the Intenet Library according to your license agreement.
+
+ni-cvi-opengl	26.3.0.49425-0+f273	windows_x64	Installs the LabWindows/CVI OpenGL Library Runtime.
+
+ni-cvi-openmp	26.3.0.49415-0+f263	windows_x64	Installs the LabWindows/CVI OpenMP Library Runtime.
+
+ni-cvi-runtime-core	26.3.0.49425-0+f273	windows_x64	Installs run-time support for projects built with full run-time support. This package provides support for most, but not all, of the provided libraries. You will also need to select additional library support if your application calls the corresponding library functions.
+
+ni-cvi-runtime-realtime	26.3.0.49425-0+f273	windows_x64	Installs run-time support for DLLs targeted for a real-time system.
+
+ni-cvi-usi	26.3.0.49418-0+f266	windows_x64	Installs the LabWindows/CVI Diadem Connectivity Support. It contains the deprecated cviusi.dll.
+
+ni-auth	26.5.0.49329-0+f177	windows_x64	NI Authentication
+
+ni-ssl-labview-2026-runtime-engine-x86-support	26.3.0.49339-0+f187	windows_x64	Installs LabVIEW 2026 Q3 runtime support files for SSL technologies.
+
+ni-ssl-labview-2026-runtime-engine-support	26.3.0.49339-0+f187	windows_x64	Installs LabVIEW 2026 Q3 64-bit runtime support files for SSL technologies.
+
+ni-error-report-x86	25.0.0.49231-0+f79	windows_x64	NI Error Reporting (32-bit) enables you to send NI a crash or internal warning report.
+
+ni-cvi-analysis	26.3.0.49419-0+f267	windows_x64	The LabWindows/CVI Analysis Library Runtime provides functions for 1D and 2D array manipulation, complex operations, matrix operations, and statistics.
+
+ni-cvi-tdms	26.3.0.49421-0+f269	windows_x64	The LabWindows/CVI TDM Streaming Library Runtime contains functions that you can use to log large amounts of test data quickly.
+
+ni-cvi-labview-dll-builder-15.1.0	15.1.1.49154-0+f2	windows_all	This is an infrastructure package for NI Software.
+
+ni-error-reporting-native-x86	26.5.0.49216-0+f64	windows_x64	NI Error Reporting enables you to send NI a crash or internal warning report.
+
+ni-update-service	26.5.0.49246-0+f94	windows_x64	NI Update Service checks for and electronically delivers software updates for NI software and drivers.
+
+ni-error-reporting-native	26.5.0.49216-0+f64	windows_x64	NI Error Reporting enables you to send NI a crash or internal warning report.
+
+ni-cvi-activex	26.3.0.49415-0+f263	windows_x64	The LabWindows/CVI ActiveX Library Runtime provides functions for ActiveX programming. You can distribute the ActiveX Library according to your license agreement.
+
+ni-max-software-provider	26.5.0.49267-0+f115	windows_x64	Provides software configuration in Measurement &amp; Automation Explorer (MAX).
+
+ni-mxs	26.0.0.49263-0+f111	windows_x64	Provides an internal configuration database for NI software and hardware.
+
+ni-logos	26.5.0.49330-0+f178	windows_x64	NI Logos provides support for the network protocol that uses network-published shared variables.
+
+ni-msaspdotnetcore-runtime-80-x86	26.5.0.49173-0+f21	windows_all	Required by some NI products. The ASP.NET Core Runtime enables you to run existing web/server applications on Windows.  This package installs the ASP.NET Core Runtime.
+
+ni-search-labview-2026-support	26.3.0.49790-0+f638	windows_x64	NI Search LabVIEW 2026 (64-bit) Support provides libraries and other files necessary to run search in LabVIEW 2026 (64-bit).
+
+ni-slcp-x86	26.5.0.49220-0+f68	windows_x64	The NI Software License Compliance Program is a mechanism that records and sends to NI only the critical information necessary to validate legal compliance with NI licensing policies.
+
+ni-slcp	26.5.0.49220-0+f68	windows_x64	The NI Software License Compliance Program is a mechanism that records and sends to NI only the critical information necessary to validate legal compliance with NI licensing policies.
+
+ni-usi-core	26.5.0.49251-0+f99	windows_all	NI USI Core provides components for NI TDM software NI USI Core provides components for NI TDM software and allows access to any file format using DataPlugins.
+
+ni-license-manager	26.5.0.49256-0+f104	windows_x64	NI License Manager is an application that helps you manage licensed NI software assets. NI License Manager is a tool designed to help you activate, deactivate, and transfer software products using license activation codes or license files. License administrators can use NI License Manager to automate product activation and add volume license servers.
+
+ni-web-services-labview-2026-support	26.5.0.49335-0+f183	windows_x64	Installs Web Services Runtime Components 64-Bit.
+
+ni-assistant-framework-custom-ui-tool	26.3.0.49793-0+f641	windows_x64	NI Assistant Framework Custom UI contains the custom UI files of Assistant Framework.
+
+ni-cvi-dotnet	26.3.0.49416-0+f264	windows_x64	The LabWindows/CVI .NET Library Runtime provides functions that facilitate calling .NET assemblies.
+
+ni-system-webserver-base	26.5.0.49335-0+f183	windows_x64	NI System Web Server Base 2026 Q5
+
+ni-cvi-datasocket	26.3.0.49425-0+f273	windows_x64	The LabWindows/CVI DataSocket Library Runtime functions simplify live data exchange between applications. You can distribute the DataSocket Library according to your license agreement.
+
+ni-labview-system-state-publisher	26.3.0.49791-0+f639	windows_x64	NI System State Publisher provides System State Publisher support for LabVIEW.
+
+ni-deployment-framework	26.3.0.49791-0+f639	windows_x64	Provides a framework to support RT or assembly deployment.
+
+ni-deployment-framework-x86	26.3.0.49791-0+f639	windows_x64	Provides a framework to support RT or assembly deployment.
+
+ni-cvi-networkstreams	26.3.0.49420-0+f268	windows_x64	The LabWindows/CVI Network Streams Library Runtime provides functions for reading and writing data to network streams. You also can use the Network Streams Library functions in real-time (RT) applications.
+
+ni-cvi-network-variable	26.3.0.49425-0+f273	windows_x64	The LabWindows/CVI Network Variable Library Runtime provides functions for reading and writing data to network variables. You can use the functions in this library to communicate with LabVIEW shared variables and Measurement Studio network variables. You also can use the Network Variable Library functions in real-time (RT) applications.
+
+ni-variable-engine	26.5.0.49333-0+f181	windows_x64	NI Variable Engine supports applications that read and write live data using shared variables. You must install this engine if you host, configure, or create shared variables in your application.
+
+ni-logos-labview-2026-support-en	26.3.0.49792-0+f640	windows_x64	NI Logos LabVIEW 2026 (64-bit) Support is used to provide LabVIEW 2026 (64-bit) Support for Logos Networking Technology.
+
+ni-datasocket	26.3.0.49347-0+f195	windows_x64	Support for built applications or shared libraries that use DataSocket. This installer includes the DataSocket Server, DataSocket Server Manager, and OPC Demo Server.
+
+ni-msaspdotnetcore-runtime-80	26.5.0.49173-0+f21	windows_x64	Required by some NI products. The ASP.NET Core Runtime enables you to run existing web/server applications on Windows.  This package installs the ASP.NET Core Runtime.
+
+ni-datafinder-client-api	26.5.0.49255-0+f103	windows_all	NI DataFinder Client provides components for connecting to DataFinder Desktop and DataFinder Server.
+
+ni-labview-2026-license	26.3.0.49791-0+f639	windows_x64	NI LabVIEW License is used to install license files for LabVIEW.
+
+ni-labview-2026-deployable-license	26.3.0.49792-0+f640	windows_x64	NI LabVIEW Deployable License contains components to support remote panel licenses.
+
+ni-lv-web-server-labview-2026-runtime-engine-support	26.5.0.49335-0+f183	windows_x64	NI RTE LabVIEW Web Server 64-Bit.
+
+ni-lv-web-server-labview-2026-runtime-engine-x86-support	26.5.0.49335-0+f183	windows_x64	Include this component when using the Web Server for stand-alone applications and shared libraries.
+
+ni-system-webserver-appserver	26.5.0.49335-0+f183	windows_x64	Include this component when using Web Services built with LabVIEW.
+
+ni-variable-engine-labview-2026-support-en	26.3.0.49792-0+f640	windows_x64	NI Variable Engine LabVIEW 2026 (64-bit) Support is used to provide LabVIEW 2026 (64-bit) Support for Variable Engine.
+
+ni-cvi-rte	26.3.0.49425-0+f273	windows_x64	The LabWindows/CVI Shared Runtime Base enables you to run most executables or use most DLLs created with LabWindows/CVI on a machine without the development environment installed. The LabWindows/CVI Shared Runtime Base enables you to run executables or use DLLs created with LabWindows/CVI that do not use separate LabWindows/CVI Shared Runtime libraries, and it must be present on any target computer on which you want to run your executable program. You can distribute the Runtime according to your license agreement.  The mark LabWindows is used under a license from Microsoft Corporation. Windows is a registered trademark of Microsoft Corporation in the United States and other countries.
+
+ni-labview-2026-runtime-engine	26.3.0.49794-0+f642	windows_x64	The LabVIEW Runtime is a software add-on that enables engineers to run executables on a nondevelopment machine. The LabVIEW Runtime enables you to run executables created with the LabVIEW Application Builder on machines that do not have LabVIEW installed. The LabVIEW Runtime includes the libraries and other files necessary to run basic application types built in LabVIEW.
+
+ni-labview-2026-runtime-engine-x86	26.3.0.49794-0+f642	windows_x64	The LabVIEW Runtime is a software add-on that enables engineers to run executables on a nondevelopment machine. The LabVIEW Runtime enables you to run executables created with the LabVIEW Application Builder on machines that do not have LabVIEW installed. The LabVIEW Runtime includes the libraries and other files necessary to run basic application types built in LabVIEW.
+
+ni-system-webserver	26.5.0.49335-0+f183	windows_x64	Support for using Web services to communicate between National Instruments software, such as LabVIEW and NI Measurement &amp; Automation Explorer.
+
+ni-cvi-runtime-engine	26.3.0.49425-0+f273	windows_x64	The LabWindows/CVI Shared Runtime enables you to run executables or use DLLs created with LabWindows/CVI on machines without LabWindows/CVI installed. The LabWindows/CVI Shared Runtime is backwards compatible and may be used with applications that were created with previous versions of LabWindows/CVI. You can distribute the Runtime according to your license agreement. The mark LabWindows is used under a license from Microsoft Corporation. Windows is a registered trademark of Microsoft Corporation in the United States and other countries.
+
+ni-realtime-error-dialog-x64	26.1.0.49356-0+f204	windows_x64	LabVIEW Real-Time Error Dialog enables you to view error logs and generate error reports for sessions of a LabVIEW Real-Time target.
+
+ni-vipm-helper	26.3.0.49161-0+f9	windows_x64	Discover and install LabVIEW add-ons from the LabVIEW Tools Network. Package your own reusable code and share it with others.
+
+ni-labview-vimerge	26.3.0.49794-0+f642	windows_x64	NI LabVIEW Merge Utility (64-bit) is a utility to merge LabVIEW VIs.
+
+ni-labview-vicompare	26.3.0.49794-0+f642	windows_x64	NI LabVIEW Compare Utility (64-bit) is a utility to compare LabVIEW VIs.
+
+ni-labview-datafinder-runtime	26.3.0.49232-0+f80	windows_x64	LabVIEW DataFinder Connectivity Runtime enables the connection to DataFinder Server
+
+ni-example-finder	26.3.0.49794-0+f642	windows_x64	NI Example Finder is a utility that you can browse and search LabVIEW example VIs.
+
+ni-realtime-error-dialog-x86	26.1.0.49358-0+f206	windows_x64	LabVIEW Real-Time Error Dialog enables you to view error logs and generate error reports for sessions of a LabVIEW Real-Time target.
+
+ni-targetdiscoverywizard	26.5.0.49268-0+f116	windows_x64	Diagnoses problems adding a remote system to NI MAX. NI Remote System Discovery Troubleshooting Wizard diagnoses problems with adding a system to Measurement &amp; Automation Explorer (MAX).
+
+ni-sysdetails-webservice	26.3.0.49279-0+f127	windows_x64	Provides a web service for querying system details.
+
+ni-sysapi-webservice	26.3.0.49279-0+f127	windows_x64	Provides 32-bit web service components for the NI System API Framework.
+
+ni-max-remote-provider	26.5.0.49268-0+f116	windows_x64	Provides remote configuration of NI Real-Time targets in Measurement &amp; Automation Explorer (MAX).
+
+ni-max	26.5.0.49268-0+f116	windows_x64	Use this application to configure, test, and communicate with your NI hardware. Use Measurement &amp; Automation Explorer (MAX) to configure, test, and communicate with your NI hardware. You must install the appropriate driver software for your hardware to appear in MAX.
+
+ni-assistant-framework	26.3.0.49793-0+f641	windows_x64	NI Assistant Framework (64-bit) is a toolset for making software applications, with a particular emphasis on tools needed for measurement applications.
+
+ni-labview-2026-core-en	26.3.0.49795-0+f643	windows_x64	LabVIEW is systems engineering software for applications that require test, measurement, and control with rapid access to hardware and data insights. The LabVIEW programming environment simplifies hardware integration for engineering applications so that you have a consistent way to acquire data from NI and third-party hardware. LabVIEW reduces the complexity of programming, so you can focus on your unique engineering problem. LabVIEW enables you to immediately visualize results with built-in, drag-and-drop engineering user interface creation and integrated data viewers. To turn your acquired data into real business results, you can develop algorithms for data analysis and advanced control with included math and signal processing IP or reuse your own libraries from a variety of tools. To ensure compatibility with other engineering tools, LabVIEW can interoperate with, and reuse libraries from, other software and open-source languages.
+
+ni-dfc-labview-support	26.3.0.49232-0+f80	windows_x64	LabVIEW DataFinder Connectivity Runtime enables the connection to DataFinder Server
+
+ni-labview-vi-analyzer-toolkit-lic	26.3.0.49275-0+f123	windows_x64	This installs the NI LabVIEW VI Analyzer Toolkit License.
+
+ni-lvvia-offline-manual-en	26.3.0.49277-0+f125	windows_x64	This is an infrastructure package for NI Software.
+
+ni-viawin-labview-support	26.3.0.49277-0+f125	windows_x64	The LabVIEW VI Analyzer Toolkit helps you perform static code analysis to improve the quality and readability of your LabVIEW code. The LabVIEW VI Analyzer Toolkit is a software add-on for LabVIEW that helps you improve graphical code developed in LabVIEW. With this toolkit, you can configure more than 90 included tests for automated code review and static code analysis of all VIs in an application, or you can create your own using the test creation wizard. The LabVIEW VI Analyzer Toolkit provides debugging tools that help you avoid improper coding techniques that could impact an application\x27s performance, functionality, or maintainability. In addition, you can enforce effective programming practices and coding styles within teams of developers to ensure code readability and functionality.
+
+ni-labview-command-line-interface-x86	26.3.0.49372-0+f220	windows_x64	The NI LabVIEW Command Line Interface (CLI) helps you run operations in LabVIEW by executing commands from the command line. The NI LabVIEW Command Line Interface (CLI) is a software add-on for LabVIEW. You can use it to automate the build process of LabVIEW applications and run the VIs and custom operations you create in LabVIEW.
+
+ni-labview-unit-test-framework-toolkit-lic	26.3.0.49246-0+f94	windows_x64	This installs the NI LabVIEW Unit Test Framework Toolkit License.
+
+ni-lvutf-offline-manual-en	26.3.0.49249-0+f97	windows_x64	This is an infrastructure package for NI Software.
+
+ni-utf-labview-support	26.3.0.49249-0+f97	windows_x64	The LabVIEW Unit Test Framework Toolkit helps you automate LabVIEW VI unit testing to perform functional validation. The LabVIEW Unit Test Framework Toolkit is a software add-on for LabVIEW that helps you automate functional validation and demonstrate whether an application behaves properly. You can generate a unit test or import test parameters from a text document created in an editor such as Microsoft Excel. Tests can encompass multiple test cases, which define input values and the expected output for any data type, including arrays and clusters. You can identify the source of incorrect outputs, track code coverage, and generate validation documents in HTML, ATML/XML, or ASCII formats.
+
+</pre></details>
+</div>
+</body>
+</html>
