@@ -1799,7 +1799,8 @@ docker run --rm `
         cannot safely validate are rejected conservatively. Private package feeds, embedded Dragon VIPC references,
         and NIPM installation are not supported by this initial LVPM adapter.</div>
       <p>Both Linux worker images install Ruby and pinned Asciidoctor, Asciidoctor PDF, Kroki, and AsciiMath
-        gems before applying VIP packages. The image build checks all four tools and renders a small HTML/PDF
+        gems before applying VIP packages. The root gem versions match AsciiDoc 1.12.1’s bundled toolchain
+        (including Kroki 0.10.2, compatible with the NI image’s Ruby 3.0). The image build checks all four tools and renders a small HTML/PDF
         document offline. This satisfies AsciiDoc's native toolchain check before its post-install action can
         open the interactive Linux sudo-configuration dialog. No sudoers permissions are added.</p>
       <p>Linux VIPM and LVPM builds pre-create <code>~/natinst/LabVIEW Data/wovalab-post-install-dialog</code>,

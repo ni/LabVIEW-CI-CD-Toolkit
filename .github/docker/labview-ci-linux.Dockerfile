@@ -59,8 +59,9 @@ RUN set -eux; \
       vipm --version || true
 
 # AsciiDoc's Linux post-install VI otherwise opens a sudo-configuration dialog.
+# Match the tool versions shipped with AsciiDoc 1.12.1 (Kroki 2 needs newer Ruby).
 # Supply its native toolchain before package hooks; no sudoers changes or skipped hooks.
-RUN gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.27 asciidoctor-kroki:2.0.0 asciimath:2.0.6 \
+RUN gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.24 asciidoctor-kroki:0.10.2 asciimath:2.0.6 \
  && asciidoctor --version && asciidoctor-pdf --version \
  && gem which asciidoctor-kroki && gem which asciimath \
  && printf '= Container dependency check\n\nAsciidoctor is installed.\n' > /tmp/lvci-asciidoctor.adoc \
