@@ -18,7 +18,7 @@ args = sys.argv[1:]
 if not args or args.pop(0).lower() != '/c' or not args:
     sys.exit('Unsupported AsciiDoc command wrapper invocation')
 if args[0] not in ('asciidoctor', 'asciidoctor-pdf') and args not in (
-        ['gem', 'which', 'asciidoctor-kroki'], ['gem', 'which', 'asciimath']):
+        ['gem', 'which', 'asciidoctor-kroki'], ['gem', 'which', 'asciimath'], ['gem', 'outdated']):
     sys.exit('Unsupported AsciiDoc command: ' + repr(args))
 os.execvp(args[0], args)
 PYPROBE
