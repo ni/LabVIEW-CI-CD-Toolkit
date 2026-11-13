@@ -21,7 +21,7 @@ if args[0] not in ('asciidoctor', 'asciidoctor-pdf') and args not in (
         ['gem', 'which', 'asciidoctor-kroki'], ['gem', 'which', 'asciimath'], ['gem', 'outdated']):
     sys.exit('Unsupported AsciiDoc command: ' + repr(args))
 if args == ['gem', 'outdated']:
-    args += ['--local', '--clear-sources']
+    args += ['--config-file', '/tmp/lvci-pinned-gemrc']
 result = subprocess.run(args, capture_output=True, text=True)
 with open('/evidence/cmd-results.jsonl', 'a') as out:
     out.write(json.dumps({'args': args, 'exit': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr}) + '\n')
@@ -30,6 +30,7 @@ sys.stderr.write(result.stderr)
 sys.exit(result.returncode)
 PYPROBE
 chmod +x /usr/local/bin/cmd
+printf ":sources: []\n" > /tmp/lvci-pinned-gemrc
 unset LV_RTE_HEADLESS
 export DISPLAY=:99
 Xvfb "$DISPLAY" -screen 0 1440x1000x24 -ac +extension GLX +render -noreset >/evidence/xvfb.log 2>&1 &
