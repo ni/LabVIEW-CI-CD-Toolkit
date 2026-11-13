@@ -1,8 +1,35 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "73d2c415aa07403ed5f4025d02fef41e5f223400",
+  "sha": "dfd0fd48e910d2b1a64cde988e80fdf4928561cf",
   "revisions": [
+    {
+      "sha": "dfd0fd48e910d2b1a64cde988e80fdf4928561cf",
+      "short": "dfd0fd4",
+      "message": "Merge pull request #160 from ni/codex/reliable-linux-update",
+      "author": "Elijah Kerry",
+      "date": "2026-11-13T15:45:20Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "d6d31ad6d1ceadfd47eaa8f860c17d014f077208",
+      "short": "d6d31ad",
+      "message": "Keep the current dependency revision available for safe retry",
+      "author": "elijah286",
+      "date": "2026-11-13T15:31:44Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "72eff7dc45b6534bcca9eaddd880ae81461ea4fa",
+      "short": "72eff7d",
+      "message": "Fix Linux update browser reads and release-only revision checks",
+      "author": "elijah286",
+      "date": "2026-11-13T15:27:50Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "73d2c415aa07403ed5f4025d02fef41e5f223400",
       "short": "73d2c41",
@@ -873,33 +900,6 @@
       "message": "Prepare release 4.19.3",
       "author": "github-actions[bot]",
       "date": "2026-11-02T21:33:31Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "2b31d8ea0e20ba1ac914d493937cea14f4279920",
-      "short": "2b31d8e",
-      "message": "Merge pull request #102 from ni/dependabot/github_actions/actions/setup-python-7",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:33:16Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "7963ebf2b5f1edf317f1e90a81ee89ec274c8b7e",
-      "short": "7963ebf",
-      "message": "Exercise artifact v7 REST ZIP compatibility on Linux and Windows",
-      "author": "elijah286",
-      "date": "2026-11-02T21:32:41Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "ed0fd3a8e1280fb0c67908eb47ab5ec3eec24331",
-      "short": "ed0fd3a",
-      "message": "Isolate Linux unit-test driver from client Python imports",
-      "author": "elijah286",
-      "date": "2026-11-02T21:30:44Z",
       "project": false,
       "dep_only": false
     },
