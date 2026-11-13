@@ -1,0 +1,49 @@
+name: Diagnose AsciiDoc Linux Hook
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Start isolated hook diagnostic
+        run: |
+          mkdir -p ci-out/hook-diagnostic
+          docker run -d --name hook-diagnostic --entrypoint /bin/bash \
+            --mount "type=bind,src=$PWD,dst=/input,readonly" \
+            --mount "type=bind,src=$PWD/ci-out/hook-diagnostic,dst=/evidence" \
+            ghcr.io/ni/labview-ci-cd-toolkit-labview:linux-lvpm-89287e60180bc1194c0d148ded8930a6e8bb4d2d145a231b91b6565e2b74a16b@sha256:444b52c7d4121d1f2b89b618c398fdeb5b2ea397446e02c418f3650e8a81fa96 \
+            /input/.github/labview/diagnostics/asciidoc-hook.sh
+      - name: Capture first five minutes
+        run: |
+          for i in $(seq 1 60); do
+            if [ "$(docker inspect hook-diagnostic --format '{{.State.Running}}')" != true ]; then break; fi
+            sleep 5
+          done
+          docker logs hook-diagnostic > ci-out/hook-diagnostic/container.log 2>&1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: hook-diagnostic-early
+          path: ci-out/hook-diagnostic/
+      - name: Wait for hook result
+        run: |
+          result=$(docker wait hook-diagnostic)
+          docker logs hook-diagnostic > ci-out/hook-diagnostic/container.log 2>&1
+          echo "Diagnostic container exit: $result"
+          test "$result" = 0
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: hook-diagnostic-final
+          path: ci-out/hook-diagnostic/
