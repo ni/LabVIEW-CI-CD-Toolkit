@@ -37,7 +37,7 @@ jobs:
       - name: Build candidate and recheck installed project pins
         shell: pwsh
         run: ./.github/labview/test-native-windows-worker.ps1 -Python python
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Verify Windows dependency warnings clear
