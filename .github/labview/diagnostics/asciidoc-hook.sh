@@ -61,5 +61,14 @@ set +e
 wait "$installer"
 result=$?
 printf '%s\n' "$result" > /evidence/install-exit-code
+if [ "$result" = 0 ]; then
+  tools='/usr/local/natinst/LabVIEW-2026-64/vi.lib/Wovalab/AsciiDoc for LabVIEW/Toolchain'
+  lvpm --global --labview-version 2026 vi-run "$tools/Check Asciidoctor Toolchain Installation.vi" \
+    --get 'Installation Ok?' --get 'Installation Details' --get 'error out' --timeout 60 \
+    > /evidence/post-install-toolchain-check.txt 2>&1
+  lvpm --global --labview-version 2026 vi-run "$tools/Check For Toolchain Update.vi" \
+    --get 'Update available' --get 'error out' --timeout 60 \
+    > /evidence/post-install-update-check.txt 2>&1
+fi
 find /root/natinst -maxdepth 5 -name '*.conf' -exec sh -c 'echo "$1"; cat "$1"' _ {} \; > /evidence/labview-preferences.txt
 exit "$result"
