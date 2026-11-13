@@ -484,6 +484,15 @@
       return out;
     }
 
+    function includeCurrentDependencyRevision(commits){
+      if (!defaultRevision) return commits;
+      // Dependency updates must offer the live HEAD even when the shared project
+      // history filters tooling commits or the generated dashboard is older.
+      const current = commits.find(commit => commit.sha === defaultRevision);
+      return [{...current, sha:defaultRevision, short:short(defaultRevision),
+        message:current?.message || "Current default-branch revision", project:true, depOnly:false},
+        ...commits.filter(commit => commit.sha !== defaultRevision)];
+    }
     async function listCommits(){
       // Prefer the dashboard's classified inventory (each revision tagged project /
       // dependency-only) so the shared revision picker can hide CI/tooling and
@@ -851,11 +860,19 @@
           && (jobSection.match(/^    (?:if|needs):/gm) || []).length === 2);
     }
     async function verifiedLinuxUpdateTarget(intent){
-      const read = async (url, kind) => {
-        const response = await fetch(url, { cache:"no-cache", headers:updHeaders() });
+      const read = async (url, kind, asText = false) => {
+        const headers = updHeaders();
+        if (asText) headers.Accept = "application/vnd.github.raw+json";
+        let response;
+        try { response = await fetch(url, { cache:"no-cache", headers }); }
+        catch (_) {
+          throw new Error("Cannot load " + kind + " from GitHub. No update submitted. Check your connection and GitHub access, then retry.");
+        }
         if (!linuxUpdateIntentCurrent(intent)) throw new Error("Update context changed; no new request submitted.");
-        if (!response.ok) throw new Error("Cannot verify " + kind + " (HTTP " + response.status + ").");
-        const value = kind === "repository" || kind === "HEAD" ? await response.json() : await response.text();
+        if (!response.ok) throw new Error("Cannot verify " + kind + " (HTTP " + response.status + "). No update submitted. Check repository access and token permissions (Contents: read and Actions: write).");
+        let value;
+        try { value = asText ? await response.text() : await response.json(); }
+        catch (_) { throw new Error("Cannot read the " + kind + " response from GitHub. No update submitted. Retry after checking your connection."); }
         if (!linuxUpdateIntentCurrent(intent)) throw new Error("Update context changed; no new request submitted.");
         return value;
       };
@@ -863,15 +880,42 @@
       if (String(metadata.full_name || "").toLowerCase() !== repo.toLowerCase() || typeof metadata.default_branch !== "string" || !metadata.default_branch) throw new Error("Repository/default branch identity is unavailable.");
       const head = await read(api("/commits/" + encodeURIComponent(metadata.default_branch)), "HEAD");
       if (!/^[a-f0-9]{40}$/.test(head.sha || "")) throw new Error("Invalid committed HEAD identity.");
-      const settings = await read(raw(".github/labview-ci.yml", head.sha), "committed settings");
+      // Authenticated browser reads belong on the API origin. The raw-file host
+      // rejects the CORS preflight for Authorization / X-GitHub-Api-Version.
+      const contents = path => api("/contents/" + path.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(head.sha));
+      const settings = await read(contents(".github/labview-ci.yml"), "committed settings", true);
       const config = parseManifestYaml(settings);
       const implicit = !hasConfigList(config, "vipc") || !hasConfigList(config, "dragon");
-      if (!(implicit ? linuxImplicitSettingsMatch(settings, head.sha, intent) : committedMonitoringMatches(settings, intent.context))) throw new Error("Monitoring or worker choices differ from committed HEAD. Review and merge the intended configuration; your choices are unchanged. No update submitted.");
+      const releaseOnlyAdvance = implicit && head.sha !== intent.context.revision
+        ? await linuxReleaseOnlyAdvance(read, intent.context.revision, head.sha) : false;
+      if (!(implicit ? linuxImplicitSettingsMatch(settings, head.sha, intent, releaseOnlyAdvance) : committedMonitoringMatches(settings, intent.context))) throw new Error("Monitoring or worker choices differ from committed HEAD. Review and merge the intended configuration; your choices are unchanged. No update submitted.");
       if (intent.context.tooling === "vipm" && String(config.linuxUse || "").startsWith("linux-lvpm-")) throw new Error("Linux currently selects LVPM. Review the reset under Current selection and rollback before a VIPM update.");
       const file = intent.context.tooling === "lvpm" ? "build-labview-lvpm-image.yml" : "build-labview-linux-image.yml";
-      const workflow = await read(raw(".github/workflows/" + file, head.sha), "reviewed workflow");
+      const workflow = await read(contents(".github/workflows/" + file), "reviewed workflow", true);
       if (!linuxReviewedWorkflow(workflow, file)) throw new Error("Installed Linux workflow lacks reviewed-SHA protection. Update the installed tooling before building; no update submitted.");
       return Object.freeze({sha:head.sha, ref:metadata.default_branch, file});
+    }
+    async function linuxReleaseOnlyAdvance(read, inspected, head){
+      // Pages can intentionally omit release bookkeeping commits from its revision
+      // list. Prove that only version/history changed before reusing that view.
+      if (!/^[a-f0-9]{40}$/.test(inspected || "")) return false;
+      const comparison = await read(api("/compare/" + inspected + "..." + head + "?per_page=100"), "release revision comparison");
+      if (comparison.status !== "ahead" || comparison.base_commit?.sha !== inspected || comparison.merge_base_commit?.sha !== inspected
+        || !Array.isArray(comparison.commits) || comparison.commits.length !== comparison.total_commits
+        || comparison.commits.at(-1)?.sha !== head || !Array.isArray(comparison.files)
+        || !comparison.files.length || comparison.files.length >= 300) return false;
+      const catalogPath = ".github/labview-ci/catalog.json";
+      if (comparison.files.some(file => !["added", "modified", "removed"].includes(file.status)
+        || !(file.filename === catalogPath || /^\.github\/labview-ci\/notes\/[^/]+\.md$/.test(file.filename || "")))) return false;
+      if (!comparison.files.some(file => file.filename === catalogPath)) return true;
+      const readCatalog = async sha => {
+        const value = JSON.parse(await read(api("/contents/" + catalogPath + "?ref=" + sha), "release catalog", true));
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Cannot verify release catalog; no update submitted.");
+        delete value.version;
+        delete value.history;
+        return JSON.stringify(value);
+      };
+      return await readCatalog(inspected) === await readCatalog(head);
     }
     async function runLinuxPrimaryAction(){
       if (activePlatform !== "linux" || linuxDispatchPending || linuxVipmPending || (linuxOperation && linuxOperation.busy) || (linuxUpdateIntent && linuxUpdateIntent.busy)) return;
@@ -910,10 +954,11 @@
     function recordLinuxLoadedInputs(provenance, text = null){
       linuxLoadedInputs = Object.freeze({repo, revision:selectedRevision, inputs:JSON.stringify(monitorInputs()), config:linuxConfigSignature(selectedConfig), provenance, text});
     }
-    function linuxImplicitSettingsMatch(text, sha, intent){
+    function linuxImplicitSettingsMatch(text, sha, intent, releaseOnlyAdvance = false){
       const loaded = intent.context.loaded;
-      if (intent.context.dirty || sha !== intent.context.revision || !loaded || loaded !== linuxLoadedInputs
-        || loaded.repo !== repo || loaded.revision !== sha || loaded.inputs !== intent.context.inputs
+      if (sha !== intent.context.revision && !releaseOnlyAdvance) throw new Error("Source files changed since this view. Select the current default-branch revision, review its dependencies, then update. No update submitted.");
+      if (intent.context.dirty || !loaded || loaded !== linuxLoadedInputs
+        || loaded.repo !== repo || loaded.revision !== intent.context.revision || loaded.inputs !== intent.context.inputs
         || loaded.config !== linuxConfigSignature(selectedConfig) || linuxMonitoringRequest) throw new Error("Implicit monitoring requires a clean, fully loaded current revision with no pending Save. Choices are preserved; no update submitted.");
       const root = text.match(/^config:[ \t]*\r?\n((?: {2}[^\n]*\n?|[ \t]*\n)*)/m);
       if ((text.match(/^config:/gm) || []).length !== 1 || !root) throw new Error("Implicit configuration is malformed or unavailable.");
@@ -2257,7 +2302,7 @@
         const generated = await fetchJson(base + "dependencies/index.json");
         if (generated && Array.isArray(generated.vipc)) generatedInventory = generated;
       } catch (_) {}
-      const commits = await listCommits().catch(e => { $("status").textContent = e.message; return []; });
+      const commits = includeCurrentDependencyRevision(await listCommits().catch(e => { $("status").textContent = e.message; return []; }));
       const params = new URLSearchParams(location.search);
       const requestedSha = params.get("sha") || "";
       const generatedSha = generatedInventory && generatedInventory.sha;
