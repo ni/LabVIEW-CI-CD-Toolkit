@@ -32,7 +32,8 @@ def candidate_tag(fingerprint, base_digest, build_inputs_sha256, run_id, attempt
 def build_inputs_hash(repo):
     root = Path(repo)
     paths = [root / path for path in (WORKFLOW, ".github/docker/labview-ci-lvpm.Dockerfile",
-             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py")]
+             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py",
+             ".github/labview/asciidoc-linux-command.py")]
     paths += [path for path in (root / ".github/labview/toimages").rglob("*") if path.is_file()]
     inputs = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
               for path in sorted(paths)}

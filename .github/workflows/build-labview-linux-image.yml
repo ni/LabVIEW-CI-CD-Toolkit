@@ -285,6 +285,7 @@ jobs:
               pathlib.Path('.github/docker/labview-ci-linux.Dockerfile'),
               pathlib.Path('.github/labview/vipm/install-vipc-linux.sh'),
               pathlib.Path('.github/labview/vipm/linux-worker.py'),
+              pathlib.Path('.github/labview/asciidoc-linux-command.py'),
               pathlib.Path('ci-out/linux-vipc-inputs.json'),
           ]
           files += sorted(pathlib.Path('.github/labview/vipm').glob('*.vipc'), key=lambda p: p.name.lower())

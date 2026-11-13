@@ -2,4 +2,4 @@
 - Honor explicit Linux selections for Antidoc and internal VIPCs.
 - Validate the source example’s expanded Linux package set with both VIPM and LVPM.
 - Record installed native packages in LVPM candidates so NI-package status can be verified.
-- Install AsciiDoc’s native rendering tools and suppress its optional donation prompt for unattended Linux installs.
+- Fix AsciiDoc’s Linux command invocation, install its native rendering tools, and suppress its optional donation prompt for unattended installs.

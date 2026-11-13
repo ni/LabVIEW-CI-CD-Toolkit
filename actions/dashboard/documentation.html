@@ -1801,8 +1801,16 @@ docker run --rm `
       <p>Both Linux worker images install Ruby and pinned Asciidoctor, Asciidoctor PDF, Kroki, and AsciiMath
         gems before applying VIP packages. The root gem versions match AsciiDoc 1.12.1’s bundled toolchain
         (including Kroki 0.10.2, compatible with the NI image’s Ruby 3.0). The image build checks all four tools and renders a small HTML/PDF
-        document offline. This satisfies AsciiDoc's native toolchain check before its post-install action can
-        open the interactive Linux sudo-configuration dialog. No sudoers permissions are added.</p>
+        document offline. AsciiDoc 1.12.1's <code>Send Ruby Command.vi</code> invokes these Linux tools
+        through <code>cmd /c</code>. The images put a restricted compatibility command on their PATH at
+        <code>/opt/lvci/asciidoc-compat/cmd</code>: it forwards Asciidoctor/Asciidoctor PDF arguments and the
+        two supported <code>gem which</code> checks, plus the read-only <code>gem outdated</code> query,
+        to the real native executables, preserving output and
+        failure status. It does not emulate a Windows shell, evaluate shell text, or install gems.
+        The image smoke checks exercise this same command path. This lets the package check the installed
+        toolchain before considering its interactive Linux sudo-configuration dialog; no sudoers permissions
+        are added. The bridge ships in the client tooling payload and is included in both worker build hashes.
+        See the pinned <a href="https://gitlab.com/wovalab/open-source/asciidoc-toolkit/-/tree/e0eaf44f7a05990d1b20e7174d359dc98d1f6ff3/Sources/Toolchain">upstream toolchain source</a>.</p>
       <p>Linux VIPM and LVPM builds pre-create <code>~/natinst/LabVIEW Data/wovalab-post-install-dialog</code>,
         the opt-out used by the Wovalab donation dialog's “Do not show this window again” checkbox.
         This prevents AsciiDoc's post-install action from waiting for a click in unattended builds.

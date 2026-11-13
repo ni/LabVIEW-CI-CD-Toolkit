@@ -435,7 +435,8 @@ class NetworkAndWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
             for relative in (worker.WORKFLOW, '.github/docker/labview-ci-lvpm.Dockerfile',
-                             '.github/labview/lvpm/worker.py', '.github/labview/lvpm/adapter.py'):
+                             '.github/labview/lvpm/worker.py', '.github/labview/lvpm/adapter.py',
+                             '.github/labview/asciidoc-linux-command.py'):
                 target = repo / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text('raise RuntimeError("inspected client code must not execute")\n')
@@ -476,7 +477,8 @@ class NetworkAndWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
             for relative in (worker.WORKFLOW, ".github/docker/labview-ci-lvpm.Dockerfile",
-                             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py"):
+                             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py",
+                             ".github/labview/asciidoc-linux-command.py"):
                 target = repo / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((ROOT / relative).read_bytes())
@@ -484,6 +486,11 @@ class NetworkAndWorkflowTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(json.dumps(catalog))
             original = worker.build_inputs_hash(repo)
+            bridge = repo / ".github/labview/asciidoc-linux-command.py"
+            bridge_original = bridge.read_bytes()
+            bridge.write_bytes(bridge_original + b"\n# changed command handling\n")
+            self.assertNotEqual(worker.build_inputs_hash(repo), original)
+            bridge.write_bytes(bridge_original)
             release_only = {**catalog, "version": "999.999.999", "history": [], "channel": "test"}
             target.write_text(json.dumps(release_only))
             self.assertEqual(worker.build_inputs_hash(repo), original)
