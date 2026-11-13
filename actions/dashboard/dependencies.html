@@ -1444,6 +1444,10 @@
         if (btn) { btn.disabled = false; btn.textContent = "Save monitored files"; }
         setMonitorStatus("Network error: " + esc(String(e && e.message || e)), "err");
       } finally {
+        if (!request.submitted && request.status === "submitting") {
+          request.status = "blocked";
+          if (linuxMonitoringRequest === request) updateMonitorUi();
+        }
         if (request && monitoringRequestCurrent(request) && linuxMonitoringRequest === request) {
           if (btn && ["blocked", "rejected"].includes(request.status)) { btn.disabled = false; btn.textContent = "Save monitored files"; }
           renderLinuxPrerequisites();

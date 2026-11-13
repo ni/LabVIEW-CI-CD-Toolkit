@@ -1616,6 +1616,25 @@ for (const tooling of ['lvpm','vipm']) {
     }
   }
 }
+// Switching platforms during Save's read-only preflight must not leave Save locked.
+start = prerequisiteFixture({dirty:true});
+elements.set('saveMonitor', uiElement());
+let releaseMonitoringLookup;
+lookupBarrier = {match:url => url === 'https://api.github.com/repos/owner/project',
+  promise:new Promise(resolve => {releaseMonitoringLookup = resolve;})};
+const abandonedSave = hooks.dispatchMonitor();
+await Promise.resolve();
+hooks.selectPlatform('windows');
+releaseMonitoringLookup();
+await abandonedSave;
+assert.equal(postCount(start),0);
+assert.equal(elements.get('saveMonitor').disabled,false);
+lookupBarrier = null;
+dispatchStatus = 204;
+await hooks.dispatchMonitor();
+assert.equal(postCount(start),1);
+prerequisiteCases++;
+
 for (const sourceRepo of ['ni/LabVIEW-CI-CD-Toolkit','owner/toolkit-fork']) {
   start = prerequisiteFixture({dirty:true});
   const sourceContext = vm.createContext({...context,window:{LVCI:{repo:sourceRepo}}});
