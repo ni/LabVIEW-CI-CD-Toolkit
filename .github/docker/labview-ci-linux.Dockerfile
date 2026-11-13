@@ -48,7 +48,7 @@ RUN set -eux; \
       chmod +x /opt/lvci/vipm/install-vipc-linux.sh; \
       export DEBIAN_FRONTEND=noninteractive; \
       apt-get update; \
-                  apt-get install -y --no-install-recommends ca-certificates curl unzip xvfb python3 \
+                  apt-get install -y --no-install-recommends ca-certificates curl unzip xvfb python3 ruby-full \
         fonts-dejavu-core fonts-liberation fonts-noto-core xfonts-base xfonts-75dpi xfonts-100dpi fontconfig; \
       fc-cache -f >/dev/null 2>&1 || true; \
       curl -fL --retry 3 --retry-delay 2 -o /tmp/vipm.deb "${VIPM_DEB_URL}"; \
@@ -57,6 +57,17 @@ RUN set -eux; \
       rm -rf /var/lib/apt/lists/*; \
       command -v vipm; \
       vipm --version || true
+
+# AsciiDoc's Linux post-install VI otherwise opens a sudo-configuration dialog.
+# Supply its native toolchain before package hooks; no sudoers changes or skipped hooks.
+RUN gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.27 asciidoctor-kroki:2.0.0 asciimath:2.0.6 \
+ && asciidoctor --version && asciidoctor-pdf --version \
+ && gem which asciidoctor-kroki && gem which asciimath \
+ && printf '= Container dependency check\n\nAsciidoctor is installed.\n' > /tmp/lvci-asciidoctor.adoc \
+ && asciidoctor -r asciidoctor-kroki -r asciimath -o /tmp/lvci-asciidoctor.html /tmp/lvci-asciidoctor.adoc \
+ && asciidoctor-pdf -o /tmp/lvci-asciidoctor.pdf /tmp/lvci-asciidoctor.adoc \
+ && test -s /tmp/lvci-asciidoctor.html && test -s /tmp/lvci-asciidoctor.pdf \
+ && rm /tmp/lvci-asciidoctor.adoc /tmp/lvci-asciidoctor.html /tmp/lvci-asciidoctor.pdf
 
 RUN --mount=type=secret,id=vipm_serial,required=false \
       --mount=type=secret,id=vipm_full_name,required=false \

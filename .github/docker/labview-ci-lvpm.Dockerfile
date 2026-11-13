@@ -29,10 +29,21 @@ ARG LABVIEW_VERSION=2026
 ENV LVPM_CONFIG_CACHE=/opt/lvci/lvpm/cache \
     LV_RTE_HEADLESS=1
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates python3 python3-yaml python3-tomli unzip xvfb \
+ && apt-get install -y --no-install-recommends ca-certificates python3 python3-yaml python3-tomli unzip xvfb ruby-full \
     fonts-dejavu-core fonts-liberation fonts-noto-core xfonts-base xfonts-75dpi xfonts-100dpi fontconfig \
  && fc-cache -f \
  && rm -rf /var/lib/apt/lists/*
+# AsciiDoc's Linux post-install VI otherwise opens a sudo-configuration dialog.
+# Supply its native toolchain before package hooks; no sudoers changes or skipped hooks.
+RUN gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.27 asciidoctor-kroki:2.0.0 asciimath:2.0.6 \
+ && asciidoctor --version && asciidoctor-pdf --version \
+ && gem which asciidoctor-kroki && gem which asciimath \
+ && printf '= Container dependency check\n\nAsciidoctor is installed.\n' > /tmp/lvci-asciidoctor.adoc \
+ && asciidoctor -r asciidoctor-kroki -r asciimath -o /tmp/lvci-asciidoctor.html /tmp/lvci-asciidoctor.adoc \
+ && asciidoctor-pdf -o /tmp/lvci-asciidoctor.pdf /tmp/lvci-asciidoctor.adoc \
+ && test -s /tmp/lvci-asciidoctor.html && test -s /tmp/lvci-asciidoctor.pdf \
+ && rm /tmp/lvci-asciidoctor.adoc /tmp/lvci-asciidoctor.html /tmp/lvci-asciidoctor.pdf
+
 COPY --from=lvpm-builder /src/lvpm/target/release/lvpm /usr/local/bin/lvpm
 COPY --from=lvpm-builder /src/lvpm/LICENSE-MIT /src/lvpm/LICENSE-APACHE /usr/share/licenses/lvpm/
 COPY .github/labview/lvpm/adapter.py /opt/lvci/lvpm/adapter.py
