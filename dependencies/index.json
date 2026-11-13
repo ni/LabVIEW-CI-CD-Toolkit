@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "07387c2706c3d72209af5baf3f1f96edb61e894c",
+  "sha": "526282978fcbc4ff600dee715a13ed4b1b414bc2",
   "revisions": [
+    {
+      "sha": "526282978fcbc4ff600dee715a13ed4b1b414bc2",
+      "short": "5262829",
+      "message": "Merge pull request #157 from ni/codex/concise-release-highlights",
+      "author": "Elijah Kerry",
+      "date": "2026-11-13T03:26:51Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "09efe858fde715b2c7908d0007a4ec182bc7300b",
+      "short": "09efe85",
+      "message": "Show concise release highlights with expandable full notes",
+      "author": "elijah286",
+      "date": "2026-11-12T23:49:41Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "07387c2706c3d72209af5baf3f1f96edb61e894c",
       "short": "07387c2",
@@ -882,24 +900,6 @@
       "message": "Fail Linux unit-test status when report generation fails",
       "author": "elijah286",
       "date": "2026-11-02T21:27:09Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "9be6646d50c053e8055a3d14570b877f35b3d3fd",
-      "short": "9be6646",
-      "message": "Remove explanatory comments from composite action sources",
-      "author": "elijah286",
-      "date": "2026-11-02T21:26:09Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "f5f227281230a6e1348b7f7de83fe984524daf4c",
-      "short": "f5f2272",
-      "message": "Add safe standalone worker-image and unit-test actions",
-      "author": "elijah286",
-      "date": "2026-11-02T21:24:09Z",
       "project": false,
       "dep_only": false
     },
