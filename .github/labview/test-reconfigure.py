@@ -284,6 +284,20 @@ class ReconfigurePreservationTests(unittest.TestCase):
         original['config']['container']['vipc'] = entries
         self.assert_preserved(actual, original)
 
+    def test_source_monitoring_pr_metadata_works_for_forks_without_releases(self):
+        step = next(step for step in WORKFLOW['jobs']['reconfigure']['steps'] if step['name'] == 'Open pull request')
+        script = step['run'].split("python3 - <<'PY'\n", 1)[1].split('\nPY', 1)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            subprocess.run([sys.executable, '-c', script], cwd=directory, check=True,
+                           env={**os.environ, 'GITHUB_REPOSITORY':'owner/source-fork',
+                                'BASELINE':'v5.0.3', 'TARGET':'v5.0.4'})
+            body = (Path(directory) / 'source-monitoring-pr.md').read_text()
+        self.assertIn('v5.0.4 (projected), incremental (patch)', body)
+        self.assertIn('https://github.com/ni/LabVIEW-CI-CD-Toolkit/releases/tag/v5.0.3', body)
+        self.assertNotIn('owner/source-fork/releases', body)
+        self.assertIn('gh release view --repo ni/LabVIEW-CI-CD-Toolkit', step['run'])
+        self.assertIn('--title "$RECONFIGURE_PR_TITLE"', step['run'])
+
     def test_source_save_rejects_unscoped_or_stale_requests_without_changes(self):
         for inputs in ({}, {'IN_MONITORING_ONLY':'true'},
                        {'IN_MONITORING_ONLY':'true','IN_EXPECTED_SHA':'a'*40},

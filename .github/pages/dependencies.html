@@ -2229,7 +2229,7 @@
       const generatedVipcs = (data.vipc || []).map(v => {
         const cls = classifyVipc(v.path, vipcConfig, vipcHasConfig);
         const tooling = v.tooling === true || cls.role === 'core';
-        const cap = !vipcConfig.has(normPath(v.path)) && (v.role === 'capability' || cls.role === 'capability');
+        const cap = cls.role === 'capability';
         return { path:v.path, role:v.role || cls.role || (tooling ? 'core' : 'project'), tooling, configured:tooling ? true : (cap ? (v.configured !== false) : cls.configured), monitored:tooling ? true : (cap ? (v.monitored !== false) : cls.monitored), monitorOn:tooling ? MONITOR_PLATFORMS.slice() : (cap ? (Array.isArray(v.monitorOn) ? v.monitorOn : cls.monitorOn) : cls.monitorOn), locked:tooling || cls.locked, packages:v.packages || [], error:v.error || "", open:false };
       });
       const dragonFiles = Array.isArray(data.dragon)

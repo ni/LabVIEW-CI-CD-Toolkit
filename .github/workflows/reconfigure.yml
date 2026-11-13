@@ -846,7 +846,7 @@ jobs:
           git push -u origin "$BRANCH"
 
           if [ "${RECONFIGURE_SOURCE_MONITORING:-}" = true ]; then
-            BASELINE=$(gh release view --json tagName --jq .tagName)
+            BASELINE=$(gh release view --repo ni/LabVIEW-CI-CD-Toolkit --json tagName --jq .tagName)
             TARGET=$(python3 -c 'import re,sys; m=re.fullmatch(r"v([0-9]+)\.([0-9]+)\.([0-9]+)",sys.argv[1]); assert m, "Expected a published semantic version"; print(f"v{m[1]}.{m[2]}.{int(m[3])+1}")' "$BASELINE")
             export BASELINE TARGET
             python3 - <<'PY'
@@ -858,7 +858,7 @@ jobs:
 
           ## Release impact
 
-          **Target: {target} (projected), incremental (patch)**, based on [published {baseline}](https://github.com/{repo}/releases/tag/{baseline}). Availability: **not published**; merge order may change this projection. Select the first containing immutable version after publication; no beta/stable promotion is requested.
+          **Target: {target} (projected), incremental (patch)**, based on [published {baseline}](https://github.com/ni/LabVIEW-CI-CD-Toolkit/releases/tag/{baseline}). Availability: **not published**; merge order may change this projection. Select the first containing immutable version after publication; no beta/stable promotion is requested.
 
           ## Validation
 

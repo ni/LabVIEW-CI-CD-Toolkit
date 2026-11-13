@@ -1953,6 +1953,15 @@ for (const platform of ['windows', 'linux']) {
   assert.equal(postCount(before),1);
   assert.equal(JSON.parse(requests.slice(before).find(r => r.options.method === 'POST').options.body).inputs.monitoring_only,'true');
 }
+// Older indexes marked unselected internal VIPCs as Windows capabilities. Reconcile
+// their checkboxes from configuration before preserving the other platform in Save.
+restrictedContext.hooks.setState({platform:'linux',vipcs:[],dragons:[]});
+restrictedContext.hooks.renderGenerated({sha:revision,config:{hasVipcList:false,vipc:[]},
+  vipc:[{path:'.github/labview/experimental.vipc',role:'capability',configured:false,monitored:true,monitorOn:['windows'],packages:[]}],columns:[],dragon:{files:[]}});
+assert.equal(restrictedContext.hooks.monitorInputs().container_vipc,'.github/labview/experimental.vipc::none');
+restrictedContext.hooks.setFileMonitor('vipc','.github/labview/experimental.vipc','linux',true);
+assert.equal(restrictedContext.hooks.monitorInputs().container_vipc,'.github/labview/experimental.vipc::linux');
+
 // Source Save cannot dispatch an older unsafe workflow or continue after the user changes inputs.
 for (const workflow of ['', '# source-monitoring-only-v1', 'name: old Reconfigure']) {
   const before = prerequisiteFixture({dirty:true});
@@ -1962,6 +1971,8 @@ for (const workflow of ['', '# source-monitoring-only-v1', 'name: old Reconfigur
   await restrictedContext.hooks.dispatchMonitor();
   assert.equal(postCount(before),0);
   assert.match(elements.get('monitorStatus').innerHTML,/monitoring-only Save update/);
+  assert.equal(elements.get('saveMonitor').disabled,false);
+  assert.equal(elements.get('saveMonitor').textContent,'Save monitored files');
 }
 reviewedWorkflowOverride = null;
 for (const path of ['.github/labview/antidoc/antidoc.vipc','.github/labview/experimental.vipc']) {
