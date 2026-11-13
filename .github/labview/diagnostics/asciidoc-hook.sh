@@ -20,6 +20,8 @@ if not args or args.pop(0).lower() != '/c' or not args:
 if args[0] not in ('asciidoctor', 'asciidoctor-pdf') and args not in (
         ['gem', 'which', 'asciidoctor-kroki'], ['gem', 'which', 'asciimath'], ['gem', 'outdated']):
     sys.exit('Unsupported AsciiDoc command: ' + repr(args))
+if args == ['gem', 'outdated']:
+    args += ['--local', '--clear-sources']
 os.execvp(args[0], args)
 PYPROBE
 chmod +x /usr/local/bin/cmd
