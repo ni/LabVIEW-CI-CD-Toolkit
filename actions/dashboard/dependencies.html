@@ -484,6 +484,15 @@
       return out;
     }
 
+    function includeCurrentDependencyRevision(commits){
+      if (!defaultRevision) return commits;
+      // Dependency updates must offer the live HEAD even when the shared project
+      // history filters tooling commits or the generated dashboard is older.
+      const current = commits.find(commit => commit.sha === defaultRevision);
+      return [{...current, sha:defaultRevision, short:short(defaultRevision),
+        message:current?.message || "Current default-branch revision", project:true, depOnly:false},
+        ...commits.filter(commit => commit.sha !== defaultRevision)];
+    }
     async function listCommits(){
       // Prefer the dashboard's classified inventory (each revision tagged project /
       // dependency-only) so the shared revision picker can hide CI/tooling and
@@ -947,7 +956,8 @@
     }
     function linuxImplicitSettingsMatch(text, sha, intent, releaseOnlyAdvance = false){
       const loaded = intent.context.loaded;
-      if (intent.context.dirty || (sha !== intent.context.revision && !releaseOnlyAdvance) || !loaded || loaded !== linuxLoadedInputs
+      if (sha !== intent.context.revision && !releaseOnlyAdvance) throw new Error("Source files changed since this view. Select the current default-branch revision, review its dependencies, then update. No update submitted.");
+      if (intent.context.dirty || !loaded || loaded !== linuxLoadedInputs
         || loaded.repo !== repo || loaded.revision !== intent.context.revision || loaded.inputs !== intent.context.inputs
         || loaded.config !== linuxConfigSignature(selectedConfig) || linuxMonitoringRequest) throw new Error("Implicit monitoring requires a clean, fully loaded current revision with no pending Save. Choices are preserved; no update submitted.");
       const root = text.match(/^config:[ \t]*\r?\n((?: {2}[^\n]*\n?|[ \t]*\n)*)/m);
@@ -2292,7 +2302,7 @@
         const generated = await fetchJson(base + "dependencies/index.json");
         if (generated && Array.isArray(generated.vipc)) generatedInventory = generated;
       } catch (_) {}
-      const commits = await listCommits().catch(e => { $("status").textContent = e.message; return []; });
+      const commits = includeCurrentDependencyRevision(await listCommits().catch(e => { $("status").textContent = e.message; return []; }));
       const params = new URLSearchParams(location.search);
       const requestedSha = params.get("sha") || "";
       const generatedSha = generatedInventory && generatedInventory.sha;

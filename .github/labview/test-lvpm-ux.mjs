@@ -105,7 +105,7 @@ const fixtureSource = source.replace('    init();', `
       monitorCounts, monitorInputs, dispatchMonitor, openUpdateApprovalDialog, loadRevision,
       renderLinuxPrerequisites, checkLinuxMonitoringHead,
       runLinuxPrimaryAction, committedMonitoringMatches, linuxMonitoringContext, linuxSaveRestriction,
-      verifiedLinuxUpdateTarget, linuxReviewedWorkflow, updateIntent:() => linuxUpdateIntent,
+      verifiedLinuxUpdateTarget, linuxReviewedWorkflow, includeCurrentDependencyRevision, updateIntent:() => linuxUpdateIntent,
       cancelLinuxUpdateApproval,
       acceptedMonitoring:() => { linuxMonitoringRequest = {...linuxMonitoringContext(),status:'accepted'}; },
       headCheck:() => linuxHeadCheck,
@@ -1463,6 +1463,19 @@ for (const tooling of ['vipm', 'lvpm']) {
     hooks.invalidateLinuxOperation();
     prerequisiteCases++;
   }
+}
+prerequisiteFixture();
+for (const existing of [false, true]) {
+  const history = [{sha:'e'.repeat(40),message:'Project revision',project:true}];
+  if (existing) history.unshift({sha:revision,message:'Tooling update',project:false,depOnly:true});
+  const before = JSON.stringify(history);
+  const options = hooks.includeCurrentDependencyRevision(history);
+  assert.equal(options[0].sha,revision);
+  assert.equal(options[0].project,true);
+  assert.equal(options[0].depOnly,false);
+  assert.equal(options.filter(option => option.sha === revision).length,1);
+  assert.equal(JSON.stringify(history),before);
+  prerequisiteCases++;
 }
 const actualSourceFiles = fs.readdirSync(new URL('../',root),{recursive:true}).filter(path => /\.(?:vipc|dragon)$/i.test(path));
 for (const tooling of ['vipm','lvpm']) {

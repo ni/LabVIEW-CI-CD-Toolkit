@@ -1674,7 +1674,9 @@ docker run --rm `
         must establish ancestry and a complete change list containing only release notes and the catalog,
         whose fields other than version and history must remain identical. Any dependency, workflow,
         runtime catalog, or other source change still requires a current revision; incomplete comparisons
-        fail closed. Edited implicit settings cannot use this path. Unsupported or malformed configuration
+        fail closed. The dependency revision picker always includes the live default-branch HEAD, including
+        tooling commits, so a user can review current dependencies after a meaningful source change instead
+        of being trapped in an older generated view. Edited implicit settings cannot use this path. Unsupported or malformed configuration
         shapes remain unverified and do not dispatch.</p>
       <p>The explicit update intent retains its page context across authentication, reads, VIPM approval,
         and submission. Changes to platform, inspected revision, monitoring, or tooling invalidate it.
