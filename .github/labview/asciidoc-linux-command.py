@@ -17,8 +17,14 @@ def native_command(arguments):
     command = arguments[1:]
     if command[0] in ("asciidoctor", "asciidoctor-pdf"):
         return command
+    if command == ["gem", "outdated"]:
+        # The hook otherwise upgrades the pinned toolchain (and opens a sudo
+        # dialog), even when all required tools passed their native checks.
+        # Use RubyGems' own source controls: no remote update discovery during
+        # an immutable worker build. Normal `gem outdated` remains unchanged.
+        return ["gem", "outdated", "--local", "--clear-sources"]
     if command in (["gem", "which", "asciidoctor-kroki"],
-                   ["gem", "which", "asciimath"], ["gem", "outdated"]):
+                   ["gem", "which", "asciimath"]):
         return command
     raise ValueError("Unsupported command in AsciiDoc Linux compatibility wrapper")
 
@@ -26,6 +32,8 @@ def native_command(arguments):
 def main():
     try:
         command = native_command(sys.argv[1:])
+        if command[:2] == ["gem", "outdated"]:
+            print("Pinned CI toolchain: remote Ruby upgrade discovery is disabled.", file=sys.stderr)
         os.execvp(command[0], command)
     except (ValueError, OSError) as error:
         print(f"AsciiDoc Linux command failed: {error}", file=sys.stderr)

@@ -1806,7 +1806,11 @@ docker run --rm `
         <code>/opt/lvci/asciidoc-compat/cmd</code>: it forwards Asciidoctor/Asciidoctor PDF arguments and the
         two supported <code>gem which</code> checks, plus the read-only <code>gem outdated</code> query,
         to the real native executables, preserving output and
-        failure status. It does not emulate a Windows shell, evaluate shell text, or install gems.
+        failure status. During the package hook, the optional outdated query uses RubyGems' own
+        <code>--local --clear-sources</code> options: the pinned CI toolchain must not discover and install
+        arbitrary newer gems or open an interactive upgrade dialog. Normal <code>gem outdated</code>
+        outside this bridge is unchanged. The bridge does not emulate a Windows shell, evaluate shell text,
+        or install gems.
         The image smoke checks exercise this same command path. This lets the package check the installed
         toolchain before considering its interactive Linux sudo-configuration dialog; no sudoers permissions
         are added. The bridge ships in the client tooling payload and is included in both worker build hashes.

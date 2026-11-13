@@ -34,13 +34,19 @@ class CommandTests(unittest.TestCase):
 
     def test_observed_package_checks_execute_native_tools(self):
         for command in (("asciidoctor", "--version"), ("asciidoctor-pdf", "--version"),
-                        ("gem", "which", "asciidoctor-kroki"), ("gem", "which", "asciimath"),
-                        ("gem", "outdated")):
+                        ("gem", "which", "asciidoctor-kroki"), ("gem", "which", "asciimath")):
             with self.subTest(command=command):
                 result = self.invoke("/c", *command)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(json.loads(result.stdout), list(command[1:]))
                 self.assertEqual(result.stderr, "native diagnostic\n")
+
+    def test_optional_update_query_cannot_upgrade_the_pinned_toolchain(self):
+        result = self.invoke("/c", "gem", "outdated")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), ["outdated", "--local", "--clear-sources"])
+        self.assertIn("remote Ruby upgrade discovery is disabled", result.stderr)
+        self.assertIn("native diagnostic", result.stderr)
 
     def test_renderer_arguments_are_preserved_without_shell_evaluation(self):
         marker = self.bin / "must-not-exist"
