@@ -1,1 +1,0 @@
-The VI hierarchy once again shows a brown, clickable Diff pill when a side-by-side report exists for the selected revision. The pill opens the report even when snapshot frames are unavailable and supports keyboard activation. Snapshot status remains a separate small red X; VIs without reports do not receive a misleading Diff pill.
