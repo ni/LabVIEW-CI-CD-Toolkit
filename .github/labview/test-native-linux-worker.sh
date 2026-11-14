@@ -89,9 +89,11 @@ if (release['status'] != 'qualified' or not re.fullmatch(r'20\d{2}', year)
     raise SystemExit('A qualified catalog Linux release is required')
 config_path = root / '.github/labview-ci.yml'
 original_config = hashlib.sha256(config_path.read_bytes()).hexdigest()
+selected_vipcs = ['.github/labview/antidoc/antidoc.vipc', '.github/labview/experimental.vipc',
+                  'example/Dependencies.vipc']
 fixture = {'schemaVersion': 1, 'config': {'labviewVersion': year, 'os': ['linux'],
-           'container': {'vipc': [{'path': 'example/Dependencies.vipc', 'monitor': True,
-                                   'monitorOn': ['linux']}], 'dragon': [{'path': 'example/Example.dragon',
+           'container': {'vipc': [{'path': path, 'monitor': True,
+                                   'monitorOn': ['linux']} for path in selected_vipcs], 'dragon': [{'path': 'example/Example.dragon',
            'monitor': True, 'monitorOn': ['linux']}]}}}
 config_path.write_text(yaml.safe_dump(fixture, sort_keys=False))
 (output / 'fixture-config.yml').write_bytes(config_path.read_bytes())
@@ -155,6 +157,8 @@ PY
     docker image inspect "$image" > "$out/image-inspect.json"
     [[ "$(docker image inspect "$image" --format '{{.Os}}/{{.Architecture}}')" == linux/amd64 ]]
     docker run --rm --network none --entrypoint /usr/bin/dpkg-query "$image" -W '-f=${Package} ${Version}\n' > "$out/dpkg-list.txt"
+    docker run --rm --network none --entrypoint /usr/bin/dpkg-query "$image" \
+        -W '-f=${db:Status-Status}\t${Package}\t${Version}\n' > "$out/dpkg-status.tsv"
     container=$(docker create --network none --entrypoint /bin/sh "$image" -c true)
     if [[ "$mode" == vipm ]]; then
         docker cp "$container:/opt/lvci/vipm/observed-inventory.json" "$out/observed-inventory.json"

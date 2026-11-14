@@ -1387,12 +1387,17 @@ docker run --rm `
         registry publication and activity checks still require CI qualification; local fixtures do not establish them.</p>
       <p>The revision picker compares that revision's declarations and monitoring choices with its selected worker.
         Saving in a client submits a configuration proposal; it is not applied until reviewed and merged.
-        Windows and Linux checkboxes preserve the other platform's selection. The tooling source intentionally disables
-        client Save on both platforms and explains that monitoring changes require a source PR; forks remain ineligible
-        for the client installer. Existing LVPM candidate verification, digest pins and explicit activation are unchanged.</p>
+        Windows and Linux checkboxes preserve the other platform's selection. In the tooling source and its forks,
+        Save opens a monitoring-only source PR through Reconfigure. The workflow verifies the reviewed default-branch
+        SHA and rejects unrelated settings; only the dependency lists in <code>.github/labview-ci.yml</code> change.
+        The client installer remains forbidden. Explicit per-file selections override capability defaults, including
+        selecting Antidoc or an internal VIPC for Linux. LVPM publication also queries installed native packages from the exact candidate image,
+        retaining the dpkg status output and excluding removed or incompletely configured packages. This supplies the
+        NI-package inventory needed by the Dependencies page. Older candidates require rebuilding to obtain it.
+        Existing LVPM candidate verification, digest pins and explicit activation are unchanged.</p>
       <p><code>native-dependency-validation.yml</code> runs only on its dedicated validation branch or manual dispatch.
         Windows x64 VIPM and Linux x64 VIPM/LVPM jobs build the candidate with the real example VIPC and Dragon files,
-        the tooling baseline, and the Windows Antidoc capability. They retain source
+        the tooling baseline, and Antidoc. Linux also includes the explicitly selected experimental VIPC, matching the source example monitoring configuration (35 unique package requirements). They retain source
         hashes, build logs and installed-inventory evidence as artifacts. The jobs have read-only repository/package
         permissions and never publish images, active aliases or Pages pointers. A passed native build verifies the
         selected fixture and recorded scope, not every project or LabVIEW activity; failures retain diagnostic artifacts.</p>
@@ -1664,7 +1669,7 @@ docker run --rm `
         matching settings can proceed. Reconfigure&rsquo;s omitted <code>monitorOn</code> with
         <code>monitor: true</code> means both platforms; false remains an opt-out. There are no Find/Open
         navigation stages, automatic updates on page load, or background retries. Source repositories and
-        their forks must change monitoring through reviewed source PRs, not client Save or the installer.</p>
+        their forks use the monitoring-only Save path to propose a reviewed source PR. Save does not invoke the client installer or automatically build or activate a worker.</p>
       <p>Legacy implicit monitoring (omitted lists, not explicit empty lists) retains a clean-current path:
         authenticated HEAD must equal the fully loaded revision, with unchanged complete discovery inputs,
         worker settings, and no pending Save. Generated inventory requires exact repository/revision provenance;
@@ -1776,7 +1781,10 @@ docker run --rm `
           <code>container.use</code> and existing overrides without assuming the fallback uses VIPM. Reconfigure applies
           only explicitly requested settings to the parsed existing manifest: activation/reset preserves separate
           VIPC and Dragon lists, explicit dependency-policy values, platform settings, provenance, and unknown
-          client fields. A no-op keeps the file byte-identical; an actual update may normalize YAML formatting.</li>
+          client fields. The tooling source and its forks also support these configuration-only activation/reset
+          PRs: the request may change only the Linux selection, and activation retains the same server-side
+          candidate verification. The client installer is never invoked. A no-op keeps the file byte-identical;
+          an actual update may normalize YAML formatting.</li>
       </ol>
       <p>Project declarations that intentionally duplicate CI-tooling roots (for example
         <code>example/Dependencies.vipc</code>) must keep shared roots pinned to the exact same versions;
@@ -1793,6 +1801,31 @@ docker run --rm `
         compile, test, build, and rendering activities before depending on it. Conditional file groups the adapter
         cannot safely validate are rejected conservatively. Private package feeds, embedded Dragon VIPC references,
         and NIPM installation are not supported by this initial LVPM adapter.</div>
+      <p>Both Linux worker images install Ruby and pinned Asciidoctor, Asciidoctor PDF, Kroki, and AsciiMath
+        gems before applying VIP packages. The root gem versions match AsciiDoc 1.12.1’s bundled toolchain
+        (including Kroki 0.10.2, compatible with the NI image’s Ruby 3.0). The image build checks all four tools and renders a small HTML/PDF
+        document offline. AsciiDoc 1.12.1's <code>Send Ruby Command.vi</code> invokes these Linux tools
+        through <code>cmd /c</code>. The images put a restricted compatibility command on their PATH at
+        <code>/opt/lvci/asciidoc-compat/cmd</code>: it forwards Asciidoctor/Asciidoctor PDF arguments and the
+        two supported <code>gem which</code> checks, plus the read-only <code>gem outdated</code> query,
+        to the real native executables, preserving output and
+        failure status. During the package hook, the optional outdated query uses RubyGems' own
+        command-specific <code>gemrc</code> with an empty remote-source list: the pinned CI toolchain must not discover and install
+        arbitrary newer gems or open an interactive upgrade dialog. Normal <code>gem outdated</code>
+        outside this bridge is unchanged. The bridge does not emulate a Windows shell, evaluate shell text,
+        or install gems.
+        The image smoke checks exercise this same command path, including the update query with networking disabled. This lets the package check the installed
+        toolchain before considering its interactive Linux sudo-configuration dialog; no sudoers permissions
+        are added. The bridge ships in the client tooling payload and is included in both worker build hashes.
+        See the pinned <a href="https://gitlab.com/wovalab/open-source/asciidoc-toolkit/-/tree/e0eaf44f7a05990d1b20e7174d359dc98d1f6ff3/Sources/Toolchain">upstream toolchain source</a>.</p>
+      <p>Linux VIPM and LVPM builds pre-create <code>~/natinst/LabVIEW Data/wovalab-post-install-dialog</code>,
+        the opt-out used by the Wovalab donation dialog's “Do not show this window again” checkbox.
+        This prevents AsciiDoc's post-install action from waiting for a click in unattended builds.
+        All package hooks still run, and a hook failure still rejects the image. The path follows the standard
+        NI Linux image's default data directory; customized base images must preserve that setting or provide
+        the same marker in their configured data directory.
+        The mechanism is defined in Wovalab's
+        <a href="https://gitlab.com/wovalab/open-source/post-install-dialog/-/tree/11078cefaebfd36e6de2781c83009500e55d00b9">post-install dialog source</a>.</p>
       <p>These are <strong>global installs inside isolated containers</strong>, not developer virtual environments.
         Snapshots retain their existing <code>TOIMAGES_IMAGE</code> or repository Linux-latest selection when
         <code>linuxUse</code> is absent. After opting in, explicit snapshot action overrides precede
@@ -1804,7 +1837,8 @@ docker run --rm `
         a fresh candidate is built, verified, and explicitly activated. A failed candidate leaves the previous image
         available but does not make stale requirements current. The selected environment drives Linux inventory;
         an unused candidate does not create missing-dependency warnings for the active pipeline. LVPM inventories
-        VIP packages, not native NI packages: unmeasured native package coverage is unknown, not evidence of absence.</p>
+        VIP packages. The candidate workflow separately queries installed native NI packages with
+        <code>dpkg-query</code> from the exact published image digest; unmeasured native package coverage remains unknown.</p>
       <p>The dashboard separately reports <strong>local freshness</strong> for the exact inspected revision and
         digest-pinned selection. It uses trusted action-distributed helper code, treating the client checkout only as
         input data. Optional pinned Python prerequisites are installed in an isolated temporary environment only when

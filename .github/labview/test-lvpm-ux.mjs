@@ -96,7 +96,7 @@ const context = vm.createContext({
   }
 });
 const fixtureSource = source.replace('    init();', `
-    globalThis.hooks = { parseManifestYaml, resolveColumn, packagesInManifest, pkgCellState,
+    globalThis.hooks = { classifyVipc, monitorMap, parseManifestYaml, resolveColumn, packagesInManifest, pkgCellState,
       candidateSelection, loadLinuxBuildAvailability, linuxWorkflowPayload, dispatchLinuxWorker, dispatchContainerUpdate, loadManifestFor, updTargets, renderLinuxInstaller, nipmCell, enrichPlatformState,
       pollLinuxOperation, validateLinuxRun, invalidateLinuxOperation, getLinuxOperation:() => linuxOperation,
       lvpmFreshness, localFreshnessText, loadPlatformStates, renderGenerated, renderContainers,
@@ -1282,7 +1282,7 @@ function prerequisiteFixture(overrides = {}){
 const prerequisiteMarkup = () => elements.get('linuxPrerequisites').innerHTML;
 const newHead = 'f'.repeat(40);
 let start;
-const actualImplicitManifest = fs.readFileSync(new URL('labview-ci.yml',root),'utf8');
+const actualImplicitManifest = fs.readFileSync(new URL('labview-ci.yml',root),'utf8').replace(/^  container:\n[\s\S]*?(?=^  \w|^\S|$(?![\s\S]))/m,'');
 const implicitConfig = hooks.parseManifestYaml(actualImplicitManifest);
 assert.equal(implicitConfig.hasVipcList,false);
 assert.equal(implicitConfig.hasDragonList,false);
@@ -1616,6 +1616,25 @@ for (const tooling of ['lvpm','vipm']) {
     }
   }
 }
+// Switching platforms during Save's read-only preflight must not leave Save locked.
+start = prerequisiteFixture({dirty:true});
+elements.set('saveMonitor', uiElement());
+let releaseMonitoringLookup;
+lookupBarrier = {match:url => url === 'https://api.github.com/repos/owner/project',
+  promise:new Promise(resolve => {releaseMonitoringLookup = resolve;})};
+const abandonedSave = hooks.dispatchMonitor();
+await Promise.resolve();
+hooks.selectPlatform('windows');
+releaseMonitoringLookup();
+await abandonedSave;
+assert.equal(postCount(start),0);
+assert.equal(elements.get('saveMonitor').disabled,false);
+lookupBarrier = null;
+dispatchStatus = 204;
+await hooks.dispatchMonitor();
+assert.equal(postCount(start),1);
+prerequisiteCases++;
+
 for (const sourceRepo of ['ni/LabVIEW-CI-CD-Toolkit','owner/toolkit-fork']) {
   start = prerequisiteFixture({dirty:true});
   const sourceContext = vm.createContext({...context,window:{LVCI:{repo:sourceRepo}}});
@@ -1627,8 +1646,14 @@ for (const sourceRepo of ['ni/LabVIEW-CI-CD-Toolkit','owner/toolkit-fork']) {
   await sourceHooks.runLinuxPrimaryAction();
   assert.equal(postCount(start),0);
   await sourceHooks.dispatchMonitor();
-  assert.equal(postCount(start),0);
-  assert.match(elements.get('monitorStatus').innerHTML,/tooling source|fork of/);
+  assert.equal(postCount(start),1);
+  const saved = JSON.parse(requests.slice(start).find(request => request.options.method === 'POST').options.body);
+  assert.equal(saved.ref,'trunk');
+  assert.equal(saved.inputs.monitoring_only,'true');
+  assert.equal(saved.inputs.expected_sha,revision);
+  assert.equal(sourceHooks.isMonitorDirty(),true);
+  await sourceHooks.dispatchMonitor();
+  assert.equal(postCount(start),1);
   prerequisiteCases++;
 }
 start = prerequisiteFixture({dirty:true,revision:'e'.repeat(40)});
@@ -1835,8 +1860,7 @@ for (const platforms of [['windows'],['windows','linux'],['linux'],[]]){
   start = prerequisiteFixture({vipcs:[file]});
   activeConfig = explicitMonitoring([file]);
   await hooks.runLinuxPrimaryAction();
-  assert.equal(postCount(start),platforms.join('+') === 'windows' ? 1 : 0);
-  if (platforms.join('+') !== 'windows') assert.match(prerequisiteMarkup(),/Cannot verify/);
+  assert.equal(postCount(start),1, platforms.join('+'));
   hooks.invalidateLinuxOperation();
   prerequisiteCases++;
 }
@@ -1940,11 +1964,44 @@ vm.runInContext(fixtureSource, restrictedContext);
 for (const platform of ['windows', 'linux']) {
   restrictedContext.hooks.setState({platform, vipcs:[{...projectVipc}], dragons:[], columns:loaderPlatforms()});
   restrictedContext.hooks.setFileMonitor('vipc', 'project.vipc', platform, false);
-  assert.equal(elements.get('saveMonitor').disabled, true);
+  assert.equal(elements.get('saveMonitor').disabled, false);
   assert.match(elements.get('monitorStatus').innerHTML, /reviewed source PR/);
+  repoMetadata = {full_name:'ni/LabVIEW-CI-CD-Toolkit',default_branch:'main',fork:false};
   const before = requests.length;
   await restrictedContext.hooks.dispatchMonitor();
-  assert.equal(requests.length, before);
+  assert.equal(postCount(before),1);
+  assert.equal(JSON.parse(requests.slice(before).find(r => r.options.method === 'POST').options.body).inputs.monitoring_only,'true');
+}
+// Older indexes marked unselected internal VIPCs as Windows capabilities. Reconcile
+// their checkboxes from configuration before preserving the other platform in Save.
+restrictedContext.hooks.setState({platform:'linux',vipcs:[],dragons:[]});
+restrictedContext.hooks.renderGenerated({sha:revision,config:{hasVipcList:false,vipc:[]},
+  vipc:[{path:'.github/labview/experimental.vipc',role:'capability',configured:false,monitored:true,monitorOn:['windows'],packages:[]}],columns:[],dragon:{files:[]}});
+assert.equal(restrictedContext.hooks.monitorInputs().container_vipc,'.github/labview/experimental.vipc::none');
+restrictedContext.hooks.setFileMonitor('vipc','.github/labview/experimental.vipc','linux',true);
+assert.equal(restrictedContext.hooks.monitorInputs().container_vipc,'.github/labview/experimental.vipc::linux');
+
+// Source Save cannot dispatch an older unsafe workflow or continue after the user changes inputs.
+for (const workflow of ['', '# source-monitoring-only-v1', 'name: old Reconfigure']) {
+  const before = prerequisiteFixture({dirty:true});
+  restrictedContext.hooks.setState({dirty:true,vipcs:[{...projectVipc}],dragons:[]});
+  repoMetadata = {full_name:'ni/LabVIEW-CI-CD-Toolkit',default_branch:'main',fork:false};
+  reviewedWorkflowOverride = workflow;
+  await restrictedContext.hooks.dispatchMonitor();
+  assert.equal(postCount(before),0);
+  assert.match(elements.get('monitorStatus').innerHTML,/monitoring-only Save update/);
+  assert.equal(elements.get('saveMonitor').disabled,false);
+  assert.equal(elements.get('saveMonitor').textContent,'Save monitored files');
+}
+reviewedWorkflowOverride = null;
+for (const path of ['.github/labview/antidoc/antidoc.vipc','.github/labview/experimental.vipc']) {
+  for (const monitorOn of [['windows'],['linux'],['windows','linux'],[]]) {
+    const configured = hooks.monitorMap([{path,monitor:monitorOn.length > 0,monitorOn}]);
+    assert.deepEqual(plain(hooks.classifyVipc(path,configured,true).monitorOn),monitorOn);
+    restrictedContext.hooks.renderGenerated({sha:revision,config:{hasVipcList:true,vipc:[{path,monitor:monitorOn.length > 0,monitorOn}]},
+      vipc:[{path,role:'capability',monitorOn:['windows'],packages:[]}],columns:[],dragon:{files:[]}});
+    assert.equal(restrictedContext.hooks.monitorInputs().container_vipc,path + '::' + (monitorOn.join('+') || 'none'));
+  }
 }
 console.log('Linux monitoring prerequisites: ' + prerequisiteCases + ' actual-function cases; Dragon file/package details: ' + dragonDetailCases + ' renderer cases passed.');
 console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety and monitoring regressions passed; ' + progressCases + ' dispatch identity/progress/error/duplicate/stale-context cases and ' + visualChecks + ' visual progress checks passed.');

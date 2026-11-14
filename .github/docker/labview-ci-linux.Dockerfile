@@ -48,7 +48,7 @@ RUN set -eux; \
       chmod +x /opt/lvci/vipm/install-vipc-linux.sh; \
       export DEBIAN_FRONTEND=noninteractive; \
       apt-get update; \
-                  apt-get install -y --no-install-recommends ca-certificates curl unzip xvfb python3 \
+                  apt-get install -y --no-install-recommends ca-certificates curl unzip xvfb python3 ruby-full \
         fonts-dejavu-core fonts-liberation fonts-noto-core xfonts-base xfonts-75dpi xfonts-100dpi fontconfig; \
       fc-cache -f >/dev/null 2>&1 || true; \
       curl -fL --retry 3 --retry-delay 2 -o /tmp/vipm.deb "${VIPM_DEB_URL}"; \
@@ -57,6 +57,28 @@ RUN set -eux; \
       rm -rf /var/lib/apt/lists/*; \
       command -v vipm; \
       vipm --version || true
+
+# AsciiDoc 1.12.1 invokes its native Ruby tools through `cmd /c` on Linux too.
+# Restrict the bridge to Asciidoctor rendering and the package's gem checks.
+COPY .github/labview/asciidoc-linux-command.py /opt/lvci/asciidoc-compat/cmd
+RUN chmod +x /opt/lvci/asciidoc-compat/cmd \
+ && printf ":sources: []\n" > /opt/lvci/asciidoc-compat/gemrc
+ENV PATH="/opt/lvci/asciidoc-compat:${PATH}"
+
+# AsciiDoc's Linux post-install VI otherwise opens a sudo-configuration dialog.
+# Match the tool versions shipped with AsciiDoc 1.12.1 (Kroki 2 needs newer Ruby).
+# Supply its native toolchain before package hooks; no sudoers changes or skipped hooks.
+RUN gem install --no-document asciidoctor:2.0.26 asciidoctor-pdf:2.3.24 asciidoctor-kroki:0.10.2 asciimath:2.0.6 \
+ && cmd /c asciidoctor --version && cmd /c asciidoctor-pdf --version \
+ && cmd /c gem which asciidoctor-kroki && cmd /c gem which asciimath \
+ && printf '= Container dependency check\n\nAsciidoctor is installed.\n' > /tmp/lvci-asciidoctor.adoc \
+ && cmd /c asciidoctor -r asciidoctor-kroki -r asciimath -o /tmp/lvci-asciidoctor.html /tmp/lvci-asciidoctor.adoc \
+ && cmd /c asciidoctor-pdf -o /tmp/lvci-asciidoctor.pdf /tmp/lvci-asciidoctor.adoc \
+ && test -s /tmp/lvci-asciidoctor.html && test -s /tmp/lvci-asciidoctor.pdf \
+ && rm /tmp/lvci-asciidoctor.adoc /tmp/lvci-asciidoctor.html /tmp/lvci-asciidoctor.pdf
+# Prove the package's optional update query stays offline and finds no unpinned upgrades.
+RUN --network=none cmd /c gem outdated > /tmp/lvci-pinned-gem-updates \
+ && test ! -s /tmp/lvci-pinned-gem-updates && rm /tmp/lvci-pinned-gem-updates
 
 RUN --mount=type=secret,id=vipm_serial,required=false \
       --mount=type=secret,id=vipm_full_name,required=false \

@@ -46,6 +46,15 @@ find_labview() {
   return 1
 }
 
+# Wovalab's donation dialog checks this opt-out file in Dflt Data Dir.vi.
+# Keep package hooks enabled; only suppress its optional interactive prompt.
+prepare_unattended_hooks() {
+  local data_dir="${1:-$HOME/natinst/LabVIEW Data}"
+  mkdir -p "$data_dir"
+  touch "$data_dir/wovalab-post-install-dialog"
+  echo "Disabled the optional Wovalab post-install donation prompt: $data_dir"
+}
+
 start_labview() {
   local labview_bin
   labview_bin="$(find_labview || true)"
@@ -126,6 +135,7 @@ if [ -n "${VIPM_SERIAL_NUMBER:-}" ]; then
   echo "VIPM activation command was not accepted; continuing with the installed license state."
 fi
 
+prepare_unattended_hooks
 start_labview
 echo "Refreshing VIPM package sources..."
 if refresh_output=$(run_vipm refresh --force 2>&1); then

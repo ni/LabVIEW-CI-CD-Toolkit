@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -323,6 +324,31 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(worker.resolve(self.repo, "snapshots", self.repository), "explicit-custom")
 
 
+class NativePackageInventoryTests(unittest.TestCase):
+    def test_removed_and_unconfigured_packages_do_not_count_as_installed(self):
+        raw = ('installed\tni-vialinux-labview-support\t26.3.0\n'
+               'config-files\tremoved-package\t1.0\n'
+               'unpacked\tincomplete-package\t2.0\n')
+        self.assertEqual(worker.native_packages(raw), [{'name':'ni-vialinux-labview-support', 'version':'26.3.0'}])
+        for invalid in ('', 'ni-vialinux-labview-support 26.3.0', 'installed\tbad name\t1.0',
+                        'installed\tmissing-version\t', 'config-files\tremoved-package\t1.0'):
+            with self.assertRaises(ValueError):
+                worker.native_packages(invalid)
+
+    @unittest.skipUnless(shutil.which('dpkg-query'), 'Native dpkg query requires Linux')
+    def test_actual_installed_status_query_and_workflow_capture(self):
+        workflow = yaml.safe_load((ROOT / worker.WORKFLOW).read_text())
+        step = next(step for step in workflow['jobs']['candidate']['steps']
+                    if step['name'] == 'Bind the installed file inventory to the exact published digest')
+        query_format = '${db:Status-Status}\t${Package}\t${Version}\n'
+        self.assertIn("-W '-f=${db:Status-Status}\\t${Package}\\t${Version}\\n'", step['run'])
+        raw = subprocess.check_output(['dpkg-query', '-W', '-f=' + query_format], text=True)
+        installed = worker.native_packages(raw)
+        self.assertTrue(any(item['name'] == 'dpkg' for item in installed))
+        self.assertIn("'dpkg_packages': native", step['run'])
+        self.assertIn('docker run --rm --network none --entrypoint /usr/bin/dpkg-query "$image_ref"', step['run'])
+
+
 class NetworkAndWorkflowTests(unittest.TestCase):
     def test_native_linux_installer_is_targeted_and_fails_closed(self):
         script = (ROOT / '.github/labview/vipm/install-vipc-linux.sh').read_text()
@@ -339,6 +365,7 @@ class NetworkAndWorkflowTests(unittest.TestCase):
             "*' list '*) printf '%s\\n' \"$INSTALLED_INVENTORY\"; return \"$LIST_EXIT\" ;;\n"
             "*) return 0 ;; esac; }\n")
         script = script.replace('VIPM_BIN="$(find_vipm || true)"', mocks + '\nVIPM_BIN="$(find_vipm || true)"')
+        script = script.replace("\nprepare_unattended_hooks\n", '\nprepare_unattended_hooks "$VIPC_DIR/labview-data"\n')
         inventory = 'Using LabVIEW 2026 (64-bit)\nsome_lib v1.1-1'
         cases = (
             ('0', '0', '0', inventory, True),
@@ -408,7 +435,8 @@ class NetworkAndWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
             for relative in (worker.WORKFLOW, '.github/docker/labview-ci-lvpm.Dockerfile',
-                             '.github/labview/lvpm/worker.py', '.github/labview/lvpm/adapter.py'):
+                             '.github/labview/lvpm/worker.py', '.github/labview/lvpm/adapter.py',
+                             '.github/labview/asciidoc-linux-command.py'):
                 target = repo / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text('raise RuntimeError("inspected client code must not execute")\n')
@@ -449,7 +477,8 @@ class NetworkAndWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
             for relative in (worker.WORKFLOW, ".github/docker/labview-ci-lvpm.Dockerfile",
-                             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py"):
+                             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py",
+                             ".github/labview/asciidoc-linux-command.py"):
                 target = repo / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((ROOT / relative).read_bytes())
@@ -457,6 +486,11 @@ class NetworkAndWorkflowTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(json.dumps(catalog))
             original = worker.build_inputs_hash(repo)
+            bridge = repo / ".github/labview/asciidoc-linux-command.py"
+            bridge_original = bridge.read_bytes()
+            bridge.write_bytes(bridge_original + b"\n# changed command handling\n")
+            self.assertNotEqual(worker.build_inputs_hash(repo), original)
+            bridge.write_bytes(bridge_original)
             release_only = {**catalog, "version": "999.999.999", "history": [], "channel": "test"}
             target.write_text(json.dumps(release_only))
             self.assertEqual(worker.build_inputs_hash(repo), original)

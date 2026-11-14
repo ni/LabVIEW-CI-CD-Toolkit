@@ -4478,16 +4478,19 @@ def _vipc_role(path, config_vipc, has_config_list):
   """
   if path == TOOLING_CORE_VIPC:
     return 'core', '', True, True, True
+  entry = (config_vipc or {}).get(path)
+  if entry is not None:
+    monitored = entry.get('monitor') is True
+    return 'project', '', monitored, monitored, False
   cap = _capability_for_vipc(path)
   if cap:
     return 'capability', cap, _capability_enabled(cap), True, False
   # Any other VIPC under .github/ is internal/experimental tooling, NOT a user
-  # project dependency: the worker "Stage repo VIPC files" step excludes .github/
-  # from baking, so such a file can never be present on the standard workers and
-  # must not be flagged as a missing dependency. Classify it as a tooling file
+  # project dependency by default. Explicit entries above opt it into staging
+  # and coverage; unselected internal files must not raise dependency warnings. Classify it as a tooling file
   # (capability role, no capability) so it shows N/A rather than a false gap.
   if (path or '').replace('\\', '/').startswith('.github/'):
-    return 'capability', '', False, True, False
+    return 'capability', '', False, False, False
   entry = (config_vipc or {}).get(path)
   monitored = bool(entry and entry.get('monitor') is True) if has_config_list else True
   return 'project', '', monitored, monitored, False
@@ -5075,7 +5078,7 @@ def _build_dependencies_index():
     if role == 'capability':
       # A capability VIPC is baked only into its capability's worker platform(s),
       # so limit its monitored columns accordingly (Antidoc = Windows only).
-      monitor_on = _capability_platforms(capability)
+      monitor_on = _capability_platforms(capability) if capability else []
     else:
       monitor_on = _monitor_on(config_vipc.get(path), has_config_list, role == 'core')
     vipcs.append({'path': path, 'role': role, 'capability': capability,

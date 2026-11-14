@@ -30,6 +30,9 @@ class LvpmAdapterTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
+        home = patch.object(ADAPTER.Path, "home", return_value=self.root / "home")
+        home.start()
+        self.addCleanup(home.stop)
         self.write_vipc(ADAPTER.CORE, ["core_lib-1.0.0"])
 
     def write_vipc(self, relative, packages):

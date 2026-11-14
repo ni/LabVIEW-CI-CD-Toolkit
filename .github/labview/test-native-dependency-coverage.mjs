@@ -14,19 +14,22 @@ vm.runInContext(script.replace('    init();', `
   currentVipcs = fixture.index.vipc;
   currentDragons = fixture.index.dragon.files.map(file => ({...file, path:file.source_file}));
   activePlatform = fixture.platform;
-  const state = enrichPlatformState({key:fixture.platform, tag:'latest'}, fixture.manifest);
+  const state = enrichPlatformState({key:fixture.platform, tag:fixture.index.columns[0].tag}, fixture.manifest);
   currentColStates = {[fixture.platform]:state};
   const column = COLS.find(item => item.key === fixture.platform);
   globalThis.result = {
     cells: currentVipcs.flatMap(file => file.packages.map(pkg => ({pkg, ...pkgCellState(pkg,state,file,column)}))),
     vipcs: currentVipcs.map(file => vipcFileState(file,currentColStates)),
     dragons: currentDragons.map(dragonFileState),
-    native: fixture.index.nipm.filter(dep => dep.platforms.includes(fixture.platform)).map(dep => ({name:dep.name, html:nipmCell(dep,column,state)})),
+    native: fixture.index.nipm.filter(dep => dep.platforms.includes(fixture.platform)).map(dep => ({name:dep.name, key:dep.key, html:nipmCell(dep,column,state)})),
     coverage: platformCoverage(fixture.platform)
   };
 `), context);
 for (const cell of context.result.cells) assert.equal(cell.state, 'present', cell.pkg + ': ' + cell.title);
 for (const pill of [...context.result.vipcs, ...context.result.dragons]) assert.match(pill, /dep-file-state installed/);
-for (const cell of context.result.native) assert.match(cell.html, /aria-label="Present"/, cell.name + ': ' + cell.html);
+for (const cell of context.result.native) {
+  const expected = fixture.manifest.installer === 'lvpm' && cell.key === 'vipm' ? /LVPM selected; VIPM is not the Linux installer/ : /aria-label="Present"/;
+  assert.match(cell.html, expected, cell.name + ': ' + cell.html);
+}
 assert.equal(context.result.coverage.pending, false, JSON.stringify(context.result.coverage));
 console.log(`${fixture.platform}: ${context.result.cells.length} package cells, native NI packages, VIPC and Dragon status pills, and platform coverage clear`);

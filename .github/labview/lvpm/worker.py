@@ -32,7 +32,8 @@ def candidate_tag(fingerprint, base_digest, build_inputs_sha256, run_id, attempt
 def build_inputs_hash(repo):
     root = Path(repo)
     paths = [root / path for path in (WORKFLOW, ".github/docker/labview-ci-lvpm.Dockerfile",
-             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py")]
+             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py",
+             ".github/labview/asciidoc-linux-command.py")]
     paths += [path for path in (root / ".github/labview/toimages").rglob("*") if path.is_file()]
     inputs = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
               for path in sorted(paths)}
@@ -73,6 +74,24 @@ def verify_registry(image, tag, digest):
         with opener.open(request, timeout=30) as response:
             if response.headers.get("Docker-Content-Digest") != digest:
                 raise ValueError("GHCR candidate tag or immutable digest has changed")
+
+
+def native_packages(raw):
+    """Only installed dpkg records establish native package coverage."""
+    packages = set()
+    for line in raw.splitlines():
+        fields = line.split('\t')
+        if len(fields) != 3:
+            raise ValueError('Malformed dpkg status inventory')
+        status, name, version = fields
+        if status != 'installed':
+            continue
+        if not re.fullmatch(r'[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?', name) or not version or re.search(r'\s', version):
+            raise ValueError('Invalid installed dpkg package record')
+        packages.add((name, version))
+    if not packages:
+        raise ValueError('Installed native package inventory is empty')
+    return [{'name': name, 'version': version} for name, version in sorted(packages)]
 
 
 def verify_image_platform(image, inventory):
