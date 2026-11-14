@@ -95,7 +95,7 @@ fixture = {'schemaVersion': 1, 'config': {'labviewVersion': year, 'os': ['linux'
            'container': {'vipc': [{'path': path, 'monitor': True,
                                    'monitorOn': ['linux']} for path in selected_vipcs], 'dragon': [{'path': 'example/Example.dragon',
            'monitor': True, 'monitorOn': ['linux']}]}}}
-config_path.write_text(yaml.safe_dump(fixture, sort_keys=False))
+# Diagnostic: retain the actual merged source configuration, including explicit core monitoring.
 (output / 'fixture-config.yml').write_bytes(config_path.read_bytes())
 paths = sorted(path for path in root.rglob('*') if path.is_file())
 hashes = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
