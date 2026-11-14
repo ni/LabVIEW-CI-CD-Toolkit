@@ -1,0 +1,153 @@
+﻿{
+    "schema":  1,
+    "platform":  "windows",
+    "labview_version":  "2026",
+    "labview_bitness":  "64",
+    "source":  "vipm list --installed",
+    "target_verified":  true,
+    "raw":  "vipm.exe : Using LabVIEW 2026 (64-bit)\r\nAt C:\\vipm\\install-vipc.ps1:1083 char:16\r\n+         $out = \u0026 $VipmExe @GlobalFlags list --installed 2\u003e\u00261\r\n+                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : NotSpecified: (Using LabVIEW 2026 (64-bit):Strin    g) [], RemoteException\r\n    + FullyQualifiedErrorId : NativeCommandError\r\n \r\nListing installed packages\r\nInstalled packages (35):\r\n  astemes_lib_lunit v2.0.13.6\r\n  astemes_lib_lunit_cli v1.7.1.32\r\n  astemes_lib_lunit_coverage_analysis_add_on v1.0.0.2\r\n  astemes_lib_lunit_global_fixture_add_on v1.0.5.4\r\n  astemes_lib_lunit_parameterized_add_on v1.1.10.8\r\n  astemes_lib_lunit_test_inheritance_add_on v1.0.5.4\r\n  dataflow_g_lib_g_image v0.5.0.1\r\n  felipefoz_lib_lv_rainbow_terminal v1.1.1.5\r\n  graphbuilder v2.3.0.7\r\n  jki_lib_caraya v1.4.4.148\r\n  jki_lib_state_machine v2024.0.3.23\r\n  jki_rsc_toolkits_palette v1.1-1\r\n  labview_open_source_lib_epoch_datetime v1.3.0.8\r\n  labview_open_source_project_lib_labview_open_source_palette v1.0.2.7\r\n  labview_open_source_project_lib_openuri v1.4.0.13\r\n  lvos_lib_caraya_cli_extension v2.0.0.7\r\n  ni_lib_junit_results_api v1.0.1.6\r\n  ni_lib_simple_xml v1.0.0.4\r\n  ni_lib_utf_junit_report v1.0.1.43\r\n  oglib_appcontrol v4.1.0.7\r\n  oglib_array v6.0.1.20\r\n  oglib_boolean v6.0.0.9\r\n  oglib_error v6.0.0.26\r\n  oglib_file v6.0.2.28\r\n  oglib_lvdata v6.0.0.45\r\n  oglib_string v6.0.2.35\r\n  pnr_lib_caraya_junit_for_azure_pipelines v1.2.0.11\r\n  pnr_lib_junit_xml v1.0.0.4\r\n  sas_workshops_lib_lunit_for_g_cli v1.2.1.85\r\n  wiresmith_technology_lib_g_cli v3.0.1.98\r\n  wovalab_lib_antidoc v3.3.1.879\r\n  wovalab_lib_antidoc_add_on_labview_project_documentation v3.2.0.358\r\n  wovalab_lib_antidoc_add_on_labview_toolkit_documentation v3.0.0.77\r\n  wovalab_lib_antidoc_cli v3.4.0.126\r\n  wovalab_lib_asciidoc_for_labview v1.12.1.492\r\n",
+    "packages":  [
+                     {
+                         "name":  "astemes_lib_lunit",
+                         "version":  "2.0.13.6"
+                     },
+                     {
+                         "name":  "astemes_lib_lunit_cli",
+                         "version":  "1.7.1.32"
+                     },
+                     {
+                         "name":  "astemes_lib_lunit_coverage_analysis_add_on",
+                         "version":  "1.0.0.2"
+                     },
+                     {
+                         "name":  "astemes_lib_lunit_global_fixture_add_on",
+                         "version":  "1.0.5.4"
+                     },
+                     {
+                         "name":  "astemes_lib_lunit_parameterized_add_on",
+                         "version":  "1.1.10.8"
+                     },
+                     {
+                         "name":  "astemes_lib_lunit_test_inheritance_add_on",
+                         "version":  "1.0.5.4"
+                     },
+                     {
+                         "name":  "dataflow_g_lib_g_image",
+                         "version":  "0.5.0.1"
+                     },
+                     {
+                         "name":  "felipefoz_lib_lv_rainbow_terminal",
+                         "version":  "1.1.1.5"
+                     },
+                     {
+                         "name":  "graphbuilder",
+                         "version":  "2.3.0.7"
+                     },
+                     {
+                         "name":  "jki_lib_caraya",
+                         "version":  "1.4.4.148"
+                     },
+                     {
+                         "name":  "jki_lib_state_machine",
+                         "version":  "2024.0.3.23"
+                     },
+                     {
+                         "name":  "jki_rsc_toolkits_palette",
+                         "version":  "1.1-1"
+                     },
+                     {
+                         "name":  "labview_open_source_lib_epoch_datetime",
+                         "version":  "1.3.0.8"
+                     },
+                     {
+                         "name":  "labview_open_source_project_lib_labview_open_source_palette",
+                         "version":  "1.0.2.7"
+                     },
+                     {
+                         "name":  "labview_open_source_project_lib_openuri",
+                         "version":  "1.4.0.13"
+                     },
+                     {
+                         "name":  "lvos_lib_caraya_cli_extension",
+                         "version":  "2.0.0.7"
+                     },
+                     {
+                         "name":  "ni_lib_junit_results_api",
+                         "version":  "1.0.1.6"
+                     },
+                     {
+                         "name":  "ni_lib_simple_xml",
+                         "version":  "1.0.0.4"
+                     },
+                     {
+                         "name":  "ni_lib_utf_junit_report",
+                         "version":  "1.0.1.43"
+                     },
+                     {
+                         "name":  "oglib_appcontrol",
+                         "version":  "4.1.0.7"
+                     },
+                     {
+                         "name":  "oglib_array",
+                         "version":  "6.0.1.20"
+                     },
+                     {
+                         "name":  "oglib_boolean",
+                         "version":  "6.0.0.9"
+                     },
+                     {
+                         "name":  "oglib_error",
+                         "version":  "6.0.0.26"
+                     },
+                     {
+                         "name":  "oglib_file",
+                         "version":  "6.0.2.28"
+                     },
+                     {
+                         "name":  "oglib_lvdata",
+                         "version":  "6.0.0.45"
+                     },
+                     {
+                         "name":  "oglib_string",
+                         "version":  "6.0.2.35"
+                     },
+                     {
+                         "name":  "pnr_lib_caraya_junit_for_azure_pipelines",
+                         "version":  "1.2.0.11"
+                     },
+                     {
+                         "name":  "pnr_lib_junit_xml",
+                         "version":  "1.0.0.4"
+                     },
+                     {
+                         "name":  "sas_workshops_lib_lunit_for_g_cli",
+                         "version":  "1.2.1.85"
+                     },
+                     {
+                         "name":  "wiresmith_technology_lib_g_cli",
+                         "version":  "3.0.1.98"
+                     },
+                     {
+                         "name":  "wovalab_lib_antidoc",
+                         "version":  "3.3.1.879"
+                     },
+                     {
+                         "name":  "wovalab_lib_antidoc_add_on_labview_project_documentation",
+                         "version":  "3.2.0.358"
+                     },
+                     {
+                         "name":  "wovalab_lib_antidoc_add_on_labview_toolkit_documentation",
+                         "version":  "3.0.0.77"
+                     },
+                     {
+                         "name":  "wovalab_lib_antidoc_cli",
+                         "version":  "3.4.0.126"
+                     },
+                     {
+                         "name":  "wovalab_lib_asciidoc_for_labview",
+                         "version":  "1.12.1.492"
+                     }
+                 ],
+    "required_project":  true,
+    "status":  "observed"
+}
