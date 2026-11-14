@@ -181,8 +181,16 @@ inventory_args=(--vipc-dir "$VIPC_DIR" --required)
 if ! run_vipm --labview-version "$LABVIEW_VERSION" --labview-bitness 64 list --installed > "$INVENTORY_DIR/vipm-list.txt" 2>&1; then
   inventory_args+=(--failed)
 fi
+inventory_result=0
 python3 "$(dirname "$0")/linux-worker.py" observe --year "$LABVIEW_VERSION" \
   --raw "$INVENTORY_DIR/vipm-list.txt" --output "$INVENTORY_DIR/observed-inventory.json" \
-  "${inventory_args[@]}"
+  "${inventory_args[@]}" || inventory_result=$?
+if [ "$inventory_result" -ne 0 ]; then
+  echo "Strict inventory validation failed; captured CLI output follows:" >&2
+  cat "$INVENTORY_DIR/vipm-list.txt" >&2
+  df -h / /tmp /opt/lvci/vipm >&2
+  free -m >&2
+  exit "$inventory_result"
+fi
 cat "$INVENTORY_DIR/vipm-list.txt"
 echo "All VIPC files applied successfully."

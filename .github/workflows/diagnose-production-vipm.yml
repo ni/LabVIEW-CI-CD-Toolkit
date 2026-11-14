@@ -1,0 +1,227 @@
+name: Diagnose production Linux VIPM inventory
+run-name: Read-only production VIPM build diagnostic
+env:
+  IMAGE_NAME: ''
+  PAGES_URL: ''
+  DEFAULT_TAG: linux-${{ vars.LABVIEW_VERSION || '2026' }}
+  LCWC_LINUX_BASE_IMAGE: ${{ vars.LCWC_LINUX_BASE_IMAGE || 'ghcr.io/elijah286/labview-ci-with-containers-labview:linux-2026'
+    }}
+permissions:
+  contents: read
+  packages: read
+concurrency:
+  group: diagnose-production-vipm-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+    - name: Verify reviewed commit
+      env:
+        EXPECTED_SHA: ${{ inputs.expected_sha }}
+      run: "if [ -n \"$EXPECTED_SHA\" ]; then\n  if ! [[ \"$EXPECTED_SHA\" =~ ^[0-9a-fA-F]{40}$ ]]; then\n    echo \"::error::Invalid\
+        \ reviewed commit SHA; expected exactly 40 hexadecimal characters.\"\n    exit 1\n  fi\n  reviewed_sha=$(printf '%s'\
+        \ \"$EXPECTED_SHA\" | tr '[:upper:]' '[:lower:]')\n  if [ \"$GITHUB_SHA\" != \"$reviewed_sha\" ]; then\n    echo \"\
+        ::error::Reviewed HEAD moved. Click Update container image again to review the new target.\"\n    exit 1\n  fi\nfi\n"
+    - name: Checkout repository
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+        fetch-depth: 0
+    - name: Validate selected dependency revision
+      env:
+        DEPENDENCY_SHA: ${{ inputs.dependency_sha || github.sha }}
+      run: '[[ "$DEPENDENCY_SHA" =~ ^[0-9a-fA-F]{40}$ ]]
+
+        git merge-base --is-ancestor "$DEPENDENCY_SHA" "$GITHUB_SHA"
+
+        '
+    - name: Install gate configuration parser
+      run: python3 -m pip install PyYAML==6.0.3
+    - name: Decide whether to rebuild
+      id: decide
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        BEFORE: ${{ github.event.before }}
+        SHA: ${{ github.sha }}
+      run: "python3 - <<'PY'\nimport os, subprocess, pathlib, yaml\n\ndef emit(build, why):\n    with open(os.environ['GITHUB_OUTPUT'],\
+        \ 'a') as f:\n        f.write('build=%s\\n' % ('true' if build else 'false'))\n    print('rebuild =', build, '--',\
+        \ why)\n    raise SystemExit(0)\n\ntry:\n    if os.environ.get('EVENT_NAME', '') != 'push':\n        emit(True, 'dispatch/schedule\
+        \ -> always rebuild')\n    before = os.environ.get('BEFORE', '') or ''\n    sha = os.environ.get('SHA', '') or 'HEAD'\n\
+        \    if not before or set(before) == {'0'}:\n        emit(False, 'no diff base on push -> skip (opt-in)')\n    diff\
+        \ = subprocess.run(['git', 'diff', '--name-only', before, sha],\n                          capture_output=True, text=True)\n\
+        \    if diff.returncode != 0:\n        emit(False, 'git diff failed -> skip (opt-in)')\n    files = [f for f in diff.stdout.splitlines()\
+        \ if f.strip()]\n    dep_changed = [f for f in files\n                   if f.lower().endswith(('.vipc', '.dragon'))\n\
+        \                   and not f.replace(os.sep, '/').startswith('.github/')]\n    if not dep_changed:\n        emit(False,\
+        \ 'no project dependency changed -> skip')\n\n    # Per-file monitor flags from config.container.vipc (default OFF).\n\
+        \    # This (Linux) worker only auto-rebuilds for a file that is\n    # monitor: true AND monitored for Linux (its\
+        \ monitorOn list includes\n    # 'linux', or no monitorOn is set = every platform).\n    PLATFORM = 'linux'\n    cfg\
+        \ = pathlib.Path('.github/labview-ci.yml')\n    data = yaml.safe_load(cfg.read_text(encoding='utf-8')) if cfg.exists()\
+        \ else {}\n    container = (data.get('config') or {}).get('container', {})\n    for entry in container.get('vipc',\
+        \ []) + container.get('dragon', []):\n        on = entry.get('monitorOn')\n        if isinstance(on, str):\n     \
+        \       on = on.split('+')\n        if on is not None and not isinstance(on, list):\n            raise ValueError('monitorOn\
+        \ must be a platform list or + separated string')\n        if (entry.get('monitor') is True and (on is None or PLATFORM\
+        \ in on)\n                and entry.get('path') in dep_changed):\n            emit(True, 'monitored dependency changed:\
+        \ ' + entry['path'])\n    emit(False, 'changed dependencies are not monitored for ' + PLATFORM + ' -> skip')\nexcept\
+        \ SystemExit:\n    raise\nexcept Exception as e:\n    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:\n        f.write('build=false\\\
+        n')\n    print('gate error -> build=false:', e)\nPY\n"
+  build-and-push:
+    needs: gate
+    if: needs.gate.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.sha }}
+    - name: Checkout selected dependency revision
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ inputs.dependency_sha || github.sha }}
+        path: ci-out/linux-source
+        persist-credentials: false
+    - name: Log in to GHCR
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+    - name: Set up crane (registry copy tool)
+      run: 'ver=v0.20.2
+
+        url="https://github.com/google/go-containerregistry/releases/download/${ver}/go-containerregistry_Linux_x86_64.tar.gz"
+
+        tmp="$(mktemp -d)"
+
+        curl -fsSL "$url" | tar -xz -C "$tmp"
+
+        echo "$tmp" >> "$GITHUB_PATH"
+
+        "$tmp/crane" version
+
+        '
+    - name: Resolve image name and date tag
+      id: date
+      env:
+        IMAGE_OVERRIDE: ${{ vars.LABVIEW_IMAGE_NAME }}
+        PAGES_URL_OVERRIDE: ${{ vars.PAGES_URL }}
+      run: "owner=$(printf '%s' \"${GITHUB_REPOSITORY%%/*}\" | tr '[:upper:]' '[:lower:]')\nname=\"${IMAGE_OVERRIDE:-${GITHUB_REPOSITORY##*/}-labview}\"\
+        \nname=$(printf '%s' \"$name\" | tr '[:upper:]' '[:lower:]')\necho \"IMAGE_NAME=ghcr.io/${owner}/${name}\" >> \"$GITHUB_ENV\"\
+        \necho \"PAGES_URL=${PAGES_URL_OVERRIDE:-https://${owner}.github.io/${GITHUB_REPOSITORY##*/}}\" >> \"$GITHUB_ENV\"\
+        \necho \"date=$(date +'%Y%m%d')\" >> \"$GITHUB_OUTPUT\"\n# Derive the source repo that OWNS the shared LCWC Linux\
+        \ base image\n# (ghcr.io/<owner>/<name>-labview -> <owner>/<name>). Only that repo BUILDS\n# the base; every other\
+        \ repo is a client that COPIES it. Deriving the identity\n# from the (lowercase) image name keeps it immune to the\
+        \ installer's branding\n# rewrite, so a client never mistakes itself for the source.\nbase_repo=\"${LCWC_LINUX_BASE_IMAGE%:*}\"\
+        \nsrc_slug=\"${base_repo#*/}\"; src_slug=\"${src_slug%-labview}\"\nthis_repo=\"$(printf '%s' \"$GITHUB_REPOSITORY\"\
+        \ | tr '[:upper:]' '[:lower:]')\"\nif [ \"$this_repo\" = \"$(printf '%s' \"$src_slug\" | tr '[:upper:]' '[:lower:]')\"\
+        \ ]; then\n  echo \"is_source=true\" >> \"$GITHUB_OUTPUT\"\nelse\n  echo \"is_source=false\" >> \"$GITHUB_OUTPUT\"\
+        \nfi\n"
+    - name: Stage repo VIPC files
+      id: vipc
+      shell: bash
+      env:
+        FALLBACK_YEAR: ${{ vars.LABVIEW_VERSION || '2026' }}
+        DEPENDENCY_SHA: ${{ inputs.dependency_sha || github.sha }}
+      run: "python3 -m pip install PyYAML==6.0.3\npython3 .github/labview/vipm/linux-worker.py stage \\\n  --root ci-out/linux-source\
+        \ --destination .github/labview/vipm \\\n  --dependency-sha \"$DEPENDENCY_SHA\" --output ci-out/linux-vipc-inputs.json\n\
+        python3 - <<'PY'\nimport os, re, json, pathlib\nplan = json.loads(pathlib.Path('ci-out/linux-vipc-inputs.json').read_text())\n\
+        year = plan['labview_version']\nif not re.fullmatch(r'20\\d{2}', year):\n  raise ValueError('LabVIEW version must\
+        \ be a four-digit year')\nwith open(os.environ['GITHUB_ENV'], 'a') as output:\n  output.write(f'LABVIEW_VERSION={year}\\\
+        nDEFAULT_TAG=linux-{year}\\n')\nwith open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:\n  out.write(f\"\
+        count={len(plan['files'])}\\n\")\nPY\n"
+    - name: Compute worker version
+      id: ver
+      env:
+        IS_SOURCE: ${{ steps.date.outputs.is_source }}
+        VIPC_COUNT: ${{ steps.vipc.outputs.count }}
+        RELEASE_ID: ${{ inputs.release_id }}
+      run: "python3 - <<'PY'\nimport hashlib, json, pathlib, os, re, subprocess\nis_source = os.environ.get('IS_SOURCE', '')\
+        \ == 'true'\nyear = os.environ['LABVIEW_VERSION']\ncatalog = json.loads(pathlib.Path('.github/labview-ci/catalog.json').read_text())['containers']\n\
+        release_id = (os.environ.get('RELEASE_ID') if is_source else '') or catalog['default']\ndefault_release = catalog['default']\n\
+        release = next(entry for entry in catalog['supported'] if entry['id'] == release_id)\nif release['status'] != 'qualified'\
+        \ or str(release['labviewYear']) != year:\n  raise ValueError('The selected Linux base must be qualified for the configured\
+        \ LabVIEW year')\nbase = release['linuxTag']\nif not re.fullmatch(r'nationalinstruments/labview:[a-z0-9.-]+-linux',\
+        \ base) or ':latest' in base:\n  raise ValueError('The Linux base must be an explicit NI release tag')\ndigest = subprocess.check_output(['crane',\
+        \ 'digest', base], text=True).strip()\nni_tag = base.split(':', 1)[1] + '@' + digest\nfiles = [\n    pathlib.Path('.github/docker/labview-ci-linux.Dockerfile'),\n\
+        \    pathlib.Path('.github/labview/vipm/install-vipc-linux.sh'),\n    pathlib.Path('.github/labview/vipm/linux-worker.py'),\n\
+        \    pathlib.Path('.github/labview/asciidoc-linux-command.py'),\n    pathlib.Path('ci-out/linux-vipc-inputs.json'),\n\
+        ]\nfiles += sorted(pathlib.Path('.github/labview/vipm').glob('*.vipc'), key=lambda p: p.name.lower())\n# The VI Browser\
+        \ render engine (lvctl + runner) is baked into this\n# worker, so its source must factor into the version -- an engine\
+        \ change\n# must yield a new worker image on the next dependency build.\ntoimages = pathlib.Path('.github/labview/toimages')\n\
+        if toimages.is_dir():\n  files += sorted((p for p in toimages.rglob('*') if p.is_file()), key=lambda p: p.as_posix().lower())\n\
+        parts = []\nfor path in files:\n  if path.exists():\n    parts.append(f'{path.as_posix()}={hashlib.sha256(path.read_bytes()).hexdigest()}')\n\
+        if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest):\n  raise ValueError('Cannot resolve the Linux base digest')\n\
+        parts += [f'base-image={base}', f'base-digest={digest}', f'labview-version={year}']\nversion = 'linux-' + hashlib.sha256('\\\
+        n'.join(parts).encode('utf-8')).hexdigest()[:12]\nwith open(os.environ['GITHUB_OUTPUT'], 'a') as f:\n  for key, value\
+        \ in {'version': version, 'base_image': base, 'base_digest': digest,\n                     'ni_tag': ni_tag, 'release_id':\
+        \ release_id, 'default_release': default_release}.items():\n    f.write(f'{key}={value}\\n')\nprint('Worker version:',\
+        \ version)\nPY\n"
+    - name: Build and push LabVIEW Linux CI image
+      env:
+        VIPM_SERIAL_NUMBER: ${{ secrets.VIPM_SERIAL_NUMBER }}
+        VIPM_FULL_NAME: ${{ secrets.VIPM_FULL_NAME }}
+        VIPM_EMAIL: ${{ secrets.VIPM_EMAIL }}
+        IS_SOURCE: ${{ steps.date.outputs.is_source }}
+        VIPC_COUNT: ${{ steps.vipc.outputs.count }}
+        UPDATE_MODE: ${{ github.event.inputs.update_mode || 'replace' }}
+      run: "set -euo pipefail\nbase=\"${{ env.IMAGE_NAME }}\"\ntag=\"${{ env.DEFAULT_TAG }}\"\ndate_tag=\"${{ steps.date.outputs.date\
+        \ }}\"\nworker_version=\"${{ steps.ver.outputs.version }}\"\n# SOURCE base build, or a deliberate client dependency\
+        \ bake: docker buildx build.\nif [ \"${{ github.event.inputs.push_latest }}\" = \"true\" ]; then\n  echo \"push_latest\
+        \ is kept for compatibility; :linux-latest is always published.\"\nfi\nsecret_flags=()\nif [ -n \"${VIPM_SERIAL_NUMBER:-}\"\
+        \ ]; then secret_flags+=(--secret id=vipm_serial,env=VIPM_SERIAL_NUMBER); fi\nif [ -n \"${VIPM_FULL_NAME:-}\" ]; then\
+        \ secret_flags+=(--secret id=vipm_full_name,env=VIPM_FULL_NAME); fi\nif [ -n \"${VIPM_EMAIL:-}\" ]; then secret_flags+=(--secret\
+        \ id=vipm_email,env=VIPM_EMAIL); fi\n\n# update_mode mirrors the Windows worker: replace (default) rebuilds the\n\
+        # moving tags in place so actions pick up the update automatically; new\n# publishes a fresh dated tag alongside the\
+        \ current worker WITHOUT moving\n# :linux-latest / :<tag>, so users opt in per action in Configure Workers.\nupdate_mode=\"\
+        ${UPDATE_MODE:-replace}\"\nif [ \"$update_mode\" = \"new\" ]; then\n  new_tag=\"${tag}-deps-${date_tag}\"\n  image_tags=(\"\
+        ${base}:${worker_version}\" \"${base}:${new_tag}\")\nelse\n  image_tags=(\"${base}:${tag}\" \"${base}:${tag}-${date_tag}\"\
+        \ \"${base}:${worker_version}\" \"${base}:linux-latest\")\nfi\n\n# The source repo pins the NI container release from\
+        \ the catalog's\n# containers[] default entry (never latest-linux: NI repointed the\n# latest-* tags to 2026 Q3 on\
+        \ 2026-07-27 unannounced -- pinning keeps a\n# container change a deliberate, qualified catalog edit) and also\n#\
+        \ publishes a per-release tag (linux-<releaseId>) so clients pinned to\n# an older container release keep a stable\
+        \ base to copy.\nlv_container_args=(--build-arg LV_CONTAINER_TAG=\"${{ steps.ver.outputs.ni_tag }}\")\nif [ \"${IS_SOURCE}\"\
+        \ = \"true\" ]; then\n  rel_id=\"${{ steps.ver.outputs.release_id }}\"\n  default_rel=\"${{ steps.ver.outputs.default_release\
+        \ }}\"\n  if [ \"$rel_id\" != \"$default_rel\" ]; then\n    # Non-default release: publish ONLY its pinned per-release\
+        \ tag (plus\n    # the immutable worker version) -- the moving tags keep tracking the\n    # default release so nothing\
+        \ switches containers implicitly.\n    image_tags=(\"${base}:${worker_version}\" \"${base}:linux-${rel_id}\")\n  elif\
+        \ [ \"$update_mode\" != \"new\" ]; then\n    image_tags+=(\"${base}:linux-${rel_id}\")\n  fi\nfi\ntag_flags=()\nfor\
+        \ t in \"${image_tags[@]}\"; do tag_flags+=(-t \"$t\"); done\n\ndocker buildx build \\\n  --platform linux/amd64 \\\
+        \n  --file .github/docker/labview-ci-linux.Dockerfile \\\n  --build-arg CI_WORKER_VERSION=\"${worker_version}\" \\\
+        \n  --build-arg LABVIEW_VERSION=\"${LABVIEW_VERSION}\" \\\n  \"${lv_container_args[@]}\" \\\n  \"${tag_flags[@]}\"\
+        \ \\\n  \"${secret_flags[@]}\" \\\n  --load \\\n  .\n\nprintf '%s\\n' \"${image_tags[@]#${base}:}\" > ci-out/linux-publish-tags.txt\n\
+        echo \"Diagnostic: no registry push or alias publication\"\n\nif [ \"$update_mode\" = \"new\" ]; then\n  echo \"::notice::Pushed\
+        \ immutable Linux worker '${base}:${worker_version}'. Requested aliases will be published only after inventory and\
+        \ manifest verification; existing default worker selection is unchanged.\"\nfi\n"
+    - name: Inspect successful local inventory
+      run: 'set -euo pipefail
+
+        image="${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.version }}"
+
+        c=$(docker create --entrypoint /bin/true "$image")
+
+        trap ''docker rm "$c" >/dev/null'' EXIT
+
+        docker cp "$c:/opt/lvci/vipm/observed-inventory.json" ci-out/observed-inventory.json
+
+        docker cp "$c:/opt/lvci/vipm/vipm-list.txt" ci-out/vipm-list.txt
+
+        cat ci-out/vipm-list.txt
+
+        '
+    - name: Retain diagnostic evidence
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: production-vipm-diagnostic
+        path: 'ci-out/observed-inventory.json
+
+          ci-out/vipm-list.txt
+
+          ci-out/linux-vipc-inputs.json'
+        if-no-files-found: warn
+'on':
+  workflow_dispatch: {}
