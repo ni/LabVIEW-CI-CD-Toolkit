@@ -1,8 +1,116 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "dfd0fd48e910d2b1a64cde988e80fdf4928561cf",
+  "sha": "046ef3f34d7391a86a04e2e87d883d7690b8d5db",
   "revisions": [
+    {
+      "sha": "046ef3f34d7391a86a04e2e87d883d7690b8d5db",
+      "short": "046ef3f",
+      "message": "Merge pull request #162 from ni/codex/source-dependency-monitoring",
+      "author": "Elijah Kerry",
+      "date": "2026-11-14T20:03:10Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "e45b77156be03d98952304604e4b41d70d3a3e5f",
+      "short": "e45b771",
+      "message": "Keep pinned toolchain checks offline and preserve source worker activation",
+      "author": "elijah286",
+      "date": "2026-11-13T19:45:25Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "a62923ce55fe076c0c6964e392106422ec9c2a4b",
+      "short": "a62923c",
+      "message": "Disable remote Ruby upgrade discovery during pinned package hooks",
+      "author": "elijah286",
+      "date": "2026-11-13T19:37:01Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "09aa8f9ece0c563a568303634cf5d9f5893c2be4",
+      "short": "09aa8f9",
+      "message": "Run AsciiDoc Linux toolchain checks through native commands",
+      "author": "elijah286",
+      "date": "2026-11-13T19:30:11Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "bd7b0bd2ee42f75f0b85803f412ee890bfc5efb7",
+      "short": "bd7b0bd",
+      "message": "Pin AsciiDoc renderer versions compatible with the NI Linux base",
+      "author": "elijah286",
+      "date": "2026-11-13T17:18:57Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "dc978fdbb5e43e02f4b05c16ce8386e080c35b10",
+      "short": "dc978fd",
+      "message": "Install AsciiDoc native prerequisites before Linux package hooks",
+      "author": "elijah286",
+      "date": "2026-11-13T17:12:09Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "1e9362a8cd8dde6cee51447167bb15dd69d3ea0b",
+      "short": "1e9362a",
+      "message": "Release Save preflight lock when the platform changes",
+      "author": "elijah286",
+      "date": "2026-11-13T16:49:25Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "f8d81e35fb0ffd0550a3b1fbbe1868d6661d69ea",
+      "short": "f8d81e3",
+      "message": "Check LVPM native package inventories through dependency UI",
+      "author": "elijah286",
+      "date": "2026-11-13T16:47:50Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "42a5bb806339daf9535a0ddb115a9a438a51777f",
+      "short": "42a5bb8",
+      "message": "Prevent optional Linux install prompts and capture native LVPM packages",
+      "author": "elijah286",
+      "date": "2026-11-13T16:44:55Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "8efc994fd563a96abb328fd59f88bd30e87312f4",
+      "short": "8efc994",
+      "message": "Keep client release workflows eligible for configuration changes",
+      "author": "elijah286",
+      "date": "2026-11-13T16:18:02Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "1673f7d992f18be56099c2c1908f69584de4f644",
+      "short": "1673f7d",
+      "message": "Preserve unselected internal dependencies when reading older indexes",
+      "author": "elijah286",
+      "date": "2026-11-13T16:13:03Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "8ad4aaf6945c2f16512229ea5e4718bf3106b707",
+      "short": "8ad4aaf",
+      "message": "Fix source dependency monitoring Save and honor explicit platform selections",
+      "author": "elijah286",
+      "date": "2026-11-13T16:06:07Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "dfd0fd48e910d2b1a64cde988e80fdf4928561cf",
       "short": "dfd0fd4",
@@ -796,114 +904,6 @@
       "dep_only": false
     },
     {
-      "sha": "34c44ea78071e6b8087c06d7983094df83e6c345",
-      "short": "34c44ea",
-      "message": "security: require canonical producer workflow path",
-      "author": "elijah286",
-      "date": "2026-11-02T21:44:37Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "2db092f8fd6056e9ea57528cde64a262f11f8391",
-      "short": "2db092f",
-      "message": "Merge pull request #108 from ni/lvci-release/release-4.19.4",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:44:09Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5d2841d753e6067334b8e00dab5b9a2e709c6055",
-      "short": "5d2841d",
-      "message": "ci: run vidiff node mocks under github-script v9 runtime",
-      "author": "elijah286",
-      "date": "2026-11-02T21:43:42Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "25214f4cf8070a58c8fb6db43b112632b2b2b691",
-      "short": "25214f4",
-      "message": "Harden VIDiff deploy workflow_run provenance and metadata validation",
-      "author": "elijah286",
-      "date": "2026-11-02T21:36:59Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "18b6244c61bc5df93f95387aff118a59caeea421",
-      "short": "18b6244",
-      "message": "Prepare release 4.19.4",
-      "author": "github-actions[bot]",
-      "date": "2026-11-02T21:41:02Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5f82ec3b57520705573848f4b7e37330fbd12d14",
-      "short": "5f82ec3",
-      "message": "Merge pull request #104 from ni/dependabot/github_actions/actions/upload-artifact-7",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:40:47Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "c29c27a084f4c699724c96ecc3d06247a8f6a6d7",
-      "short": "c29c27a",
-      "message": "Merge branch 'main' into dependabot/github_actions/actions/upload-artifact-7",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:36:36Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "703f00124725d43e2970db44c53c650e0077dd29",
-      "short": "703f001",
-      "message": "Merge pull request #107 from ni/lvci-release/release-4.19.3",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:36:15Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "cb65c9f9e45a4300b4bba34a787b948a71570621",
-      "short": "cb65c9f",
-      "message": "Bump actions/checkout from 4 to 7",
-      "author": "dependabot[bot]",
-      "date": "2026-11-02T21:35:32Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "d2908784eaf4f5f22733b39d077b2648502f64c2",
-      "short": "d290878",
-      "message": "Merge branch 'main' into dependabot/github_actions/actions/upload-artifact-7",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:34:51Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "fe69bf4a20f51648e24ad34ed710427de1b2d742",
-      "short": "fe69bf4",
-      "message": "Merge remote-tracking branch 'origin/main' into integration/validated-open-prs-20261102",
-      "author": "elijah286",
-      "date": "2026-11-02T21:33:44Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "ed9a936e7d993b9db396a8138f0999d3bbbbf8b6",
-      "short": "ed9a936",
-      "message": "Prepare release 4.19.3",
-      "author": "github-actions[bot]",
-      "date": "2026-11-02T21:33:31Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
       "sha": "d0e080c128589707c82a13a45d842952fb3a5fc8",
       "short": "d0e080c",
       "message": "Merge remote-tracking branch 'origin/main' into via-debug",
@@ -1133,21 +1133,63 @@
     "use": "",
     "linuxUse": "",
     "actions": {},
-    "vipc": [],
-    "dragon": [],
-    "hasVipcList": false,
-    "hasDragonList": false
+    "vipc": [
+      {
+        "path": ".github/labview/antidoc/antidoc.vipc",
+        "monitor": true,
+        "monitorOn": [
+          "windows",
+          "linux"
+        ]
+      },
+      {
+        "path": ".github/labview/experimental.vipc",
+        "monitor": true,
+        "monitorOn": [
+          "linux"
+        ]
+      },
+      {
+        "path": ".github/labview/vipm/ci-tooling.vipc",
+        "monitor": true,
+        "monitorOn": [
+          "windows",
+          "linux"
+        ]
+      },
+      {
+        "path": "example/Dependencies.vipc",
+        "monitor": true,
+        "monitorOn": [
+          "windows",
+          "linux"
+        ]
+      }
+    ],
+    "dragon": [
+      {
+        "path": "example/Example.dragon",
+        "monitor": true,
+        "monitorOn": [
+          "windows",
+          "linux"
+        ]
+      }
+    ],
+    "hasVipcList": true,
+    "hasDragonList": true
   },
   "vipc": [
     {
       "path": ".github/labview/antidoc/antidoc.vipc",
-      "role": "capability",
-      "capability": "antidoc",
+      "role": "project",
+      "capability": "",
       "tooling": false,
       "configured": true,
       "monitored": true,
       "monitorOn": [
-        "windows"
+        "windows",
+        "linux"
       ],
       "locked": false,
       "packages": [
@@ -1165,13 +1207,13 @@
     },
     {
       "path": ".github/labview/experimental.vipc",
-      "role": "capability",
+      "role": "project",
       "capability": "",
       "tooling": false,
-      "configured": false,
+      "configured": true,
       "monitored": true,
       "monitorOn": [
-        "windows"
+        "linux"
       ],
       "locked": false,
       "packages": [
