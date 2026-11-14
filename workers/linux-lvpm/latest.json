@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "repository": "ni/LabVIEW-CI-CD-Toolkit",
-  "tag": "linux-lvpm-89287e60180bc1194c0d148ded8930a6e8bb4d2d145a231b91b6565e2b74a16b",
-  "manifest_path": "workers/linux-lvpm/linux-lvpm-89287e60180bc1194c0d148ded8930a6e8bb4d2d145a231b91b6565e2b74a16b/manifest.json",
-  "image_ref": "ghcr.io/ni/labview-ci-cd-toolkit-labview:linux-lvpm-89287e60180bc1194c0d148ded8930a6e8bb4d2d145a231b91b6565e2b74a16b@sha256:444b52c7d4121d1f2b89b618c398fdeb5b2ea397446e02c418f3650e8a81fa96",
-  "image_digest": "sha256:444b52c7d4121d1f2b89b618c398fdeb5b2ea397446e02c418f3650e8a81fa96",
-  "requirements_fingerprint": "67d3c458d4f2451de18fcefd8afdc81c38040b225e9e042d774bb5c965b35c02",
+  "tag": "linux-lvpm-070f006b28a909a03027b0d87180f6a3725daac1960db4ab93fa979e124b3b1e",
+  "manifest_path": "workers/linux-lvpm/linux-lvpm-070f006b28a909a03027b0d87180f6a3725daac1960db4ab93fa979e124b3b1e/manifest.json",
+  "image_ref": "ghcr.io/ni/labview-ci-cd-toolkit-labview:linux-lvpm-070f006b28a909a03027b0d87180f6a3725daac1960db4ab93fa979e124b3b1e@sha256:ba85e5ec9c3d786d8491330ae974861d42808132bd861b81e44a4c43d010b85c",
+  "image_digest": "sha256:ba85e5ec9c3d786d8491330ae974861d42808132bd861b81e44a4c43d010b85c",
+  "requirements_fingerprint": "ed0f33d3c3edc911720ef6051f0157da2f2d8a5708aca60ed20f8eb022d7949c",
   "verification": {
     "status": "passed",
     "scope": "package-files",
@@ -13,9 +13,9 @@
     "hook_error_output": "not_observable_by_upstream"
   },
   "workflow_run": {
-    "id": 43452731551,
+    "id": 43635522510,
     "attempt": 1,
-    "head_sha": "73d2c415aa07403ed5f4025d02fef41e5f223400",
+    "head_sha": "046ef3f34d7391a86a04e2e87d883d7690b8d5db",
     "workflow_path": ".github/workflows/build-labview-lvpm-image.yml"
   }
 }
