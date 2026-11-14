@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "0cf8a8f8ecf093f936aa7e668e1b6359ebe11c6a",
+  "sha": "2c0e7dbb52cc8144cfa4bc688e00be3623b94d2b",
   "revisions": [
+    {
+      "sha": "2c0e7dbb52cc8144cfa4bc688e00be3623b94d2b",
+      "short": "2c0e7db",
+      "message": "Merge pull request #167 from ni/codex/linux-inventory-error-output",
+      "author": "Elijah Kerry",
+      "date": "2026-11-14T23:22:51Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "eee39ed0f4306c194cc53825afee37a0f5b41be7",
+      "short": "eee39ed",
+      "message": "Retain VIPM CLI errors before strict Linux inventory validation",
+      "author": "elijah286",
+      "date": "2026-11-14T23:07:40Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "0cf8a8f8ecf093f936aa7e668e1b6359ebe11c6a",
       "short": "0cf8a8f",
@@ -882,24 +900,6 @@
       "message": "ci: wire vidiff distribution security checks",
       "author": "elijah286",
       "date": "2026-11-02T21:56:11Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "55a6d023ad03b319d510a3b41019459dd01bc62a",
-      "short": "55a6d02",
-      "message": "security: fail-close vidiff publish on untrusted producers",
-      "author": "elijah286",
-      "date": "2026-11-02T21:54:06Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "fcced1fbf5941cd7c221d6331358093812062f4c",
-      "short": "fcced1f",
-      "message": "security: block untrusted VIDiff Pages publication",
-      "author": "elijah286",
-      "date": "2026-11-02T21:51:47Z",
       "project": false,
       "dep_only": false
     },
