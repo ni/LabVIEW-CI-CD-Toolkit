@@ -1216,6 +1216,10 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         It retains build and fresh-container evidence without publishing worker images. Its result does not
         establish that a published worker is active; publication and dashboard verification are separate steps.</p>
 
+      <p>Linux VIPM builds print the installed-inventory command output before validating it, so a failed
+        build retains the underlying CLI error. A failed command, wrong LabVIEW target, or missing pinned
+        package still blocks worker publication.</p>
+
       <h3>Initial seeding preserves rebuilt workers</h3>
       <p>Windows and Linux seed-copy workflows run only on the repository's current default branch,
         including repositories whose default branch is not <code>main</code>. Branch and Dependabot pushes
