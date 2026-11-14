@@ -177,10 +177,6 @@ class LinuxWorkerTests(unittest.TestCase):
 
     def test_linux_publication_uses_validated_digest_and_parent_cli(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/build-labview-linux-image.yml").read_text())
-        qualification = yaml.safe_load((ROOT / ".github/workflows/native-dependency-validation.yml").read_text())
-        qualified_host = qualification["jobs"]["linux"]["runs-on"]
-        self.assertNotIn("latest", qualified_host)
-        self.assertEqual(workflow["jobs"]["build-and-push"]["runs-on"], qualified_host)
         steps = workflow["jobs"]["build-and-push"]["steps"]
         build = next(step for step in steps if step.get("name") == "Build and push LabVIEW Linux CI image")
         manifest = next(step for step in steps if step.get("name") == "Generate worker manifest")

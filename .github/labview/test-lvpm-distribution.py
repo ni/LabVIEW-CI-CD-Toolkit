@@ -22,7 +22,7 @@ SPEC = importlib.util.spec_from_file_location("lvpm_installer", ROOT / ".github/
 INSTALLER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(INSTALLER)
 HELPERS = {".github/labview/lvpm/worker.py", ".github/labview/lvpm/adapter.py"}
-SHARED_HELPERS = HELPERS | {".github/labview/dragon_deps.py", ".github/labview/asciidoc-linux-command.py"}
+SHARED_HELPERS = HELPERS | {".github/labview/seed-worker.py", ".github/labview/dragon_deps.py", ".github/labview/asciidoc-linux-command.py"}
 CANDIDATE_FILES = {
     ".github/workflows/build-labview-lvpm-image.yml",
     ".github/docker/labview-ci-lvpm.Dockerfile",

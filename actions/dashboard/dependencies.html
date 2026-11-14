@@ -859,7 +859,7 @@
         && text.indexOf(guard) < text.indexOf('uses: actions/checkout@')
         && count === (file === "build-labview-linux-image.yml" ? 2 : 1)
         && (text.match(checkout) || []).length === count
-        && (file !== "build-labview-linux-image.yml" || ["ubuntu-latest", "ubuntu-24.04"].some(runner => text.includes("  build-and-push:\n    needs: gate\n    if: needs.gate.outputs.build == 'true'\n    runs-on: " + runner + "\n\n    steps:\n"))
+        && (file !== "build-labview-linux-image.yml" || text.includes("  build-and-push:\n    needs: gate\n    if: needs.gate.outputs.build == 'true'\n    runs-on: ubuntu-latest\n\n    steps:\n")
           && (jobSection.match(/^    (?:if|needs):/gm) || []).length === 2);
     }
     async function verifiedLinuxUpdateTarget(intent){

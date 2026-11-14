@@ -1207,14 +1207,6 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         converted into deterministic VIPCs by the trusted staging helper. The input record preserves both
         the original source hash and generated VIPC hash. Unsupported NIPM requirements, custom feeds,
         embedded VIPC references, conflicting project pins, and mismatched LabVIEW targets fail before the build.</p>
-      <p>Linux VIPM production builds pin their Docker host to <code>ubuntu-24.04</code>, matching
-        native qualification. Keep the production build and qualification runner versions aligned;
-        a moving <code>ubuntu-latest</code> label can change the host independently of the pinned container.
-        Ubuntu 26.04 production runs failed final inventory verification while the same committed
-        dependency selections passed on Ubuntu 24.04. The inventory CLI output is written to build logs
-        before validation so a failed read remains diagnosable. Target and exact-version checks still
-        block publication when installed evidence is unavailable. The browser update guard recognizes both
-        the legacy workflow and the pinned host while retaining reviewed-commit and job-dependency checks.</p>
       <p>VIPC XML is parsed structurally, including compact single-line exports. The final Windows and Linux inventories must
         satisfy every effective tooling and project pin; explicit project pins take precedence over the tooling
         baseline. A successful install command alone is insufficient. The native validation workflow covers
@@ -1223,6 +1215,17 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         functions: every package cell, VIPC/Dragon status pill, and pending indicator must clear.
         It retains build and fresh-container evidence without publishing worker images. Its result does not
         establish that a published worker is active; publication and dashboard verification are separate steps.</p>
+
+      <h3>Initial seeding preserves rebuilt workers</h3>
+      <p>Windows and Linux seed-copy workflows run only on the repository's current default branch,
+        including repositories whose default branch is not <code>main</code>. Branch and Dependabot pushes
+        cannot replace production worker tags or inventory. Before any registry login or publication,
+        seeding checks <code>workers/&lt;platform&gt;/latest.json</code> directly on the canonical
+        <code>gh-pages</code> branch. An existing valid pointer means the worker is initialized and the
+        seed job preserves it. Only a missing pointer permits initial seeding; malformed evidence,
+        authentication failures, and other API errors stop the job. Tooling updates and monitoring changes
+        therefore do not erase previously installed dependencies. Use the dependency build workflow to
+        update or repair an initialized worker.</p>
 
       <h3>When images rebuild</h3>
       <p>A worker rebuild is a heavy, opt-in operation. It runs when you apply a dependency update from the dashboard's
