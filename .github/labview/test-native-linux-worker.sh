@@ -37,8 +37,8 @@ run_validation() (
         exit 1
     }
     source /etc/os-release
-    [[ "$ID" == ubuntu && "$VERSION_ID" == 24.04 ]] || {
-        printf 'Requires Ubuntu 24.04.\n' >&2
+    [[ "$ID" == ubuntu && "$VERSION_ID" == 26.04 ]] || {
+        printf 'Diagnostic requires Ubuntu 26.04.\n' >&2
         exit 1
     }
     for executable in docker python3 git tar df sha256sum; do
