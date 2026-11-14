@@ -1,0 +1,1 @@
+- Worker seeding now runs only on the default branch and preserves initialized workers, preventing dependency updates or branch jobs from replacing installed packages with an older seed image.

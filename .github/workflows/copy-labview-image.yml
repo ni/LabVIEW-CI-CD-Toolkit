@@ -15,7 +15,7 @@ on:
   # unknown". Trigger the seed from the push itself: the install/update merge
   # writes .github/labview-ci.yml, and listing this file's own path both fires a
   # seed when the tooling updates and forces GitHub to register the workflow.
-  # Safe to re-run: crane copy of an unchanged digest is a no-op re-tag.
+  # Existing workers are preserved; only a fresh default-branch installation is seeded.
   push:
     paths:
       - '.github/labview-ci.yml'
@@ -35,11 +35,13 @@ permissions:
   packages: write
 
 concurrency:
-  group: build-labview-windows-image   # shares the lane with the Build workflow so the two never race the worker-manifest publish
+  # Only default-branch seeding shares the build lane; branch jobs cannot displace a pending rebuild.
+  group: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && 'build-labview-windows-image' || format('seed-windows-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:
   copy-and-push:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     # Pure registry copy: crane only, no Docker -- so it runs on ubuntu-latest,
     # whose fast network copies the multi-GB base image in a couple of minutes.
     runs-on: ubuntu-latest
@@ -53,7 +55,14 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Preserve an initialized worker
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python .github/labview/seed-worker.py --platform windows
+
       - name: Log in to GHCR
+        if: steps.existing.outputs.seed == 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -61,6 +70,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Resolve image name and date tag
+        if: steps.existing.outputs.seed == 'true'
         id: date
         shell: bash
         env:
@@ -75,6 +85,7 @@ jobs:
           echo "date=$(date +'%Y%m%d')" >> "$GITHUB_OUTPUT"
 
       - name: Set up crane (registry copy tool)
+        if: steps.existing.outputs.seed == 'true'
         shell: bash
         run: |
           ver=v0.20.2
@@ -85,6 +96,7 @@ jobs:
           "$tmp/crane" version
 
       - name: Resolve the LCWC base image digest
+        if: steps.existing.outputs.seed == 'true'
         id: base
         shell: bash
         run: |
@@ -103,6 +115,7 @@ jobs:
       # Worker version = short SHA-256 over the LCWC seed image + its digest. A seed
       # copy bakes no dependencies, so vipc-count is always 0. Same inputs -> same tag.
       - name: Compute worker version
+        if: steps.existing.outputs.seed == 'true'
         id: ver
         shell: bash
         env:
@@ -124,6 +137,7 @@ jobs:
           PY
 
       - name: Copy and tag the Windows worker image
+        if: steps.existing.outputs.seed == 'true'
         shell: bash
         env:
           BASE_IMAGE: ${{ steps.base.outputs.image }}
@@ -143,6 +157,7 @@ jobs:
           echo "Published (registry copy): ${immutable}"
 
       - name: Generate worker manifest
+        if: steps.existing.outputs.seed == 'true'
         shell: bash
         env:
           BASE_IMAGE: ${{ steps.base.outputs.image }}
@@ -184,17 +199,20 @@ jobs:
           JSON
 
       - name: Enable Git long paths (Windows MAX_PATH workaround)
+        if: steps.existing.outputs.seed == 'true'
         shell: bash
         run: |
           git config --global core.longpaths true
           git config --system core.longpaths true || true
 
       - name: Publish worker manifest to GitHub Pages
+        if: steps.existing.outputs.seed == 'true'
         uses: ./.github/actions/publish-gh-pages
         with:
           publish_dir: ci-out/workers-pages
           commit_message: Publish Windows worker manifest
       - name: Summary
+        if: steps.existing.outputs.seed == 'true'
         shell: bash
         run: |
           echo "### Windows worker image copied (install seed)" >> "$GITHUB_STEP_SUMMARY"

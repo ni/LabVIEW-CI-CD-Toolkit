@@ -8,6 +8,9 @@ on:
       - '.github/labview/vipm/install-vipc-linux.sh'
       - '.github/labview/build-worker-manifest.py'
       - '.github/labview/test-linux-worker.py'
+      - '.github/labview/seed-worker.py'
+      - '.github/labview/test-seed-worker.py'
+      - '.github/workflows/copy-labview-image.yml'
       - '.github/labview/asciidoc-linux-command.py'
       - '.github/labview/test-asciidoc-linux-command.py'
       - '.github/labview/vipm/ci-tooling.vipc'
@@ -37,6 +40,9 @@ on:
       - '.github/labview/vipm/install-vipc-linux.sh'
       - '.github/labview/build-worker-manifest.py'
       - '.github/labview/test-linux-worker.py'
+      - '.github/labview/seed-worker.py'
+      - '.github/labview/test-seed-worker.py'
+      - '.github/workflows/copy-labview-image.yml'
       - '.github/labview/asciidoc-linux-command.py'
       - '.github/labview/test-asciidoc-linux-command.py'
       - '.github/labview/vipm/ci-tooling.vipc'
@@ -82,6 +88,7 @@ jobs:
         run: |
           python .github/labview/test-asciidoc-linux-command.py
           python .github/labview/test-linux-worker.py
+          python .github/labview/test-seed-worker.py
           python .github/labview/test-lvpm.py
           python .github/labview/test-lvpm-worker.py
           python .github/labview/test-lvpm-ux.py
