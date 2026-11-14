@@ -1,8 +1,44 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "046ef3f34d7391a86a04e2e87d883d7690b8d5db",
+  "sha": "0cf8a8f8ecf093f936aa7e668e1b6359ebe11c6a",
   "revisions": [
+    {
+      "sha": "0cf8a8f8ecf093f936aa7e668e1b6359ebe11c6a",
+      "short": "0cf8a8f",
+      "message": "Merge pull request #165 from ni/codex/pin-linux-vipm-runner",
+      "author": "Elijah Kerry",
+      "date": "2026-11-14T22:38:36Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "01d8bb3b027f75e82c3067025c5e84e8d1098f1f",
+      "short": "01d8bb3",
+      "message": "Preserve initialized production workers during seed jobs",
+      "author": "elijah286",
+      "date": "2026-11-14T22:25:20Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "64d31e7198e0ba53e9c085878931641d4e2b5e10",
+      "short": "64d31e7",
+      "message": "Recognize the qualified Linux host in reviewed-update preflight",
+      "author": "elijah286",
+      "date": "2026-11-14T20:50:31Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "f3dd777c4318ae73634c3fbdfdfe62a3eae2abeb",
+      "short": "f3dd777",
+      "message": "Keep Linux VIPM builds on the qualified Ubuntu host",
+      "author": "elijah286",
+      "date": "2026-11-14T20:47:17Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "046ef3f34d7391a86a04e2e87d883d7690b8d5db",
       "short": "046ef3f",
@@ -864,42 +900,6 @@
       "message": "security: block untrusted VIDiff Pages publication",
       "author": "elijah286",
       "date": "2026-11-02T21:51:47Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "ffe0878b6c1827c5ad34a36b82c4a334bb181493",
-      "short": "ffe0878",
-      "message": "Merge remote-tracking branch 'origin/main' into integration/vidiff-deploy-security-20261102",
-      "author": "elijah286",
-      "date": "2026-11-02T21:51:30Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "aedd8994584c0a640eb87f49705dccd33d481eb3",
-      "short": "aedd899",
-      "message": "Use newly validated Python and artifact actions in added capabilities",
-      "author": "elijah286",
-      "date": "2026-11-02T21:45:23Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5121c60c11bda66eda7ab9220f32d05afbfde1a5",
-      "short": "5121c60",
-      "message": "Merge branch 'main' into fix/dependencies-platform-ux-20261102",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T21:45:17Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "3193220a5bad0ab334fcab99c4786bcb2c7ba51c",
-      "short": "3193220",
-      "message": "Merge remote-tracking branch 'origin/main' into integration/validated-open-prs-20261102",
-      "author": "elijah286",
-      "date": "2026-11-02T21:44:45Z",
       "project": false,
       "dep_only": false
     },

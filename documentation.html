@@ -1216,6 +1216,17 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         It retains build and fresh-container evidence without publishing worker images. Its result does not
         establish that a published worker is active; publication and dashboard verification are separate steps.</p>
 
+      <h3>Initial seeding preserves rebuilt workers</h3>
+      <p>Windows and Linux seed-copy workflows run only on the repository's current default branch,
+        including repositories whose default branch is not <code>main</code>. Branch and Dependabot pushes
+        cannot replace production worker tags or inventory. Before any registry login or publication,
+        seeding checks <code>workers/&lt;platform&gt;/latest.json</code> directly on the canonical
+        <code>gh-pages</code> branch. An existing valid pointer means the worker is initialized and the
+        seed job preserves it. Only a missing pointer permits initial seeding; malformed evidence,
+        authentication failures, and other API errors stop the job. Tooling updates and monitoring changes
+        therefore do not erase previously installed dependencies. Use the dependency build workflow to
+        update or repair an initialized worker.</p>
+
       <h3>When images rebuild</h3>
       <p>A worker rebuild is a heavy, opt-in operation. It runs when you apply a dependency update from the dashboard's
         <em>Review &amp; update dependencies</em> dialog, on the monthly cron (to pick up base-image security updates),
