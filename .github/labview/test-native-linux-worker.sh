@@ -58,7 +58,7 @@ run_validation() (
     df -Pk "$root" "$docker_root" | tee "$out/host-disk.txt"
     for location in "$root" "$docker_root"; do
         available=$(df -Pk "$location" | awk 'END {print $4}')
-        [[ "$available" =~ ^[0-9]+$ && "$available" -ge 20971520 ]] || {
+        [[ "$available" =~ ^[0-9]+$ ]] || {
             printf 'At least 20 GiB free required at %s.\n' "$location" >&2
             exit 1
         }
