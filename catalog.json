@@ -4521,6 +4521,7 @@
       ".github/labview/dragon_deps.py",
       ".github/labview/lvpm/worker.py",
       ".github/labview/lvpm/adapter.py",
+      ".github/labview/asciidoc-linux-command.py",
       ".github/actions/publish-gh-pages/action.yml"
     ]
   },
