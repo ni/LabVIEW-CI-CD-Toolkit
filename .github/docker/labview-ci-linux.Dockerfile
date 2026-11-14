@@ -89,6 +89,7 @@ RUN --mount=type=secret,id=vipm_serial,required=false \
       if [ -f /run/secrets/vipm_email ]; then export VIPM_EMAIL="$(cat /run/secrets/vipm_email)"; fi; \
       export VIPC_DIR=/opt/lvci/vipc; \
       export LABVIEW_VERSION="${LABVIEW_VERSION}"; \
+      trap 'result=$?; if [ "$result" -ne 0 ]; then cat /opt/lvci/vipm/vipm-list.txt >&2; df -h /; free -m; fi; exit "$result"' EXIT; \
       /opt/lvci/vipm/install-vipc-linux.sh
 
 # VI Browser render engine, baked in so 2.0 screenshots render inside this
