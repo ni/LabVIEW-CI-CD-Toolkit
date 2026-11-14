@@ -1601,6 +1601,12 @@ for (const tooling of ['lvpm','vipm']) {
     prerequisiteCases++;
   }
   if (tooling === 'vipm') {
+    for (const runner of ['ubuntu-latest', 'ubuntu-24.04']) {
+      const compatible = original.replace('    runs-on: ubuntu-24.04\n', '    runs-on: ' + runner + '\n');
+      assert.equal(!!hooks.linuxReviewedWorkflow(compatible,file),true);
+    }
+    const unsupported = original.replace('    runs-on: ubuntu-24.04\n', '    runs-on: self-hosted\n');
+    assert.equal(!!hooks.linuxReviewedWorkflow(unsupported,file),false);
     for (const mutation of [
       text => text.replace("    if: needs.gate.outputs.build == 'true'", "    if: always() && needs.gate.outputs.build == 'true'"),
       text => text.replace('    needs: gate\n', ''),

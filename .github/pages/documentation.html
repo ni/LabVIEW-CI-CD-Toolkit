@@ -1213,7 +1213,8 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         Ubuntu 26.04 production runs failed final inventory verification while the same committed
         dependency selections passed on Ubuntu 24.04. The inventory CLI output is written to build logs
         before validation so a failed read remains diagnosable. Target and exact-version checks still
-        block publication when installed evidence is unavailable.</p>
+        block publication when installed evidence is unavailable. The browser update guard recognizes both
+        the legacy workflow and the pinned host while retaining reviewed-commit and job-dependency checks.</p>
       <p>VIPC XML is parsed structurally, including compact single-line exports. The final Windows and Linux inventories must
         satisfy every effective tooling and project pin; explicit project pins take precedence over the tooling
         baseline. A successful install command alone is insufficient. The native validation workflow covers

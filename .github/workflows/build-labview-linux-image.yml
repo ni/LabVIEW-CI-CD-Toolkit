@@ -174,11 +174,11 @@ jobs:
               print('gate error -> build=false:', e)
           PY
 
+  # Keep the Docker host aligned with native-dependency-validation.yml.
+  # ubuntu-latest moved to 26.04; VIPM inventory was qualified on 24.04.
   build-and-push:
     needs: gate
     if: needs.gate.outputs.build == 'true'
-    # Keep the Docker host aligned with native-dependency-validation.yml.
-    # ubuntu-latest moved to 26.04; VIPM inventory was qualified on 24.04.
     runs-on: ubuntu-24.04
 
     steps:
