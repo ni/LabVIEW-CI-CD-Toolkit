@@ -1,0 +1,1 @@
+- Linux VIPM worker rebuilds use the qualified Ubuntu 24.04 host. Inventory errors now retain the CLI output needed to diagnose a failed build.
