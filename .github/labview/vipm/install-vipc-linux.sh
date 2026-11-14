@@ -181,8 +181,9 @@ inventory_args=(--vipc-dir "$VIPC_DIR" --required)
 if ! run_vipm --labview-version "$LABVIEW_VERSION" --labview-bitness 64 list --installed > "$INVENTORY_DIR/vipm-list.txt" 2>&1; then
   inventory_args+=(--failed)
 fi
+# Keep CLI errors visible even when strict inventory validation stops the build.
+cat "$INVENTORY_DIR/vipm-list.txt"
 python3 "$(dirname "$0")/linux-worker.py" observe --year "$LABVIEW_VERSION" \
   --raw "$INVENTORY_DIR/vipm-list.txt" --output "$INVENTORY_DIR/observed-inventory.json" \
   "${inventory_args[@]}"
-cat "$INVENTORY_DIR/vipm-list.txt"
 echo "All VIPC files applied successfully."

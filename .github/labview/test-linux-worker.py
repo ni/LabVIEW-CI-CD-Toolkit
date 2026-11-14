@@ -90,6 +90,31 @@ class LinuxWorkerTests(unittest.TestCase):
             self.assertFalse(value["target_verified"])
             self.assertEqual(value["packages"], [])
 
+    def test_inventory_cli_errors_remain_visible_without_accepting_failed_evidence(self):
+        installer = ROOT / '.github/labview/vipm/install-vipc-linux.sh'
+        final_check = installer.read_text().split('inventory_args=(--vipc-dir', 1)[1]
+        final_check = 'inventory_args=(--vipc-dir' + final_check
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with zipfile.ZipFile(root / 'project-test.vipc', 'w') as archive:
+                archive.writestr('config.xml', '<Root><Package><Name>package_id-1.0</Name></Package></Root>')
+            raw = root / 'fixture.txt'
+            for output, status, accepted in (
+                    ('VIPM could not read its installed database\n', 17, False),
+                    ('Using LabVIEW 2026 (64-bit)\npackage_id v1.0\n', 17, False),
+                    ('Using LabVIEW 2025 (64-bit)\npackage_id v1.0\n', 0, False),
+                    ('Using LabVIEW 2026 (64-bit)\npackage_id v1.0\n', 0, True)):
+                with self.subTest(output=output, status=status):
+                    raw.write_text(output)
+                    result = subprocess.run(['bash', '-euc',
+                        'run_vipm() { cat "$FIXTURE_RAW"; return "$FIXTURE_STATUS"; }\n' + final_check,
+                        str(installer)], capture_output=True, text=True,
+                        env={**os.environ, 'INVENTORY_DIR': str(root), 'VIPC_DIR': str(root),
+                             'LABVIEW_VERSION': '2026', 'FIXTURE_RAW': str(raw), 'FIXTURE_STATUS': str(status)})
+                    self.assertIn(output, result.stdout)
+                    self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                    self.assertEqual('All VIPC files applied successfully.' in result.stdout, accepted)
+
     def test_bom_inventory_cli_and_exact_project_versions(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
