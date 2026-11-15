@@ -1,0 +1,391 @@
+{
+  "schema": 1,
+  "dependency_sha": "bbf4cad61258a629ecc65959a26330135ef46007",
+  "labview_version": "2026",
+  "config_sha256": "ddc7f06d1fbf642179249d32c7f44f0ca5cf2951974a2001b4a778684bd2e478",
+  "files": [
+    {
+      "path": ".github/labview/antidoc/antidoc.vipc",
+      "sha256": "96539708c4b444dabeaa7bec29eb37dbe3dc7e0a510b741059fc85bf28b5001d",
+      "staged_name": "project-1f011be06155cc16fef8a38dd3e2b3f5e1f1d5d991d407c2b600914380ab02ad.vipc",
+      "requirements": [
+        {
+          "name": "wovalab_lib_antidoc_cli",
+          "version": "3.4.0.126",
+          "source_files": [
+            ".github/labview/antidoc/antidoc.vipc"
+          ]
+        },
+        {
+          "name": "wovalab_lib_asciidoc_for_labview",
+          "version": "1.12.1.492",
+          "source_files": [
+            ".github/labview/antidoc/antidoc.vipc"
+          ]
+        },
+        {
+          "name": "wovalab_lib_antidoc",
+          "version": "3.3.1.879",
+          "source_files": [
+            ".github/labview/antidoc/antidoc.vipc"
+          ]
+        },
+        {
+          "name": "wiresmith_technology_lib_g_cli",
+          "version": "3.0.1.98",
+          "source_files": [
+            ".github/labview/antidoc/antidoc.vipc"
+          ]
+        },
+        {
+          "name": "jki_lib_state_machine",
+          "version": "2024.0.3.23",
+          "source_files": [
+            ".github/labview/antidoc/antidoc.vipc"
+          ]
+        },
+        {
+          "name": "jki_rsc_toolkits_palette",
+          "version": "1.1-1",
+          "source_files": [
+            ".github/labview/antidoc/antidoc.vipc"
+          ]
+        },
+        {
+          "name": "wovalab_lib_antidoc_add_on_labview_project_documentation",
+          "version": "3.2.0.358",
+          "source_files": [
+            ".github/labview/antidoc/antidoc.vipc"
+          ]
+        },
+        {
+          "name": "wovalab_lib_antidoc_add_on_labview_toolkit_documentation",
+          "version": "3.0.0.77",
+          "source_files": [
+            ".github/labview/antidoc/antidoc.vipc"
+          ]
+        },
+        {
+          "name": "graphbuilder",
+          "version": "2.3.0.7",
+          "source_files": [
+            ".github/labview/antidoc/antidoc.vipc"
+          ]
+        }
+      ],
+      "staged_sha256": "96539708c4b444dabeaa7bec29eb37dbe3dc7e0a510b741059fc85bf28b5001d"
+    },
+    {
+      "path": ".github/labview/experimental.vipc",
+      "sha256": "000f5cf7edc45a97eb9aa2e8f3b6ec6c8b07c1791ae441cd02e55792d00e2477",
+      "staged_name": "project-2c08693e571befdf11a8c7a80d7b973597042d361598f3a5c07b74834740a449.vipc",
+      "requirements": [
+        {
+          "name": "wovalab_lib_antidoc_cli",
+          "version": "3.4.0.126",
+          "source_files": [
+            ".github/labview/experimental.vipc"
+          ]
+        }
+      ],
+      "staged_sha256": "000f5cf7edc45a97eb9aa2e8f3b6ec6c8b07c1791ae441cd02e55792d00e2477"
+    },
+    {
+      "path": ".github/labview/vipm/ci-tooling.vipc",
+      "sha256": "f93bae171ad581c0f3e33a8eef09036029a03cccb3ac63af0b89c99ddcdd945f",
+      "staged_name": "project-edbd9315286a69d4c4ad7c00b5e6def664b4bafa066d47111597ba93eaeb9f30.vipc",
+      "requirements": [
+        {
+          "name": "astemes_lib_lunit",
+          "version": "2.0.13.6",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "astemes_lib_lunit_cli",
+          "version": "1.7.1.32",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "astemes_lib_lunit_coverage_analysis_add_on",
+          "version": "1.0.0.2",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "sas_workshops_lib_lunit_for_g_cli",
+          "version": "1.2.1.85",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "astemes_lib_lunit_global_fixture_add_on",
+          "version": "1.0.5.4",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "astemes_lib_lunit_parameterized_add_on",
+          "version": "1.1.10.8",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "astemes_lib_lunit_test_inheritance_add_on",
+          "version": "1.0.5.4",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "wiresmith_technology_lib_g_cli",
+          "version": "3.0.1.98",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "felipefoz_lib_lv_rainbow_terminal",
+          "version": "1.1.1.5",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "ni_lib_utf_junit_report",
+          "version": "1.0.1.43",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "ni_lib_simple_xml",
+          "version": "1.0.0.4",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "ni_lib_junit_results_api",
+          "version": "1.0.1.6",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "dataflow_g_lib_g_image",
+          "version": "0.5.0.1",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "lvos_lib_caraya_cli_extension",
+          "version": "2.0.0.7",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "pnr_lib_caraya_junit_for_azure_pipelines",
+          "version": "1.2.0.11",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "jki_lib_caraya",
+          "version": "1.4.4.148",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "labview_open_source_project_lib_labview_open_source_palette",
+          "version": "1.0.2.7",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "oglib_string",
+          "version": "6.0.2.35",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "oglib_lvdata",
+          "version": "6.0.0.45",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "oglib_file",
+          "version": "6.0.2.28",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "oglib_error",
+          "version": "6.0.0.26",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "oglib_array",
+          "version": "6.0.1.20",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "labview_open_source_lib_epoch_datetime",
+          "version": "1.3.0.8",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "pnr_lib_junit_xml",
+          "version": "1.0.0.4",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "jki_rsc_toolkits_palette",
+          "version": "1.1-1",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "jki_lib_state_machine",
+          "version": "2024.0.3.23",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        },
+        {
+          "name": "labview_open_source_project_lib_openuri",
+          "version": "1.4.0.13",
+          "source_files": [
+            ".github/labview/vipm/ci-tooling.vipc"
+          ]
+        }
+      ],
+      "staged_sha256": "f93bae171ad581c0f3e33a8eef09036029a03cccb3ac63af0b89c99ddcdd945f"
+    },
+    {
+      "path": "example/Dependencies.vipc",
+      "sha256": "d48245e69cd866e955c67ad4feaf53065544555b50b18227b7aefb77e944cbdb",
+      "staged_name": "project-62a52e750646129337e0e814fb4223ab50965ab658102e69fca2a59ee797a79f.vipc",
+      "requirements": [
+        {
+          "name": "oglib_file",
+          "version": "6.0.2.28",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "dataflow_g_lib_g_image",
+          "version": "0.5.0.1",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_string",
+          "version": "6.0.2.35",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_lvdata",
+          "version": "6.0.0.45",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_error",
+          "version": "6.0.0.26",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_array",
+          "version": "6.0.1.20",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "oglib_appcontrol",
+          "version": "4.1.0.7",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "ni_lib_utf_junit_report",
+          "version": "1.0.1.43",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "ni_lib_junit_results_api",
+          "version": "1.0.1.6",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        },
+        {
+          "name": "ni_lib_simple_xml",
+          "version": "1.0.0.4",
+          "source_files": [
+            "example/Dependencies.vipc"
+          ]
+        }
+      ],
+      "staged_sha256": "d48245e69cd866e955c67ad4feaf53065544555b50b18227b7aefb77e944cbdb"
+    },
+    {
+      "path": "example/Example.dragon",
+      "sha256": "3c9b874dbec14697c544a796588a32d640ce3a939f73e0445f28535868fed953",
+      "staged_name": "project-8c12a7b57710b1ef77db52006871641b0a9d9718a258f184d10c17ac95e4c267.vipc",
+      "requirements": [
+        {
+          "name": "oglib_boolean",
+          "version": "6.0.0.9",
+          "source_files": [
+            "example/Example.dragon"
+          ]
+        },
+        {
+          "name": "oglib_array",
+          "version": "6.0.1.20",
+          "source_files": [
+            "example/Example.dragon"
+          ]
+        }
+      ],
+      "staged_sha256": "2bb6c29e68bb1e29374d413df0a370bc248744678ca02e2c5fffc32122207605"
+    }
+  ]
+}
