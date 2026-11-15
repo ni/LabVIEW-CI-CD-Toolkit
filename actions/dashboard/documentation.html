@@ -1217,7 +1217,9 @@ ghcr.io/&lt;lcwc-owner&gt;/&lt;lcwc-repo&gt;-labview-base   # the shared base, o
         establish that a published worker is active; publication and dashboard verification are separate steps.</p>
 
       <p>Linux VIPM builds print the installed-inventory command output before validating it, so a failed
-        build retains the underlying CLI error. A failed command, wrong LabVIEW target, or missing pinned
+        build retains the underlying CLI error. A native inventory-process segmentation fault (exit 139)
+        gets at most three read attempts, five seconds apart; installs are not repeated. Other command
+        failures are not retried. A failed command, wrong LabVIEW target, or missing pinned
         package still blocks worker publication.</p>
 
       <h3>Initial seeding preserves rebuilt workers</h3>

@@ -102,18 +102,61 @@ class LinuxWorkerTests(unittest.TestCase):
             for output, status, accepted in (
                     ('VIPM could not read its installed database\n', 17, False),
                     ('Using LabVIEW 2026 (64-bit)\npackage_id v1.0\n', 17, False),
+                    ('Using LabVIEW 2026 (64-bit)\npackage_id v1.0\n', 139, False),
                     ('Using LabVIEW 2025 (64-bit)\npackage_id v1.0\n', 0, False),
                     ('Using LabVIEW 2026 (64-bit)\npackage_id v1.0\n', 0, True)):
                 with self.subTest(output=output, status=status):
                     raw.write_text(output)
                     result = subprocess.run(['bash', '-euc',
-                        'run_vipm() { cat "$FIXTURE_RAW"; return "$FIXTURE_STATUS"; }\n' + final_check,
+                        'run_vipm() { cat "$FIXTURE_RAW"; return "$FIXTURE_STATUS"; }\n'
+                        'sleep() { :; }\n' + final_check,
                         str(installer)], capture_output=True, text=True,
                         env={**os.environ, 'INVENTORY_DIR': str(root), 'VIPC_DIR': str(root),
                              'LABVIEW_VERSION': '2026', 'FIXTURE_RAW': str(raw), 'FIXTURE_STATUS': str(status)})
                     self.assertIn(output, result.stdout)
                     self.assertEqual(result.returncode == 0, accepted, result.stderr)
                     self.assertEqual('All VIPC files applied successfully.' in result.stdout, accepted)
+
+    def test_only_inventory_segfaults_are_retried_and_success_is_reverified(self):
+        installer = ROOT / '.github/labview/vipm/install-vipc-linux.sh'
+        final_check = 'inventory_args=(--vipc-dir' + installer.read_text().split('inventory_args=(--vipc-dir', 1)[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with zipfile.ZipFile(root / 'project-test.vipc', 'w') as archive:
+                archive.writestr('config.xml', '<Root><Package><Name>package_id-1.0</Name></Package></Root>')
+            for failures, status, target, version, calls, accepted in (
+                    (1, 139, '2026', '1.0', 2, True), (2, 139, '2026', '1.0', 3, True),
+                    (3, 139, '2026', '1.0', 3, False), (1, 17, '2026', '1.0', 1, False),
+                    (1, 124, '2026', '1.0', 1, False), (1, 137, '2026', '1.0', 1, False),
+                    (1, 139, '2025', '1.0', 2, False), (1, 139, '2026', '2.0', 2, False)):
+                with self.subTest(failures=failures, status=status, target=target, version=version):
+                    script = root / 'cli-calls'
+                    sleeps = root / 'sleeps'
+                    script.write_text('')
+                    sleeps.write_text('')
+                    fixture = '''cli_calls=0
+run_vipm() {
+  cli_calls=$((cli_calls + 1))
+  echo call >> "$FIXTURE_CALLS"
+  if [ "$cli_calls" -le "$FIXTURE_FAILURES" ]; then
+    echo "fixture CLI failed with exit $FIXTURE_STATUS"
+    return "$FIXTURE_STATUS"
+  fi
+  printf 'Using LabVIEW %s (64-bit)\\npackage_id v%s\\n' "$FIXTURE_TARGET" "$FIXTURE_VERSION"
+}
+sleep() { echo "$1" >> "$FIXTURE_SLEEPS"; }
+'''
+                    result = subprocess.run(['bash', '-euc', fixture + final_check, str(installer)],
+                        capture_output=True, text=True, env={**os.environ,
+                            'INVENTORY_DIR': str(root), 'VIPC_DIR': str(root), 'LABVIEW_VERSION': '2026',
+                            'FIXTURE_CALLS': str(script), 'FIXTURE_SLEEPS': str(sleeps),
+                            'FIXTURE_FAILURES': str(failures), 'FIXTURE_STATUS': str(status),
+                            'FIXTURE_TARGET': target, 'FIXTURE_VERSION': version})
+                    self.assertEqual(len(script.read_text().splitlines()), calls)
+                    self.assertEqual(sleeps.read_text().splitlines(), ['5'] * (calls - 1))
+                    self.assertEqual(result.returncode == 0, accepted, result.stdout + result.stderr)
+                    self.assertEqual('All VIPC files applied successfully.' in result.stdout, accepted)
+                    self.assertIn(f'fixture CLI failed with exit {status}', result.stdout)
 
     def test_bom_inventory_cli_and_exact_project_versions(self):
         with tempfile.TemporaryDirectory() as directory:

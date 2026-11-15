@@ -178,11 +178,23 @@ if ! kill -0 "$LABVIEW_PID" 2>/dev/null; then
 fi
 mkdir -p "$INVENTORY_DIR"
 inventory_args=(--vipc-dir "$VIPC_DIR" --required)
-if ! run_vipm --labview-version "$LABVIEW_VERSION" --labview-bitness 64 list --installed > "$INVENTORY_DIR/vipm-list.txt" 2>&1; then
+# VIPM's native inventory process can crash on startup after successful installs.
+# Retry only SIGSEGV (139), never a timeout, a package error, or invalid evidence.
+for inventory_attempt in 1 2 3; do
+  inventory_result=0
+  run_vipm --labview-version "$LABVIEW_VERSION" --labview-bitness 64 list --installed > "$INVENTORY_DIR/vipm-list.txt" 2>&1 || inventory_result=$?
+  cat "$INVENTORY_DIR/vipm-list.txt"
+  if [ "$inventory_result" -eq 0 ]; then
+    break
+  fi
+  if [ "$inventory_result" -eq 139 ] && [ "$inventory_attempt" -lt 3 ]; then
+    echo "VIPM inventory process crashed (exit 139, attempt $inventory_attempt/3); retrying the read in 5 seconds." >&2
+    sleep 5
+    continue
+  fi
   inventory_args+=(--failed)
-fi
-# Keep CLI errors visible even when strict inventory validation stops the build.
-cat "$INVENTORY_DIR/vipm-list.txt"
+  break
+done
 python3 "$(dirname "$0")/linux-worker.py" observe --year "$LABVIEW_VERSION" \
   --raw "$INVENTORY_DIR/vipm-list.txt" --output "$INVENTORY_DIR/observed-inventory.json" \
   "${inventory_args[@]}"
