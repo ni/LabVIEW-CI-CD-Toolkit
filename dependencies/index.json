@@ -1,8 +1,35 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "2c0e7dbb52cc8144cfa4bc688e00be3623b94d2b",
+  "sha": "bbf4cad61258a629ecc65959a26330135ef46007",
   "revisions": [
+    {
+      "sha": "bbf4cad61258a629ecc65959a26330135ef46007",
+      "short": "bbf4cad",
+      "message": "Merge pull request #169 from ni/codex/retry-vipm-inventory-crash",
+      "author": "Elijah Kerry",
+      "date": "2026-11-15T01:42:47Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "acc6ec9847283eef0297d63958a74767059c91b8",
+      "short": "acc6ec9",
+      "message": "Reject valid-looking output from exhausted crashing reads",
+      "author": "elijah286",
+      "date": "2026-11-15T00:50:38Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "2e56716c036801ce9f7e2dfad42089787904af02",
+      "short": "2e56716",
+      "message": "Retry crashed Linux VIPM inventory reads with strict verification",
+      "author": "elijah286",
+      "date": "2026-11-15T00:48:39Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "2c0e7dbb52cc8144cfa4bc688e00be3623b94d2b",
       "short": "2c0e7db",
@@ -873,33 +900,6 @@
       "message": "Merge pull request #98 from ni/fix/dependencies-platform-ux-20261102",
       "author": "Elijah Kerry",
       "date": "2026-11-02T22:17:30Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "964047f2e9f693a7fea0c916d9030b8e07d3a812",
-      "short": "964047f",
-      "message": "Fix VIDiff client payload closure for deployment guards",
-      "author": "elijah286",
-      "date": "2026-11-02T21:57:08Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b1d39072304982450f7ccccbb1f02c8084a7a820",
-      "short": "b1d3907",
-      "message": "security: declare actions read for vidiff artifact access",
-      "author": "elijah286",
-      "date": "2026-11-02T21:56:46Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "eb0600b04a8dc4ee3e1d099c339841a17b3b91e1",
-      "short": "eb0600b",
-      "message": "ci: wire vidiff distribution security checks",
-      "author": "elijah286",
-      "date": "2026-11-02T21:56:11Z",
       "project": false,
       "dep_only": false
     },
