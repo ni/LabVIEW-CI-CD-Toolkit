@@ -19,6 +19,7 @@ const candidate = {
 const elements = new Map();
 const requests = [];
 let responseCandidate = candidate;
+let responseProposals = [];
 let activeConfig = 'config:\n  container:\n    linuxUse: "' + tag + '@' + digest + '"\n';
 let failMetadata = false;
 let workflowResponse = 'available';
@@ -73,6 +74,7 @@ const context = vm.createContext({
         { type:'file', path:'.github/workflows/build-labview-lvpm-image.yml' }
       ] };
     }
+    if (url.includes('/pulls?')) return {ok:true, json:async () => responseProposals};
     if (url.includes('latest.json')) return { ok:true, json:async () => ({ tag, manifest_path:candidate.manifest_path, image_digest:digest }) };
     if (url.includes('manifest.json')) return { ok:true, json:async () => responseCandidate };
     if (new URL(url).hostname === 'raw.githubusercontent.com' && (options.headers?.Authorization || options.headers?.['X-GitHub-Api-Version'])) throw new TypeError('Load failed');
@@ -940,9 +942,10 @@ function progressFixture(){
   commitResponses = [];
   elements.set('lvpmStatus', uiElement());
   elements.set('lvpmRunLink', uiElement());
+  elements.set('lvpmActivationLink', {...uiElement(), hidden:true});
   for (const id of ['lvpmProgress','lvpmProgressPhase','lvpmProgressBar']) elements.set(id, uiElement());
   elements.get('lvpmProgress').hidden = true;
-  for (const id of ['lvpmBuild','lvpmActivate','lvpmReset']) elements.set(id, {disabled:false});
+  for (const id of ['lvpmBuild','lvpmActivate','lvpmReset']) elements.set(id, {...uiElement(), disabled:false});
   return requests.length;
 }
 const postCount = start => requests.slice(start).filter(request => request.options.method === 'POST').length;
@@ -1016,25 +1019,68 @@ for (const conclusion of ['success','cancelled','timed_out','action_required','n
   progressStart = progressFixture();
   runResponse = {...identifiedRun, status:'completed', conclusion};
   const configBefore = plain(candidate);
+  responseCandidate = {...candidate, workflow_run:{...candidate.workflow_run,id:123}};
   await hooks.dispatchLinuxWorker('build');
-  assert.match(elements.get('lvpmStatus').textContent, conclusion === 'success' ? /Build workflow succeeded\. Refresh to check for a published candidate/ : new RegExp('Workflow ' + conclusion));
-  assertLinuxProgress(conclusion === 'success' ? 'Workflow succeeded · review required' : conclusion === 'cancelled' ? 'Workflow cancelled' : conclusion === 'timed_out' ? 'Workflow failed · inspect logs' : 'Workflow did not succeed · inspect logs', conclusion === 'success' ? 'ok' : 'err', false);
+  assert.match(elements.get('lvpmStatus').textContent, conclusion === 'success' ? /New LVPM worker ready/ : new RegExp('Workflow ' + conclusion));
+  assertLinuxProgress(conclusion === 'success' ? 'Build succeeded — ready to use' : conclusion === 'cancelled' ? 'Workflow cancelled' : conclusion === 'timed_out' ? 'Workflow failed · inspect logs' : 'Workflow did not succeed · inspect logs', conclusion === 'success' ? 'ok' : 'err', false);
   assert.equal(postCount(progressStart), 1);
   assert.equal(runPoll, null);
   assert.deepEqual(plain(candidate), configBefore);
-  assert.equal(requests.slice(progressStart).filter(request => request.url.includes('manifest.json')).length, 0);
+  assert.equal(requests.slice(progressStart).filter(request => request.url.includes('manifest.json')).length, conclusion === 'success' ? 1 : 0);
   assert.doesNotMatch(elements.get('lvpmStatus').textContent, /^(Candidate verified|CI activities passed|Activation complete)/);
   progressCases++;
 }
+responseCandidate = candidate;
+responseProposals = [{number:44,state:'open',head:{ref:'labview-ci/reconfigure-123',repo:{full_name:'owner/project'}},base:{ref:'trunk',repo:{full_name:'owner/project'}}}];
 for (const action of ['activate','reset']) {
   progressStart = progressFixture();
   runResponse = {...identifiedRun, path:'.github/workflows/reconfigure.yml', status:'completed', conclusion:'success'};
   await hooks.dispatchLinuxWorker(action);
-  assert.match(elements.get('lvpmStatus').textContent, /Reconfigure workflow succeeded.*only merging the proposal applies/);
-  assertLinuxProgress('Workflow succeeded · review required', 'ok', false);
+  assert.match(elements.get('lvpmStatus').textContent, /Merge this pull request to activate the worker/);
+  assertLinuxProgress('Worker change ready — merge to activate', 'ok', false);
+  assert.equal(elements.get('lvpmActivationLink').href, 'https://github.com/owner/project/pull/44');
+  assert.equal(elements.get('lvpmActivationLink').hidden, false);
   assert.equal(postCount(progressStart), 1);
   progressCases++;
 }
+// An older candidate must not masquerade as the newly completed build.
+progressStart = progressFixture();
+runResponse = {...identifiedRun,status:'completed',conclusion:'success'};
+responseCandidate = candidate; // run 42, while we dispatched 123
+await hooks.dispatchLinuxWorker('build');
+assertLinuxProgress('Build succeeded — loading new worker', '', true);
+assert.doesNotMatch(elements.get('lvpmReview').innerHTML, /id="lvpmActivate"/);
+assert.equal(typeof runPoll, 'function');
+responseCandidate = {...candidate,workflow_run:{...candidate.workflow_run,id:123}};
+await runPoll();
+assertLinuxProgress('Build succeeded — ready to use', 'ok', false);
+const readyMarkup = elements.get('lvpmReview').innerHTML;
+assert.ok(readyMarkup.indexOf('Use this worker') < readyMarkup.indexOf('<details>'));
+assert.match(readyMarkup, /Merge it to make this image the Linux worker/);
+assert.equal(postCount(progressStart), 1); // discovery never dispatches activation
+assert.equal(runPoll, null);
+
+// Failed publication/discovery is bounded, and never offers the old image.
+progressFixture();
+responseCandidate = candidate;
+runResponse = {...identifiedRun,status:'completed',conclusion:'success'};
+await hooks.dispatchLinuxWorker('build');
+for(let i=1;i<12;i++) await runPoll();
+assertLinuxProgress('Build succeeded — image not available yet', 'warn', false);
+assert.equal(runPoll,null);
+assert.match(elements.get('lvpmReview').innerHTML,/Check for new worker/);
+assert.doesNotMatch(elements.get('lvpmReview').innerHTML,/id="lvpmActivate"/);
+
+// A similarly named PR from another repository is never linked as our activation.
+progressFixture();
+responseProposals = [{number:44,state:'open',head:{ref:'labview-ci/reconfigure-123',repo:{full_name:'other/project'}},base:{ref:'trunk',repo:{full_name:'owner/project'}}}];
+runResponse = {...identifiedRun,path:'.github/workflows/reconfigure.yml',status:'completed',conclusion:'success'};
+await hooks.dispatchLinuxWorker('activate');
+assert.equal(elements.get('lvpmActivationLink').hidden,true);
+assert.match(elements.get('lvpmStatus').textContent,/Open its run below for the pull request/);
+responseProposals = [];
+responseCandidate = candidate;
+
 for (const invalid of [
   null, {}, {...acceptedDetails, workflow_run_id:'123'}, {...acceptedDetails, workflow_run_id:-1},
   {...acceptedDetails, run_url:'https://api.github.com/repos/other/project/actions/runs/123'},

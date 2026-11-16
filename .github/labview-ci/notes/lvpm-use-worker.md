@@ -1,0 +1,3 @@
+- Show a prominent “Use this worker” button when an LVPM image is ready, and link directly to the activation pull request.
+- Automatically find the image from the completed build; explain delayed publication and the remaining activation step.
+- Allow verified, configuration-only LVPM activation in the toolkit source and forks without running the client installer.

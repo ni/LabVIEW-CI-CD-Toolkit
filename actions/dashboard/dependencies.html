@@ -83,6 +83,10 @@
     #linuxPrerequisites{border-left:3px solid var(--accent);padding:4px 12px;margin:12px 0}
     #linuxPrerequisites.pending{border-left-color:var(--warn)}
     #linuxPrerequisites a{overflow-wrap:anywhere}
+    .lvpm-activation{border:1px solid var(--accent);border-radius:8px;padding:16px;margin:12px 0}
+    .lvpm-activation h3{margin-top:0}
+    #lvpmActivationLink{display:inline-block;padding:10px 18px;border-radius:6px;background:var(--accent);color:var(--accent-fg);font-weight:700}
+    #lvpmActivate{padding:10px 18px;border-radius:6px;font-weight:700}
     #linuxPrimary{display:inline-block;padding:9px 12px;border:1px solid transparent;border-radius:6px}
     #lvpmStatus:empty{display:none}
     #lvpmStatus{padding:10px 0;font-weight:600;white-space:pre-line}
@@ -781,6 +785,7 @@
         if (status) status.textContent = "Tracking stopped because the page context changed. Submitted workflows may continue on GitHub.";
         const link = $("lvpmRunLink");
         if (link) link.hidden = true;
+        if ($("lvpmActivationLink")) $("lvpmActivationLink").hidden = true;
         renderLinuxProgress("stopped");
       }
       linuxOperation = null;
@@ -1082,7 +1087,11 @@
       const states = {
         checking:["Checking request", "", true], submitting:["Submitting request", "", true],
         awaiting:["Awaiting identified run", "", true], queued:["Workflow queued", "", true],
-        running:["Workflow running", "", true], succeeded:["Workflow succeeded · review required", "ok", false],
+        running:["Workflow running", "", true], succeeded:["Workflow succeeded", "ok", false],
+        candidateReady:["Build succeeded — ready to use", "ok", false],
+        candidateWaiting:["Build succeeded — loading new worker", "", true],
+        candidateUnavailable:["Build succeeded — image not available yet", "warn", false],
+        proposalReady:["Worker change ready — merge to activate", "ok", false],
         failed:["Workflow failed · inspect logs", "err", false], cancelled:["Workflow cancelled", "err", false],
         unsuccessful:["Workflow did not succeed · inspect logs", "err", false],
         rejected:["Request not submitted or rejected", "err", false],
@@ -1139,15 +1148,21 @@
           linuxOperationStatus(operation, run.status === "in_progress" ? "Workflow running. Active worker unchanged." : "Workflow " + String(run.status || "pending") + ". Active worker unchanged.", operation.runId, run.status === "in_progress" ? "running" : run.status === "queued" ? "queued" : "awaiting");
           return;
         }
+        if (run.conclusion === "success" && operation.action === "build") {
+          await refreshBuiltCandidate(operation);
+          return;
+        }
         operation.busy = false;
         if (operation.intent) operation.intent.busy = false;
         clearInterval(operation.timer);
         const message = run.conclusion === "success"
           ? operation.action === "vipm" ? "Linux VIPM build workflow succeeded. Inspect its image output and refreshed dependency inventory; this does not establish runtime activity success."
-            : operation.action === "build" ? "Build workflow succeeded. Refresh to check for a published candidate and review its package-file evidence before requesting activation. This does not prove CI activities passed; the active worker is unchanged."
-            : "Reconfigure workflow succeeded. Review its pull request; only merging the proposal applies the change."
+            : "Worker change prepared. Open the activation pull request and merge it to use the new worker. Your current worker stays active until then."
           : "Workflow " + String(run.conclusion || "finished without a success result") + ". Open the logs for the failing step. No successful candidate or configuration change is established.";
         linuxOperationStatus(operation, message, operation.runId, run.conclusion === "success" ? "succeeded" : run.conclusion === "cancelled" ? "cancelled" : ["failure", "timed_out"].includes(run.conclusion) ? "failed" : "unsuccessful");
+        if (run.conclusion === "success" && ["activate", "reset"].includes(operation.action)) {
+          await showLinuxActivationProposal(operation);
+        }
       } catch (error) {
         if (!linuxOperationCurrent(operation)) return;
         clearInterval(operation.timer);
@@ -1155,6 +1170,56 @@
       } finally {
         operation.polling = false;
         if (linuxOperationCurrent(operation)) syncLinuxOperationButtons();
+      }
+    }
+    async function refreshBuiltCandidate(operation){
+      let candidate = null;
+      try { candidate = await loadLvpmCandidate(); } catch (_) {}
+      if (!linuxOperationCurrent(operation)) return;
+      const run = candidate && candidate.workflow_run || {};
+      const matching = run.id === operation.runId && run.attempt === 1
+        && run.head_sha === operation.revision && run.workflow_path === ".github/workflows/" + operation.file;
+      operation.candidateChecks = (operation.candidateChecks || 0) + 1;
+      // Never offer an older/unrelated image as the result of this build.
+      operation.candidate = matching ? candidate : null;
+      lvpmCandidate = operation.candidate;
+      operation.busy = !matching && operation.candidateChecks < 12;
+      if (operation.intent) operation.intent.busy = operation.busy;
+      if (!operation.busy) clearInterval(operation.timer);
+      renderLvpmCandidate();
+      linuxOperationStatus(operation, matching
+        ? "New LVPM worker ready. Select Use this worker to request activation."
+        : "Build succeeded. Waiting for the new image to become available. Your current worker is still active.", operation.runId,
+        matching ? "candidateReady" : operation.busy ? "candidateWaiting" : "candidateUnavailable");
+    }
+    async function showLinuxActivationProposal(operation){
+      const branch = "labview-ci/reconfigure-" + operation.runId;
+      try {
+        const response = await fetch(api("/pulls?state=all&head=" + encodeURIComponent(repo.split("/")[0] + ":" + branch)
+          + "&base=" + encodeURIComponent(operation.ref)), { cache:"no-cache", headers:updHeaders() });
+        if (!response.ok) throw new Error("Proposal lookup failed.");
+        const proposals = await response.json();
+        if (!linuxOperationCurrent(operation)) return;
+        const matches = Array.isArray(proposals) ? proposals.filter(pr => Number.isSafeInteger(pr.number) && pr.number > 0
+          && pr.head && pr.head.ref === branch && pr.head.repo && pr.head.repo.full_name.toLowerCase() === repo.toLowerCase()
+          && pr.base && pr.base.ref === operation.ref && pr.base.repo && pr.base.repo.full_name.toLowerCase() === repo.toLowerCase()) : [];
+        if (matches.length !== 1) throw new Error("No unique activation proposal found.");
+        const pr = matches[0];
+        operation.proposal = pr;
+        renderLvpmCandidate();
+        const status = pr.merged_at ? "Worker change merged. Refresh the page to load the new selection."
+          : pr.state === "open" ? "Merge this pull request to activate the worker. Repository approval rules still apply."
+          : "The worker change pull request was closed without merging. Your worker was not changed.";
+        linuxOperationStatus(operation, status, operation.runId, pr.state === "open" ? "proposalReady" : "succeeded");
+        const link = $("lvpmActivationLink");
+        if (link) {
+          link.href = "https://github.com/" + repo + "/pull/" + pr.number;
+          link.textContent = pr.state === "open" ? "Review and activate worker ↗" : "Open worker change ↗";
+          link.hidden = false;
+        }
+      } catch (_) {
+        if (linuxOperationCurrent(operation)) linuxOperationStatus(operation,
+          "Worker-change workflow finished. Open its run below for the pull request; merge that proposal to activate. If settings already match, no new proposal is needed.", operation.runId, "succeeded");
       }
     }
     async function dispatchLinuxWorker(action, intent = null){
@@ -1167,6 +1232,7 @@
       if (!token()) { pendingTokenAction = () => dispatchLinuxWorker(action); showTokenPanel(); if (status) status.textContent = "Paste a token with Actions: write to continue."; return; }
       const operation = { action, revision:intent ? intent.target.sha : revision, intent, token:token(), epoch:linuxContextEpoch, busy:true, file:intent ? intent.target.file : action === "build" ? "build-labview-lvpm-image.yml" : "reconfigure.yml", visibilityChecks:0 };
       linuxOperation = operation;
+      if ($("lvpmActivationLink")) $("lvpmActivationLink").hidden = true;
       linuxDispatchPending = true;
       syncLinuxOperationButtons();
       linuxOperationStatus(operation, "Checking the current revision and workflow…", null, "checking");
@@ -1242,13 +1308,13 @@
       const configuredSelection = selectedConfig.linuxUse || selectedConfig.use || "latest";
       const selectedLvpm = String(configuredSelection).startsWith("linux-lvpm-");
       linuxBuildAvailability = { state:"checking", reason:"Checking the installed build workflow." };
-      linuxToolingView = selectedLvpm ? "lvpm" : "vipm";
+      linuxToolingView = new URL(location.href).searchParams.get("installer") === "lvpm" || selectedLvpm ? "lvpm" : "vipm";
       lvpmCandidate = null;
       host.innerHTML = '<h2>Linux dependency tooling</h2><p>Configured Linux default (selected revision <code>' + esc(short(revision)) + '</code>): <strong>' + (selectedLvpm ? 'LVPM' : 'VIPM') + '</strong>.</p>'
-        + '<fieldset><legend>Preview an approach · Windows unchanged</legend><label><input type="radio" name="linuxInstaller" value="vipm"' + (selectedLvpm ? '' : ' checked') + '> VIPM</label> <label><input type="radio" name="linuxInstaller" value="lvpm"' + (selectedLvpm ? ' checked' : '') + '> LVPM</label></fieldset>'
+        + '<fieldset><legend>Preview an approach · Windows unchanged</legend><label><input type="radio" name="linuxInstaller" value="vipm"' + (linuxToolingView === 'vipm' ? ' checked' : '') + '> VIPM</label> <label><input type="radio" name="linuxInstaller" value="lvpm"' + (linuxToolingView === 'lvpm' ? ' checked' : '') + '> LVPM</label></fieldset>'
+        + '<div id="linuxVipmView"' + (linuxToolingView === 'lvpm' ? ' hidden' : '') + '></div>'
+        + '<div id="lvpmReview"' + (linuxToolingView === 'lvpm' ? '' : ' hidden') + '>Loading candidate evidence…</div>'
         + '<div id="linuxPrerequisites"></div>'
-        + '<div id="linuxVipmView"' + (selectedLvpm ? ' hidden' : '') + '></div>'
-        + '<div id="lvpmReview"' + (selectedLvpm ? '' : ' hidden') + '>Loading candidate evidence…</div>'
         + '<div class="lvpm-progress" id="lvpmProgress" hidden><div class="upd-prog-head"><span class="upd-prog-phase" id="lvpmProgressPhase"></span></div><div class="upd-prog-track" aria-hidden="true"><div class="upd-prog-bar" id="lvpmProgressBar"></div></div></div>'
         + '<div role="status" aria-live="polite" id="lvpmStatus"></div><a id="lvpmRunLink" target="_blank" rel="noopener" hidden></a>'
         + '<details><summary>Current selection and rollback</summary><p>Switching these views does not change configuration or dispatch a workflow. Explicit per-action overrides win.</p><p><code>' + esc(configuredSelection) + '</code></p><p>Per-action overrides: ' + esc(Object.entries(selectedConfig.actions || {}).map(([activity, selection]) => activity + ': ' + selection).join('; ') || 'none') + '. These are preserved and may prevent the Linux default from applying to an activity.</p>'
@@ -1268,17 +1334,41 @@
       try { candidate = await loadLvpmCandidate(); } catch (_) {}
       const buildAvailability = await loadLinuxBuildAvailability();
       if ($("linuxInstaller") !== host || revision !== selectedRevision || activePlatform !== "linux") return;
-      lvpmCandidate = candidate;
+      const completedBuild = linuxOperationCurrent(linuxOperation || {}) && linuxOperation.action === "build" && linuxOperation.candidateChecks;
+      lvpmCandidate = completedBuild ? linuxOperation.candidate : candidate;
       linuxBuildAvailability = buildAvailability;
+      renderLvpmCandidate();
+      syncLinuxOperationButtons();
+      renderLinuxPrerequisites();
+      if (linuxOperationCurrent(linuxOperation || {})) linuxOperationStatus(linuxOperation, linuxOperation.message || "Checking workflow…", linuxOperation.runId);
+    }
+    function renderLvpmCandidate(){
+      const candidate = lvpmCandidate;
+      const revision = selectedRevision;
+      const configuredSelection = selectedConfig.linuxUse || selectedConfig.use || "latest";
+      const selectedLvpm = String(configuredSelection).startsWith("linux-lvpm-");
       const run = candidate && candidate.workflow_run || {};
       const review = $("lvpmReview");
+      if (!review) return;
       const declarations = currentVipcs.concat(currentDragons).filter(item => Array.isArray(item.monitorOn) && item.monitorOn.includes("linux"));
       const current = !!defaultRevision && revision === defaultRevision;
       const alreadySelected = candidateSelection(candidate) === configuredSelection;
       const canActivate = candidate && !alreadySelected;
       const freshness = lvpmFreshness(resolveColumn(COLS.find(col => col.key === "linux"), selectedConfig));
       const candidateHeading = candidateSelection(candidate) === configuredSelection ? 'Currently selected Linux default' : 'Alternative candidate — not automatically used';
-      review.innerHTML = '<p class="ct-sub">Linux x86-64 · Package-file verification only, not CI activity validation.</p>'
+      const activationHint = monitorDirty ? 'Save and merge your monitoring changes first.'
+        : !current ? 'Open the current revision to use this worker.'
+        : 'Creates a worker-change pull request. Merge it to make this image the Linux worker for future jobs.';
+      const currentUrl = new URL(location.href);
+      currentUrl.searchParams.set("sha", defaultRevision || "");
+      currentUrl.searchParams.set("installer", "lvpm");
+      const proposal = linuxOperationCurrent(linuxOperation || {}) && linuxOperation.proposal;
+      review.innerHTML = (proposal ? '<div class="lvpm-activation"><h3>' + (proposal.state === 'open' ? 'One step left: activate your worker' : 'Worker change completed') + '</h3><a id="lvpmActivationLink" target="_blank" rel="noopener" href="https://github.com/' + esc(repo) + '/pull/' + proposal.number + '">' + (proposal.state === 'open' ? 'Review and activate worker ↗' : 'Open worker change ↗') + '</a><p>' + (proposal.merged_at ? 'Merged. Refresh to load the new worker selection.' : proposal.state === 'open' ? 'Merge this pull request to use the new Linux worker. Repository approval rules apply.' : 'Closed without merging. The active worker was not changed.') + '</p></div>'
+        : canActivate ? '<div class="lvpm-activation"><h3>New LVPM worker ready</h3><button type="button" class="primary" id="lvpmActivate"' + (current && !monitorDirty ? '' : ' disabled') + '>Use this worker</button><p>' + esc(activationHint) + '</p>'
+        + (!current && defaultRevision ? '<a href="' + esc(currentUrl.href) + '">Open current revision</a>' : '') + '</div>'
+        : alreadySelected && candidate ? '<p><strong>This LVPM worker is already selected.</strong></p>'
+        : '<p>No new worker is available yet.</p><button type="button" id="lvpmRefresh">Check for new worker</button>')
+        + '<p class="ct-sub">Linux x86-64 · Package-file verification only, not CI activity validation.</p>'
         + (selectedLvpm && freshness.status !== "current" ? '<p><strong>Current Linux dependencies are ' + esc(freshness.status) + '.</strong> Build a new candidate, reverify it, then reactivate.</p>' : '')
         + '<details><summary>Candidate evidence and build inputs</summary>'
         + '<p>' + esc(localFreshnessText(resolveColumn(COLS.find(col => col.key === "linux"), selectedConfig))) + '</p>'
@@ -1286,13 +1376,27 @@
           + '<details><summary>Image identity and verification evidence</summary><p><code>' + esc(candidate.image_ref) + '</code></p><p>Requirements: <code>' + esc(candidate.requirements_fingerprint || "") + '</code>. Source: <code>' + esc(run.head_sha || "") + '</code>; workflow <code>' + esc(run.workflow_path || "") + '</code>; run ' + esc(run.id || "") + ', attempt ' + esc(run.attempt || "") + '.</p><ul>' + (candidate.packages || []).map(pkg => '<li>' + esc(pkg.name || "") + ' ' + esc(pkg.version || "") + '</li>').join('') + '</ul></details>' : '<p>No eligible candidate manifest is available. The VIPM worker is not substituted.</p>')
         + (Number.isSafeInteger(run.id) && run.id > 0 ? '<p><a href="https://github.com/' + esc(repo) + '/actions/runs/' + run.id + '" target="_blank" rel="noopener">Review candidate build run</a></p>' : '')
         + '<p>Committed Linux declarations (' + declarations.length + (declarations.length === 1 ? ' file' : ' files') + ')</p><ul>' + declarations.map(item => '<li><code>' + esc(item.path) + '</code> — ' + (item.packages || []).length + ' declared packages</li>').join('') + '</ul>'
-        + '<p>' + esc(buildAvailability.reason) + '</p>'
-        + (canActivate ? '<p>Activation requests a separate reviewable PR; build success alone does not change the worker.</p><button type="button" id="lvpmActivate"' + (current && !monitorDirty ? '' : ' disabled') + '>Activate candidate via reviewable PR</button>' : '') + '</details>'
+        + '<p>' + esc(linuxBuildAvailability.reason) + '</p>'
+        + '</details>'
         + '<details><summary>Limitations and recovery</summary><p>Hook VI error-out results cannot be observed upstream. Hook-dependent packages and native/NIPM installation are not established. Exact-pin conflicts fail preflight; reconcile declarations rather than silently changing pins. There is no automatic LVPM rebuild: after input changes, build, reverify and explicitly re-activate a new candidate. Runtime freshness fails closed; no VIPM fallback occurs. Activation revalidates provenance, digest and inputs server-side; action overrides are preserved.</p></details>';
       if ($("lvpmActivate")) $("lvpmActivate").addEventListener("click", () => dispatchLinuxWorker("activate"));
-      syncLinuxOperationButtons();
-      renderLinuxPrerequisites();
-      if (linuxOperationCurrent(linuxOperation || {})) linuxOperationStatus(linuxOperation, linuxOperation.message || "Checking workflow…", linuxOperation.runId);
+      if ($("lvpmRefresh")) $("lvpmRefresh").addEventListener("click", async () => {
+        if (linuxOperationCurrent(linuxOperation || {}) && linuxOperation.action === "build") {
+          linuxOperation.candidateChecks = 0;
+          clearInterval(linuxOperation.timer);
+          const operation = linuxOperation;
+          operation.timer = setInterval(() => pollLinuxOperation(operation), 15000);
+          await pollLinuxOperation(operation);
+        } else {
+          const context = linuxMonitoringContext();
+          let refreshed = null;
+          try { refreshed = await loadLvpmCandidate(); } catch (_) {}
+          if (!linuxMonitoringContextCurrent(context)) return;
+          lvpmCandidate = refreshed;
+          renderLvpmCandidate();
+          syncLinuxOperationButtons();
+        }
+      });
     }
     // Compose the dependency-warning note. Returns "" when there is nothing worth
     // warning about, so the note stays hidden instead of restating the obvious.
