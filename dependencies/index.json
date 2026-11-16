@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "cb5761069e8478f52632f433039a4234902465d2",
+  "sha": "9bd6c39004af3c8ad3e3ee05832c7ca893a9e9e1",
   "revisions": [
+    {
+      "sha": "9bd6c39004af3c8ad3e3ee05832c7ca893a9e9e1",
+      "short": "9bd6c39",
+      "message": "Merge pull request #175 from ni/lvci-release/release-5.0.5-f35c74a1d2df69368d54911ffbb330e7d687a34f",
+      "author": "Elijah Kerry",
+      "date": "2026-11-16T23:29:44Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "f35c74a1d2df69368d54911ffbb330e7d687a34f",
+      "short": "f35c74a",
+      "message": "Prepare release 5.0.5",
+      "author": "github-actions[bot]",
+      "date": "2026-11-16T23:22:23Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "cb5761069e8478f52632f433039a4234902465d2",
       "short": "cb57610",
@@ -882,24 +900,6 @@
       "message": "Prepare release 4.20.0",
       "author": "github-actions[bot]",
       "date": "2026-11-03T00:26:59Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "86c3245c4242aa240df05226f20ca18833515f43",
-      "short": "86c3245",
-      "message": "Merge pull request #103 from ni/dependabot/github_actions/actions/github-script-9",
-      "author": "Elijah Kerry",
-      "date": "2026-11-03T00:26:19Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "534ccd59d99d4504b91e4b33fcd579638ec238ce",
-      "short": "534ccd5",
-      "message": "Bump actions/github-script from 8 to 9",
-      "author": "dependabot[bot]",
-      "date": "2026-11-03T00:24:43Z",
       "project": false,
       "dep_only": false
     },
