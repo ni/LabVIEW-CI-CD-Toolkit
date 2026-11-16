@@ -211,7 +211,6 @@ function renderSources() {
 }
 function updateUrl() {
   const params = new URLSearchParams();
-  if (location.protocol === 'file:') return;
   if (selected !== 'all') params.set('range',selected);
   if (selected === 'custom') {params.set('from',from);params.set('through',through);}
   if (metric !== defaultMetric()) params.set('metric',metric);
@@ -244,19 +243,16 @@ function csv() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 async function init() {
-  const embedded = $('embedded-snapshot');
-  if (embedded) data = JSON.parse(embedded.textContent);
-  else {
-    const response = await fetch('data.json', {cache:'no-cache'});
-    if (!response.ok) throw new Error('Snapshot unavailable');
-    data = await response.json();
-  }
+  const response = await fetch('data.json', {cache:'no-cache'});
+  if (!response.ok) throw new Error('Snapshot unavailable');
+  data = await response.json();
   min = data.created;
   max = data.updated?.slice(0,10);
   if (data.schema !== 1 || !valid(min) || !valid(max) || min > max || !/^[\w.-]+\/[\w.-]+$/.test(data.repo)) throw new Error('Unsupported snapshot');
   $('repo-name').textContent = data.repo.toLowerCase() === 'ni/labview-ci-cd-toolkit'
     ? 'LabVIEW CI/CD Toolkit' : data.repo;
-  $('repo-link').href = 'https://github.com/' + data.repo;
+  const repoPath = data.repo.split('/').map(encodeURIComponent).join('/');
+  $('repo-link').href = new URL(repoPath, 'https://github.com/').href;
   $('updated').textContent = date(max) + ' · ' + data.updated.slice(11,16) + ' UTC';
   const p = new URLSearchParams(location.search);
   const desired = p.get('range');
