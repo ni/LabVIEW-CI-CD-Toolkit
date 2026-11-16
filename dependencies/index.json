@@ -1,8 +1,62 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "05303be70d74872bf36dc984dc4ef5d2854ad14d",
+  "sha": "cb5761069e8478f52632f433039a4234902465d2",
   "revisions": [
+    {
+      "sha": "cb5761069e8478f52632f433039a4234902465d2",
+      "short": "cb57610",
+      "message": "Merge pull request #171 from ni/codex/lvpm-use-worker",
+      "author": "Elijah Kerry",
+      "date": "2026-11-16T23:22:03Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "e3fc1dd64e8cde2161de1db5069925ad937ee0e4",
+      "short": "e3fc1dd",
+      "message": "Merge pull request #173 from ni/codex/adoption-observatory",
+      "author": "Elijah Kerry",
+      "date": "2026-11-16T23:21:47Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "248c809c16b2e64712d58b9d80735fe24ccd5b0e",
+      "short": "248c809",
+      "message": "Use the served adoption snapshot and encode the repository link",
+      "author": "elijah286",
+      "date": "2026-11-16T23:19:48Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "1425ed254ff51f41a8b16871a281621b14106515",
+      "short": "1425ed2",
+      "message": "Publish repository adoption dashboard and archive GitHub traffic",
+      "author": "elijah286",
+      "date": "2026-11-16T23:17:08Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "20830e1ea9fe7c4d299bcc12ccdd751f35850cca",
+      "short": "20830e1",
+      "message": "Hide activation links when the request context changes",
+      "author": "elijah286",
+      "date": "2026-11-16T22:41:00Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "cbcbd605bd0091c2333af1e64491ffe52b76d17b",
+      "short": "cbcbd60",
+      "message": "Make newly built LVPM workers easy to activate",
+      "author": "elijah286",
+      "date": "2026-11-16T22:40:31Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "05303be70d74872bf36dc984dc4ef5d2854ad14d",
       "short": "05303be",
@@ -846,60 +900,6 @@
       "message": "Bump actions/github-script from 8 to 9",
       "author": "dependabot[bot]",
       "date": "2026-11-03T00:24:43Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5b886823c36f1239e4f2e8e5a931e20980f9de1c",
-      "short": "5b88682",
-      "message": "Merge pull request #105 from ni/dependabot/github_actions/actions/checkout-7",
-      "author": "Elijah Kerry",
-      "date": "2026-11-03T00:23:49Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "0ccc540c38411162a77effd4bf58ca72c792265b",
-      "short": "0ccc540",
-      "message": "Merge pull request #106 from ni/integration/validated-open-prs-20261102",
-      "author": "Elijah Kerry",
-      "date": "2026-11-03T00:23:02Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "00bfd126ca4f253d0223764523fd7259f820d821",
-      "short": "00bfd12",
-      "message": "Merge pull request #109 from ni/integration/vidiff-deploy-security-20261102",
-      "author": "Elijah Kerry",
-      "date": "2026-11-03T00:22:44Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "622c3b795a37456777d127818660f0045258e278",
-      "short": "622c3b7",
-      "message": "Merge remote-tracking branch 'origin/main' into integration/vidiff-deploy-security-20261102",
-      "author": "elijah286",
-      "date": "2026-11-02T22:19:49Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "2f5152b3145d1502aa48793c63557164a5268705",
-      "short": "2f5152b",
-      "message": "Merge remote-tracking branch 'origin/main' into integration/validated-open-prs-20261102",
-      "author": "elijah286",
-      "date": "2026-11-02T22:19:48Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "8e66f4b5ebdde7ed0708418895a130b03e585d6c",
-      "short": "8e66f4b",
-      "message": "Merge pull request #110 from ni/lvci-release/release-4.19.5",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T22:19:37Z",
       "project": false,
       "dep_only": false
     },
