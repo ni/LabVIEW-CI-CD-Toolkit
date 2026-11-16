@@ -1,0 +1,140 @@
+name: Repository Adoption — GitHub Pages
+
+on:
+  pull_request:
+    paths:
+      - '.github/adoption/**'
+      - '.github/workflows/adoption-pages.yml'
+      - 'examples/adoption-metrics-caller.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/adoption/**'
+      - '.github/workflows/adoption-pages.yml'
+  schedule:
+    - cron: '23 8 * * *'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      toolkit_ref:
+        description: The same immutable toolkit commit SHA used to call this workflow.
+        type: string
+        required: true
+    secrets:
+      ADOPTION_TRAFFIC_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lvci-adoption-pages
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s .github/adoption -p 'test_*.py'
+      - run: node --check .github/adoption/site/dashboard.js
+
+  publish:
+    if: >-
+      github.event_name != 'pull_request' &&
+      github.ref_name == github.event.repository.default_branch &&
+      !github.event.repository.private &&
+      (github.repository == 'ni/LabVIEW-CI-CD-Toolkit' ||
+       vars.LABVIEW_ADOPTION_PUBLISH == 'true')
+    permissions:
+      contents: write
+      pages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the adoption add-on
+        uses: actions/checkout@v7
+        with:
+          repository: ni/LabVIEW-CI-CD-Toolkit
+          ref: ${{ inputs.toolkit_ref || github.sha }}
+          persist-credentials: false
+
+      - name: Verify the existing Pages source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/pages" | jq -e '
+            .build_type == "legacy" and .source.branch == "gh-pages" and .source.path == "/"
+          ' || { echo "::error::Enable GitHub Pages from the root of gh-pages before publishing."; exit 1; }
+
+      - name: Load published archive or initialize it
+        id: archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/adoption-previous.json"
+          # A new Pages folder returns 404. Any other error must stop publication
+          # so an inaccessible archive can never be replaced by a blank one.
+          if gh api "repos/$GITHUB_REPOSITORY/contents/adoption/data.json?ref=gh-pages" \
+            --header 'Accept: application/vnd.github.raw+json' >"$archive" 2>"$RUNNER_TEMP/adoption-api.err"; then
+            echo "path=$archive" >> "$GITHUB_OUTPUT"
+          elif grep -Eq 'HTTP 404\b' "$RUNNER_TEMP/adoption-api.err"; then
+            if [[ "${GITHUB_REPOSITORY,,}" == 'ni/labview-ci-cd-toolkit' ]]; then
+              echo "path=$PWD/.github/adoption/seed.json" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            cat "$RUNNER_TEMP/adoption-api.err" >&2
+            exit 1
+          fi
+
+      - name: Build public adoption snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADOPTION_TRAFFIC_TOKEN: ${{ secrets.ADOPTION_TRAFFIC_TOKEN }}
+          ADOPTION_ARCHIVE: ${{ steps.archive.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/adoption-site"
+          mkdir -p "$out"
+          cp .github/adoption/site/{index.html,styles.css,dashboard.js} "$out/"
+          args=()
+          if [[ -n "$ADOPTION_ARCHIVE" ]]; then args+=(--archive "$ADOPTION_ARCHIVE"); fi
+          python3 .github/adoption/collect.py --repo "$GITHUB_REPOSITORY" \
+            --output "$out/data.json" "${args[@]}"
+          echo "ADOPTION_OUT=$out" >> "$GITHUB_ENV"
+
+      - name: Publish adoption folder to GitHub Pages
+        uses: ./.github/actions/publish-gh-pages
+        with:
+          publish_dir: ${{ env.ADOPTION_OUT }}
+          destination_dir: adoption
+          commit_message: 'Publish repository adoption snapshot'
+
+      - name: Request a GitHub Pages rebuild
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds" --silent
+
+      - name: Verify both traffic endpoints were collected
+        if: github.repository == 'ni/LabVIEW-CI-CD-Toolkit'
+        shell: bash
+        run: |
+          # Public metrics still publish during a credential outage. A failed
+          # run makes the traffic outage visible to workflow maintainers.
+          failed=0
+          for kind in views clones; do
+            if ! jq -e --arg kind "$kind" '.traffic_checked[$kind] == .updated' "$ADOPTION_OUT/data.json" >/dev/null; then
+              echo "::error::Could not refresh $kind. Check the ADOPTION_TRAFFIC_TOKEN Actions secret."
+              failed=1
+            else
+              latest=$(jq -r --arg kind "$kind" '.traffic[$kind] | keys | last // "no daily rows yet"' "$ADOPTION_OUT/data.json")
+              echo "- $kind collected. Latest daily row: $latest" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          exit "$failed"
