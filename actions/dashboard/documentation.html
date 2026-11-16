@@ -1731,8 +1731,17 @@ docker run --rm `
         this tooling source repository or a fork to test this feature; use a separate scratch client repository.</p>
       <p><strong>Update container image</strong> uses the selected Linux tooling. VIPM still requires
         review and approval before dispatch.
-        Candidate activation is a separate guarded action inside the collapsed candidate evidence section;
-        rollback is available under Current selection and rollback. Building an LVPM candidate never changes the active worker.
+        After a successful LVPM build, the page automatically checks for the image from that exact run.
+        A prominent <strong>Use this worker</strong> button appears above the collapsed evidence, with
+        <strong>Build succeeded — ready to use</strong> status. If publication is delayed, the page retries
+        for up to twelve checks and offers <strong>Check for new worker</strong>; it never substitutes an older build.
+        The button verifies the candidate and requests a configuration-only pull request. The page links
+        directly to that run&rsquo;s proposal as <strong>Review and activate worker</strong>.
+        Merge it under the repository&rsquo;s normal approval rules to select the image for future Linux jobs;
+        existing jobs and per-action overrides are unaffected. Historical revisions and unsaved monitoring
+        choices explain what must be updated before activation. Source repositories and forks use the same
+        strict candidate verification and a configuration-only PR, without invoking the client installer.
+        Rollback remains under Current selection and rollback. Building alone does not change the active worker.
         The single action clarifies submission and navigation, not package compatibility: conflicting pins or
         runtime installation failures can still stop the build. No successful image bake or CI activity run
         is established by enabling or submitting the button.</p>
@@ -1743,14 +1752,14 @@ docker run --rm `
         while checking, submitting, awaiting run visibility, queued, or running; it does not invent a completion
         percentage or estimate package-install progress. Failure and cancellation stop the bar with a red label
         and retain the exact run link. Uncertain outcomes or stopped tracking show a warning, not success.
-        Workflow success stops the bar with a review-required label, not a claim of candidate verification or
-        activation. Reduced-motion preferences disable the animation. It never picks the latest run or infers ownership
+        Build success loads the matching published candidate before showing it ready to use; a successful
+        configuration request links to its activation proposal without claiming the worker has changed. Reduced-motion preferences disable the animation. It never picks the latest run or infers ownership
         from timing. Delayed run visibility is retried; permission/network errors or mismatched identities stop
         tracking without automatically retrying the dispatch. Legacy HTTP 204 responses establish only acceptance:
         open the workflow runs and inspect them before refreshing or retrying. Repeated clicks are blocked while
         submitting, tracking, or the outcome is uncertain. Changing platform, revision, or monitoring invalidates
         the observer, not the remote run. Workflow success alone does not establish a published, verified candidate
-        or activate it: refresh and review candidate evidence, then request and merge the activation PR separately.</p>
+        or activate it: the page checks for the matching image, then offers Use this worker and the activation PR.</p>
       <ol>
         <li><strong>Review.</strong> The candidate uses the locked CI-tooling VIPC and project VIPC/Dragon files
           selected for Linux. One installer owns the environment; no per-package mixing of VIPM and LVPM occurs.

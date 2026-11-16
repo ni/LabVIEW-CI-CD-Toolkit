@@ -132,10 +132,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LABVIEW_IMAGE_NAME: ${{ vars.LABVIEW_IMAGE_NAME }}
         run: |
-          if [ -f .github/workflows/release.yml ] && [ -f .github/labview-ci/catalog.json ]; then
-            echo 'LVPM client activation is blocked in the tooling source repository and its forks.' >&2
-            exit 1
-          fi
+          # Source and client worker selections use the same strict verification.
+          # The source path below changes only config; it never runs the installer.
           python3 .github/labview/lvpm/worker.py verify --repo . --candidate "$IN_LINUX_WORKER" --repository "$GITHUB_REPOSITORY" --image-name "${LABVIEW_IMAGE_NAME:-}"
 
       - name: Apply settings to config files

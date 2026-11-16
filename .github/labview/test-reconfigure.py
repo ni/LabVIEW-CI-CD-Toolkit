@@ -301,6 +301,28 @@ class ReconfigurePreservationTests(unittest.TestCase):
         self.assertLess(steps.index(verify), steps.index(APPLY))
         self.assertIn("inputs.linux_worker != 'reset'", verify['if'])
 
+    def test_source_activation_runs_strict_verifier_and_propagates_failure(self):
+        step = next(step for step in WORKFLOW['jobs']['reconfigure']['steps']
+                    if step['name'] == 'Verify Linux LVPM candidate before changing configuration')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / '.github/workflows').mkdir(parents=True)
+            (root / '.github/labview-ci').mkdir()
+            (root / '.github/workflows/release.yml').write_text('source marker')
+            (root / '.github/labview-ci/catalog.json').write_text('{}')
+            verifier = root / '.github/labview/lvpm/worker.py'
+            verifier.parent.mkdir(parents=True)
+            verifier.write_text("import os,sys\nfrom pathlib import Path\nPath('verified-args').write_text(' '.join(sys.argv[1:]))\nsys.exit(int(os.environ['VERIFY_EXIT']))\n")
+            selection = 'linux-lvpm-' + 'a' * 64 + '@sha256:' + 'b' * 64
+            for code in (0, 1):
+                result = subprocess.run(['bash', '-e', '-c', step['run']], cwd=root,
+                    env={**os.environ, 'IN_LINUX_WORKER': selection, 'GITHUB_REPOSITORY':'owner/source-fork',
+                         'VERIFY_EXIT':str(code)}, capture_output=True, text=True)
+                self.assertEqual(result.returncode, code, result.stderr)
+                args = (root / 'verified-args').read_text()
+                self.assertIn('verify --repo . --candidate ' + selection, args)
+                self.assertIn('--repository owner/source-fork', args)
+
     def test_source_worker_selection_rejects_unrelated_changes(self):
         for other in ({'IN_VERSION': '2025'}, {'IN_CONTAINER_VIPC': 'project.vipc::linux'},
                       {'IN_ACTS': 'dashboard'}, {'IN_EXPECTED_SHA': 'a' * 40}):

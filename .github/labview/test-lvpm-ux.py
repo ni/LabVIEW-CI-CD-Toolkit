@@ -179,7 +179,7 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
         self.assertIn('return_run_details:true', page)
         self.assertIn('Dispatch accepted, not completed', page)
         self.assertIn('GitHub returned no run identity', page)
-        self.assertIn('Refresh to check for a published candidate', page)
+        self.assertIn('Build succeeded — loading new worker', page)
         self.assertIn('Workflow success alone does not establish a published, verified candidate', documentation)
         self.assertEqual((ROOT / '.github/pages/documentation.html').read_bytes(),
                          (ROOT / 'actions/dashboard/documentation.html').read_bytes())
@@ -379,7 +379,8 @@ class ReconfigureLvpmTests(unittest.TestCase):
         self.assertEqual(parser['run'], 'python3 -m pip install PyYAML==6.0.3')
         self.assertIn('--candidate "$IN_LINUX_WORKER" --repository "$GITHUB_REPOSITORY" --image-name "${LABVIEW_IMAGE_NAME:-}"', verify['run'])
         self.assertNotIn('${{', verify['run'])
-        self.assertIn('.github/workflows/release.yml', verify['run'])
+        self.assertNotIn('exit 1', verify['run'])
+        self.assertIn('source_repository and not (monitoring_only or source_worker_only)', SCRIPT)
         self.assertEqual(WORKFLOW['permissions']['packages'], 'read')
         self.assertEqual(WORKFLOW['permissions']['actions'], 'read')
         checkout = next(step for step in STEPS if step['name'] == 'Checkout repository')
