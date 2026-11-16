@@ -12,6 +12,7 @@ Push a commit and this pipeline spins up headless LabVIEW inside a throwaway Doc
 
 <p align="center">
   <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/documentation.html">Documentation</a> &nbsp;·&nbsp;
+  <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/adoption/">Adoption metrics</a> &nbsp;·&nbsp;
   <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/faq.html">FAQ</a> &nbsp;·&nbsp;
   <a href="example/README.md">Example project</a>
 </p>

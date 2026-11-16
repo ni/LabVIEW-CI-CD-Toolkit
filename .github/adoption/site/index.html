@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Historical adoption, traffic, and activity for the LabVIEW CI/CD Toolkit.">
+  <title>Adoption Observatory · LabVIEW CI/CD Toolkit</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="dashboard.js" defer></script>
+</head>
+<body>
+  <header class="top"><div class="wrap nav">
+    <a class="brand" href="./" aria-label="Adoption Observatory home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 28 28"><path d="M4 20l6-8 5 4 8-10M18 6h5v5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Adoption Observatory</a>
+    <a href="#coverage" class="nav-link">Methodology</a>
+    <a id="repo-link" href="https://github.com/ni/LabVIEW-CI-CD-Toolkit" class="repo-link">GitHub <span aria-hidden="true">↗</span></a>
+  </div></header>
+  <main class="wrap">
+    <section class="hero">
+      <div><div class="eyebrow"><span></span><b id="repo-name">LABVIEW CI/CD TOOLKIT</b></div>
+      <h1>Repository adoption</h1>
+      <p>Track public toolkit use, GitHub traffic, and project activity over time.</p></div>
+      <div class="freshness"><span class="status-dot"></span><div><strong>Data snapshot</strong><span id="updated">Loading GitHub history…</span></div></div>
+    </section>
+    <div id="load-message" role="status"></div>
+    <div id="dashboard" hidden>
+      <section class="panel filters" aria-label="Date range">
+        <div class="filter-lead"><strong>Time window</strong><small id="window-label" aria-live="polite"></small></div>
+        <div class="presets" role="group" aria-label="Date presets" id="presets">
+          <button data-range="14">14D</button><button data-range="30">30D</button><button data-range="90">90D</button><button data-range="365">1Y</button><button data-range="all">Lifetime</button><button data-range="custom">Custom</button>
+        </div>
+        <form id="custom" hidden><label>From <input type="date" id="from" required></label><label>Through <input type="date" id="through" required></label><button type="submit" class="secondary">Apply</button></form>
+        <button id="export" class="secondary download"><span aria-hidden="true">↓</span> CSV</button>
+      </section>
+      <section class="kpis" aria-label="Metrics in the selected date range" id="cards"></section>
+      <section class="panel trends" aria-labelledby="trend-title">
+        <div class="panel-top"><div><div class="kicker"><span class="section-dot"></span> TRENDS</div><h2 id="trend-title">Adoption over time</h2></div>
+        <div class="chart-controls"><label>Metric <select id="metric"></select></label><label>Group by <select id="bucket"><option value="auto">Auto</option><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option></select></label></div></div>
+        <p id="chart-description" class="hint"></p>
+        <div class="chart-scroll" tabindex="0" aria-label="Scrollable chart"><div id="chart"></div></div>
+        <div id="chart-status" class="chart-status" role="status"></div>
+        <details class="chart-data"><summary>View chart data</summary><div class="table-scroll"><table id="chart-table"><thead></thead><tbody></tbody></table></div></details>
+      </section>
+      <div class="lower">
+        <section id="coverage" class="panel coverage" aria-labelledby="coverage-title"><div class="kicker"><span class="section-dot"></span> DATA QUALITY</div>
+          <h2 id="coverage-title">Coverage &amp; methodology</h2>
+          <p class="hint">Read each metric in the context of what GitHub makes available.</p>
+          <div id="sources"></div>
+        </section>
+        <aside class="panel context" aria-labelledby="context-title"><div class="kicker"><span class="section-dot"></span> REPOSITORY</div>
+          <h2 id="context-title">Project snapshot</h2><p class="hint">Current values from GitHub, regardless of your date filter.</p><dl id="snapshot"></dl>
+          <div id="traffic-note" class="inset"></div>
+        </aside>
+      </div>
+    </div>
+  </main>
+  <footer class="wrap footer"><span>Adoption Observatory</span><span>Dates and grouping use UTC · Source: GitHub</span></footer>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Optional add-on. Copy to .github/workflows/adoption-metrics.yml in your public
+# GitHub repository. Replace both TOOLKIT_COMMIT_SHA placeholders with the same
+# full SHA of a toolkit revision that includes adoption-pages.yml.
+# Requires GitHub Pages from the gh-pages branch and explicit public opt-in:
+#   gh variable set LABVIEW_ADOPTION_PUBLISH --body true
+name: Publish adoption dashboard
+
+on:
+  schedule:
+    - cron: '23 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  adoption:
+    uses: ni/LabVIEW-CI-CD-Toolkit/.github/workflows/adoption-pages.yml@TOOLKIT_COMMIT_SHA
+    with:
+      toolkit_ref: TOOLKIT_COMMIT_SHA
+    secrets:
+      ADOPTION_TRAFFIC_TOKEN: ${{ secrets.ADOPTION_TRAFFIC_TOKEN }}
