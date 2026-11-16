@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "bbf4cad61258a629ecc65959a26330135ef46007",
+  "sha": "05303be70d74872bf36dc984dc4ef5d2854ad14d",
   "revisions": [
+    {
+      "sha": "05303be70d74872bf36dc984dc4ef5d2854ad14d",
+      "short": "05303be",
+      "message": "Merge pull request #170 from ni/lvci-release/release-5.0.4-dff413f1d7be9252d383388927da6141569b78de",
+      "author": "Elijah Kerry",
+      "date": "2026-11-16T21:38:20Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "dff413f1d7be9252d383388927da6141569b78de",
+      "short": "dff413f",
+      "message": "Prepare release 5.0.4",
+      "author": "github-actions[bot]",
+      "date": "2026-11-15T01:42:59Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "bbf4cad61258a629ecc65959a26330135ef46007",
       "short": "bbf4cad",
@@ -882,24 +900,6 @@
       "message": "Merge pull request #110 from ni/lvci-release/release-4.19.5",
       "author": "Elijah Kerry",
       "date": "2026-11-02T22:19:37Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "5cbe7b7c6e97f5cb650fabfbf226068618fe882a",
-      "short": "5cbe7b7",
-      "message": "Prepare release 4.19.5",
-      "author": "github-actions[bot]",
-      "date": "2026-11-02T22:17:47Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "9736176b4c54ac8845a13c39b03023049a0b4b19",
-      "short": "9736176",
-      "message": "Merge pull request #98 from ni/fix/dependencies-platform-ux-20261102",
-      "author": "Elijah Kerry",
-      "date": "2026-11-02T22:17:30Z",
       "project": false,
       "dep_only": false
     },
@@ -10056,18 +10056,18 @@
       "source": "dpkg-query installed status",
       "status": "observed"
     },
-    "tag": "linux-lvpm-070f006b28a909a03027b0d87180f6a3725daac1960db4ab93fa979e124b3b1e",
-    "manifest_path": "workers/linux-lvpm/linux-lvpm-070f006b28a909a03027b0d87180f6a3725daac1960db4ab93fa979e124b3b1e/manifest.json",
-    "image_ref": "ghcr.io/ni/labview-ci-cd-toolkit-labview:linux-lvpm-070f006b28a909a03027b0d87180f6a3725daac1960db4ab93fa979e124b3b1e@sha256:ba85e5ec9c3d786d8491330ae974861d42808132bd861b81e44a4c43d010b85c",
-    "image_digest": "sha256:ba85e5ec9c3d786d8491330ae974861d42808132bd861b81e44a4c43d010b85c",
+    "tag": "linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5",
+    "manifest_path": "workers/linux-lvpm/linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5/manifest.json",
+    "image_ref": "ghcr.io/ni/labview-ci-cd-toolkit-labview:linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5@sha256:af3e79eb2db59ef535a7a136b070b50ba0efe4bb5a9ecd86f9e4626425c06999",
+    "image_digest": "sha256:af3e79eb2db59ef535a7a136b070b50ba0efe4bb5a9ecd86f9e4626425c06999",
     "base_image": "nationalinstruments/labview:2026q3-linux@sha256:b09fe6328707cac6ef3bde3402dee92d7e6382edb2ec75995c3276e9ab6de7f0",
     "base_digest": "sha256:b09fe6328707cac6ef3bde3402dee92d7e6382edb2ec75995c3276e9ab6de7f0",
     "build_inputs_sha256": "b4ab8b69ec99393ddb73264475ce515b5c951837b1cae61dc43fe1c7771a4f9d",
-    "dependency_revision": "046ef3f34d7391a86a04e2e87d883d7690b8d5db",
+    "dependency_revision": "05303be70d74872bf36dc984dc4ef5d2854ad14d",
     "workflow_run": {
-      "id": 43635522510,
+      "id": 43962929266,
       "attempt": 1,
-      "head_sha": "046ef3f34d7391a86a04e2e87d883d7690b8d5db",
+      "head_sha": "05303be70d74872bf36dc984dc4ef5d2854ad14d",
       "workflow_path": ".github/workflows/build-labview-lvpm-image.yml"
     }
   }
