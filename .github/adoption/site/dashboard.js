@@ -20,6 +20,7 @@ const valid = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) &&
   Number.isFinite(+time(d)) && iso(time(d)) === d;
 
 const METRICS = {
+  unique_cloners: {name:'Unique cloners', kind:'traffic'},
   clients: {name:'Verified public clients', icon:'◎', kind:'sample', desc:'Latest observed number of public repositories found using the toolkit in each period. Includes demo and scratch repositories; private clients and unindexed repositories are outside coverage.'},
   views: {name:'Repository views', icon:'◉', kind:'traffic', desc:'Total GitHub repository page views on observed days. Hatched periods have no observation; lighter bars have partial daily coverage.'},
   clones: {name:'Repository clones', icon:'⇄', kind:'traffic', desc:'Full Git clones on observed days. This may include CI, bots, and repeated clones, so the result cannot estimate installations or unique people.'},
@@ -28,15 +29,22 @@ const METRICS = {
   releases: {name:'Releases published', icon:'◆', kind:'event', desc:'Published releases GitHub still lists, including prereleases and backfilled releases on their publication dates.'},
   merges: {name:'Pull requests merged', icon:'⎇', kind:'event', desc:'Merged pull requests still visible in the GitHub repository, dated by their merge time.'},
 };
-let data, selected = 'all', metric, bucketSetting = 'auto', from, through, min, max;
+let data, selected, metric, bucketSetting = 'auto', from, through, min, max;
 const isTraffic = (k) => METRICS[k].kind === 'traffic';
 
 function rows(k) {
+  if (k === 'unique_cloners') return data.traffic.clones;
   return k === 'clients' ? data.clients : isTraffic(k) ? data.traffic[k] : data.events[k];
 }
 function interval(k, a, b) {
   const series = rows(k);
   const entries = Object.keys(series).filter((day) => day >= a && day <= b).sort();
+  if (k === 'unique_cloners') {
+    // GitHub deduplicates each day independently. Use the highest observed day
+    // for wider groups because the same cloner can appear on multiple days.
+    const value = entries.length ? Math.max(...entries.map((day) => series[day][1])) : null;
+    return {value, entries:entries.length};
+  }
   if (METRICS[k].kind === 'sample') {
     const last = entries.at(-1);
     return {value:last ? series[last] : null, entries:entries.length, last};
@@ -51,7 +59,7 @@ function note(k, stats) {
 }
 function renderCards() {
   const active = document.activeElement?.dataset?.metric;
-  $('cards').replaceChildren(...Object.keys(METRICS).filter((k) => k !== 'merges').map((k) => {
+  $('cards').replaceChildren(...Object.keys(METRICS).filter((k) => METRICS[k].icon && k !== 'merges').map((k) => {
     const stats = interval(k, from, through);
     const b = node('button', undefined, 'kpi' + (metric === k ? ' is-active' : ''));
     b.dataset.metric = k;
@@ -61,7 +69,11 @@ function renderCards() {
     icon.setAttribute('aria-hidden','true');
     label.append(icon, document.createTextNode(METRICS[k].name));
     b.append(label, node('span', stats.value === null ? '—' : fmt(stats.value), 'value'), node('small', note(k, stats)));
-    b.addEventListener('click', () => { metric = k; render(); });
+    b.addEventListener('click', () => {
+      metric = k;
+      render();
+      $('trend-title').scrollIntoView({block:'nearest'});
+    });
     return b;
   }));
   if (active) $('cards').querySelector('[data-metric="' + active + '"]')?.focus();
@@ -104,10 +116,17 @@ function renderChart() {
   const {bins, mode} = series();
   const covering = bins.filter((b) => b.value !== null);
   const chart = $('chart');
-  const defaultMessage = METRICS[metric].name + ' · ' + mode + ' grouping · UTC';
+  const unique = metric === 'unique_cloners';
+  const heading = unique ? (mode === 'day' ? 'Daily unique cloners' : 'Peak daily unique cloners') : METRICS[metric].name;
+  const defaultMessage = heading + ' · ' + mode + ' grouping · UTC';
   const live = $('chart-status');
   live.textContent = defaultMessage;
-  $('chart-description').textContent = METRICS[metric].desc;
+  $('trend-title').textContent = heading;
+  $('chart-description').textContent = unique
+    ? (mode === 'day'
+      ? 'Each bar shows one UTC day. The same cloner can appear on multiple days.'
+      : 'Each bar shows the highest daily count in its period. Hatched periods have no archived traffic.')
+    : METRICS[metric].desc;
   chart.replaceChildren();
   if (!covering.length) {
     chart.append(node('div', 'No observations in this range. Try a different time window or metric.', 'empty'));
@@ -164,7 +183,7 @@ function renderChart() {
   }
   const table = $('chart-table');
   const head = document.createElement('tr');
-  ['UTC period','Value','Coverage'].forEach((column) => head.append(node('th',column)));
+  ['UTC period', unique ? heading : 'Value', 'Coverage'].forEach((column) => head.append(node('th', column)));
   table.tHead.replaceChildren(head);
   table.tBodies[0].replaceChildren(...bins.map((b) => {
     const tr = document.createElement('tr');
@@ -211,14 +230,34 @@ function renderSources() {
 }
 function updateUrl() {
   const params = new URLSearchParams();
-  if (selected !== 'all') params.set('range',selected);
+  if (selected !== defaultRange()) params.set('range',selected);
   if (selected === 'custom') {params.set('from',from);params.set('through',through);}
   if (metric !== defaultMetric()) params.set('metric',metric);
   if (bucketSetting !== 'auto') params.set('bucket',bucketSetting);
   const query = params.toString();
   history.replaceState(null,'',location.pathname + (query ? '?' + query : '') + location.hash);
 }
-function defaultMetric() {return Object.keys(data.clients).length ? 'clients' : 'stars';}
+function cloneWindow() {
+  const w = data.traffic_windows?.clones;
+  return w && valid(w.from) && valid(w.to) && min <= w.from && w.from <= w.to && w.to <= max &&
+    Number.isSafeInteger(w.uniques) && w.uniques >= 0 ? w : null;
+}
+function defaultRange() {
+  return cloneWindow() ? 'traffic' : 'all';
+}
+function defaultMetric() {
+  if (Object.keys(rows('unique_cloners')).length) return 'unique_cloners';
+  return Object.keys(data.clients).length ? 'clients' : 'stars';
+}
+function renderCloneWindow() {
+  const w = cloneWindow();
+  $('presets').querySelector('[data-range="traffic"]').hidden = !w;
+  $('clone-summary').hidden = !w;
+  if (w) {
+    $('clone-total').textContent = fmt(w.uniques);
+    $('clone-window').textContent = dates(w.from, w.to) + ' · UTC';
+  }
+}
 function render() {
   $('window-label').textContent = dates(from,through) + ' · UTC';
   $('metric').value = metric;
@@ -229,7 +268,18 @@ function render() {
   updateUrl();
 }
 function preset(k) {
-  selected = k; through = max;
+  if (k === 'traffic') {
+    const w = cloneWindow();
+    if (w) {
+      selected = k;
+      from = w.from;
+      through = w.to;
+      return;
+    }
+    k = 'all';
+  }
+  selected = k;
+  through = max;
   from = k === 'all' ? min : [shift(max,1-Number(k)),min].sort().at(-1);
 }
 function csv() {
@@ -256,7 +306,7 @@ async function init() {
   $('updated').textContent = date(max) + ' · ' + data.updated.slice(11,16) + ' UTC';
   const p = new URLSearchParams(location.search);
   const desired = p.get('range');
-  preset(['14','30','90','365'].includes(desired) ? desired : 'all');
+  preset(['traffic','14','30','90','365','all'].includes(desired) ? desired : defaultRange());
   if (desired === 'custom' && valid(p.get('from')) && valid(p.get('through')) &&
       p.get('from') >= min && p.get('through') <= max && p.get('from') <= p.get('through')) {
     selected = 'custom'; from = p.get('from'); through = p.get('through');
@@ -282,6 +332,7 @@ async function init() {
   });
   $('export').addEventListener('click',csv);
   renderSources();
+  renderCloneWindow();
   render();
   $('dashboard').hidden = false;
 }

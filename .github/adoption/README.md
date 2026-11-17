@@ -34,6 +34,10 @@ this add-on's scope.
 
 ## What the numbers mean
 
+- The dashboard opens on the latest archived GitHub clone window when available.
+  The headline shows GitHub's deduplicated total for the displayed dates, and
+  the chart shows GitHub's unique cloners on each UTC day. Wider chart groups
+  use the highest observed daily count for the period.
 - Repository traffic comes from the
   [GitHub traffic API](https://docs.github.com/en/rest/metrics/traffic).
   The seed preserves what was still available on November 16, 2026:
