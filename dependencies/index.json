@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "0aae66d7a8d3370340edac5feddccc89ddecba40",
+  "sha": "518365e49ea7ebecfc6b53ff7524730655e5ccd4",
   "revisions": [
+    {
+      "sha": "518365e49ea7ebecfc6b53ff7524730655e5ccd4",
+      "short": "518365e",
+      "message": "Merge pull request #178 from ni/codex/lead-with-unique-cloners",
+      "author": "Elijah Kerry",
+      "date": "2026-11-17T12:14:51Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "d1111fbdaaf6ac69d836eac8267c642920fe4eaf",
+      "short": "d1111fb",
+      "message": "Lead the adoption dashboard with unique cloners",
+      "author": "elijah286",
+      "date": "2026-11-17T04:31:21Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "0aae66d7a8d3370340edac5feddccc89ddecba40",
       "short": "0aae66d",
@@ -882,24 +900,6 @@
       "message": "vipm: verify recovered Windows dependency installs",
       "author": "elijah286",
       "date": "2026-11-03T17:48:12Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "ed3c2014a7e3a57b89a6933b7c44688ce4cbda5a",
-      "short": "ed3c201",
-      "message": "Merge pull request #118 from ni/fix/dashboard-monitoring-and-vi-markers-20261103",
-      "author": "Elijah Kerry",
-      "date": "2026-11-03T04:18:05Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "26934da9495006fa4f6dab3d7f1830200251aac2",
-      "short": "26934da",
-      "message": "dashboard: enable clean worker review and simplify VI markers",
-      "author": "elijah286",
-      "date": "2026-11-03T04:15:48Z",
       "project": false,
       "dep_only": false
     },
@@ -2327,7 +2327,7 @@
       },
       "freshness": {
         "reason": "Local requirements and build inputs match. Registry, provenance, and runtime activities have not been verified by this freshness check.",
-        "revision": "0aae66d7a8d3370340edac5feddccc89ddecba40",
+        "revision": "518365e49ea7ebecfc6b53ff7524730655e5ccd4",
         "selection": "linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5@sha256:af3e79eb2db59ef535a7a136b070b50ba0efe4bb5a9ecd86f9e4626425c06999",
         "status": "current"
       },
