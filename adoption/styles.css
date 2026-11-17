@@ -44,7 +44,7 @@ button{color:inherit}
 #custom{display:flex;flex-wrap:wrap;gap:8px;align-items:end;order:4;width:100%}
 #custom input{padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
 #custom label,.chart-controls label{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);font-weight:650}
-.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-top:18px}
 .kpi{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-width:0;min-height:142px;padding:15px 14px;gap:7px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow);color:var(--ink)}
 .kpi:hover{border-color:#8dbba4}
 .kpi.is-active{border-color:#308768;box-shadow:inset 0 -3px #45a27d}
@@ -53,6 +53,30 @@ button{color:inherit}
 .kpi .value{font-size:clamp(22px,3vw,34px);font-weight:740;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.06em}
 .kpi small{line-height:1.3;color:var(--muted);font-size:11px}
 .trends,.coverage,.context{padding:24px}
+.clone-summary {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  column-gap:24px;
+  row-gap:8px;
+  padding:14px 18px;
+  margin-bottom:20px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#edf7ef;
+}
+.clone-total {
+  color:#134632;
+  font-size:clamp(32px,5vw,48px);
+  font-weight:760;
+  font-variant-numeric:tabular-nums;
+  line-height:1.08;
+  letter-spacing:-.045em;
+}
+.clone-label {color:#134632;font-size:16px;font-weight:680}
+.clone-summary p {margin:0;color:var(--ink);font-size:13px;font-weight:650}
+.clone-summary small {display:block;color:var(--muted);font-size:12px;font-weight:400}
 .panel-top{display:flex;justify-content:space-between;gap:18px;align-items:end}
 .panel h2{margin:4px 0 0;font-size:25px;line-height:1.16;letter-spacing:-.045em}
 .chart-controls{display:flex;gap:10px;flex-wrap:wrap}
