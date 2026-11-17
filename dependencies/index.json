@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "9bd6c39004af3c8ad3e3ee05832c7ca893a9e9e1",
+  "sha": "0aae66d7a8d3370340edac5feddccc89ddecba40",
   "revisions": [
+    {
+      "sha": "0aae66d7a8d3370340edac5feddccc89ddecba40",
+      "short": "0aae66d",
+      "message": "Merge pull request #176 from ni/labview-ci/reconfigure-44017209833",
+      "author": "Elijah Kerry",
+      "date": "2026-11-17T04:30:21Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "0ef981d470181728e8115dd35a8e8fa59f37672c",
+      "short": "0ef981d",
+      "message": "ci: reconfigure LabVIEW CI settings",
+      "author": "github-actions[bot]",
+      "date": "2026-11-17T04:26:55Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "9bd6c39004af3c8ad3e3ee05832c7ca893a9e9e1",
       "short": "9bd6c39",
@@ -886,24 +904,6 @@
       "dep_only": false
     },
     {
-      "sha": "8571ef4a8cdf37567fa49466c538fe6283075ad8",
-      "short": "8571ef4",
-      "message": "Merge pull request #115 from ni/lvci-release/release-4.20.0-39625746c44a01697660b1fbb71ae447ea3b3817",
-      "author": "Elijah Kerry",
-      "date": "2026-11-03T00:28:41Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "39625746c44a01697660b1fbb71ae447ea3b3817",
-      "short": "3962574",
-      "message": "Prepare release 4.20.0",
-      "author": "github-actions[bot]",
-      "date": "2026-11-03T00:26:59Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
       "sha": "d0e080c128589707c82a13a45d842952fb3a5fc8",
       "short": "d0e080c",
       "message": "Merge remote-tracking branch 'origin/main' into via-debug",
@@ -1131,7 +1131,7 @@
   ],
   "config": {
     "use": "",
-    "linuxUse": "",
+    "linuxUse": "linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5@sha256:af3e79eb2db59ef535a7a136b070b50ba0efe4bb5a9ecd86f9e4626425c06999",
     "actions": {},
     "vipc": [
       {
@@ -1378,8 +1378,8 @@
               "linux": {
                 "status": "installed",
                 "installed_version": "6.0.1.20",
-                "scope": "installed-packages",
-                "message": "Exact version checked against the selected Linux VIPM target inventory."
+                "scope": "package-files",
+                "message": "Exact version in a locally current Linux LVPM inventory; runtime activities are not verified."
               }
             },
             "status": "installed",
@@ -1401,8 +1401,8 @@
               "linux": {
                 "status": "installed",
                 "installed_version": "6.0.0.9",
-                "scope": "installed-packages",
-                "message": "Exact version checked against the selected Linux VIPM target inventory."
+                "scope": "package-files",
+                "message": "Exact version in a locally current Linux LVPM inventory; runtime activities are not verified."
               }
             },
             "status": "installed",
@@ -1438,8 +1438,8 @@
           "linux": {
             "status": "installed",
             "installed_version": "6.0.1.20",
-            "scope": "installed-packages",
-            "message": "Exact version checked against the selected Linux VIPM target inventory."
+            "scope": "package-files",
+            "message": "Exact version in a locally current Linux LVPM inventory; runtime activities are not verified."
           },
           "windows": {
             "status": "installed",
@@ -1467,8 +1467,8 @@
           "linux": {
             "status": "installed",
             "installed_version": "6.0.0.9",
-            "scope": "installed-packages",
-            "message": "Exact version checked against the selected Linux VIPM target inventory."
+            "scope": "package-files",
+            "message": "Exact version in a locally current Linux LVPM inventory; runtime activities are not verified."
           },
           "windows": {
             "status": "installed",
@@ -2316,10 +2316,21 @@
       "label": "Linux",
       "platform": "linux",
       "defaultTag": "latest",
-      "tag": "latest",
+      "tag": "linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5@sha256:af3e79eb2db59ef535a7a136b070b50ba0efe4bb5a9ecd86f9e4626425c06999",
       "ready": true,
-      "installer": "vipm",
-      "verification": {},
+      "installer": "lvpm",
+      "verification": {
+        "status": "passed",
+        "scope": "package-files",
+        "activity_checks": "not_run",
+        "hook_error_output": "not_observable_by_upstream"
+      },
+      "freshness": {
+        "reason": "Local requirements and build inputs match. Registry, provenance, and runtime activities have not been verified by this freshness check.",
+        "revision": "0aae66d7a8d3370340edac5feddccc89ddecba40",
+        "selection": "linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5@sha256:af3e79eb2db59ef535a7a136b070b50ba0efe4bb5a9ecd86f9e4626425c06999",
+        "status": "current"
+      },
       "packages": [
         "astemes_lib_lunit",
         "astemes_lib_lunit-2.0.13.6",
@@ -2394,7 +2405,7 @@
       ],
       "failed_packages": [],
       "nipkg_ready": true,
-      "vipm_verified": true,
+      "vipm_verified": false,
       "nipkg_packages": [
         {
           "name": "adduser",
@@ -2467,10 +2478,6 @@
         {
           "name": "cpp-11",
           "version": "11.4.0-1ubuntu1~22.04.3"
-        },
-        {
-          "name": "curl",
-          "version": "7.81.0-1ubuntu1.30"
         },
         {
           "name": "dash",
@@ -2814,7 +2821,7 @@
         },
         {
           "name": "libcurl4",
-          "version": "7.81.0-1ubuntu1.30"
+          "version": "7.81.0-1ubuntu1.25"
         },
         {
           "name": "libdata-dump-perl",
@@ -4137,6 +4144,14 @@
           "version": "3.10.6-1~22.04.1"
         },
         {
+          "name": "python3-tomli",
+          "version": "1.2.2-2"
+        },
+        {
+          "name": "python3-yaml",
+          "version": "5.4.1-1ubuntu1"
+        },
+        {
           "name": "python3.10",
           "version": "3.10.12-1~22.04.15"
         },
@@ -4273,10 +4288,6 @@
           "version": "2.37.2-4ubuntu3.5"
         },
         {
-          "name": "vipm",
-          "version": "26.3.2-4056"
-        },
-        {
           "name": "x11-common",
           "version": "1:7.7+23ubuntu2"
         },
@@ -4346,7 +4357,7 @@
         }
       ],
       "labview_version": "2026",
-      "version": "linux-9f4d6ccf2478"
+      "version": "linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5"
     }
   ],
   "linux_lvpm_candidate": {
