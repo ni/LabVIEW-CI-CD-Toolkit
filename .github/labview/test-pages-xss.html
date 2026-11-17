@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pages XSS regressions</title>
+</head>
+<body>
+  <h1>Pages XSS regressions</h1>
+  <p>Serve the repository root over loopback HTTP and open this page. Tests execute
+    the production helpers and selected renderers with fixture data in a real DOM.
+    Only same-origin source files are fetched; no credentials or workflows are used.</p>
+  <pre id="results">Running...</pre>
+  <script>
+  (async () => {
+    "use strict";
+    const results = [];
+    const output = document.getElementById("results");
+
+    function assert(condition, message) {
+      if (!condition) throw new Error(message);
+    }
+
+    function section(source, start, end) {
+      const first = source.indexOf(start);
+      assert(first >= 0, `Missing source boundary: ${start}`);
+      const last = source.indexOf(end, first + start.length);
+      assert(last >= 0, `Missing source boundary: ${end}`);
+      return source.slice(first, last);
+    }
+
+    async function readSource(path) {
+      const response = await fetch(path, { cache: "no-store", credentials: "omit" });
+      assert(response.ok, `Cannot read ${path}: HTTP ${response.status}`);
+      return response.text();
+    }
+
+    function test(name, run) {
+      try {
+        run();
+        results.push({ name, passed: true });
+      } catch (error) {
+        results.push({ name, passed: false, error: String(error) });
+      }
+    }
+
+    function headerRenderer(source) {
+      return new Function("cfg", "base", "document",
+        section(source, "  function trimSlash(s)", "  // Prefer the Pages base") +
+        section(source, "  function esc(s)", "  // Leading glyph") +
+        section(source, "  function pagesUrlForRepo(r)", "  function sourcePagesUrl()") +
+        section(source, "  var brandRepo = cfg.brandRepo", "  var ctx =") +
+        section(source, "    var pendbar = document.createElement", "    var alertBar =") +
+        "\nreturn { element: pendbar, navBase };");
+    }
+
+    function guidanceRenderer(source) {
+      return new Function("document", "options",
+        section(source, "    const $ = (id)", "    const provider = ()") +
+        "\nconst labviewYear = () => options.year;" +
+        "\nconst selectedRelease = () => options.release;" +
+        "\nconst catalog = options.catalog;" +
+        "\nconst isGitLab = () => options.provider === 'gitlab';" +
+        "\nconst source = () => options.source;" +
+        section(source, "    function varsHint()", "    function gitlabPagesUrl()") +
+        "\nvarsHint(); return document.getElementById('varsStep');");
+    }
+
+    function renderGuidance(render, repo, overrides = {}) {
+      const fixture = document.implementation.createHTMLDocument("Guidance fixture");
+      const input = fixture.createElement("input");
+      input.id = "repo";
+      input.value = repo;
+      const step = fixture.createElement("li");
+      step.id = "varsStep";
+      fixture.body.append(input, step);
+      return render(fixture, {
+        year: "2026",
+        release: null,
+        catalog: { containers: { default: "2026q1" } },
+        provider: "github",
+        source: { repo: "ni/LabVIEW-CI-CD-Toolkit", ref: "main" },
+        ...overrides
+      });
+    }
+
+    function checkHeader(render, repo, expectedHref) {
+      const fixture = document.implementation.createHTMLDocument("Header fixture");
+      const { element, navBase } = render({ brandRepo: repo }, "https://local.invalid/site", fixture);
+      const links = element.querySelectorAll("a");
+      assert(links.length === 1, "Banner must contain exactly one link");
+      assert(links[0].attributes.length === 1, "Repository input created an extra link attribute");
+      assert(!element.querySelector("#xss-probe"), "Repository input created injected markup");
+      assert(element.querySelectorAll("span").length === 2, "Repository input changed banner markup");
+      assert(links[0].getAttribute("href") === (expectedHref || navBase + "/dependencies.html"),
+        "Navigation destination changed or escaped its attribute");
+      assert(links[0].textContent === "Review & update dependencies \u2197", "Link label changed");
+    }
+
+    try {
+      const copies = [
+        { name: "canonical", root: "../pages/" },
+        { name: "dashboard", root: "../../actions/dashboard/" }
+      ];
+      for (const copy of copies) {
+        const [header, integrate] = await Promise.all([
+          readSource(copy.root + "lvci-header.js"),
+          readSource(copy.root + "integrate.html")
+        ]);
+        test(`${copy.name}: header syntax`, () => { new Function(header); });
+        test(`${copy.name}: inline script syntax`, () => {
+          const page = new DOMParser().parseFromString(integrate, "text/html");
+          const scripts = [...page.querySelectorAll("script:not([src])")];
+          assert(scripts.length > 0, "Installation page has no inline scripts");
+          scripts.forEach(script => { new Function(script.textContent); });
+        });
+        const renderHeader = headerRenderer(header);
+        const renderHint = guidanceRenderer(integrate);
+        const headerCases = [
+          'owner/project"><span id="xss-probe">probe',
+          'owner/project" data-xss-probe="yes',
+          "owner/project<&>\"'"
+        ];
+        headerCases.forEach((repo, index) => {
+          test(`${copy.name}: header markup input ${index + 1}`, () => checkHeader(renderHeader, repo));
+        });
+        test(`${copy.name}: project Pages link`, () =>
+          checkHeader(renderHeader, "Owner/project", "https://owner.github.io/project/dependencies.html"));
+        test(`${copy.name}: organization Pages link`, () =>
+          checkHeader(renderHeader, "Owner/OWNER.github.io", "https://owner.github.io/dependencies.html"));
+        test(`${copy.name}: unbranded link`, () =>
+          checkHeader(renderHeader, "", "https://local.invalid/site/dependencies.html"));
+
+        const guidanceCases = [
+          "owner/project",
+          'owner/<span id="xss-probe">probe</span>',
+          'owner/project"><span id="xss-probe">probe</span>',
+          "owner/project<&>\"'",
+          "",
+          "   "
+        ];
+        guidanceCases.forEach((repo, index) => {
+          test(`${copy.name}: literal guidance input ${index + 1}`, () => {
+            const step = renderGuidance(renderHint, repo);
+            const displayRepo = repo.trim() || "<owner>/<repo>";
+            const expected = "Optionally pin settings as Actions variables: " +
+              `gh variable set LABVIEW_VERSION -R ${displayRepo} -b 2026 (has a safe fallback).`;
+            assert(step.textContent === expected, "Repository value was not displayed as literal text");
+            assert(step.children.length === 1 && step.firstElementChild.tagName === "CODE",
+              "Repository input changed guidance markup");
+            assert(step.firstElementChild.attributes.length === 1,
+              "Repository input created an extra code attribute");
+            assert(!step.querySelector("#xss-probe"), "Repository input created injected markup");
+          });
+        });
+        test(`${copy.name}: pinned release guidance`, () => {
+          const label = '<span id="xss-probe">Pinned & release</span>';
+          const release = { id: "2025q3", label };
+          const step = renderGuidance(renderHint, "owner/project", { release });
+          const expected = `Pinning this repo to ${label}: the browser install sets ` +
+            "LCWC_BASE_IMAGE=ghcr.io/ni/labview-ci-cd-toolkit-labview-base:2025q3 and " +
+            "LCWC_LINUX_BASE_IMAGE=ghcr.io/ni/labview-ci-cd-toolkit-labview:linux-2025q3 as Actions variables " +
+            "(command-line installs: set them with gh variable set).";
+          assert(step.textContent === expected, "Pinned release guidance changed");
+          assert(!step.querySelector("#xss-probe"), "Release label created injected markup");
+        });
+        test(`${copy.name}: GitLab guidance`, () => {
+          const step = renderGuidance(renderHint, "group/subgroup/project", { provider: "gitlab" });
+          assert(step.textContent === "Optional GitLab CI/CD variables can override installer defaults later; " +
+            "the initial scaffold records LabVIEW 2026 in .github/labview-ci.yml.",
+            "GitLab guidance changed");
+        });
+      }
+    } catch (error) {
+      results.push({ name: "Test harness setup", passed: false, error: String(error) });
+    }
+    const failed = results.filter(result => !result.passed);
+    const status = failed.length ? "failed" : "passed";
+    document.body.dataset.status = status;
+    globalThis.xssRegressionResults = { status, total: results.length, failed: failed.length, results };
+    output.textContent = `${results.length - failed.length}/${results.length} tests passed\n` +
+      results.map(result => `${result.passed ? "PASS" : "FAIL"} ${result.name}` +
+        (result.error ? `: ${result.error}` : "")).join("\n");
+  })();
+  </script>
+</body>
+</html>
