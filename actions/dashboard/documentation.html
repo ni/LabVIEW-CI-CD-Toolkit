@@ -918,6 +918,10 @@ flowchart TD
       <h2 id="catalog">11. The catalog — single source of truth <a class="anchor" href="#catalog">#</a></h2>
       <p>Everything starts at <code>.github/labview-ci/catalog.json</code>. It is a versioned manifest that both the
         browser configurator and the Python installer consume. Its key sections:</p>
+      <p>The catalog and repository source text are UTF-8. Snapshot and VIPM contract tests read these files with an
+        explicit <code>encoding='utf-8'</code>, matching the installer rather than the host locale. This keeps
+        Snapshot and VIPM contracts independent of Windows' default CP1252 encoding; Unicode release notes
+        remain valid without rewriting the catalog or changing the runner's global encoding.</p>
       <pre><code>{
   "schemaVersion": 1,
   "version": "3.24.5",            // must equal history.releases[0].version

@@ -97,7 +97,7 @@ class WindowsDragonPlanTests(unittest.TestCase):
 
     def stage(self, dragon_text, config='', vipc=False, expected_exit=0):
         root = INSTALLER.parents[3]
-        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text(encoding='utf-8')
         stage = workflow.split('- name: Stage repo VIPC and Dragon files', 1)[1]
         stage = stage.split("          python -I - <<'PY'\n", 1)[1]
         stage = stage.split('\n          PY', 1)[0]
@@ -123,7 +123,7 @@ class WindowsDragonPlanTests(unittest.TestCase):
 
     def push_gate(self, config, expected_exit=0, changed_path='example/Example.dragon'):
         root = INSTALLER.parents[3]
-        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text(encoding='utf-8')
         gate = workflow.split('- name: Decide whether to rebuild', 1)[1]
         gate = gate.split("          python -I - <<'PY'\n", 1)[1].split('\n          PY', 1)[0]
         code = '\n'.join(line[10:] for line in gate.splitlines())
@@ -281,10 +281,10 @@ class WindowsDragonPlanTests(unittest.TestCase):
 
     def test_workflow_fingerprint_and_docker_closure_include_dragon_plan(self):
         root = INSTALLER.parents[3]
-        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text(encoding='utf-8')
         self.assertIn("$files += '.github/labview/vipm/dragon-plan.json'", workflow)
         self.assertIn("$files += '.github/labview/dragon_deps.py'", workflow)
-        docker = (root / '.github/docker/labview-ci.Dockerfile').read_text()
+        docker = (root / '.github/docker/labview-ci.Dockerfile').read_text(encoding='utf-8')
         self.assertIn('COPY .github/labview/vipm/ C:/vipm/', docker)
         self.assertIn('if ($vipcFiles -or $dragonFiles)', docker)
         self.assertNotIn('dragon apply', docker)
@@ -523,7 +523,7 @@ if (-not $guard) { throw 'No-input guard not found' }
         self.assertIn('DRAGON-ONLY=True', output)
 
     def test_actual_docker_hook_runs_for_dragon_only_and_propagates_failures(self):
-        docker = (INSTALLER.parents[3] / '.github/docker/labview-ci.Dockerfile').read_text()
+        docker = (INSTALLER.parents[3] / '.github/docker/labview-ci.Dockerfile').read_text(encoding='utf-8')
         hook = docker.split('RUN $vipcFiles = ', 1)[1].split('\n\n# Stamp', 1)[0]
         hook = '$vipcFiles = ' + hook.replace('`\n', '\n')
         for mode, failed in (('dragon-only', False), ('mixed', False),
@@ -594,7 +594,7 @@ try {{
 
     def test_worker_identity_changes_with_effective_dragon_inputs(self):
         repository = INSTALLER.parents[3]
-        workflow = (repository / '.github/workflows/build-labview-image.yml').read_text()
+        workflow = (repository / '.github/workflows/build-labview-image.yml').read_text(encoding='utf-8')
         start = workflow.index("          $vipcFiles = @(Get-ChildItem", workflow.index('- name: Compute worker version'))
         end = workflow.index('          "version=$version"', start)
         code = '\n'.join(line[10:] for line in workflow[start:end].splitlines())
@@ -1005,11 +1005,11 @@ foreach ($file in $script:Files) { if (Test-Path -LiteralPath $file) { throw 'Ou
     def test_base_defaults_catalog_override_and_shared_bootstrap_are_wired(self):
         root = INSTALLER.parents[3]
         url = 'https://traffic.libsyn.com/secure/jkinc/vipm-26.3.4056-windows-setup.exe'
-        catalog = json.loads((root / '.github/labview-ci/catalog.json').read_text())
+        catalog = json.loads((root / '.github/labview-ci/catalog.json').read_text(encoding='utf-8'))
         release = next(item for item in catalog['containers']['supported'] if item['id'] == '2026q3')
         self.assertEqual(release['vipmInstallerUrl'], url)
-        self.assertIn(f"else {{ '{url}' }}", INSTALLER.read_text())
-        dockerfile = (root / '.github/docker/labview-ci-base.Dockerfile').read_text()
+        self.assertIn(f"else {{ '{url}' }}", INSTALLER.read_text(encoding='utf-8'))
+        dockerfile = (root / '.github/docker/labview-ci-base.Dockerfile').read_text(encoding='utf-8')
         self.assertIn(f'ARG VIPM_INSTALLER_URL={url}', dockerfile)
         self.assertIn('COPY .github/labview/vipm/install-vipc.ps1 C:/ci-bootstrap/install-vipc.ps1', dockerfile)
         self.assertIn(r'RUN & C:\ci-bootstrap\install-vipc.ps1 -BootstrapOnly;', dockerfile)
@@ -1018,7 +1018,7 @@ foreach ($file in $script:Files) { if (Test-Path -LiteralPath $file) { throw 'Ou
         root = INSTALLER.parents[3]
         snippets = []
         for workflow in ('build-labview-image.yml', 'publish-base-images.yml'):
-            source = (root / '.github/workflows' / workflow).read_text()
+            source = (root / '.github/workflows' / workflow).read_text(encoding='utf-8')
             snippet = re.search(r'\$hashInput = .*?\$baseHash = [^\n]+', source, re.S).group()
             for name in ('windowsTag', 'nipmFeedUrl', 'vipmInstallerUrl'):
                 snippet = snippet.replace("'${{ matrix." + name + " }}'", f'$rel.{name}')

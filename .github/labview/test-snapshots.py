@@ -21,7 +21,7 @@ SPEC.loader.exec_module(INSTALLER)
 
 class SnapshotTests(unittest.TestCase):
     def setUp(self):
-        self.catalog = json.loads((ROOT / '.github/labview-ci/catalog.json').read_text())
+        self.catalog = json.loads((ROOT / '.github/labview-ci/catalog.json').read_text(encoding='utf-8'))
 
     def test_one_capability_installs_rich_renderers(self):
         capabilities = {entry['id']: entry for entry in self.catalog['capabilities']}
@@ -136,7 +136,7 @@ class SnapshotTests(unittest.TestCase):
             self.assertEqual((target / '.github/labview-ci.yml').read_bytes(), before)
 
     def test_browser_keep_settings_and_retired_inventory(self):
-        source = (ROOT / '.github/pages/integrate.html').read_text()
+        source = (ROOT / '.github/pages/integrate.html').read_text(encoding='utf-8')
         names = ['resolveActivities', 'resolveFiles', 'effectiveValues', 'userConfigPaths', 'isUserConfig',
                  'managedUniverse', 'retiredWorkflowSignatures', 'inventoryManagedFiles', 'staleFor']
         functions = []
@@ -174,21 +174,21 @@ const gh = async url => ({ok:true,json:async () => ({content:textFor[decodeURICo
   assert.equal(retiredWorkflowSignatures(retired), null);
 })().catch(error => {console.error(error);process.exitCode=1;});
 '''
-        result = subprocess.run(['node', '-'], input=script, text=True, capture_output=True, timeout=15)
+        result = subprocess.run(['node', '-'], input=script, encoding='utf-8', capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for name in ['integrate.html', 'documentation.html', 'configure.html']:
             self.assertEqual((ROOT / '.github/pages' / name).read_bytes(),
                              (ROOT / 'actions/dashboard' / name).read_bytes())
 
     def test_gitlab_installs_snapshot_jobs_for_both_platforms(self):
-        provider = json.loads((ROOT / '.github/labview-ci/providers/gitlab/files.json').read_text())
+        provider = json.loads((ROOT / '.github/labview-ci/providers/gitlab/files.json').read_text(encoding='utf-8'))
         pipeline = INSTALLER.gitlab_pipeline_yml(['snapshots'], ['windows', 'linux'], '2026', provider)
         for template in ['snapshots-windows.yml', 'snapshots-linux.yml']:
             self.assertIn(template, pipeline)
         self.assertNotIn('snapshots-2', pipeline)
 
     def test_coverage_counts_frames_not_html_exports(self):
-        source = ast.parse((ROOT / 'actions/dashboard/dashboard.py').read_text())
+        source = ast.parse((ROOT / 'actions/dashboard/dashboard.py').read_text(encoding='utf-8'))
         function = next(node for node in source.body if isinstance(node, ast.FunctionDef) and node.name == 'snapshot_coverage')
         namespace = {
             '_snap_cov_cache': {},
@@ -199,8 +199,8 @@ const gh = async url => ({ok:true,json:async () => ({content:textFor[decodeURICo
         self.assertEqual(namespace['snapshot_coverage']('commit'), (2, 3))
 
     def test_generation_scripts_only_render_frames(self):
-        builder = (ROOT / '.github/labview/build-snapshots.ps1').read_text()
-        renderer = (ROOT / '.github/labview/render-snapshots.ps1').read_text()
+        builder = (ROOT / '.github/labview/build-snapshots.ps1').read_text(encoding='utf-8')
+        renderer = (ROOT / '.github/labview/render-snapshots.ps1').read_text(encoding='utf-8')
         self.assertIn("-Filter '*.windows.json'", builder)
         self.assertIn("'json-blobs.windows.json'", builder)
         self.assertIn('toimages\\windows-render.ps1', renderer)
@@ -214,13 +214,13 @@ const gh = async url => ({ok:true,json:async () => ({content:textFor[decodeURICo
                 self.assertEqual(expected, (ROOT / directory / name).read_bytes())
 
     def test_reconfigure_embedded_python_parses(self):
-        source = (ROOT / '.github/workflows/reconfigure.yml').read_text()
+        source = (ROOT / '.github/workflows/reconfigure.yml').read_text(encoding='utf-8')
         for match in re.finditer(r"python3 - <<'PY'\n(.*?)\n\s+PY", source, re.S):
             ast.parse(textwrap.dedent(match.group(1)))
 
     def test_report_previews_use_interactive_viewer(self):
         for path in ['.github/labview/build-analyzer-report.py', '.github/labview/build-masscompile-report.py', '.github/labview/build-unittest-report.py', 'actions/vi-analyzer/build-analyzer-report.py', 'actions/masscompile/build-masscompile-report.py']:
-            source = (ROOT / path).read_text()
+            source = (ROOT / path).read_text(encoding='utf-8')
             self.assertIn('vi-interactive.html?file=', source, path)
             self.assertNotIn('frame.src = SNAP_BASE+html;', source, path)
 
