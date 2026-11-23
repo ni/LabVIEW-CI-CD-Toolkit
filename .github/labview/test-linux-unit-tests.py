@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
@@ -254,17 +255,22 @@ class LinuxIntegrationTests(unittest.TestCase):
             self.assertIn('astemes_lib_lunit_cli-1.7.1.32.spec', archive.namelist())
             self.assertNotIn(b'astemes_lib_lunit_cli-1.6.1.23', config)
 
-    @unittest.skipIf(os.name == 'nt', 'Bash revision parser')
     def test_vipm_revision_suffix_preserved(self):
-        text = (ROOT / 'vipm/install-vipc-linux.sh').read_text()
-        function = text.split('package_install_spec() {', 1)[1].split('\n}\n', 1)[0]
-        shell = 'package_install_spec() {' + function + '\n}\n'
-        for package, expected in [('jki_rsc_toolkits_palette-1.1-1', 'jki_rsc_toolkits_palette@1.1-1'),
-                                  ('astemes_lib_lunit_cli-1.7.1.32', 'astemes_lib_lunit_cli@1.7.1.32'),
-                                  ('name-with-dashes-2.0-12', 'name-with-dashes@2.0-12'),
-                                  ('unversioned', 'unversioned')]:
-            result = subprocess.run(['bash', '-c', shell + '\npackage_install_spec "$1"', 'test', package], capture_output=True, text=True, check=True)
-            self.assertEqual(result.stdout.strip(), expected)
+        with tempfile.TemporaryDirectory() as directory:
+            vipc = Path(directory) / 'compact.vipc'
+            for package, expected in [('jki_rsc_toolkits_palette-1.1-1', 'jki_rsc_toolkits_palette@1.1-1'),
+                                      ('astemes_lib_lunit_cli-1.7.1.32', 'astemes_lib_lunit_cli@1.7.1.32'),
+                                      ('name-with-dashes-2.0-12', 'name-with-dashes@2.0-12'),
+                                      ('unversioned', None)]:
+                with zipfile.ZipFile(vipc, 'w') as archive:
+                    archive.writestr('config.xml', '<Root><Package><Name>' + package + '</Name></Package></Root>')
+                result = subprocess.run([sys.executable, str(ROOT / 'vipm/linux-worker.py'),
+                                         'specs', '--vipc', str(vipc)], capture_output=True, text=True)
+                if expected is None:
+                    self.assertNotEqual(result.returncode, 0)
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout.strip(), expected)
 
     def test_platform_note_escapes_tool_names(self):
         note = REPORT.unsupported_note_html([{'name': '<script>alert(1)</script>', 'kind': 'unsupported-on-linux'}])

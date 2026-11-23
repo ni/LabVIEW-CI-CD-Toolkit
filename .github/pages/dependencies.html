@@ -83,6 +83,11 @@
     #linuxPrerequisites{border-left:3px solid var(--accent);padding:4px 12px;margin:12px 0}
     #linuxPrerequisites.pending{border-left-color:var(--warn)}
     #linuxPrerequisites a{overflow-wrap:anywhere}
+    .lvpm-activation{border:1px solid var(--accent);border-radius:8px;padding:16px;margin:12px 0}
+    .lvpm-activation h3{margin-top:0}
+    #lvpmActivationLink{display:inline-block;padding:10px 18px;border-radius:6px;background:var(--accent);color:var(--accent-fg);font-weight:700}
+    #lvpmActivationLink[hidden]{display:none}
+    #lvpmActivate{padding:10px 18px;border-radius:6px;font-weight:700}
     #linuxPrimary{display:inline-block;padding:9px 12px;border:1px solid transparent;border-radius:6px}
     #lvpmStatus:empty{display:none}
     #lvpmStatus{padding:10px 0;font-weight:600;white-space:pre-line}
@@ -220,10 +225,9 @@
     }
     const NIPM_DEPS = [
       { key:"labview", name:"LabVIEW", source:"NI Package Manager", labview:true, platforms:["windows","linux"] },
-      { key:"via", name:"VI Analyzer support", source:"NI Package Manager", packages:{ windows:["ni-viawin-labview-support"], linux:["ni-vialin-labview-support"] }, platforms:["windows","linux"] },
+      { key:"via", name:"VI Analyzer support", source:"NI Package Manager", packages:{ windows:["ni-viawin-labview-support"], linux:["ni-vialinux-labview-support"] }, platforms:["windows","linux"] },
       { key:"utf", name:"NI Unit Test Framework", source:"NI Package Manager", packages:{ windows:["ni-utf-labview-support"] }, platforms:["windows"] },
-      { key:"dragon", name:"JKI Dragon", source:"NI Package Manager", packages:{ windows:["jki-dragon"] }, platforms:["windows"] },
-      { key:"vipm", name:"VI Package Manager", source:"NI Package Manager", packages:{ windows:["ni-vipm"], linux:["ni-vipm"] }, platforms:["windows","linux"] }
+      { key:"vipm", name:"VI Package Manager", source:"JKI installer / Debian", packages:{ windows:["ni-vipm"], linux:["vipm"] }, platforms:["windows","linux"] }
     ];
     const $ = id => document.getElementById(id);
     const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
@@ -279,7 +283,7 @@
     const CAP_VIPC_PLATFORMS = { antidoc: ["windows"] };
     function vipcCapability(path){ const m = /^\.github\/labview\/([^/]+)\/[^/]+\.vipc$/.exec(normPath(path || "")); return (m && CAP_VIPC_PLATFORMS[m[1]]) ? m[1] : ""; }
     function normPath(path){ path = String(path || "").replace(/\\/g, "/"); return path.replace(/^\.\//, ""); }
-    function classifyVipc(path, configured, hasConfigList){ path = normPath(path); const entry = configured.get(path); const core = path === CORE_VIPC; const cap = core ? "" : vipcCapability(path); if (core) return { role:"core", capability:"", configured:true, monitored:true, monitorOn:MONITOR_PLATFORMS.slice(), locked:true }; if (cap){ const monitorOn = MONITOR_PLATFORMS.filter(p => (CAP_VIPC_PLATFORMS[cap] || []).indexOf(p) !== -1); return { role:"capability", capability:cap, configured:true, monitored:monitorOn.length > 0, monitorOn, locked:false }; } const monitorOn = monitorOnFrom(entry, hasConfigList); const monitored = monitorOn.length > 0; return { role:"project", capability:"", configured:monitored, monitored, monitorOn, locked:false }; }
+    function classifyVipc(path, configured, hasConfigList){ path = normPath(path); const entry = configured.get(path); const core = path === CORE_VIPC; const cap = core ? "" : vipcCapability(path); if (core) return { role:"core", capability:"", configured:true, monitored:true, monitorOn:MONITOR_PLATFORMS.slice(), locked:true }; if (cap && !entry){ const monitorOn = MONITOR_PLATFORMS.filter(p => (CAP_VIPC_PLATFORMS[cap] || []).indexOf(p) !== -1); return { role:"capability", capability:cap, configured:true, monitored:monitorOn.length > 0, monitorOn, locked:false }; } const monitorOn = !entry && path.startsWith(".github/") ? [] : monitorOnFrom(entry, hasConfigList); const monitored = monitorOn.length > 0; return { role:"project", capability:"", configured:monitored, monitored, monitorOn, locked:false }; }
     async function fetchJson(url){ const r = await fetch(url, { cache:"no-cache" }); if (!r.ok) throw new Error(url + " -> " + r.status); return r.json(); }
     async function fetchText(url){ const r = await fetch(url, { cache:"no-cache" }); if (!r.ok) throw new Error(url + " -> " + r.status); return r.text(); }
     function selectDependencyTab(key){
@@ -485,6 +489,15 @@
       return out;
     }
 
+    function includeCurrentDependencyRevision(commits){
+      if (!defaultRevision) return commits;
+      // Dependency updates must offer the live HEAD even when the shared project
+      // history filters tooling commits or the generated dashboard is older.
+      const current = commits.find(commit => commit.sha === defaultRevision);
+      return [{...current, sha:defaultRevision, short:short(defaultRevision),
+        message:current?.message || "Current default-branch revision", project:true, depOnly:false},
+        ...commits.filter(commit => commit.sha !== defaultRevision)];
+    }
     async function listCommits(){
       // Prefer the dashboard's classified inventory (each revision tagged project /
       // dependency-only) so the shared revision picker can hide CI/tooling and
@@ -585,23 +598,21 @@
         });
         return set;
       }
-      (man && man.vipc || []).forEach(v => (v.packages || []).forEach(p => set.add(p)));
+      (man && man.vipm_packages || []).forEach(pkg => {
+        if (!pkg || typeof pkg !== "object" || !pkg.name) return;
+        set.add(String(pkg.name));
+        if (pkg.version) set.add(pkg.name + "-" + String(pkg.version).replace(/^[vV]/, ""));
+      });
       return set;
     }
-    // Version-tolerant package matching: a VIPC declares a specific build
-    // (e.g. "wovalab_lib_antidoc_cli-3.3.0.117") but VIPM installs one version
-    // per package, so a baked "...-3.4.0.126" satisfies the request. Match on the
-    // versionless base identifier (strip a trailing "-<dotted digits>") so a
-    // present-but-different build reads as installed, not a false "missing".
-    function pkgBase(pkg){ return String(pkg || "").replace(/-\d[\d.]*$/, "").toLowerCase(); }
     function pkgInSet(pkg, set){
       if (!set || !set.size) return false;
-      if (set.has(pkg)) return true;
-      const base = pkgBase(pkg);
-      for (const p of set) if (pkgBase(p) === base) return true;
+      const key = value => String(value).toLowerCase().replace(/-v(?=\d)/, "-");
+      const wanted = key(pkg);
+      for (const installed of set) if (key(installed) === wanted) return true;
       return false;
     }
-    function nipkgInManifest(man){ return Array.isArray(man && man.nipkg_packages) ? man.nipkg_packages : []; }
+    function nipkgInManifest(man){ return [...(man && man.nipkg_inventory && man.nipkg_inventory.source === "nipkg list-installed" && man.nipkg_inventory.status === "observed" && Array.isArray(man.nipkg_packages) ? man.nipkg_packages : []), ...(Array.isArray(man && man.dpkg_packages) ? man.dpkg_packages : [])]; }
     function lvpmFreshness(st){
       if (!st || st.key === "windows" || (st.installer !== "lvpm" && !String(st.tag || "").startsWith("linux-lvpm-"))) return null;
       const unknown = reason => ({ status:"unknown", reason });
@@ -634,9 +645,11 @@
       st.manifest = man || null;
       st.installer = man && man.installer || (String(st.tag || "").startsWith("linux-lvpm-") ? "lvpm" : "vipm");
       st.ready = !!man && (st.installer !== "lvpm" || st.ready !== false);
+      if (man && man.vipm_inventory && man.vipm_inventory.status !== "observed") st.ready = false;
       st.packages = packagesInManifest(man);
       st.nipkg = nipkgInManifest(man);
-      st.nipkg_ready = Array.isArray(man && man.nipkg_packages);
+      st.nipkg_ready = !!(man && man.nipkg_inventory && man.nipkg_inventory.source === "nipkg list-installed" && man.nipkg_inventory.status === "observed") || (man && man.platform === "linux" && Array.isArray(man.dpkg_packages));
+      st.vipm_verified = !!(man && man.vipm_inventory && man.vipm_inventory.status === "observed" && man.vipm_inventory.target_verified === true);
       st.nipkgNames = new Set(st.nipkg.map(p => String(p.name || "").toLowerCase()).filter(Boolean));
       st.labview = man && man.labview_version ? String(man.labview_version) : "";
       if (man && (man.tag || man.version)) st.label = man.tag || man.version;
@@ -773,6 +786,7 @@
         if (status) status.textContent = "Tracking stopped because the page context changed. Submitted workflows may continue on GitHub.";
         const link = $("lvpmRunLink");
         if (link) link.hidden = true;
+        if ($("lvpmActivationLink")) $("lvpmActivationLink").hidden = true;
         renderLinuxProgress("stopped");
       }
       linuxOperation = null;
@@ -795,7 +809,10 @@
       return { repo, platform:activePlatform, tooling:linuxToolingView, revision:selectedRevision, epoch:linuxContextEpoch, inputs:JSON.stringify(monitorInputs()), selection:workerSelectionSettings(selectedConfig), token:token() };
     }
     function linuxMonitoringContextCurrent(context){
-      return activePlatform === "linux" && context.repo === repo && context.platform === activePlatform && context.tooling === linuxToolingView && context.selection === workerSelectionSettings(selectedConfig) && context.revision === selectedRevision && context.epoch === linuxContextEpoch
+      return activePlatform === "linux" && monitoringRequestCurrent(context);
+    }
+    function monitoringRequestCurrent(context){
+      return context.repo === repo && context.platform === activePlatform && context.tooling === linuxToolingView && context.selection === workerSelectionSettings(selectedConfig) && context.revision === selectedRevision && context.epoch === linuxContextEpoch
         && context.inputs === JSON.stringify(monitorInputs()) && context.token === token();
     }
     function matchingLinuxMonitoringRequest(){
@@ -827,6 +844,9 @@
         && intent.context.loaded === linuxLoadedInputs;
     }
     function linuxReviewedWorkflow(text, file){
+      const inputDirectory = file === "build-labview-linux-image.yml" ? "linux-source" : "lvpm-source";
+      const inputCheckout = '      - name: Checkout selected dependency revision\n        uses: actions/checkout@v7\n        with:\n          ref: $' + '{{ inputs.dependency_sha || github.sha }}\n          path: ci-out/' + inputDirectory + '\n          persist-credentials: false\n';
+      text = text.replace(inputCheckout, "");
       const guard = '      - name: Verify reviewed commit\n        env:\n          EXPECTED_SHA: $' + "{{ inputs.expected_sha }}\n        run: |\n          if [ -n \"$EXPECTED_SHA\" ]; then\n            if ! [[ \"$EXPECTED_SHA\" =~ ^[0-9a-fA-F]{40}$ ]]; then\n              echo \"::error::Invalid reviewed commit SHA; expected exactly 40 hexadecimal characters.\"\n              exit 1\n            fi\n            reviewed_sha=$(printf '%s' \"$EXPECTED_SHA\" | tr '[:upper:]' '[:lower:]')\n            if [ \"$GITHUB_SHA\" != \"$reviewed_sha\" ]; then\n              echo \"::error::Reviewed HEAD moved. Click Update container image again to review the new target.\"\n              exit 1\n            fi\n          fi";
       const checkout = /uses: actions\/checkout@[^\n]+\n        with:\n          ref: \$\{\{ github.sha \}\}/g;
       const count = (text.match(/uses: actions\/checkout@/g) || []).length;
@@ -849,11 +869,19 @@
           && (jobSection.match(/^    (?:if|needs):/gm) || []).length === 2);
     }
     async function verifiedLinuxUpdateTarget(intent){
-      const read = async (url, kind) => {
-        const response = await fetch(url, { cache:"no-cache", headers:updHeaders() });
+      const read = async (url, kind, asText = false) => {
+        const headers = updHeaders();
+        if (asText) headers.Accept = "application/vnd.github.raw+json";
+        let response;
+        try { response = await fetch(url, { cache:"no-cache", headers }); }
+        catch (_) {
+          throw new Error("Cannot load " + kind + " from GitHub. No update submitted. Check your connection and GitHub access, then retry.");
+        }
         if (!linuxUpdateIntentCurrent(intent)) throw new Error("Update context changed; no new request submitted.");
-        if (!response.ok) throw new Error("Cannot verify " + kind + " (HTTP " + response.status + ").");
-        const value = kind === "repository" || kind === "HEAD" ? await response.json() : await response.text();
+        if (!response.ok) throw new Error("Cannot verify " + kind + " (HTTP " + response.status + "). No update submitted. Check repository access and token permissions (Contents: read and Actions: write).");
+        let value;
+        try { value = asText ? await response.text() : await response.json(); }
+        catch (_) { throw new Error("Cannot read the " + kind + " response from GitHub. No update submitted. Retry after checking your connection."); }
         if (!linuxUpdateIntentCurrent(intent)) throw new Error("Update context changed; no new request submitted.");
         return value;
       };
@@ -861,15 +889,42 @@
       if (String(metadata.full_name || "").toLowerCase() !== repo.toLowerCase() || typeof metadata.default_branch !== "string" || !metadata.default_branch) throw new Error("Repository/default branch identity is unavailable.");
       const head = await read(api("/commits/" + encodeURIComponent(metadata.default_branch)), "HEAD");
       if (!/^[a-f0-9]{40}$/.test(head.sha || "")) throw new Error("Invalid committed HEAD identity.");
-      const settings = await read(raw(".github/labview-ci.yml", head.sha), "committed settings");
+      // Authenticated browser reads belong on the API origin. The raw-file host
+      // rejects the CORS preflight for Authorization / X-GitHub-Api-Version.
+      const contents = path => api("/contents/" + path.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(head.sha));
+      const settings = await read(contents(".github/labview-ci.yml"), "committed settings", true);
       const config = parseManifestYaml(settings);
       const implicit = !hasConfigList(config, "vipc") || !hasConfigList(config, "dragon");
-      if (!(implicit ? linuxImplicitSettingsMatch(settings, head.sha, intent) : committedMonitoringMatches(settings, intent.context))) throw new Error("Monitoring or worker choices differ from committed HEAD. Review and merge the intended configuration; your choices are unchanged. No update submitted.");
+      const releaseOnlyAdvance = implicit && head.sha !== intent.context.revision
+        ? await linuxReleaseOnlyAdvance(read, intent.context.revision, head.sha) : false;
+      if (!(implicit ? linuxImplicitSettingsMatch(settings, head.sha, intent, releaseOnlyAdvance) : committedMonitoringMatches(settings, intent.context))) throw new Error("Monitoring or worker choices differ from committed HEAD. Review and merge the intended configuration; your choices are unchanged. No update submitted.");
       if (intent.context.tooling === "vipm" && String(config.linuxUse || "").startsWith("linux-lvpm-")) throw new Error("Linux currently selects LVPM. Review the reset under Current selection and rollback before a VIPM update.");
       const file = intent.context.tooling === "lvpm" ? "build-labview-lvpm-image.yml" : "build-labview-linux-image.yml";
-      const workflow = await read(raw(".github/workflows/" + file, head.sha), "reviewed workflow");
+      const workflow = await read(contents(".github/workflows/" + file), "reviewed workflow", true);
       if (!linuxReviewedWorkflow(workflow, file)) throw new Error("Installed Linux workflow lacks reviewed-SHA protection. Update the installed tooling before building; no update submitted.");
       return Object.freeze({sha:head.sha, ref:metadata.default_branch, file});
+    }
+    async function linuxReleaseOnlyAdvance(read, inspected, head){
+      // Pages can intentionally omit release bookkeeping commits from its revision
+      // list. Prove that only version/history changed before reusing that view.
+      if (!/^[a-f0-9]{40}$/.test(inspected || "")) return false;
+      const comparison = await read(api("/compare/" + inspected + "..." + head + "?per_page=100"), "release revision comparison");
+      if (comparison.status !== "ahead" || comparison.base_commit?.sha !== inspected || comparison.merge_base_commit?.sha !== inspected
+        || !Array.isArray(comparison.commits) || comparison.commits.length !== comparison.total_commits
+        || comparison.commits.at(-1)?.sha !== head || !Array.isArray(comparison.files)
+        || !comparison.files.length || comparison.files.length >= 300) return false;
+      const catalogPath = ".github/labview-ci/catalog.json";
+      if (comparison.files.some(file => !["added", "modified", "removed"].includes(file.status)
+        || !(file.filename === catalogPath || /^\.github\/labview-ci\/notes\/[^/]+\.md$/.test(file.filename || "")))) return false;
+      if (!comparison.files.some(file => file.filename === catalogPath)) return true;
+      const readCatalog = async sha => {
+        const value = JSON.parse(await read(api("/contents/" + catalogPath + "?ref=" + sha), "release catalog", true));
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Cannot verify release catalog; no update submitted.");
+        delete value.version;
+        delete value.history;
+        return JSON.stringify(value);
+      };
+      return await readCatalog(inspected) === await readCatalog(head);
     }
     async function runLinuxPrimaryAction(){
       if (activePlatform !== "linux" || linuxDispatchPending || linuxVipmPending || (linuxOperation && linuxOperation.busy) || (linuxUpdateIntent && linuxUpdateIntent.busy)) return;
@@ -884,7 +939,7 @@
       try {
         if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo) || !["vipm", "lvpm"].includes(intent.context.tooling) || !["replace", "new"].includes(intent.context.mode)) throw new Error("Invalid update context; no update submitted.");
         const monitoring = matchingLinuxMonitoringRequest();
-        if (monitorDirty && (!monitoring || !["accepted", "uncertain"].includes(monitoring.status))) throw new Error("Monitoring choices are unsaved. Review and commit them before updating; choices are preserved. The tooling source and its forks require a reviewed source PR, not client Save.");
+        if (monitorDirty && (!monitoring || !["accepted", "uncertain"].includes(monitoring.status))) throw new Error("Monitoring choices are unsaved. Review and commit them before updating; choices are preserved. Save monitored files opens a configuration PR. Review and merge it, then load the committed settings.");
         intent.target = await verifiedLinuxUpdateTarget(intent);
         if (!linuxUpdateIntentCurrent(intent)) return;
         intent.message = "Reviewed committed target " + intent.target.sha + ". The inspected revision and your choices stay unchanged.";
@@ -908,10 +963,11 @@
     function recordLinuxLoadedInputs(provenance, text = null){
       linuxLoadedInputs = Object.freeze({repo, revision:selectedRevision, inputs:JSON.stringify(monitorInputs()), config:linuxConfigSignature(selectedConfig), provenance, text});
     }
-    function linuxImplicitSettingsMatch(text, sha, intent){
+    function linuxImplicitSettingsMatch(text, sha, intent, releaseOnlyAdvance = false){
       const loaded = intent.context.loaded;
-      if (intent.context.dirty || sha !== intent.context.revision || !loaded || loaded !== linuxLoadedInputs
-        || loaded.repo !== repo || loaded.revision !== sha || loaded.inputs !== intent.context.inputs
+      if (sha !== intent.context.revision && !releaseOnlyAdvance) throw new Error("Source files changed since this view. Select the current default-branch revision, review its dependencies, then update. No update submitted.");
+      if (intent.context.dirty || !loaded || loaded !== linuxLoadedInputs
+        || loaded.repo !== repo || loaded.revision !== intent.context.revision || loaded.inputs !== intent.context.inputs
         || loaded.config !== linuxConfigSignature(selectedConfig) || linuxMonitoringRequest) throw new Error("Implicit monitoring requires a clean, fully loaded current revision with no pending Save. Choices are preserved; no update submitted.");
       const root = text.match(/^config:[ \t]*\r?\n((?: {2}[^\n]*\n?|[ \t]*\n)*)/m);
       if ((text.match(/^config:/gm) || []).length !== 1 || !root) throw new Error("Implicit configuration is malformed or unavailable.");
@@ -1032,7 +1088,11 @@
       const states = {
         checking:["Checking request", "", true], submitting:["Submitting request", "", true],
         awaiting:["Awaiting identified run", "", true], queued:["Workflow queued", "", true],
-        running:["Workflow running", "", true], succeeded:["Workflow succeeded · review required", "ok", false],
+        running:["Workflow running", "", true], succeeded:["Workflow succeeded", "ok", false],
+        candidateReady:["Build succeeded — ready to use", "ok", false],
+        candidateWaiting:["Build succeeded — loading new worker", "", true],
+        candidateUnavailable:["Build succeeded — image not available yet", "warn", false],
+        proposalReady:["Worker change ready — merge to activate", "ok", false],
         failed:["Workflow failed · inspect logs", "err", false], cancelled:["Workflow cancelled", "err", false],
         unsuccessful:["Workflow did not succeed · inspect logs", "err", false],
         rejected:["Request not submitted or rejected", "err", false],
@@ -1089,15 +1149,21 @@
           linuxOperationStatus(operation, run.status === "in_progress" ? "Workflow running. Active worker unchanged." : "Workflow " + String(run.status || "pending") + ". Active worker unchanged.", operation.runId, run.status === "in_progress" ? "running" : run.status === "queued" ? "queued" : "awaiting");
           return;
         }
+        if (run.conclusion === "success" && operation.action === "build") {
+          await refreshBuiltCandidate(operation);
+          return;
+        }
         operation.busy = false;
         if (operation.intent) operation.intent.busy = false;
         clearInterval(operation.timer);
         const message = run.conclusion === "success"
           ? operation.action === "vipm" ? "Linux VIPM build workflow succeeded. Inspect its image output and refreshed dependency inventory; this does not establish runtime activity success."
-            : operation.action === "build" ? "Build workflow succeeded. Refresh to check for a published candidate and review its package-file evidence before requesting activation. This does not prove CI activities passed; the active worker is unchanged."
-            : "Reconfigure workflow succeeded. Review its pull request; only merging the proposal applies the change."
+            : "Worker change prepared. Open the activation pull request and merge it to use the new worker. Your current worker stays active until then."
           : "Workflow " + String(run.conclusion || "finished without a success result") + ". Open the logs for the failing step. No successful candidate or configuration change is established.";
         linuxOperationStatus(operation, message, operation.runId, run.conclusion === "success" ? "succeeded" : run.conclusion === "cancelled" ? "cancelled" : ["failure", "timed_out"].includes(run.conclusion) ? "failed" : "unsuccessful");
+        if (run.conclusion === "success" && ["activate", "reset"].includes(operation.action)) {
+          await showLinuxActivationProposal(operation);
+        }
       } catch (error) {
         if (!linuxOperationCurrent(operation)) return;
         clearInterval(operation.timer);
@@ -1105,6 +1171,56 @@
       } finally {
         operation.polling = false;
         if (linuxOperationCurrent(operation)) syncLinuxOperationButtons();
+      }
+    }
+    async function refreshBuiltCandidate(operation){
+      let candidate = null;
+      try { candidate = await loadLvpmCandidate(); } catch (_) {}
+      if (!linuxOperationCurrent(operation)) return;
+      const run = candidate && candidate.workflow_run || {};
+      const matching = run.id === operation.runId && run.attempt === 1
+        && run.head_sha === operation.revision && run.workflow_path === ".github/workflows/" + operation.file;
+      operation.candidateChecks = (operation.candidateChecks || 0) + 1;
+      // Never offer an older/unrelated image as the result of this build.
+      operation.candidate = matching ? candidate : null;
+      lvpmCandidate = operation.candidate;
+      operation.busy = !matching && operation.candidateChecks < 12;
+      if (operation.intent) operation.intent.busy = operation.busy;
+      if (!operation.busy) clearInterval(operation.timer);
+      renderLvpmCandidate();
+      linuxOperationStatus(operation, matching
+        ? "New LVPM worker ready. Select Use this worker to request activation."
+        : "Build succeeded. Waiting for the new image to become available. Your current worker is still active.", operation.runId,
+        matching ? "candidateReady" : operation.busy ? "candidateWaiting" : "candidateUnavailable");
+    }
+    async function showLinuxActivationProposal(operation){
+      const branch = "labview-ci/reconfigure-" + operation.runId;
+      try {
+        const response = await fetch(api("/pulls?state=all&head=" + encodeURIComponent(repo.split("/")[0] + ":" + branch)
+          + "&base=" + encodeURIComponent(operation.ref)), { cache:"no-cache", headers:updHeaders() });
+        if (!response.ok) throw new Error("Proposal lookup failed.");
+        const proposals = await response.json();
+        if (!linuxOperationCurrent(operation)) return;
+        const matches = Array.isArray(proposals) ? proposals.filter(pr => Number.isSafeInteger(pr.number) && pr.number > 0
+          && pr.head && pr.head.ref === branch && pr.head.repo && pr.head.repo.full_name.toLowerCase() === repo.toLowerCase()
+          && pr.base && pr.base.ref === operation.ref && pr.base.repo && pr.base.repo.full_name.toLowerCase() === repo.toLowerCase()) : [];
+        if (matches.length !== 1) throw new Error("No unique activation proposal found.");
+        const pr = matches[0];
+        operation.proposal = pr;
+        renderLvpmCandidate();
+        const status = pr.merged_at ? "Worker change merged. Refresh the page to load the new selection."
+          : pr.state === "open" ? "Merge this pull request to activate the worker. Repository approval rules still apply."
+          : "The worker change pull request was closed without merging. Your worker was not changed.";
+        linuxOperationStatus(operation, status, operation.runId, pr.state === "open" ? "proposalReady" : "succeeded");
+        const link = $("lvpmActivationLink");
+        if (link) {
+          link.href = "https://github.com/" + repo + "/pull/" + pr.number;
+          link.textContent = pr.state === "open" ? "Review and activate worker ↗" : "Open worker change ↗";
+          link.hidden = false;
+        }
+      } catch (_) {
+        if (linuxOperationCurrent(operation)) linuxOperationStatus(operation,
+          "Worker-change workflow finished. Open its run below for the pull request; merge that proposal to activate. If settings already match, no new proposal is needed.", operation.runId, "succeeded");
       }
     }
     async function dispatchLinuxWorker(action, intent = null){
@@ -1117,6 +1233,7 @@
       if (!token()) { pendingTokenAction = () => dispatchLinuxWorker(action); showTokenPanel(); if (status) status.textContent = "Paste a token with Actions: write to continue."; return; }
       const operation = { action, revision:intent ? intent.target.sha : revision, intent, token:token(), epoch:linuxContextEpoch, busy:true, file:intent ? intent.target.file : action === "build" ? "build-labview-lvpm-image.yml" : "reconfigure.yml", visibilityChecks:0 };
       linuxOperation = operation;
+      if ($("lvpmActivationLink")) $("lvpmActivationLink").hidden = true;
       linuxDispatchPending = true;
       syncLinuxOperationButtons();
       linuxOperationStatus(operation, "Checking the current revision and workflow…", null, "checking");
@@ -1192,13 +1309,13 @@
       const configuredSelection = selectedConfig.linuxUse || selectedConfig.use || "latest";
       const selectedLvpm = String(configuredSelection).startsWith("linux-lvpm-");
       linuxBuildAvailability = { state:"checking", reason:"Checking the installed build workflow." };
-      linuxToolingView = selectedLvpm ? "lvpm" : "vipm";
+      linuxToolingView = new URL(location.href).searchParams.get("installer") === "lvpm" || selectedLvpm ? "lvpm" : "vipm";
       lvpmCandidate = null;
       host.innerHTML = '<h2>Linux dependency tooling</h2><p>Configured Linux default (selected revision <code>' + esc(short(revision)) + '</code>): <strong>' + (selectedLvpm ? 'LVPM' : 'VIPM') + '</strong>.</p>'
-        + '<fieldset><legend>Preview an approach · Windows unchanged</legend><label><input type="radio" name="linuxInstaller" value="vipm"' + (selectedLvpm ? '' : ' checked') + '> VIPM</label> <label><input type="radio" name="linuxInstaller" value="lvpm"' + (selectedLvpm ? ' checked' : '') + '> LVPM</label></fieldset>'
+        + '<fieldset><legend>Preview an approach · Windows unchanged</legend><label><input type="radio" name="linuxInstaller" value="vipm"' + (linuxToolingView === 'vipm' ? ' checked' : '') + '> VIPM</label> <label><input type="radio" name="linuxInstaller" value="lvpm"' + (linuxToolingView === 'lvpm' ? ' checked' : '') + '> LVPM</label></fieldset>'
+        + '<div id="linuxVipmView"' + (linuxToolingView === 'lvpm' ? ' hidden' : '') + '></div>'
+        + '<div id="lvpmReview"' + (linuxToolingView === 'lvpm' ? '' : ' hidden') + '>Loading candidate evidence…</div>'
         + '<div id="linuxPrerequisites"></div>'
-        + '<div id="linuxVipmView"' + (selectedLvpm ? ' hidden' : '') + '></div>'
-        + '<div id="lvpmReview"' + (selectedLvpm ? '' : ' hidden') + '>Loading candidate evidence…</div>'
         + '<div class="lvpm-progress" id="lvpmProgress" hidden><div class="upd-prog-head"><span class="upd-prog-phase" id="lvpmProgressPhase"></span></div><div class="upd-prog-track" aria-hidden="true"><div class="upd-prog-bar" id="lvpmProgressBar"></div></div></div>'
         + '<div role="status" aria-live="polite" id="lvpmStatus"></div><a id="lvpmRunLink" target="_blank" rel="noopener" hidden></a>'
         + '<details><summary>Current selection and rollback</summary><p>Switching these views does not change configuration or dispatch a workflow. Explicit per-action overrides win.</p><p><code>' + esc(configuredSelection) + '</code></p><p>Per-action overrides: ' + esc(Object.entries(selectedConfig.actions || {}).map(([activity, selection]) => activity + ': ' + selection).join('; ') || 'none') + '. These are preserved and may prevent the Linux default from applying to an activity.</p>'
@@ -1218,17 +1335,41 @@
       try { candidate = await loadLvpmCandidate(); } catch (_) {}
       const buildAvailability = await loadLinuxBuildAvailability();
       if ($("linuxInstaller") !== host || revision !== selectedRevision || activePlatform !== "linux") return;
-      lvpmCandidate = candidate;
+      const completedBuild = linuxOperationCurrent(linuxOperation || {}) && linuxOperation.action === "build" && linuxOperation.candidateChecks;
+      lvpmCandidate = completedBuild ? linuxOperation.candidate : candidate;
       linuxBuildAvailability = buildAvailability;
+      renderLvpmCandidate();
+      syncLinuxOperationButtons();
+      renderLinuxPrerequisites();
+      if (linuxOperationCurrent(linuxOperation || {})) linuxOperationStatus(linuxOperation, linuxOperation.message || "Checking workflow…", linuxOperation.runId);
+    }
+    function renderLvpmCandidate(){
+      const candidate = lvpmCandidate;
+      const revision = selectedRevision;
+      const configuredSelection = selectedConfig.linuxUse || selectedConfig.use || "latest";
+      const selectedLvpm = String(configuredSelection).startsWith("linux-lvpm-");
       const run = candidate && candidate.workflow_run || {};
       const review = $("lvpmReview");
+      if (!review) return;
       const declarations = currentVipcs.concat(currentDragons).filter(item => Array.isArray(item.monitorOn) && item.monitorOn.includes("linux"));
       const current = !!defaultRevision && revision === defaultRevision;
       const alreadySelected = candidateSelection(candidate) === configuredSelection;
       const canActivate = candidate && !alreadySelected;
       const freshness = lvpmFreshness(resolveColumn(COLS.find(col => col.key === "linux"), selectedConfig));
       const candidateHeading = candidateSelection(candidate) === configuredSelection ? 'Currently selected Linux default' : 'Alternative candidate — not automatically used';
-      review.innerHTML = '<p class="ct-sub">Linux x86-64 · Package-file verification only, not CI activity validation.</p>'
+      const activationHint = monitorDirty ? 'Save and merge your monitoring changes first.'
+        : !current ? 'Open the current revision to use this worker.'
+        : 'Creates a worker-change pull request. Merge it to make this image the Linux worker for future jobs.';
+      const currentUrl = new URL(location.href);
+      currentUrl.searchParams.set("sha", defaultRevision || "");
+      currentUrl.searchParams.set("installer", "lvpm");
+      const proposal = linuxOperationCurrent(linuxOperation || {}) && linuxOperation.proposal;
+      review.innerHTML = (proposal ? '<div class="lvpm-activation"><h3>' + (proposal.state === 'open' ? 'One step left: activate your worker' : 'Worker change completed') + '</h3><a id="lvpmActivationLink" target="_blank" rel="noopener" href="https://github.com/' + esc(repo) + '/pull/' + proposal.number + '">' + (proposal.state === 'open' ? 'Review and activate worker ↗' : 'Open worker change ↗') + '</a><p>' + (proposal.merged_at ? 'Merged. Refresh to load the new worker selection.' : proposal.state === 'open' ? 'Merge this pull request to use the new Linux worker. Repository approval rules apply.' : 'Closed without merging. The active worker was not changed.') + '</p></div>'
+        : canActivate ? '<div class="lvpm-activation"><h3>New LVPM worker ready</h3><button type="button" class="primary" id="lvpmActivate"' + (current && !monitorDirty ? '' : ' disabled') + '>Use this worker</button><p>' + esc(activationHint) + '</p>'
+        + (!current && defaultRevision ? '<a href="' + esc(currentUrl.href) + '">Open current revision</a>' : '') + '</div>'
+        : alreadySelected && candidate ? '<p><strong>This LVPM worker is already selected.</strong></p>'
+        : '<p>No new worker is available yet.</p><button type="button" id="lvpmRefresh">Check for new worker</button>')
+        + '<p class="ct-sub">Linux x86-64 · Package-file verification only, not CI activity validation.</p>'
         + (selectedLvpm && freshness.status !== "current" ? '<p><strong>Current Linux dependencies are ' + esc(freshness.status) + '.</strong> Build a new candidate, reverify it, then reactivate.</p>' : '')
         + '<details><summary>Candidate evidence and build inputs</summary>'
         + '<p>' + esc(localFreshnessText(resolveColumn(COLS.find(col => col.key === "linux"), selectedConfig))) + '</p>'
@@ -1236,13 +1377,27 @@
           + '<details><summary>Image identity and verification evidence</summary><p><code>' + esc(candidate.image_ref) + '</code></p><p>Requirements: <code>' + esc(candidate.requirements_fingerprint || "") + '</code>. Source: <code>' + esc(run.head_sha || "") + '</code>; workflow <code>' + esc(run.workflow_path || "") + '</code>; run ' + esc(run.id || "") + ', attempt ' + esc(run.attempt || "") + '.</p><ul>' + (candidate.packages || []).map(pkg => '<li>' + esc(pkg.name || "") + ' ' + esc(pkg.version || "") + '</li>').join('') + '</ul></details>' : '<p>No eligible candidate manifest is available. The VIPM worker is not substituted.</p>')
         + (Number.isSafeInteger(run.id) && run.id > 0 ? '<p><a href="https://github.com/' + esc(repo) + '/actions/runs/' + run.id + '" target="_blank" rel="noopener">Review candidate build run</a></p>' : '')
         + '<p>Committed Linux declarations (' + declarations.length + (declarations.length === 1 ? ' file' : ' files') + ')</p><ul>' + declarations.map(item => '<li><code>' + esc(item.path) + '</code> — ' + (item.packages || []).length + ' declared packages</li>').join('') + '</ul>'
-        + '<p>' + esc(buildAvailability.reason) + '</p>'
-        + (canActivate ? '<p>Activation requests a separate reviewable PR; build success alone does not change the worker.</p><button type="button" id="lvpmActivate"' + (current && !monitorDirty ? '' : ' disabled') + '>Activate candidate via reviewable PR</button>' : '') + '</details>'
+        + '<p>' + esc(linuxBuildAvailability.reason) + '</p>'
+        + '</details>'
         + '<details><summary>Limitations and recovery</summary><p>Hook VI error-out results cannot be observed upstream. Hook-dependent packages and native/NIPM installation are not established. Exact-pin conflicts fail preflight; reconcile declarations rather than silently changing pins. There is no automatic LVPM rebuild: after input changes, build, reverify and explicitly re-activate a new candidate. Runtime freshness fails closed; no VIPM fallback occurs. Activation revalidates provenance, digest and inputs server-side; action overrides are preserved.</p></details>';
       if ($("lvpmActivate")) $("lvpmActivate").addEventListener("click", () => dispatchLinuxWorker("activate"));
-      syncLinuxOperationButtons();
-      renderLinuxPrerequisites();
-      if (linuxOperationCurrent(linuxOperation || {})) linuxOperationStatus(linuxOperation, linuxOperation.message || "Checking workflow…", linuxOperation.runId);
+      if ($("lvpmRefresh")) $("lvpmRefresh").addEventListener("click", async () => {
+        if (linuxOperationCurrent(linuxOperation || {}) && linuxOperation.action === "build") {
+          linuxOperation.candidateChecks = 0;
+          clearInterval(linuxOperation.timer);
+          const operation = linuxOperation;
+          operation.timer = setInterval(() => pollLinuxOperation(operation), 15000);
+          await pollLinuxOperation(operation);
+        } else {
+          const context = linuxMonitoringContext();
+          let refreshed = null;
+          try { refreshed = await loadLvpmCandidate(); } catch (_) {}
+          if (!linuxMonitoringContextCurrent(context)) return;
+          lvpmCandidate = refreshed;
+          renderLvpmCandidate();
+          syncLinuxOperationButtons();
+        }
+      });
     }
     // Compose the dependency-warning note. Returns "" when there is nothing worth
     // warning about, so the note stays hidden instead of restating the obvious.
@@ -1287,13 +1442,14 @@
       const btn = $("saveMonitor");
       const counts = monitorCounts();
       if (monitorDirty) ["lvpmBuild", "lvpmActivate", "lvpmReset"].forEach(id => { if ($(id)) $(id).disabled = true; });
-      if (btn) { btn.hidden = false; btn.disabled = !monitorDirty || counts.total === 0 || (activePlatform === "linux" && repo.toLowerCase() === "ni/labview-ci-cd-toolkit"); }
-      const request = activePlatform === "linux" && matchingLinuxMonitoringRequest();
+      const sourceRepository = repo.toLowerCase() === "ni/labview-ci-cd-toolkit";
+      if (btn) { btn.hidden = false; btn.disabled = !monitorDirty || counts.total === 0; }
+      const request = matchingLinuxMonitoringRequest();
       if (request && ["submitting", "accepted", "uncertain"].includes(request.status) && btn) btn.disabled = true;
       if (!counts.total) { setMonitorStatus("No dependency files found."); return; }
       if (request && request.status === "accepted" && monitorDirty) { setMonitorStatus("Save request accepted, not applied. Review workflow runs and proposals, merge the intended changes, then open committed settings."); return; }
       if (request && ["submitting", "uncertain"].includes(request.status) && monitorDirty) { setMonitorStatus("Monitoring request pending or uncertain. Check workflow runs before submitting again."); return; }
-      if (monitorDirty) setMonitorStatus("Save to update monitored files (" + counts.monitored + " of " + counts.total + " checked).");
+      if (monitorDirty) setMonitorStatus((sourceRepository ? "Save opens a reviewed source PR for monitoring only (" : "Save to update monitored files (") + counts.monitored + " of " + counts.total + " checked).");
       else setMonitorStatus(counts.monitored + " of " + counts.total + " dependency files monitored.", "ok");
     }
     function token(){ try { return localStorage.getItem(TOK_KEY) || ""; } catch (_) { return ""; } }
@@ -1334,11 +1490,11 @@
     function hideTokenPanel(){ const p = $("tokPanel"); if (p) p.hidden = true; }
     function monitorInputs(){ return { container_vipc:encodeMonitorList(currentVipcs), container_dragon:encodeMonitorList(currentDragons) }; }
     async function dispatchMonitor(){
-      const previous = activePlatform === "linux" && matchingLinuxMonitoringRequest();
+      const previous = matchingLinuxMonitoringRequest();
       if (previous && ["submitting", "accepted", "uncertain"].includes(previous.status)) return;
       if (!repo.includes("/")) { setMonitorStatus("Could not determine repository.", "err"); return; }
       if (!token()) { pendingTokenAction = dispatchMonitor; showTokenPanel(); setMonitorStatus("Paste a token to queue Reconfigure."); return; }
-      const request = activePlatform === "linux" ? { ...linuxMonitoringContext(), status:"submitting" } : null;
+      const request = { ...linuxMonitoringContext(), status:"submitting", submitted:false };
       if (request) { linuxMonitoringRequest = request; renderLinuxPrerequisites(); }
       const btn = $("saveMonitor");
       if (btn) { btn.disabled = true; btn.textContent = "Queuing..."; }
@@ -1346,15 +1502,17 @@
       try {
         if (request) {
           const reason = await linuxSaveRestriction();
-          if (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request) return;
-          if (reason) { request.status = "blocked"; request.reason = reason; setMonitorStatus(reason, "err"); return; }
+          if (!monitoringRequestCurrent(request) || linuxMonitoringRequest !== request) return;
+          if (typeof reason === "string" && reason) { request.status = "blocked"; request.reason = reason; setMonitorStatus(reason, "err"); return; }
+          request.target = reason || null;
         }
+        request.submitted = true;
         const r = await fetch("https://api.github.com/repos/" + repo + "/actions/workflows/reconfigure.yml/dispatches", {
           method:"POST",
           headers:{ "Authorization":"Bearer " + token(), "Accept":"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28", "Content-Type":"application/json" },
-          body:JSON.stringify({ ref:workflowRef(), inputs:monitorInputs() })
+          body:JSON.stringify({ ref:request.target ? request.target.ref : workflowRef(), inputs:{...monitorInputs(), ...(request.target ? request.target.inputs : {})} })
         });
-        if (request && (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request)) return;
+        if (request && (!monitoringRequestCurrent(request) || linuxMonitoringRequest !== request)) return;
         if (btn) { btn.textContent = "Save monitored files"; }
         if (r.status === 204) {
           if (request) request.status = "accepted";
@@ -1373,7 +1531,7 @@
         if (r.status === 403) { showTokenPanel("The saved token cannot dispatch workflows here. Grant <strong>Actions: Read and write</strong> for <code>" + esc(repo) + "</code>."); setMonitorStatus("Dispatch forbidden (403).", "err"); return; }
         if (r.status === 404) {
           const unregistered = await explainDispatch404("reconfigure.yml");
-          if (request && (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request)) return;
+          if (request && (!monitoringRequestCurrent(request) || linuxMonitoringRequest !== request)) return;
           if (unregistered) { hideTokenPanel(); setMonitorStatus(unregistered, "err"); return; }
           showTokenPanel("The saved token cannot see <code>" + esc(repo) + "</code>, or this repo does not have <code>reconfigure.yml</code> installed.");
           setMonitorStatus("Workflow not found or repo not accessible (404).", "err");
@@ -1381,31 +1539,46 @@
         }
         setMonitorStatus("Dispatch failed (HTTP " + r.status + ").", "err");
       } catch (e) {
-        if (request && (!linuxMonitoringContextCurrent(request) || linuxMonitoringRequest !== request)) return;
+        if (request && (!monitoringRequestCurrent(request) || linuxMonitoringRequest !== request)) return;
         if (request) {
-          request.status = "uncertain";
-          if (btn) { btn.disabled = true; btn.textContent = "Save monitored files"; }
-          setMonitorStatus("Monitoring request outcome uncertain after a network error. Inspect workflow runs before retrying.", "err");
+          request.status = request.submitted ? "uncertain" : "blocked";
+          if (btn) { btn.disabled = request.submitted; btn.textContent = "Save monitored files"; }
+          setMonitorStatus(request.submitted ? "Monitoring request outcome uncertain after a network error. Inspect workflow runs before retrying." : "Could not verify the monitoring workflow. Nothing was submitted; retry Save.", "err");
           return;
         }
         if (btn) { btn.disabled = false; btn.textContent = "Save monitored files"; }
         setMonitorStatus("Network error: " + esc(String(e && e.message || e)), "err");
       } finally {
-        if (request && linuxMonitoringContextCurrent(request) && linuxMonitoringRequest === request) renderLinuxPrerequisites();
+        if (!request.submitted && request.status === "submitting") {
+          request.status = "blocked";
+          if (linuxMonitoringRequest === request) updateMonitorUi();
+        }
+        if (request && monitoringRequestCurrent(request) && linuxMonitoringRequest === request) {
+          if (btn && ["blocked", "rejected"].includes(request.status)) { btn.disabled = false; btn.textContent = "Save monitored files"; }
+          renderLinuxPrerequisites();
+        }
       }
     }
     async function linuxSaveRestriction(){
       const canonical = "ni/labview-ci-cd-toolkit";
-      if (repo.toLowerCase() === canonical) return "The tooling source cannot use client Reconfigure or the installer. Change monitoring through a reviewed source PR.";
       try {
         const response = await fetch(api(""), { cache:"no-cache", headers:updHeaders() });
         if (!response.ok) return "Cannot verify repository eligibility; no monitoring request submitted.";
         const metadata = await response.json();
-        if (String(metadata.full_name || "").toLowerCase() === canonical) return "The tooling source cannot use client Reconfigure or the installer. Change monitoring through a reviewed source PR.";
         if (String(metadata.full_name || "").toLowerCase() !== repo.toLowerCase()) return "Repository identity is unknown; no monitoring request submitted.";
         if (typeof metadata.fork !== "boolean") return "Repository ancestry is unknown; no monitoring request submitted.";
         if (metadata.fork && [metadata.parent, metadata.source].some(item => !item || typeof item.full_name !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(item.full_name))) return "Fork ancestry is incomplete; no monitoring request submitted.";
-        if ([metadata.parent, metadata.source].some(item => item && String(item.full_name || "").toLowerCase() === canonical)) return "This is a fork of the tooling source. Use a reviewed source PR, not client Reconfigure or the installer.";
+        const sourceRepository = repo.toLowerCase() === canonical || [metadata.parent, metadata.source].some(item => item && String(item.full_name || "").toLowerCase() === canonical);
+        if (sourceRepository) {
+          if (typeof metadata.default_branch !== "string" || !metadata.default_branch) return "Cannot verify the source default branch; nothing submitted.";
+          const headResponse = await fetch(api("/commits/" + encodeURIComponent(metadata.default_branch)), {cache:"no-cache", headers:updHeaders()});
+          const head = headResponse.ok && await headResponse.json();
+          if (!head || !/^[a-f0-9]{40}$/.test(head.sha || "")) return "Cannot verify the source revision; nothing submitted.";
+          const workflowResponse = await fetch(api("/contents/.github/workflows/reconfigure.yml?ref=" + head.sha), {cache:"no-cache", headers:{...updHeaders(), Accept:"application/vnd.github.raw+json"}});
+          const workflow = workflowResponse.ok ? await workflowResponse.text() : "";
+          if (!workflow.includes("# source-monitoring-only-v1") || !workflow.includes("IN_MONITORING_ONLY: ${{ inputs.monitoring_only }}") || !workflow.includes("IN_EXPECTED_SHA: ${{ inputs.expected_sha }}")) return "The tooling source needs the monitoring-only Save update before it can open a reviewed source PR. Nothing submitted.";
+          return {ref:metadata.default_branch, inputs:{monitoring_only:"true", expected_sha:head.sha}};
+        }
         return "";
       } catch (_) { return "Cannot verify repository eligibility; no monitoring request submitted."; }
     }
@@ -1887,6 +2060,30 @@
     // Single source of truth for a package's status in one worker column. Returns
     // { state:'present'|'missing'|'na'|'', title }. statusCell renders it and the
     // per-file header pill rolls it up, so the cells and the pill never disagree.
+    function effectiveToolingPin(pkg, vipc, col){
+      if (!vipc || vipc.role !== "core" || !col) return pkg;
+      const identity = value => String(value).match(/^(.+?)-v?(\d+(?:\.\d+)+[\w.+-]*)$/i);
+      const baseline = identity(pkg);
+      if (!baseline) return pkg;
+      const selected = file => file.monitored !== false && file.configured !== false
+        && (!Array.isArray(file.monitorOn) || file.monitorOn.includes(col.key));
+      const pins = new Set();
+      for (const file of currentVipcs.filter(file => file.role !== "core" && selected(file))) {
+        for (const value of file.packages || []) {
+          const match = identity(value);
+          if (match && match[1].toLowerCase() === baseline[1].toLowerCase()) pins.add(match[1].toLowerCase() + "-" + match[2]);
+        }
+      }
+      const section = generatedInventory && generatedInventory.sha === selectedRevision && generatedInventory.dragon;
+      for (const file of section && section.files || []) {
+        if (!selected(file) || file.error) continue;
+        for (const dep of file.dependencies || []) {
+          if ((dep.manager || "vipm") === "vipm" && String(dep.package_id).toLowerCase() === baseline[1].toLowerCase() && dep.declared_version)
+            pins.add(baseline[1].toLowerCase() + "-" + dep.declared_version);
+        }
+      }
+      return pins.size === 1 ? [...pins][0] : pkg;
+    }
     function pkgCellState(pkg, colState, vipc, col){
       if (!pkg) return { state:"" };
       if (vipc && col && Array.isArray(vipc.monitorOn) && vipc.monitorOn.indexOf(col.key) === -1) return { state:"na", title:'Not monitored for ' + (MONITOR_LABELS[col.key] || col.key) };
@@ -1896,9 +2093,9 @@
       if (freshness && freshness.status !== "current") return { state:"missing", title:localFreshnessText(colState) };
       if (colState.label === "base" || colState.label === "none") return { state:"missing", title:'No dependency worker is baked for this platform yet -- run the container update' };
       if (!colState.ready) return { state:"missing", title:'Worker dependency manifest has not been published yet -- run the container update' };
-      // Version-tolerant: a baked build of the same package satisfies a
-      // differently-versioned VIPC request (VIPM installs one version per package).
-      if (colState.installer === "lvpm" ? colState.packages.has(pkg) : pkgInSet(pkg, colState.packages)) return { state:"present", title:colState.label };
+      const effective = colState.installer === "lvpm" ? pkg : effectiveToolingPin(pkg, vipc, col);
+      if (colState.installer === "lvpm" ? colState.packages.has(effective) : pkgInSet(effective, colState.packages))
+        return { state:"present", title:effective === pkg ? colState.label : 'Project-selected version installed: ' + effective };
       return { state:"missing", title:'Not baked into this worker yet -- run the container update' };
     }
     function statusCell(pkg, colState, vipc, col){
@@ -1934,7 +2131,8 @@
       if (freshness && freshness.status !== "current") return missingCell(localFreshnessText(st));
       if (!st || !st.ready) return simpleCell(null);
       if (dep.labview) return st.labview ? simpleCell(true, 'LabVIEW ' + st.labview) : simpleCell(null);
-      if (lvpm && st.nipkg_ready !== true) return '<td class="cell" title="Native packages were not inventoried for this LVPM worker"><span aria-label="Unknown: native package not inventoried">Unknown</span></td>';
+      if (dep.key === "vipm" && st.vipm_verified === true) return simpleCell(true, "VIPM CLI verified against target LabVIEW");
+      if (st.nipkg_ready !== true) return '<td class="cell" title="Installed native packages were not inventoried for this worker; rebuild to refresh coverage"><span aria-label="Unknown: native package not inventoried">Unknown</span></td>';
       const wanted = ((dep.packages || {})[col.platform] || []).map(p => p.toLowerCase());
       const found = (st.nipkg || []).find(p => wanted.includes(String(p.name || '').toLowerCase()));
       return found ? simpleCell(true, found.version || found.name) : simpleCell(false, 'missing');
@@ -2140,7 +2338,7 @@
       const generatedVipcs = (data.vipc || []).map(v => {
         const cls = classifyVipc(v.path, vipcConfig, vipcHasConfig);
         const tooling = v.tooling === true || cls.role === 'core';
-        const cap = v.role === 'capability' || cls.role === 'capability';
+        const cap = cls.role === 'capability';
         return { path:v.path, role:v.role || cls.role || (tooling ? 'core' : 'project'), tooling, configured:tooling ? true : (cap ? (v.configured !== false) : cls.configured), monitored:tooling ? true : (cap ? (v.monitored !== false) : cls.monitored), monitorOn:tooling ? MONITOR_PLATFORMS.slice() : (cap ? (Array.isArray(v.monitorOn) ? v.monitorOn : cls.monitorOn) : cls.monitorOn), locked:tooling || cls.locked, packages:v.packages || [], error:v.error || "", open:false };
       });
       const dragonFiles = Array.isArray(data.dragon)
@@ -2155,12 +2353,12 @@
       currentDragons = generatedDragons;
       monitorDirty = false;
       const platformStates = {};
-      (data.platforms || []).forEach(p => { platformStates[p.key] = { tag:p.tag || 'base', label:p.version || p.tag || 'base', installer:p.installer || 'vipm', ready:p.ready !== false, packages:new Set(p.packages || []), nipkg_ready:p.nipkg_ready !== false && Array.isArray(p.nipkg_packages), nipkg:p.nipkg_packages || [], nipkgNames:new Set((p.nipkg_packages || []).map(x => String(x.name || '').toLowerCase())), labview:p.labview_version || '' }; });
+      (data.platforms || []).forEach(p => { platformStates[p.key] = { tag:p.tag || 'base', label:p.version || p.tag || 'base', installer:p.installer || 'vipm', vipm_verified:p.vipm_verified === true, ready:p.ready !== false, packages:new Set(p.packages || []), nipkg_ready:p.nipkg_ready !== false && Array.isArray(p.nipkg_packages), nipkg:p.nipkg_packages || [], nipkgNames:new Set((p.nipkg_packages || []).map(x => String(x.name || '').toLowerCase())), labview:p.labview_version || '' }; });
       platformStates.nipmDeps = data.nipm || [];
       const colStates = {};
       (data.columns || []).forEach(col => {
         const known = COLS.find(c => c.key === col.key) || {};
-        if (!platformStates[col.key]) platformStates[col.key] = { tag:col.tag || 'base', label:col.nipkg_version || col.version || col.tag || 'base', installer:col.installer || 'vipm', ready:col.ready !== false, packages:new Set(col.packages || []), nipkg_ready:col.nipkg_ready !== false && Array.isArray(col.nipkg_packages), nipkg:col.nipkg_packages || [], nipkgNames:new Set((col.nipkg_packages || []).map(x => String(x.name || '').toLowerCase())), labview:col.labview_version || '' };
+        if (!platformStates[col.key]) platformStates[col.key] = { tag:col.tag || 'base', label:col.nipkg_version || col.version || col.tag || 'base', installer:col.installer || 'vipm', vipm_verified:col.vipm_verified === true, ready:col.ready !== false, packages:new Set(col.packages || []), nipkg_ready:col.nipkg_ready !== false && Array.isArray(col.nipkg_packages), nipkg:col.nipkg_packages || [], nipkgNames:new Set((col.nipkg_packages || []).map(x => String(x.name || '').toLowerCase())), labview:col.labview_version || '' };
         colStates[col.key] = markLinuxVipcPending(known, {
           installer: col.installer || (String(col.tag || "").startsWith("linux-lvpm-") ? "lvpm" : "vipm"),
           tag: col.tag || "base",
@@ -2227,7 +2425,7 @@
         const generated = await fetchJson(base + "dependencies/index.json");
         if (generated && Array.isArray(generated.vipc)) generatedInventory = generated;
       } catch (_) {}
-      const commits = await listCommits().catch(e => { $("status").textContent = e.message; return []; });
+      const commits = includeCurrentDependencyRevision(await listCommits().catch(e => { $("status").textContent = e.message; return []; }));
       const params = new URLSearchParams(location.search);
       const requestedSha = params.get("sha") || "";
       const generatedSha = generatedInventory && generatedInventory.sha;

@@ -62,6 +62,17 @@ image and run, so they never execute against a worker that is missing a project
 dependency. The `ci-tooling.vipc` distributed by the tooling is the **base**
 configuration applied after required project dependencies.
 
+### Linux dependency installation
+
+The Linux Dockerfile uses the official VIPM 26.3.2 (4056) Debian installer; the
+older 3954 reader can omit legacy OGP packages from final inventory. The trusted
+`linux-worker.py` helper stages the selected VIPCs and exact public Dragon VIPM
+pins, recording source and generated hashes. Unsupported NIPM/feed requirements,
+embedded VIPC references and conflicting project versions fail before installation.
+The hook parses XML structurally, so compact VIPC exports work. Final target-bound
+inventory must include every effective toolkit and project pin. Linux native
+package inventory is captured with `dpkg-query` and published for the dashboard.
+
 ### Required Windows Dragon declarations
 
 The worker workflow discovers project `.dragon` files when there is no explicit
@@ -148,8 +159,8 @@ requested LabVIEW year and bitness. A later tooling upgrade of a required pin,
 missing package, dead engine, unreadable inventory, or wrong target fails the
 worker build. Reconcile conflicting declarations; the installer does not choose
 the newest version or rewrite project pins. `VIPM_ALLOW_MISSING_PACKAGES=1` does
-not bypass Dragon installation or final verification. Existing optional tooling
-policy is unchanged, except it cannot invalidate a required Dragon root.
+not bypass Dragon installation or final verification. Earlier tooling installation attempts may warn and retry, but the final inventory
+must satisfy every effective selected tooling and project requirement.
 
 These are source and regression-test guarantees. A real Windows vendor bake and
 its final published inventory are still required before claiming that a specific
@@ -185,17 +196,13 @@ add-on must never be able to break the whole worker:
 2. **Project VIPCs are required.** Any discovered project `*.vipc` (the OpenG /
    domain dependencies the project's VIs load against) must install or the build
    fails.
-3. **Tooling VIPCs (`ci-tooling*.vipc`) are best-effort.** Their add-ons
-   (Antidoc, LUnit base + CLI, VI Tester) are opportunistic: if one wedges
-   the headless VIPM engine — Antidoc's large dependency tree is the known offender
-   — the script warns and continues, and the image is still published. The required
-   essentials above are already installed. A seed-only worker copy does not apply
-   this install hook; rebuild the project worker to bake Caraya and its required
-   project dependencies. Bake a wedge-prone
-   add-on from its own dedicated VIPC if you need it guaranteed in the worker.
+3. **Tooling retries continue, then the final gate verifies the complete set.**
+   An initial `ci-tooling.vipc` failure does not prevent remaining recovery attempts.
+   Before publishing, every effective baseline, project, capability and Dragon pin
+   must be present in the target inventory. Project pins override baseline versions.
+   An incomplete tooling install now fails even when the project VIPC succeeded.
 
-This ordering is why the main `build-labview-image.yml` produces a working,
-UTF-capable image even when Antidoc cannot currently be baked headless.
+This ordering protects required project installs while the final gate prevents publishing an incomplete worker.
 
 To add **custom** project dependencies: commit a `.vipc` (typically created in
 the VIPM editor) at the repo root or under
@@ -477,7 +484,7 @@ changed shape vs. the older `2026.1.0` build — mind the differences:**
 | `VIPM_DESKTOP_LIVELINESS_TIMEOUT` | `= VIPM_TIMEOUT` (900) | Seconds of Desktop silence the CLI tolerates before declaring `made no progress ... VIPM Desktop may be stuck` (its default is 60s). Large packages (e.g. `wovalab_lib_asciidoc_for_labview`) run post-install actions that are silently busy for minutes; the script raises this to the per-operation timeout so a healthy install is not aborted. |
 | `VIPM_REQUIRED_PACKAGES` | Caraya + UTF JUnit essentials | Comma/semicolon list of `name@version` installed FIRST as required (build fails if they fail). Default: `ni_lib_utf_junit_report@1.0.1.43,ni_lib_junit_results_api@1.0.1.6,ni_lib_simple_xml@1.0.0.4,jki_lib_caraya@1.4.4.148`. Set to `-` to disable the required pre-install. |
 | `VIPM_PUBLIC_REPO_URL` | this repo's clone URL | Public Git repo `origin` used to satisfy Community Edition's public-repo requirement. |
-| `VIPM_ALLOW_MISSING_PACKAGES` | _(unset)_ | Set to `1` only for emergency best-effort builds; otherwise a failed REQUIRED package fails the image build. (Best-effort `ci-tooling*.vipc` add-ons never fail the build regardless.) |
+| `VIPM_ALLOW_MISSING_PACKAGES` | _(unset)_ | Set to `1` only for emergency best-effort builds; otherwise a failed REQUIRED package fails the image build. It does not bypass the final selected tooling/project inventory gate. |
 | `GIT_INSTALLER_URL` | Git for Windows 2.54.0 installer | Full Git for Windows installer used before the MinGit fallback. |
 | `NO_COLOR` | `1` | Strip ANSI color from logs. |
 | `LABVIEW_VERSION` | `2026` | Target LabVIEW year for `--labview-version`. |
@@ -501,7 +508,7 @@ changed shape vs. the older `2026.1.0` build — mind the differences:**
 | `error: unexpected argument '--labview-version' found` (exit 2) | Global options must go **before** the `install` subcommand: `vipm --labview-version 2026 install <pkgs>`. The script also falls back to the bare form (active target from `Settings.ini`). |
 | `Applying VI Package Configuration ...` followed by `No packages were installed` with exit 0 | Treat it as a no-op failure, not success. The script forces fallback to parsed package specs and then local public-index package files. |
 | Package install reports "not found" | In Free/Community Windows containers this usually means VIPM's resolver index is empty even after `refresh`. The script falls back to direct public-index `.vip` / `.ogp` downloads and local-file installs; if that also fails, check package URLs, MD5s, and whether the package is in a custom/private repo. |
-| `[VIPM] ... Executing PostInstall Custom Action` then timeout | The package's own post-install VI did not return. `VIPM_NONINTERACTIVE` only controls CLI prompts, and VIPM 26.3 exposes no supported way to skip package scripts. The Linux hook preserves package contents, prints its phase/process/display diagnostics, and fails the image build rather than publishing an incomplete worker. Use a headless-compatible package release or resolve the package's install action upstream. |
+| `[VIPM] ... Executing PostInstall Custom Action` then timeout | Both Linux Dockerfiles install and smoke-test the Ruby/Asciidoctor native toolchain before package hooks, avoiding the interactive sudo-configuration dialog. Linux builds also pre-create the Wovalab donation-dialog opt-out file, `~/natinst/LabVIEW Data/wovalab-post-install-dialog`, before starting LabVIEW. This suppresses its optional prompt without skipping the post-install VI. Other blocked hooks still fail: The package's own post-install VI did not return. `VIPM_NONINTERACTIVE` only controls CLI prompts, and VIPM 26.3 exposes no supported way to skip package scripts. The Linux hook preserves package contents, prints its phase/process/display diagnostics, and fails the image build rather than publishing an incomplete worker. Use a headless-compatible package release or resolve the package's install action upstream. |
 
 ---
 

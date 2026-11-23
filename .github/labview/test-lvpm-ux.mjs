@@ -19,6 +19,7 @@ const candidate = {
 const elements = new Map();
 const requests = [];
 let responseCandidate = candidate;
+let responseProposals = [];
 let activeConfig = 'config:\n  container:\n    linuxUse: "' + tag + '@' + digest + '"\n';
 let failMetadata = false;
 let workflowResponse = 'available';
@@ -73,8 +74,20 @@ const context = vm.createContext({
         { type:'file', path:'.github/workflows/build-labview-lvpm-image.yml' }
       ] };
     }
+    if (url.includes('/pulls?')) return {ok:true, json:async () => responseProposals};
     if (url.includes('latest.json')) return { ok:true, json:async () => ({ tag, manifest_path:candidate.manifest_path, image_digest:digest }) };
     if (url.includes('manifest.json')) return { ok:true, json:async () => responseCandidate };
+    if (new URL(url).hostname === 'raw.githubusercontent.com' && (options.headers?.Authorization || options.headers?.['X-GitHub-Api-Version'])) throw new TypeError('Load failed');
+    if (url.includes('/contents/.github/') && new URL(url).searchParams.has('ref')) {
+      assert.equal(new URL(url).hostname, 'api.github.com');
+      assert.match(new URL(url).searchParams.get('ref'), /^[a-f0-9]{40}$/);
+      assert.equal(options.headers.Authorization, 'Bearer test-token');
+      assert.equal(options.headers.Accept, 'application/vnd.github.raw+json');
+      return { ok:rawConfigStatus === 200, status:rawConfigStatus, text:async () => {
+        if (rawTextBarrier) await rawTextBarrier;
+        return url.includes('/.github/workflows/') ? reviewedWorkflowOverride ?? fs.readFileSync(new URL('workflows/' + new URL(url).pathname.split('/').at(-1),root),'utf8') : activeConfig;
+      }};
+    }
     if (new URL(url).hostname === 'raw.githubusercontent.com') return { ok:rawConfigStatus === 200, status:rawConfigStatus, text:async () => { if (rawTextBarrier) await rawTextBarrier; return url.includes('/.github/workflows/') ? reviewedWorkflowOverride ?? fs.readFileSync(new URL('workflows/' + url.split('/').at(-1),root),'utf8') : activeConfig; } };
     if (options.method === 'POST') {
       if (postBarrier) await postBarrier;
@@ -85,7 +98,7 @@ const context = vm.createContext({
   }
 });
 const fixtureSource = source.replace('    init();', `
-    globalThis.hooks = { parseManifestYaml, resolveColumn, packagesInManifest, pkgCellState,
+    globalThis.hooks = { classifyVipc, monitorMap, parseManifestYaml, resolveColumn, packagesInManifest, pkgCellState,
       candidateSelection, loadLinuxBuildAvailability, linuxWorkflowPayload, dispatchLinuxWorker, dispatchContainerUpdate, loadManifestFor, updTargets, renderLinuxInstaller, nipmCell, enrichPlatformState,
       pollLinuxOperation, validateLinuxRun, invalidateLinuxOperation, getLinuxOperation:() => linuxOperation,
       lvpmFreshness, localFreshnessText, loadPlatformStates, renderGenerated, renderContainers,
@@ -94,7 +107,7 @@ const fixtureSource = source.replace('    init();', `
       monitorCounts, monitorInputs, dispatchMonitor, openUpdateApprovalDialog, loadRevision,
       renderLinuxPrerequisites, checkLinuxMonitoringHead,
       runLinuxPrimaryAction, committedMonitoringMatches, linuxMonitoringContext, linuxSaveRestriction,
-      verifiedLinuxUpdateTarget, linuxReviewedWorkflow, updateIntent:() => linuxUpdateIntent,
+      verifiedLinuxUpdateTarget, linuxReviewedWorkflow, includeCurrentDependencyRevision, updateIntent:() => linuxUpdateIntent,
       cancelLinuxUpdateApproval,
       acceptedMonitoring:() => { linuxMonitoringRequest = {...linuxMonitoringContext(),status:'accepted'}; },
       headCheck:() => linuxHeadCheck,
@@ -193,7 +206,7 @@ assert.equal(hooks.pkgCellState('actual-1.2', state).state, 'present');
 assert.equal(hooks.pkgCellState('actual-9.0', state).state, 'missing');
 const linuxColumn = { platform:'linux' };
 const nativeState = hooks.enrichPlatformState({ tag:tag + '@' + digest }, { ...candidate, labview_version:'2026' });
-const analyzer = { key:'via', platforms:['windows', 'linux'], packages:{ linux:['ni-vialin-labview-support'] } };
+const analyzer = { key:'via', platforms:['windows', 'linux'], packages:{ linux:['ni-vialinux-labview-support'] } };
 assert.equal(nativeState.nipkg_ready, false);
 assert.match(hooks.nipmCell({ key:'labview', labview:true }, linuxColumn, nativeState), /aria-label="Present"/);
 assert.match(hooks.nipmCell({ key:'vipm' }, linuxColumn, nativeState), /N\/A/);
@@ -201,9 +214,21 @@ const unknownAnalyzer = hooks.nipmCell(analyzer, linuxColumn, nativeState);
 assert.match(unknownAnalyzer, /Unknown: native package not inventoried/);
 assert.doesNotMatch(unknownAnalyzer, /dep-missing|Missing dependency/);
 assert.match(hooks.nipmCell({ key:'utf', platforms:['windows'] }, linuxColumn, nativeState), /N\/A/);
-const emptyNativeState = hooks.enrichPlatformState({ tag:tag + '@' + digest }, { ...candidate, labview_version:'2026', nipkg_packages:[] });
+const emptyNativeState = hooks.enrichPlatformState({ tag:tag + '@' + digest }, { ...candidate, labview_version:'2026', dpkg_packages:[] });
 assert.equal(emptyNativeState.nipkg_ready, true);
 assert.match(hooks.nipmCell(analyzer, linuxColumn, emptyNativeState), /Missing dependency/);
+// Available feed records from older Windows manifests cannot claim installation.
+const windowsColumn = { platform:'windows' };
+const legacyNative = {platform:'windows', labview_version:'2026', nipkg_packages:[{name:'ni-viawin-labview-support',version:'26.3'}]};
+const windowsAnalyzer = {key:'via', packages:{windows:['ni-viawin-labview-support']}};
+const legacyState = hooks.enrichPlatformState({key:'windows',tag:'latest'}, legacyNative);
+assert.equal(legacyState.nipkg_ready, false);
+assert.match(hooks.nipmCell(windowsAnalyzer,windowsColumn,legacyState), /Unknown: native package not inventoried/);
+const installedNative = {...legacyNative, nipkg_inventory:{source:'nipkg list-installed',status:'observed'}};
+assert.match(hooks.nipmCell(windowsAnalyzer,windowsColumn,hooks.enrichPlatformState({key:'windows',tag:'latest'},installedNative)), /aria-label="Present"/);
+const cliNative = {...installedNative, vipm_inventory:{status:'observed',target_verified:true}};
+assert.match(hooks.nipmCell({key:'vipm'},windowsColumn,hooks.enrichPlatformState({key:'windows',tag:'latest'},cliNative)), /aria-label="Present"/);
+assert.match(hooks.nipmCell({key:'vipm'},windowsColumn,hooks.enrichPlatformState({key:'windows',tag:'latest'},{...cliNative,vipm_inventory:{status:'observed',target_verified:false}})), /Missing dependency/);
 const manifestStart = requests.length;
 assert.equal((await hooks.loadManifestFor(tag + '@' + digest, 'linux')).image_digest, digest);
 assert.ok(requests.slice(manifestStart).every(request => !request.url.includes('latest.json')));
@@ -395,7 +420,7 @@ for (const id of ['vipcWrap', 'nipmWrap', 'systemWrap', 'dragonWrap']) elements.
 for (const testCase of freshnessCases) {
   const ready = testCase.status === 'current';
   hooks.setState({ candidate, revision:testCase.revision, config:{ use:'base', linuxUse:selection }, inventory:testCase.inventory });
-  const enriched = hooks.enrichPlatformState({ key:'linux', tag:selection }, { ...candidate, labview_version:'2026', nipkg_packages:[] });
+  const enriched = hooks.enrichPlatformState({ key:'linux', tag:selection }, { ...candidate, labview_version:'2026', dpkg_packages:[] });
   assert.equal(enriched.freshness.status, testCase.status, testCase.name);
   assert.equal(enriched.ready, ready, testCase.name);
   assert.equal(hooks.pkgCellState('actual-1.2', enriched).state, ready ? 'present' : 'missing', testCase.name);
@@ -441,10 +466,24 @@ hooks.setState({ candidate, revision:'e'.repeat(40), inventory:inventoryFor() })
 assert.equal(hooks.pkgCellState('actual-1.2', reusedState).state, 'missing');
 assert.equal(hooks.lvpmFreshness(reusedState).status, 'unknown');
 hooks.setState({ candidate });
-const vipmState = hooks.enrichPlatformState({ key:'linux', tag:'vipm-existing', ready:false }, { vipc:[{ packages:['actual-1.2'] }] });
+const vipmState = hooks.enrichPlatformState({ key:'linux', tag:'vipm-existing', ready:false }, {
+  vipc:[{ packages:['declared-only-1.0'] }], vipm_packages:[{name:'actual',version:'v1.2'}]
+});
 assert.equal(vipmState.ready, true);
-assert.equal(hooks.pkgCellState('actual-9.0', vipmState).state, 'present');
+assert.equal(hooks.pkgCellState('actual-1.2', vipmState).state, 'present');
+assert.equal(hooks.pkgCellState('actual-9.0', vipmState).state, 'missing');
+assert.equal(hooks.pkgCellState('declared-only-1.0', vipmState).state, 'missing');
+assert.deepEqual([...hooks.packagesInManifest({vipc:[{packages:['actual-1.2']}],copied_from_base:true})], []);
+assert.equal(hooks.enrichPlatformState({key:'windows'}, {vipm_inventory:{status:'unavailable'}}).ready, false);
 assert.equal(hooks.lvpmFreshness(vipmState), null);
+const coreFixture = {role:'core',monitorOn:['linux'],packages:['actual-1.0']};
+hooks.setState({vipcs:[coreFixture,{role:'project',configured:true,monitored:true,monitorOn:['linux'],packages:['actual-1.2']}]});
+assert.equal(hooks.pkgCellState('actual-1.0', vipmState, coreFixture, {key:'linux'}).state, 'present');
+assert.equal(hooks.pkgCellState('actual-1.0', {...vipmState,packages:new Set(['actual-1.0'])}, coreFixture, {key:'linux'}).state, 'missing');
+hooks.setState({vipcs:[coreFixture,{role:'project',configured:true,monitored:true,monitorOn:['windows'],packages:['actual-1.2']}]});
+assert.equal(hooks.pkgCellState('actual-1.0', vipmState, coreFixture, {key:'linux'}).state, 'missing');
+hooks.setState({vipcs:[]});
+
 const dragonPath = 'project.dragon';
 const monitoredDragon = { path:dragonPath, monitored:true, monitorOn:['linux'] };
 function dragonInventory(file, available = true){
@@ -903,9 +942,10 @@ function progressFixture(){
   commitResponses = [];
   elements.set('lvpmStatus', uiElement());
   elements.set('lvpmRunLink', uiElement());
+  elements.set('lvpmActivationLink', {...uiElement(), hidden:true});
   for (const id of ['lvpmProgress','lvpmProgressPhase','lvpmProgressBar']) elements.set(id, uiElement());
   elements.get('lvpmProgress').hidden = true;
-  for (const id of ['lvpmBuild','lvpmActivate','lvpmReset']) elements.set(id, {disabled:false});
+  for (const id of ['lvpmBuild','lvpmActivate','lvpmReset']) elements.set(id, {...uiElement(), disabled:false});
   return requests.length;
 }
 const postCount = start => requests.slice(start).filter(request => request.options.method === 'POST').length;
@@ -979,25 +1019,68 @@ for (const conclusion of ['success','cancelled','timed_out','action_required','n
   progressStart = progressFixture();
   runResponse = {...identifiedRun, status:'completed', conclusion};
   const configBefore = plain(candidate);
+  responseCandidate = {...candidate, workflow_run:{...candidate.workflow_run,id:123}};
   await hooks.dispatchLinuxWorker('build');
-  assert.match(elements.get('lvpmStatus').textContent, conclusion === 'success' ? /Build workflow succeeded\. Refresh to check for a published candidate/ : new RegExp('Workflow ' + conclusion));
-  assertLinuxProgress(conclusion === 'success' ? 'Workflow succeeded · review required' : conclusion === 'cancelled' ? 'Workflow cancelled' : conclusion === 'timed_out' ? 'Workflow failed · inspect logs' : 'Workflow did not succeed · inspect logs', conclusion === 'success' ? 'ok' : 'err', false);
+  assert.match(elements.get('lvpmStatus').textContent, conclusion === 'success' ? /New LVPM worker ready/ : new RegExp('Workflow ' + conclusion));
+  assertLinuxProgress(conclusion === 'success' ? 'Build succeeded — ready to use' : conclusion === 'cancelled' ? 'Workflow cancelled' : conclusion === 'timed_out' ? 'Workflow failed · inspect logs' : 'Workflow did not succeed · inspect logs', conclusion === 'success' ? 'ok' : 'err', false);
   assert.equal(postCount(progressStart), 1);
   assert.equal(runPoll, null);
   assert.deepEqual(plain(candidate), configBefore);
-  assert.equal(requests.slice(progressStart).filter(request => request.url.includes('manifest.json')).length, 0);
+  assert.equal(requests.slice(progressStart).filter(request => request.url.includes('manifest.json')).length, conclusion === 'success' ? 1 : 0);
   assert.doesNotMatch(elements.get('lvpmStatus').textContent, /^(Candidate verified|CI activities passed|Activation complete)/);
   progressCases++;
 }
+responseCandidate = candidate;
+responseProposals = [{number:44,state:'open',head:{ref:'labview-ci/reconfigure-123',repo:{full_name:'owner/project'}},base:{ref:'trunk',repo:{full_name:'owner/project'}}}];
 for (const action of ['activate','reset']) {
   progressStart = progressFixture();
   runResponse = {...identifiedRun, path:'.github/workflows/reconfigure.yml', status:'completed', conclusion:'success'};
   await hooks.dispatchLinuxWorker(action);
-  assert.match(elements.get('lvpmStatus').textContent, /Reconfigure workflow succeeded.*only merging the proposal applies/);
-  assertLinuxProgress('Workflow succeeded · review required', 'ok', false);
+  assert.match(elements.get('lvpmStatus').textContent, /Merge this pull request to activate the worker/);
+  assertLinuxProgress('Worker change ready — merge to activate', 'ok', false);
+  assert.equal(elements.get('lvpmActivationLink').href, 'https://github.com/owner/project/pull/44');
+  assert.equal(elements.get('lvpmActivationLink').hidden, false);
   assert.equal(postCount(progressStart), 1);
   progressCases++;
 }
+// An older candidate must not masquerade as the newly completed build.
+progressStart = progressFixture();
+runResponse = {...identifiedRun,status:'completed',conclusion:'success'};
+responseCandidate = candidate; // run 42, while we dispatched 123
+await hooks.dispatchLinuxWorker('build');
+assertLinuxProgress('Build succeeded — loading new worker', '', true);
+assert.doesNotMatch(elements.get('lvpmReview').innerHTML, /id="lvpmActivate"/);
+assert.equal(typeof runPoll, 'function');
+responseCandidate = {...candidate,workflow_run:{...candidate.workflow_run,id:123}};
+await runPoll();
+assertLinuxProgress('Build succeeded — ready to use', 'ok', false);
+const readyMarkup = elements.get('lvpmReview').innerHTML;
+assert.ok(readyMarkup.indexOf('Use this worker') < readyMarkup.indexOf('<details>'));
+assert.match(readyMarkup, /Merge it to make this image the Linux worker/);
+assert.equal(postCount(progressStart), 1); // discovery never dispatches activation
+assert.equal(runPoll, null);
+
+// Failed publication/discovery is bounded, and never offers the old image.
+progressFixture();
+responseCandidate = candidate;
+runResponse = {...identifiedRun,status:'completed',conclusion:'success'};
+await hooks.dispatchLinuxWorker('build');
+for(let i=1;i<12;i++) await runPoll();
+assertLinuxProgress('Build succeeded — image not available yet', 'warn', false);
+assert.equal(runPoll,null);
+assert.match(elements.get('lvpmReview').innerHTML,/Check for new worker/);
+assert.doesNotMatch(elements.get('lvpmReview').innerHTML,/id="lvpmActivate"/);
+
+// A similarly named PR from another repository is never linked as our activation.
+progressFixture();
+responseProposals = [{number:44,state:'open',head:{ref:'labview-ci/reconfigure-123',repo:{full_name:'other/project'}},base:{ref:'trunk',repo:{full_name:'owner/project'}}}];
+runResponse = {...identifiedRun,path:'.github/workflows/reconfigure.yml',status:'completed',conclusion:'success'};
+await hooks.dispatchLinuxWorker('activate');
+assert.equal(elements.get('lvpmActivationLink').hidden,true);
+assert.match(elements.get('lvpmStatus').textContent,/Open its run below for the pull request/);
+responseProposals = [];
+responseCandidate = candidate;
+
 for (const invalid of [
   null, {}, {...acceptedDetails, workflow_run_id:'123'}, {...acceptedDetails, workflow_run_id:-1},
   {...acceptedDetails, run_url:'https://api.github.com/repos/other/project/actions/runs/123'},
@@ -1245,7 +1328,7 @@ function prerequisiteFixture(overrides = {}){
 const prerequisiteMarkup = () => elements.get('linuxPrerequisites').innerHTML;
 const newHead = 'f'.repeat(40);
 let start;
-const actualImplicitManifest = fs.readFileSync(new URL('labview-ci.yml',root),'utf8');
+const actualImplicitManifest = fs.readFileSync(new URL('labview-ci.yml',root),'utf8').replace(/^  container:\n[\s\S]*?(?=^  \w|^\S|$(?![\s\S]))/m,'');
 const implicitConfig = hooks.parseManifestYaml(actualImplicitManifest);
 assert.equal(implicitConfig.hasVipcList,false);
 assert.equal(implicitConfig.hasDragonList,false);
@@ -1382,6 +1465,64 @@ for (const path of ['generated','live']) {
     prerequisiteCases++;
   }
 }
+// A published catalog can advance HEAD while Pages still displays the project
+// revision. Only proven release bookkeeping may bridge implicit monitoring.
+for (const tooling of ['vipm', 'lvpm']) {
+  for (const change of ['release-only', 'dependency-file', 'catalog-runtime', 'renamed', 'diverged', 'truncated-commits', 'truncated-files', 'missing-history', 'dirty']) {
+    start = prerequisiteFixture();
+    activeConfig = actualImplicitManifest;
+    hooks.setModal(modal);
+    const inspected = 'e'.repeat(40);
+    const view = installerView();
+    hooks.renderGenerated({schema:1,repo:'owner/project',sha:inspected,config:implicitConfig,
+      vipc:[{path:'project.vipc',packages:[]}],dragon:{files:[]},columns:[],system:[]});
+    if (tooling === 'lvpm') view.inputs.find(input => input.value === 'lvpm').listener();
+    if (change === 'dirty') hooks.setFileMonitor('vipc', 'project.vipc', 'linux', false);
+    const originalFetch = context.fetch;
+    context.fetch = async (url, options) => {
+      if (url.includes('/compare/')) {
+        assert.equal(url, 'https://api.github.com/repos/owner/project/compare/' + inspected + '...' + revision + '?per_page=100');
+        const files = [{filename:'.github/labview-ci/catalog.json',status:'modified'}, {filename:'.github/labview-ci/notes/fix.md',status:'removed'}];
+        if (change === 'dependency-file') files.push({filename:'project.vipc',status:'modified'});
+        if (change === 'renamed') files[0].status = 'renamed';
+        if (change === 'truncated-files') while (files.length < 300) files.push({filename:'.github/labview-ci/notes/n.md',status:'removed'});
+        return {ok:true,json:async () => ({status:change === 'diverged' ? 'diverged' : 'ahead',base_commit:{sha:inspected},merge_base_commit:{sha:inspected},
+          total_commits:change === 'truncated-commits' ? 200 : 1,commits:change === 'missing-history' ? [] : [{sha:revision}],files})};
+      }
+      if (url.includes('/contents/.github/labview-ci/catalog.json?ref=')) {
+        assert.equal(options.headers.Accept,'application/vnd.github.raw+json');
+        const isHead = new URL(url).searchParams.get('ref') === revision;
+        return {ok:true,text:async () => JSON.stringify({version:isHead ? '5.0.3' : '5.0.2',history:{notes:isHead ? 'new notes' : 'old notes'},containers:{base:isHead && change === 'catalog-runtime' ? 'different-image' : 'same-image'}})};
+      }
+      return originalFetch(url, options);
+    };
+    const before = plain(hooks.monitorInputs());
+    await hooks.runLinuxPrimaryAction();
+    if (hooks.updateIntent().phase === 'approval') await modalFields.get('#updConfirmApprove').onclick();
+    context.fetch = originalFetch;
+    assert.equal(postCount(start), change === 'release-only' ? 1 : 0, tooling + '/' + change + ': ' + hooks.updateIntent().message);
+    assert.deepEqual(plain(hooks.monitorInputs()), before);
+    if (change === 'release-only') {
+      assert.equal(hooks.updateIntent().context.revision, inspected);
+      assert.equal(JSON.parse(requests.slice(start).find(r => r.options.method === 'POST').options.body).inputs.expected_sha, revision);
+    }
+    hooks.invalidateLinuxOperation();
+    prerequisiteCases++;
+  }
+}
+prerequisiteFixture();
+for (const existing of [false, true]) {
+  const history = [{sha:'e'.repeat(40),message:'Project revision',project:true}];
+  if (existing) history.unshift({sha:revision,message:'Tooling update',project:false,depOnly:true});
+  const before = JSON.stringify(history);
+  const options = hooks.includeCurrentDependencyRevision(history);
+  assert.equal(options[0].sha,revision);
+  assert.equal(options[0].project,true);
+  assert.equal(options[0].depOnly,false);
+  assert.equal(options.filter(option => option.sha === revision).length,1);
+  assert.equal(JSON.stringify(history),before);
+  prerequisiteCases++;
+}
 const actualSourceFiles = fs.readdirSync(new URL('../',root),{recursive:true}).filter(path => /\.(?:vipc|dragon)$/i.test(path));
 for (const tooling of ['vipm','lvpm']) {
   start = prerequisiteFixture();
@@ -1450,6 +1591,25 @@ for (const failure of ['dirty','mismatch','other-platform','worker-selection','p
   assert.doesNotMatch(prerequisiteMarkup(), /Find current|Open matching/,failure);
   prerequisiteCases++;
 }
+for (const failedPath of ['/contents/.github/labview-ci.yml', '/contents/.github/workflows/']) {
+  const start = prerequisiteFixture();
+  const realFetch = context.fetch;
+  context.fetch = async (url, options) => {
+    if (url.includes(failedPath)) throw new TypeError('Load failed');
+    return realFetch(url, options);
+  };
+  await hooks.runLinuxPrimaryAction();
+  context.fetch = realFetch;
+  assert.equal(postCount(start), 0);
+  assert.equal(hooks.updateIntent().busy, false);
+  assert.match(hooks.updateIntent().message, /Cannot load (committed settings|reviewed workflow) from GitHub/);
+  assert.match(hooks.updateIntent().message, /No update submitted/);
+  // A failed read is safe to retry; it must not leave the update button stuck.
+  await hooks.runLinuxPrimaryAction();
+  assert.equal(postCount(start), 1);
+  hooks.invalidateLinuxOperation();
+  prerequisiteCases++;
+}
 for (const tooling of ['lvpm','vipm']) {
   const file = tooling === 'lvpm' ? 'build-labview-lvpm-image.yml' : 'build-labview-linux-image.yml';
   const original = fs.readFileSync(new URL('workflows/' + file,root),'utf8');
@@ -1502,6 +1662,25 @@ for (const tooling of ['lvpm','vipm']) {
     }
   }
 }
+// Switching platforms during Save's read-only preflight must not leave Save locked.
+start = prerequisiteFixture({dirty:true});
+elements.set('saveMonitor', uiElement());
+let releaseMonitoringLookup;
+lookupBarrier = {match:url => url === 'https://api.github.com/repos/owner/project',
+  promise:new Promise(resolve => {releaseMonitoringLookup = resolve;})};
+const abandonedSave = hooks.dispatchMonitor();
+await Promise.resolve();
+hooks.selectPlatform('windows');
+releaseMonitoringLookup();
+await abandonedSave;
+assert.equal(postCount(start),0);
+assert.equal(elements.get('saveMonitor').disabled,false);
+lookupBarrier = null;
+dispatchStatus = 204;
+await hooks.dispatchMonitor();
+assert.equal(postCount(start),1);
+prerequisiteCases++;
+
 for (const sourceRepo of ['ni/LabVIEW-CI-CD-Toolkit','owner/toolkit-fork']) {
   start = prerequisiteFixture({dirty:true});
   const sourceContext = vm.createContext({...context,window:{LVCI:{repo:sourceRepo}}});
@@ -1513,8 +1692,14 @@ for (const sourceRepo of ['ni/LabVIEW-CI-CD-Toolkit','owner/toolkit-fork']) {
   await sourceHooks.runLinuxPrimaryAction();
   assert.equal(postCount(start),0);
   await sourceHooks.dispatchMonitor();
-  assert.equal(postCount(start),0);
-  assert.match(elements.get('monitorStatus').innerHTML,/tooling source|fork of/);
+  assert.equal(postCount(start),1);
+  const saved = JSON.parse(requests.slice(start).find(request => request.options.method === 'POST').options.body);
+  assert.equal(saved.ref,'trunk');
+  assert.equal(saved.inputs.monitoring_only,'true');
+  assert.equal(saved.inputs.expected_sha,revision);
+  assert.equal(sourceHooks.isMonitorDirty(),true);
+  await sourceHooks.dispatchMonitor();
+  assert.equal(postCount(start),1);
   prerequisiteCases++;
 }
 start = prerequisiteFixture({dirty:true,revision:'e'.repeat(40)});
@@ -1565,7 +1750,7 @@ for (const stage of ['repository','head','settings','workflow','actor','workflow
     if (stage === 'repository') return url === 'https://api.github.com/repos/owner/project';
     if (stage === 'head' || stage === 'revalidate-head') return url.includes('/commits/') && ++headReads === (stage === 'head' ? 1 : 2);
     if (stage === 'settings') return url.includes('/.github/labview-ci.yml');
-    if (stage === 'workflow') return url.includes('raw.githubusercontent.com') && url.endsWith('/build-labview-lvpm-image.yml');
+    if (stage === 'workflow') return url.includes('/contents/.github/workflows/build-labview-lvpm-image.yml?ref=');
     if (stage === 'actor') return url.endsWith('/user');
     if (stage === 'workflow-metadata') return url === 'https://api.github.com/repos/owner/project/actions/workflows/build-labview-lvpm-image.yml';
     return false;
@@ -1617,7 +1802,7 @@ for (const bodyStage of ['repository','HEAD','settings','workflow','actor','work
       : bodyStage === 'HEAD' ? url.includes('/commits/')
       : bodyStage === 'settings' ? settings && settingsBodies === 1
       : bodyStage === 'revalidated-settings' ? settings && settingsBodies === 2
-      : bodyStage === 'workflow' ? url.includes('raw.githubusercontent.com') && url.endsWith('.yml') && !settings
+      : bodyStage === 'workflow' ? url.includes('/contents/.github/workflows/') && !settings
       : bodyStage === 'actor' ? url.endsWith('/user') : url.endsWith('/actions/workflows/build-labview-lvpm-image.yml');
     if (!selected) return response;
     const kind = response.text ? 'text' : 'json';
@@ -1721,8 +1906,7 @@ for (const platforms of [['windows'],['windows','linux'],['linux'],[]]){
   start = prerequisiteFixture({vipcs:[file]});
   activeConfig = explicitMonitoring([file]);
   await hooks.runLinuxPrimaryAction();
-  assert.equal(postCount(start),platforms.join('+') === 'windows' ? 1 : 0);
-  if (platforms.join('+') !== 'windows') assert.match(prerequisiteMarkup(),/Cannot verify/);
+  assert.equal(postCount(start),1, platforms.join('+'));
   hooks.invalidateLinuxOperation();
   prerequisiteCases++;
 }
@@ -1816,6 +2000,54 @@ assert.equal(sourceGuardReads, 1);
 for (const functionName of ['installToRepo', 'proceedInstall']) {
   const body = integrate.slice(integrate.indexOf('async function ' + functionName + '('));
   assert.match(body.slice(0, 1000), /await toolingSourceBlock\(repo\)/);
+}
+hooks.setState({platform:'linux', vipcs:[{...projectVipc, monitorOn:['windows']}], dragons:[], columns:loaderPlatforms()});
+hooks.setFileMonitor('vipc', 'project.vipc', 'linux', true);
+assert.equal(elements.get('saveMonitor').disabled, false);
+assert.match(hooks.monitorInputs().container_vipc, /project\.vipc::windows\+linux/);
+const restrictedContext = vm.createContext({...context, window:{LVCI:{repo:'ni/LabVIEW-CI-CD-Toolkit'}}});
+vm.runInContext(fixtureSource, restrictedContext);
+for (const platform of ['windows', 'linux']) {
+  restrictedContext.hooks.setState({platform, vipcs:[{...projectVipc}], dragons:[], columns:loaderPlatforms()});
+  restrictedContext.hooks.setFileMonitor('vipc', 'project.vipc', platform, false);
+  assert.equal(elements.get('saveMonitor').disabled, false);
+  assert.match(elements.get('monitorStatus').innerHTML, /reviewed source PR/);
+  repoMetadata = {full_name:'ni/LabVIEW-CI-CD-Toolkit',default_branch:'main',fork:false};
+  const before = requests.length;
+  await restrictedContext.hooks.dispatchMonitor();
+  assert.equal(postCount(before),1);
+  assert.equal(JSON.parse(requests.slice(before).find(r => r.options.method === 'POST').options.body).inputs.monitoring_only,'true');
+}
+// Older indexes marked unselected internal VIPCs as Windows capabilities. Reconcile
+// their checkboxes from configuration before preserving the other platform in Save.
+restrictedContext.hooks.setState({platform:'linux',vipcs:[],dragons:[]});
+restrictedContext.hooks.renderGenerated({sha:revision,config:{hasVipcList:false,vipc:[]},
+  vipc:[{path:'.github/labview/experimental.vipc',role:'capability',configured:false,monitored:true,monitorOn:['windows'],packages:[]}],columns:[],dragon:{files:[]}});
+assert.equal(restrictedContext.hooks.monitorInputs().container_vipc,'.github/labview/experimental.vipc::none');
+restrictedContext.hooks.setFileMonitor('vipc','.github/labview/experimental.vipc','linux',true);
+assert.equal(restrictedContext.hooks.monitorInputs().container_vipc,'.github/labview/experimental.vipc::linux');
+
+// Source Save cannot dispatch an older unsafe workflow or continue after the user changes inputs.
+for (const workflow of ['', '# source-monitoring-only-v1', 'name: old Reconfigure']) {
+  const before = prerequisiteFixture({dirty:true});
+  restrictedContext.hooks.setState({dirty:true,vipcs:[{...projectVipc}],dragons:[]});
+  repoMetadata = {full_name:'ni/LabVIEW-CI-CD-Toolkit',default_branch:'main',fork:false};
+  reviewedWorkflowOverride = workflow;
+  await restrictedContext.hooks.dispatchMonitor();
+  assert.equal(postCount(before),0);
+  assert.match(elements.get('monitorStatus').innerHTML,/monitoring-only Save update/);
+  assert.equal(elements.get('saveMonitor').disabled,false);
+  assert.equal(elements.get('saveMonitor').textContent,'Save monitored files');
+}
+reviewedWorkflowOverride = null;
+for (const path of ['.github/labview/antidoc/antidoc.vipc','.github/labview/experimental.vipc']) {
+  for (const monitorOn of [['windows'],['linux'],['windows','linux'],[]]) {
+    const configured = hooks.monitorMap([{path,monitor:monitorOn.length > 0,monitorOn}]);
+    assert.deepEqual(plain(hooks.classifyVipc(path,configured,true).monitorOn),monitorOn);
+    restrictedContext.hooks.renderGenerated({sha:revision,config:{hasVipcList:true,vipc:[{path,monitor:monitorOn.length > 0,monitorOn}]},
+      vipc:[{path,role:'capability',monitorOn:['windows'],packages:[]}],columns:[],dragon:{files:[]}});
+    assert.equal(restrictedContext.hooks.monitorInputs().container_vipc,path + '::' + (monitorOn.join('+') || 'none'));
+  }
 }
 console.log('Linux monitoring prerequisites: ' + prerequisiteCases + ' actual-function cases; Dragon file/package details: ' + dragonDetailCases + ' renderer cases passed.');
 console.log('LVPM UX: existing dispatch/inventory/freshness/Dragon/OS-safety and monitoring regressions passed; ' + progressCases + ' dispatch identity/progress/error/duplicate/stale-context cases and ' + visualChecks + ' visual progress checks passed.');

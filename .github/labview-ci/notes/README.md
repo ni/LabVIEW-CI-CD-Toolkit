@@ -28,6 +28,9 @@ can change the version of record.
 ## Writing a good fragment
 
 Plain prose, no heading, no bullet — it becomes one entry in a list clients read.
+Keep it to one to three short, user-focused sentences. Lead with the benefit; put
+implementation details and validation logs in the PR, not the update notice.
+The page shows at most three brief highlights with full notes collapsed.
 Say what changed and what it means for them:
 
 > VI Analyzer reports now embed each VI's rendered front panel and block diagram

@@ -11,6 +11,8 @@ on:
       - '.github/labview/vipm/**'
       - '.github/labview/test-composite-actions.py'
       - '.github/labview/test-vipm-install.py'
+      - '.github/labview/test-windows-worker.ps1'
+      - '.github/labview/build-worker-manifest.py'
       - '.github/labview/dragon_deps.py'
       - '.github/labview-ci/providers/gitlab/templates/custom-image-windows.yml'
       - '.github/docker/labview-ci.Dockerfile'
@@ -29,6 +31,8 @@ on:
       - '.github/labview/vipm/**'
       - '.github/labview/test-composite-actions.py'
       - '.github/labview/test-vipm-install.py'
+      - '.github/labview/test-windows-worker.ps1'
+      - '.github/labview/build-worker-manifest.py'
       - '.github/labview/dragon_deps.py'
       - '.github/labview-ci/providers/gitlab/templates/custom-image-windows.yml'
       - '.github/docker/labview-ci.Dockerfile'
@@ -61,3 +65,7 @@ jobs:
       - name: Check VIPM bootstrap and dependency recovery without LabVIEW
         if: runner.os == 'Windows'
         run: python .github/labview/test-vipm-install.py
+      - name: Check Windows inventory and worker publication without LabVIEW
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./.github/labview/test-windows-worker.ps1

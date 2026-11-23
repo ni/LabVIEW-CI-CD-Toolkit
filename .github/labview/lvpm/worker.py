@@ -32,7 +32,8 @@ def candidate_tag(fingerprint, base_digest, build_inputs_sha256, run_id, attempt
 def build_inputs_hash(repo):
     root = Path(repo)
     paths = [root / path for path in (WORKFLOW, ".github/docker/labview-ci-lvpm.Dockerfile",
-             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py")]
+             ".github/labview/lvpm/adapter.py", ".github/labview/lvpm/worker.py",
+             ".github/labview/asciidoc-linux-command.py")]
     paths += [path for path in (root / ".github/labview/toimages").rglob("*") if path.is_file()]
     inputs = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
               for path in sorted(paths)}
@@ -75,6 +76,24 @@ def verify_registry(image, tag, digest):
                 raise ValueError("GHCR candidate tag or immutable digest has changed")
 
 
+def native_packages(raw):
+    """Only installed dpkg records establish native package coverage."""
+    packages = set()
+    for line in raw.splitlines():
+        fields = line.split('\t')
+        if len(fields) != 3:
+            raise ValueError('Malformed dpkg status inventory')
+        status, name, version = fields
+        if status != 'installed':
+            continue
+        if not re.fullmatch(r'[a-z0-9][a-z0-9+.-]*(?::[a-z0-9-]+)?', name) or not version or re.search(r'\s', version):
+            raise ValueError('Invalid installed dpkg package record')
+        packages.add((name, version))
+    if not packages:
+        raise ValueError('Installed native package inventory is empty')
+    return [{'name': name, 'version': version} for name, version in sorted(packages)]
+
+
 def verify_image_platform(image, inventory):
     if (not isinstance(image, dict) or not isinstance(inventory, dict)
             or image.get("Os") != "linux" or image.get("Architecture") != "amd64"
@@ -83,6 +102,12 @@ def verify_image_platform(image, inventory):
 
 
 def verify_packages(manifest, plan):
+    target = manifest.get("labview_target")
+    match = re.fullmatch(r"LabVIEW (20\d{2}) \(64-bit\)\s+v(\d+(?:\.\d+)?)", str(target))
+    if (not match or match[1] != plan.get("labview_version")
+            or int(match[2].split(".")[0]) + 2000 != int(match[1])
+            or manifest.get("labview_internal_version") != (match[2] if "." in match[2] else match[2] + ".0")):
+        raise ValueError("Candidate has no captured matching 64-bit LabVIEW target")
     packages = manifest.get("packages")
     if not isinstance(packages, list) or not packages:
         raise ValueError("Candidate has no package inventory")
@@ -96,6 +121,7 @@ def verify_packages(manifest, plan):
                 or name in installed or not isinstance(version, str) or not version
                 or not re.fullmatch(r"[0-9a-f]{64}", str(package.get("sha256", "")))
                 or not isinstance(files, list) or not files
+                or package.get("target") != target
                 or not all(isinstance(path, str) and path.startswith("/") and ".." not in Path(path).parts
                            for path in files)):
             raise ValueError("Invalid candidate package version, archive hash, or installed file inventory")
@@ -134,7 +160,7 @@ def github_json(endpoint):
         raise ValueError("Authenticated GitHub API access requires GH_TOKEN or GITHUB_TOKEN")
     result = subprocess.run(
         ["gh", "api", "--hostname", "github.com", "-H", "Accept: application/vnd.github+json", endpoint],
-        check=True, capture_output=True, text=True,
+        check=True, capture_output=True, text=True, timeout=60,
     )
     return json.loads(result.stdout)
 

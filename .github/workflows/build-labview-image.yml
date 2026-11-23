@@ -28,6 +28,14 @@ on:
     - cron: '0 4 1 * *'
   workflow_dispatch:
     inputs:
+      expected_sha:
+        description: 'Reviewed HEAD; reject a changed dispatch target'
+        type: string
+        required: false
+      dependency_sha:
+        description: 'Optional full dependency commit SHA; must be an ancestor of reviewed HEAD'
+        type: string
+        required: false
       push_latest:
         description: 'Deprecated — :latest is always published now (kept for compatibility)'
         type: boolean
@@ -292,8 +300,46 @@ jobs:
     runs-on: windows-2022
 
     steps:
+      - name: Validate selected dependency revision
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          DEPENDENCY_SHA: ${{ inputs.dependency_sha || github.sha }}
+        run: |
+          if ($env:EXPECTED_SHA -and ($env:EXPECTED_SHA -notmatch '^[a-fA-F0-9]{40}$' -or $env:EXPECTED_SHA -ine $env:GITHUB_SHA)) {
+            throw 'Reviewed HEAD moved or expected_sha is invalid.'
+          }
+          if ($env:DEPENDENCY_SHA -notmatch '^[a-fA-F0-9]{40}$') {
+            throw 'dependency_sha must be a full 40-character commit SHA.'
+          }
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Verify dependency ancestry
+        shell: pwsh
+        env:
+          DEPENDENCY_SHA: ${{ inputs.dependency_sha || github.sha }}
+        run: |
+          git merge-base --is-ancestor $env:DEPENDENCY_SHA $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'dependency_sha must be an ancestor of reviewed HEAD.' }
+
+      - name: Checkout selected dependency source
+        if: inputs.dependency_sha != '' && inputs.dependency_sha != github.sha
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.dependency_sha }}
+          path: .dependency-source
+          persist-credentials: false
+
+      - name: Record selected source revision
+        id: source_revision
+        shell: bash
+        env:
+          DEPENDENCY_SHA: ${{ inputs.dependency_sha || github.sha }}
+        run: echo "revision=$DEPENDENCY_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -337,33 +383,59 @@ jobs:
       - name: Stage repo VIPC and Dragon files
         id: vipc
         shell: bash
+        env:
+          DEPENDENCY_ROOT: ${{ inputs.dependency_sha != '' && inputs.dependency_sha != github.sha && '.dependency-source' || '.' }}
         run: |
           python -I - <<'PY'
-          import os, glob, shutil, pathlib, importlib.util
+          import os, glob, shutil, pathlib, importlib.util, json
           parser_path = pathlib.Path('.github/labview/dragon_deps.py').resolve()
           parser_spec = importlib.util.spec_from_file_location('lvci_trusted_dragon', parser_path)
           dragon_parser = importlib.util.module_from_spec(parser_spec)
           parser_spec.loader.exec_module(dragon_parser)
           dest = pathlib.Path('.github/labview/vipm'); dest.mkdir(parents=True, exist_ok=True)
-          cfg = pathlib.Path('.github/labview-ci.yml')
+          dependency_root = pathlib.Path(os.environ.get('DEPENDENCY_ROOT', '.'))
+          cfg = dependency_root / '.github/labview-ci.yml'
           PLATFORM = 'windows'
+          repository = pathlib.Path('.').resolve()
+          selected = {}
+
+          def stage_source(source, source_root=dependency_root):
+              path = pathlib.Path(source)
+              resolved = path.resolve(strict=True)
+              if not resolved.is_relative_to(source_root.resolve()) or not resolved.is_file():
+                  raise ValueError(f'Selected dependency is not a repository file: {source}')
+              if any(part.is_symlink() for part in (path, *path.parents)):
+                  raise ValueError(f'Selected dependency uses a symlink: {source}')
+              key = path.name.lower()
+              identity = resolved.relative_to(repository).as_posix()
+              if key == 'ci-tooling.vipc' and resolved != (dest / 'ci-tooling.vipc').resolve():
+                  raise ValueError('Selected project cannot replace ci-tooling.vipc')
+              if key in selected and selected[key] != identity:
+                  raise ValueError(f'Selected dependencies have colliding basenames: {source}')
+              if resolved != (dest / path.name).resolve():
+                  shutil.copy2(resolved, dest / path.name)
+              selected[key] = identity
 
           def configured_paths(kind):
-              return dragon_parser.windows_monitored_paths(str(cfg), kind)
+              paths, configured = dragon_parser.windows_monitored_paths(str(cfg), kind)
+              return [str(dependency_root / path) for path in paths], configured
 
           paths, saw_vipc_list = configured_paths('vipc')
           if not paths and not saw_vipc_list:
               paths = sorted(
-                  p for p in glob.glob('**/*.vipc', recursive=True)
+                  str(dependency_root / p) for p in glob.glob('**/*.vipc', root_dir=dependency_root, recursive=True)
                   if not p.replace(os.sep, '/').startswith('.github/')
               )
+          selected_vipcs = {pathlib.Path(p).resolve() for p in paths}
+          for old in dest.iterdir():
+              if old.suffix.lower() == '.vipc' and old.name != 'ci-tooling.vipc' and old.resolve() not in selected_vipcs:
+                  old.unlink()
+              elif old.name in ('selected-stage.json', 'observed-inventory.json'):
+                  old.unlink()
           staged = 0
           for p in paths:
-              if os.path.isfile(p):
-                  shutil.copy2(p, dest / os.path.basename(p))
-                  print('Staged VIPC:', p); staged += 1
-              else:
-                  print('Configured VIPC not found (skipping):', p)
+              stage_source(p)
+              print('Staged VIPC:', p); staged += 1
           # Capability-scoped VIPCs (e.g. Antidoc) live under .github/labview/<cap>/
           # and are baked into the worker ONLY when that capability is installed -
           # detected by the presence of its action workflow. This keeps an add-on's
@@ -376,7 +448,7 @@ jobs:
           ]
           for vipc_path, signal in capability_vipcs:
               if os.path.isfile(vipc_path) and os.path.isfile(signal):
-                  shutil.copy2(vipc_path, dest / os.path.basename(vipc_path))
+                  stage_source(vipc_path, source_root=repository)
                   print('Staged capability VIPC:', vipc_path); staged += 1
               elif os.path.isfile(vipc_path):
                   print('Capability VIPC present but capability not installed (skipping):', vipc_path)
@@ -390,11 +462,11 @@ jobs:
           dpaths, saw_dragon_list = configured_paths('dragon')
           if not dpaths and not saw_dragon_list:
               dpaths = sorted(
-                  p for p in glob.glob('**/*.dragon', recursive=True)
+                  str(dependency_root / p) for p in glob.glob('**/*.dragon', root_dir=dependency_root, recursive=True)
                   if not p.replace(os.sep, '/').startswith('.github/')
               )
           dragon_plan = dragon_parser.stage_windows_sources(
-              dpaths, str(dest), repository_root='.', target_year=os.environ.get('DEFAULT_TAG', '2026'))
+              dpaths, str(dest), repository_root=str(dependency_root), target_year=os.environ.get('DEFAULT_TAG', '2026'))
           dstaged = len(dragon_plan['files'])
           for source in dragon_plan['files']:
               print('Staged required Dragon:', source['source_file'])
@@ -408,16 +480,22 @@ jobs:
           # ONLY when a .vipc being applied references that package. (glob '*.vip' does
           # not match '*.vipc', so no extension collision here.)
           vpaths = sorted(
-              p for p in glob.glob('**/*.vip', recursive=True)
+              str(dependency_root / p) for p in glob.glob('**/*.vip', root_dir=dependency_root, recursive=True)
               if not p.replace(os.sep, '/').startswith('.github/')
           )
+          for old in dest.iterdir():
+              if old.suffix.lower() == '.vip':
+                  old.unlink()
           vstaged = 0
           for p in vpaths:
               if os.path.isfile(p):
-                  shutil.copy2(p, dest / os.path.basename(p))
+                  stage_source(p)
                   print('Staged VIP:', p); vstaged += 1
           if not vstaged:
               print('No VIP files to stage.')
+
+          (dest / 'selected-stage.json').write_text(
+              json.dumps(selected, sort_keys=True, indent=2) + '\n', encoding='utf-8')
 
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
               out.write(f'count={staged}\n')
@@ -543,18 +621,23 @@ jobs:
       - name: Compute worker version
         id: ver
         shell: pwsh
+        env:
+          DEPENDENCY_ROOT: ${{ inputs.dependency_sha != '' && inputs.dependency_sha != github.sha && '.dependency-source' || '.' }}
         run: |
           $vipcFiles = @(Get-ChildItem '.github/labview/vipm' -Filter *.vipc -File | Sort-Object Name)
           $dragonFiles = @(Get-ChildItem '.github/labview/vipm' -Filter *.dragon -File | Sort-Object Name)
           # -Filter '*.vip' also matches '*.vipc' (Windows 8.3 wildcard); match the exact
           # extension so committed local .vip payloads are hashed without double-counting VIPCs.
           $vipFiles = @(Get-ChildItem '.github/labview/vipm' -File | Where-Object { $_.Extension -eq '.vip' } | Sort-Object Name)
-          $files = @()
+          $dependencyRoot = if ($env:DEPENDENCY_ROOT) { $env:DEPENDENCY_ROOT } else { '.' }
+          $files = @((Join-Path $dependencyRoot '.github/labview-ci.yml'))
           if ($vipcFiles.Count -gt 0 -or $dragonFiles.Count -gt 0 -or $vipFiles.Count -gt 0) {
             $files += '.github/docker/labview-ci.Dockerfile'
             $files += '.github/labview/vipm/install-vipc.ps1'
             $files += '.github/labview/vipm/dragon-plan.json'
+            $files += '.github/labview/vipm/selected-stage.json'
             $files += '.github/labview/dragon_deps.py'
+            $files += @(Get-ChildItem '.github/labview/vipm' -Filter '*.ps1' -File | Sort-Object Name | ForEach-Object FullName)
             $files += ($vipcFiles | ForEach-Object FullName)
             $files += ($dragonFiles | ForEach-Object FullName)
             $files += ($vipFiles | ForEach-Object FullName)
@@ -562,6 +645,8 @@ jobs:
           $parts = @(
             'lcwc-base-image=${{ steps.base.outputs.image }}',
             'lcwc-base-digest=${{ steps.base.outputs.digest }}',
+            'labview-version=${{ env.DEFAULT_TAG }}',
+            'labview-bitness=64',
             ('vipc-count={0}' -f $vipcFiles.Count),
             ('dragon-count={0}' -f $dragonFiles.Count),
             ('vip-count={0}' -f $vipFiles.Count)
@@ -586,7 +671,7 @@ jobs:
           $ver   = '${{ env.DEFAULT_TAG }}'
           $date  = '${{ steps.date.outputs.date }}'
           $wv    = '${{ steps.ver.outputs.version }}'
-          $lcwcBase = '${{ steps.base.outputs.image }}'
+          $lcwcBase = '${{ steps.base.outputs.repo_digest }}'
           # Count what labview-ci.Dockerfile will actually COPY + apply: every .vipc /
           # .dragon staged into .github/labview/vipm. That ALWAYS includes the baseline
           # tooling VIPC (ci-tooling.vipc -> Caraya / VI Tester / LUnit CLI / the UTF
@@ -623,7 +708,7 @@ jobs:
           # worker until a user selects the new tag per action in Configure Workers.
           $updateMode = '${{ github.event.inputs.update_mode || 'replace' }}'
           if ($updateMode -eq 'new') {
-            $newTag = "${ver}-deps-${date}"
+            $newTag = "${ver}-deps-${date}-${wv}"
             $tags = @("${base}:${wv}", "${base}:${newTag}")
           } else {
             $tags = @("${base}:${ver}", "${base}:${ver}-${date}", "${base}:${wv}", "${base}:latest")
@@ -634,15 +719,12 @@ jobs:
             $immutable = "${base}:${wv}"
             crane copy $lcwcBase $immutable
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            foreach ($tag in @($ver, "${ver}-${date}", 'latest')) {
-              crane tag $immutable $tag
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-              Write-Host "Published (registry copy): ${base}:${tag}"
-            }
+            & ./.github/labview/vipm/publish-worker-tags.ps1 -Immutable $immutable -References $tags
             Write-Host "Published (registry copy): $immutable"
           } else {
             Write-Host "::notice::$depCount repository dependency file(s) selected ($vipcCount VIPC, $dragonCount Dragon). Building the repo-specific dependency layer now; this can take a long time because VIPM must apply project dependencies before CI can run on the updated worker."
-            $tagFlags = ($tags | ForEach-Object { "-t", $_ })
+            $immutable = "${base}:${wv}"
+            $tagFlags = @('-t', $immutable)
             $repoUrl = '${{ github.server_url }}/${{ github.repository }}.git'
             # -m 8GB: the VIPC layer runs the whole VIPM stack (headless LabVIEW +
             # VIPM Desktop + vipm CLI, together >1.7 GB on 2026 Q3) inside a build
@@ -655,11 +737,44 @@ jobs:
               --build-arg VIPM_PUBLIC_REPO_URL=$repoUrl `
               --build-arg LVCI_UNIT_TESTS_INSTALLED=$unitTestsArg @tagFlags .
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            foreach ($tag in $tags) {
-              Write-Host "Pushing $tag"
-              docker push $tag
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            New-Item -ItemType Directory -Force -Path 'ci-out/worker' | Out-Null
+            $container = docker create $immutable
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create verified image for inventory extraction.' }
+            try {
+              docker cp "${container}:C:/vipm/observed-inventory.json" 'ci-out/worker/observed-inventory.json'
+              if ($LASTEXITCODE -ne 0) { throw 'Built image lacks required observed inventory.' }
+            } finally { docker rm $container | Out-Host }
+            $observed = Get-Content 'ci-out/worker/observed-inventory.json' -Raw -Encoding UTF8 | ConvertFrom-Json -NoEnumerate
+            if ($observed -isnot [pscustomobject] -or
+                ($observed.schema -isnot [long] -and $observed.schema -isnot [int]) -or $observed.schema -ne 1 -or
+              $observed.source -isnot [string] -or $observed.source -cne 'vipm list --installed' -or
+              $observed.platform -isnot [string] -or $observed.platform -cne 'windows' -or
+                $observed.labview_version -isnot [string] -or $observed.labview_version -cne $ver -or
+                $observed.labview_bitness -isnot [string] -or $observed.labview_bitness -cne '64' -or
+              $observed.status -isnot [string] -or $observed.status -cnotin @('observed', 'unavailable') -or
+                $observed.required_project -isnot [bool] -or $observed.target_verified -isnot [bool] -or
+                $observed.raw -isnot [string] -or $observed.packages -isnot [array]) {
+              throw 'Built image inventory target is invalid.'
             }
+            if (($observed.required_project -and -not $observed.target_verified) -or
+                ($observed.target_verified -and $observed.status -cne 'observed') -or
+                (-not $observed.target_verified -and ($observed.status -cne 'unavailable' -or $observed.packages.Count))) {
+              throw 'Built image inventory verification is invalid.'
+            }
+            foreach ($package in $observed.packages) {
+              if ($package -isnot [pscustomobject] -or $package.name -isnot [string] -or
+                  -not $package.name.Trim() -or $package.version -isnot [string] -or -not $package.version.Trim()) {
+                throw 'Built image inventory package is invalid.'
+              }
+            }
+            try {
+              docker run --rm --entrypoint powershell $immutable -NoLogo -NoProfile -Command '& nipkg list-installed; exit $LASTEXITCODE' |
+                Out-File -FilePath 'ci-out/worker/nipkg-list.txt' -Encoding utf8
+              if ($LASTEXITCODE -ne 0) { throw "Installed NI inventory capture failed (exit $LASTEXITCODE)." }
+            } catch { throw "nipkg list-installed capture failed: $_" }
+            docker push $immutable
+            if ($LASTEXITCODE -ne 0) { throw 'Verified immutable worker push failed; active aliases were not changed.' }
+            & ./.github/labview/vipm/publish-worker-tags.ps1 -Immutable $immutable -References $tags
             if ($updateMode -eq 'new') {
               Write-Host "::notice::Published a NEW worker tag '${base}:${newTag}' alongside the current container. Select it per action in Configure Workers; existing actions keep using the current :latest / :${ver} worker until you switch them."
             }
@@ -672,18 +787,16 @@ jobs:
       # failed (VIPM wedged against the repointed NI latest-windows) still shipped
       # to every client. A failed bake now leaves clients on the last good base.
       - name: Promote LCWC base tags (bake-verified)
-        if: steps.base.outputs.is_source == 'true'
+        if: steps.base.outputs.is_source == 'true' && inputs.update_mode != 'new'
         shell: pwsh
         run: |
-          foreach ($tag in @('${{ steps.base.outputs.image }}', '${{ steps.base.outputs.release_tag }}')) {
-            Write-Host "Promoting bake-verified LCWC base tag $tag"
-            docker push $tag
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          & ./.github/labview/vipm/publish-worker-tags.ps1 `
+            -Immutable '${{ steps.base.outputs.immutable }}' `
+            -References @('${{ steps.base.outputs.image }}', '${{ steps.base.outputs.release_tag }}')
 
       # Capture what's installed and render the human/machine worker manifest.
-      # All of this is best-effort: a hiccup here must not fail an otherwise good
-      # image build (the image is already pushed by this point).
+      # Installed inventories were captured before publication. Preserve them
+      # when rendering the manifest; never substitute available feed packages.
       - name: Generate worker manifest
         shell: pwsh
         run: |
@@ -694,23 +807,20 @@ jobs:
           # any .vipc/.dragon in .github/labview/vipm was applied (always incl. ci-tooling.vipc).
           $workerLayer = if ((@(Get-ChildItem '.github/labview/vipm' -Filter *.vipc -File -ErrorAction SilentlyContinue).Count + @(Get-ChildItem '.github/labview/vipm' -Filter *.dragon -File -ErrorAction SilentlyContinue).Count) -gt 0) { 'repo-vipc-layer' } else { 'seed-only-copy' }
           $outDir = "ci-out/workers-pages/workers/windows/$wv"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
           New-Item -ItemType Directory -Force -Path 'ci-out/worker' | Out-Null
-          New-Item -ItemType File -Force -Path 'ci-out/worker/nipkg-list.txt','ci-out/worker/vipm-list.txt' | Out-Null
+          New-Item -ItemType File -Force -Path 'ci-out/worker/vipm-list.txt' | Out-Null
 
-          # Installed-package list captured from inside the freshly built image.
+          # Installed-package list was captured before publishing the built image.
           # A seed-only copy is byte-identical to the LCWC base and is NOT present on
           # the runner (it was copied at the registry level), so pulling it back just
           # to read nipkg would re-download multiple gigabytes. Skip it on the copy
-          # path; the VIPC-layer path already has the image locally from docker build.
+          # path; the VIPC-layer path preserves the captured installed inventory.
           if ($workerLayer -eq 'repo-vipc-layer') {
-            try {
-              docker run --rm $img powershell -NoLogo -NoProfile -Command "nipkg list" 2>$null |
-                Out-File -FilePath 'ci-out/worker/nipkg-list.txt' -Encoding utf8
-            } catch { Write-Host "nipkg list capture failed: $_" }
-            try {
-              docker run --rm $img powershell -NoLogo -NoProfile -Command "& 'C:\Program Files\JKI\VI Package Manager\support\vipm.exe' --labview-version ${{ vars.LABVIEW_VERSION || '2026' }} --labview-bitness 64 list --installed" 2>$null |
-                Out-File -FilePath 'ci-out/worker/vipm-list.txt' -Encoding utf8
-            } catch { Write-Host "VIPM list capture failed: $_" }
+            $observed = Get-Content 'ci-out/worker/observed-inventory.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+            $observed.packages | ForEach-Object { '{0} {1}' -f $_.name, $_.version } |
+              Set-Content 'ci-out/worker/vipm-list.txt' -Encoding UTF8
+            Copy-Item 'ci-out/worker/observed-inventory.json' (Join-Path $outDir 'observed-inventory.json') -Force
           } else {
             Write-Host "Seed-only copy: the worker mirrors the LCWC base; skipping installed-package capture to avoid a multi-gigabyte pull."
           }
@@ -721,12 +831,19 @@ jobs:
           Get-ChildItem '.github/labview/vipm' -Filter *.vipc -File |
             ForEach-Object { $vipcArgs += @('--vipc', $_.FullName) }
 
+          $inventoryArgs = @()
+          if (Test-Path -LiteralPath 'ci-out/worker/observed-inventory.json' -PathType Leaf) {
+            $inventoryArgs = @('--observed-inventory', 'ci-out/worker/observed-inventory.json')
+          }
+
           python .github/labview/build-worker-manifest.py `
             --platform windows `
             --version $wv `
             --nipkg-list 'ci-out/worker/nipkg-list.txt' `
             --vipm-list 'ci-out/worker/vipm-list.txt' `
             --labview-version ${{ vars.LABVIEW_VERSION || '2026' }} `
+            --labview-bitness 64 `
+            --dependency-sha '${{ inputs.dependency_sha || github.sha }}' `
             --pages-url '${{ env.PAGES_URL }}' `
             --base-image '${{ steps.base.outputs.image }}' `
             --base-digest "$baseDigest" `
@@ -734,9 +851,10 @@ jobs:
             --seed-digest "$baseDigest" `
             --worker-layer $workerLayer `
             --image-ref $img `
-            --git-sha '${{ github.sha }}' `
+            --git-sha '${{ steps.source_revision.outputs.revision }}' `
             --run-url 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}' `
             --out-dir $outDir `
+            @inventoryArgs `
             @vipcArgs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -748,8 +866,19 @@ jobs:
             build_date   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
             git_sha      = '${{ github.sha }}'
           }
-          $latest | ConvertTo-Json |
-            Out-File -FilePath 'ci-out/workers-pages/workers/windows/latest.json' -Encoding utf8
+          if ('${{ inputs.update_mode }}' -ne 'new') {
+            $latest.git_sha = '${{ steps.source_revision.outputs.revision }}'
+            $latest | ConvertTo-Json |
+              Out-File -FilePath 'ci-out/workers-pages/workers/windows/latest.json' -Encoding utf8
+          }
+
+      - name: Upload observed Windows inventory
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-observed-inventory
+          path: ci-out/worker/observed-inventory.json
+          if-no-files-found: warn
 
       - name: Enable Git long paths (Windows MAX_PATH workaround)
         shell: bash
@@ -765,12 +894,17 @@ jobs:
           publish_dir: ci-out/workers-pages
           commit_message: Publish Windows worker manifest
       - name: Summary
-        shell: bash
+        shell: pwsh
         run: |
-          echo "### Docker image published" >> "$GITHUB_STEP_SUMMARY"
-          echo "- \`${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- \`${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}-${{ steps.date.outputs.date }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- \`${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.version }}\` (immutable worker tag)" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "**Worker version:** \`${{ steps.ver.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "[Worker manifest](${{ env.PAGES_URL }}/workers/windows/${{ steps.ver.outputs.version }}/manifest.html)" >> "$GITHUB_STEP_SUMMARY"
+          $base = '${{ env.IMAGE_NAME }}'
+          $year = '${{ env.DEFAULT_TAG }}'
+          $date = '${{ steps.date.outputs.date }}'
+          $version = '${{ steps.ver.outputs.version }}'
+          $lines = @('### Docker image published', "- Immutable worker: ${base}:${version}")
+          if ('${{ inputs.update_mode }}' -eq 'new') {
+            $lines += "- New worker: ${base}:${year}-deps-${date}-${version} (active aliases unchanged)"
+          } else {
+            $lines += "- Active aliases: ${base}:${year}, ${base}:${year}-${date}, ${base}:latest"
+          }
+          $lines += '[Worker manifest](${{ env.PAGES_URL }}/workers/windows/${{ steps.ver.outputs.version }}/manifest.html)'
+          $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

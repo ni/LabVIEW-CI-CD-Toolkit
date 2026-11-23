@@ -49,6 +49,40 @@ def dashboard_functions(*names):
     return namespace
 
 
+class ExplicitVipcMonitoringTests(unittest.TestCase):
+    def test_explicit_internal_and_capability_choices_override_defaults(self):
+        functions = dashboard_functions('_vipc_role', '_monitor_on', '_parse_container_config',
+                                        '_capability_for_vipc', '_capability_enabled')
+        functions.update(TOOLING_CORE_VIPC='.github/labview/vipm/ci-tooling.vipc',
+                         MONITOR_PLATFORMS=['windows', 'linux'],
+                         _CAPABILITY_WORKFLOW={'antidoc': '.github/workflows/run-antidoc-windows-container.yml'})
+        config = functions['_parse_container_config'](str(ROOT / '.github/labview-ci.yml'))
+        entries = {entry['path']: entry for entry in config['vipc']}
+        for path in ['.github/labview/antidoc/antidoc.vipc', '.github/labview/experimental.vipc']:
+            role, _, configured, monitored, locked = functions['_vipc_role'](path, entries, True)
+            self.assertEqual((role, configured, monitored, locked), ('project', True, True, False))
+            self.assertIn('linux', functions['_monitor_on'](entries[path], True, False))
+            entries[path] = {'path': path, 'monitor': False}
+            self.assertEqual(functions['_vipc_role'](path, entries, True), ('project', '', False, False, False))
+            self.assertEqual(functions['_monitor_on'](entries[path], True, False), [])
+        self.assertEqual(functions['_vipc_role']('.github/labview/experimental.vipc', {}, False),
+                         ('capability', '', False, False, False))
+
+
+class NativeInventoryTests(unittest.TestCase):
+    def test_available_packages_cannot_establish_installed_coverage(self):
+        functions = dashboard_functions('_manifest_nipkg_packages', '_nipkg_version_index')
+        available = {'nipkg_packages': [{'name': 'ni-viawin-labview-support', 'version': '26.3'}]}
+        for source in ({}, {'source': 'nipkg list', 'status': 'observed'},
+                       {'source': 'nipkg list-installed', 'status': 'unavailable'}):
+            manifest = dict(available, nipkg_inventory=source)
+            self.assertEqual(functions['_manifest_nipkg_packages'](manifest), [])
+            self.assertEqual(functions['_nipkg_version_index'](manifest), {})
+        installed = dict(available, nipkg_inventory={'source': 'nipkg list-installed', 'status': 'observed'})
+        self.assertEqual(functions['_manifest_nipkg_packages'](installed), available['nipkg_packages'])
+        self.assertEqual(functions['_nipkg_version_index'](installed), {'ni-viawin-labview-support': {'26.3'}})
+
+
 class DependenciesPlatformMarkupTests(unittest.TestCase):
     def test_platform_tabs_have_valid_accessible_panel_targets(self):
         elements = []
@@ -115,7 +149,7 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
         page = (ROOT / '.github/pages/dependencies.html').read_text()
         save = page.split('async function dispatchMonitor(){', 1)[1].split('async function linuxSaveRestriction()', 1)[0]
         self.assertLess(save.index('await linuxSaveRestriction()'), save.index('method:"POST"'))
-        self.assertIn('linuxMonitoringContextCurrent(request)', save)
+        self.assertIn('monitoringRequestCurrent(request)', save)
         compare = page.split('function committedMonitoringMatches(', 1)[1].split('async function checkLinuxMonitoringHead()', 1)[0]
         for required in ('config.hasVipcList', 'config.hasDragonList', 'workerSelectionSettings(config)',
                          'normalizedMonitorInputs(JSON.parse(context.inputs))', 'Duplicate declaration paths',
@@ -145,7 +179,7 @@ class DependenciesPlatformMarkupTests(unittest.TestCase):
         self.assertIn('return_run_details:true', page)
         self.assertIn('Dispatch accepted, not completed', page)
         self.assertIn('GitHub returned no run identity', page)
-        self.assertIn('Refresh to check for a published candidate', page)
+        self.assertIn('Build succeeded — loading new worker', page)
         self.assertIn('Workflow success alone does not establish a published, verified candidate', documentation)
         self.assertEqual((ROOT / '.github/pages/documentation.html').read_bytes(),
                          (ROOT / 'actions/dashboard/documentation.html').read_bytes())
@@ -345,7 +379,8 @@ class ReconfigureLvpmTests(unittest.TestCase):
         self.assertEqual(parser['run'], 'python3 -m pip install PyYAML==6.0.3')
         self.assertIn('--candidate "$IN_LINUX_WORKER" --repository "$GITHUB_REPOSITORY" --image-name "${LABVIEW_IMAGE_NAME:-}"', verify['run'])
         self.assertNotIn('${{', verify['run'])
-        self.assertIn('.github/workflows/release.yml', verify['run'])
+        self.assertNotIn('exit 1', verify['run'])
+        self.assertIn('source_repository and not (monitoring_only or source_worker_only)', SCRIPT)
         self.assertEqual(WORKFLOW['permissions']['packages'], 'read')
         self.assertEqual(WORKFLOW['permissions']['actions'], 'read')
         checkout = next(step for step in STEPS if step['name'] == 'Checkout repository')
@@ -365,7 +400,117 @@ class ReconfigureLvpmTests(unittest.TestCase):
                              (ROOT / 'actions/dashboard' / page).read_bytes())
 
 
+class WorkerInventoryTests(unittest.TestCase):
+    def generate(self, inventory=None, raw='diagnostic_package 1.0', platform='windows', native=None):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw_path = root / 'vipm-list.txt'
+            raw_path.write_text(raw)
+            arguments = [sys.executable, str(ROOT / '.github/labview/build-worker-manifest.py'),
+                         '--platform', platform, '--version', 'test-worker',
+                         '--labview-version', '2026', '--labview-bitness', '64',
+                         '--dependency-sha', 'd' * 40, '--vipm-list', str(raw_path),
+                         '--out-dir', str(root / 'out')]
+            if native is not None:
+                native_path = root / 'nipkg-list.txt'
+                native_path.write_text(native)
+                arguments += ['--nipkg-list', str(native_path)]
+            if inventory is not None:
+                path = root / 'observed.json'
+                path.write_text(json.dumps(inventory), encoding='utf-8-sig')
+                arguments += ['--observed-inventory', str(path)]
+            result = subprocess.run(arguments, text=True, capture_output=True)
+            output = root / 'out/manifest.json'
+            return result, json.loads(output.read_text()) if output.exists() else None
+
+    def evidence(self, **overrides):
+        return {'schema': 1, 'platform': 'windows', 'labview_version': '2026',
+                'labview_bitness': '64', 'source': 'vipm list --installed',
+                'target_verified': True, 'required_project': True, 'status': 'observed',
+                'raw': 'LabVIEW 2026 (64-bit)\nactual 1.2',
+                'packages': [{'name': 'actual', 'version': '1.2'}], **overrides}
+
+    def test_native_inventory_preserves_installed_provenance(self):
+        result, manifest = self.generate(native='ni-viawin-labview-support 26.3.0 x64\n')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(manifest['nipkg_inventory'], {'source': 'nipkg list-installed', 'status': 'observed'})
+        self.assertEqual(manifest['nipkg_packages'], [{'name': 'ni-viawin-labview-support', 'version': '26.3.0'}])
+        result, manifest = self.generate()
+        self.assertEqual(manifest['nipkg_inventory']['status'], 'unavailable')
+
+    def test_only_structured_target_bound_evidence_is_installed(self):
+        result, manifest = self.generate(self.evidence())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(manifest['schema'], 3)
+        self.assertEqual(manifest['dependency_sha'], 'd' * 40)
+        self.assertEqual(manifest['vipm_packages'], [{'name': 'actual', 'version': '1.2'}])
+        self.assertTrue(manifest['vipm_inventory']['target_verified'])
+        result, manifest = self.generate()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(manifest['vipm_packages'], [])
+        self.assertEqual(manifest['vipm_inventory']['status'], 'unverified')
+
+    def test_baseline_unavailable_never_claims_packages(self):
+        result, manifest = self.generate(self.evidence(status='unavailable',
+            target_verified=False, required_project=False, packages=[]))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(manifest['vipm_packages'], [])
+
+    def test_invalid_or_wrong_target_inventory_cannot_publish(self):
+        invalid = [None, [], {'schema': True}, {'platform': 'linux'},
+                   {'labview_version': '2025'}, {'labview_bitness': '32'},
+                   {'source': 'requested VIPC'}, {'target_verified': 'true'},
+                   {'required_project': 'false'}, {'status': 'verified'},
+                   {'target_verified': False}, {'packages': []},
+                   {'packages': [{'name': 'bad package', 'version': '1.2'}]},
+                   {'packages': [{'name': 'actual', 'version': ''}]},
+                   {'packages': [{'name': 'actual', 'version': '1.2'}] * 2},
+                   {'status': 'unavailable', 'target_verified': False}]
+        for overrides in invalid:
+            with self.subTest(overrides=overrides):
+                evidence = self.evidence(**overrides) if isinstance(overrides, dict) else overrides
+                if overrides is None:
+                    evidence = 'not-an-object'
+                result, manifest = self.generate(evidence)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIsNone(manifest)
+
+
 class DashboardLvpmTests(unittest.TestCase):
+    def test_vipm_coverage_uses_observations_not_requests_or_seed_inference(self):
+        namespace = dashboard_functions('_manifest_packages')
+        namespace['_core_tooling_packages'] = lambda: ['inferred-core-1.0']
+        manifest = {'platform': 'windows', 'copied_from_base': True,
+                    'vipc': [{'packages': ['declared-only-1.0']}]}
+        self.assertEqual(namespace['_manifest_packages'](manifest), [])
+        manifest['vipm_packages'] = [{'name': 'actual', 'version': 'v1.2'}]
+        self.assertIn('actual-1.2', namespace['_manifest_packages'](manifest))
+        self.assertNotIn('declared-only-1.0', namespace['_manifest_packages'](manifest))
+        manifest['vipm_inventory'] = {'status': 'unavailable'}
+        self.assertEqual(namespace['_manifest_packages'](manifest), [])
+
+    def test_vipm_wrong_version_remains_pending(self):
+        namespace = dashboard_functions('_compute_deps_pending')
+        data = {'columns': [{'key': 'windows', 'ready': True, 'tag': 'win-existing',
+                             'packages': ['actual', 'actual-v1.2']}],
+                'vipc': [{'path': 'project.vipc', 'role': 'project', 'configured': True,
+                          'monitorOn': ['windows'], 'packages': ['actual-1.2']}]}
+        self.assertFalse(namespace['_compute_deps_pending'](data)['pending'])
+        data['vipc'][0]['packages'] = ['actual-9.0']
+        self.assertTrue(namespace['_compute_deps_pending'](data)['pending'])
+
+    def test_selected_linux_worker_with_unavailable_inventory_remains_pending(self):
+        namespace = dashboard_functions('_compute_deps_pending')
+        data = {'columns': [{'key': 'linux', 'ready': False, 'tag': 'linux-existing',
+                             'packages': ['actual-1.2']}],
+                'vipc': [{'path': 'project.vipc', 'role': 'project', 'configured': True,
+                          'monitorOn': ['linux'], 'packages': ['actual-1.2']}]}
+        pending = namespace['_compute_deps_pending'](data)
+        self.assertTrue(pending['pending'])
+        self.assertIn('linux', pending['containers'])
+        data['columns'][0]['tag'] = 'base'
+        self.assertFalse(namespace['_compute_deps_pending'](data)['pending'])
+
     def test_selected_inventory_does_not_count_declarations_as_installed(self):
         namespace = dashboard_functions('_manifest_packages')
         namespace['_core_tooling_packages'] = lambda: ['inferred-core-1.0']
@@ -549,6 +694,24 @@ class DashboardLvpmTests(unittest.TestCase):
 
 
 class DashboardDragonInspectionTests(unittest.TestCase):
+    def test_linux_vipm_exact_dragon_inventory_clears_pending(self):
+        inventory = {'platform': 'linux', 'status': 'observed', 'target_verified': True,
+                     'labview_version': '2026', 'labview_bitness': '64',
+                     'source': 'vipm list --installed', 'packages': [{'name': 'actual', 'version': '1.2'}]}
+        manifest = {'platform': 'linux', 'labview_version': '2026', 'vipm_inventory': inventory}
+        result = self.inspect(linux_manifest=manifest, selection='latest')
+        self.assertTrue(result['dragon']['ready'])
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'installed')
+        self.assertFalse(result['pending']['pending'])
+        inventory['packages'][0]['version'] = '1.3'
+        result = self.inspect(linux_manifest=manifest, selection='latest')
+        self.assertTrue(result['pending']['pending'])
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'wrong_version')
+        inventory['target_verified'] = False
+        result = self.inspect(linux_manifest=manifest, selection='latest')
+        self.assertTrue(result['pending']['pending'])
+        self.assertEqual(result['dragon']['install_set'][0]['status'], 'unknown')
+
     def test_actual_example_parser_output_reaches_actual_ui_renderer(self):
         result = self.inspect(declarations=(ROOT / 'example/Example.dragon').read_text())
         dependencies = result['dragon']['files'][0]['dependencies']

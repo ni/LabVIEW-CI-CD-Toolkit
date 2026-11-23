@@ -1,0 +1,105 @@
+name: Native Dependency Validation
+run-name: Native dependency validation at ${{ github.sha }}
+
+on:
+  push:
+    branches: [validation/native-dependencies-20261109, codex/dependency-reliability]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Native platforms to validate'
+        type: choice
+        options: [all, linux, windows]
+        default: all
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: native-dependency-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    if: inputs.platform != 'linux'
+    name: Windows x64 VIPM build and runtime inventory
+    runs-on: windows-2022
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install validation prerequisites
+        run: python -m pip install PyYAML==6.0.3
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build candidate and recheck installed project pins
+        shell: pwsh
+        run: ./.github/labview/test-native-windows-worker.ps1 -Python python
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Verify Windows dependency warnings clear
+        run: python .github/labview/test-native-dependency-coverage.py --platform windows --evidence ci-out/native-windows
+      - name: Retain Windows native evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-windows-${{ github.sha }}
+          path: ci-out/native-windows/
+          if-no-files-found: warn
+          retention-days: 14
+
+  linux:
+    if: inputs.platform != 'windows'
+    name: Linux x64 ${{ matrix.installer }} build and installed-file verification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        installer: [vipm, lvpm]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Free unused hosted-runner tool space
+        run: |
+          sudo -n rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h /
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install validation prerequisites
+        run: python -m pip install PyYAML==6.0.3 tomli==2.4.0
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build candidate and verify native inventory
+        env:
+          NATIVE_LINUX_INSTALLER: ${{ matrix.installer }}
+        run: bash .github/labview/test-native-linux-worker.sh
+      - name: Verify Linux dependency warnings clear
+        env:
+          INSTALLER: ${{ matrix.installer }}
+        run: python .github/labview/test-native-dependency-coverage.py --platform linux --installer "$INSTALLER" --evidence "ci-out/native-linux-$INSTALLER"
+      - name: Retain Linux native evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-linux-${{ matrix.installer }}-${{ github.sha }}
+          path: ci-out/native-linux-${{ matrix.installer }}/
+          if-no-files-found: warn
+          retention-days: 14

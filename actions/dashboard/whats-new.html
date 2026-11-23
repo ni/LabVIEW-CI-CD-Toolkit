@@ -110,8 +110,10 @@
     .rel-title{font-weight:600;font-size:.95em}
     .rel-date{color:var(--fg-muted);font-size:.78em;margin-left:auto}
     .rel-sum{color:var(--fg);font-size:.88em;margin:8px 0 6px}
-    .rel-hi{margin:0;padding-left:20px;font-size:.86em;color:var(--fg-muted)}
-    .rel-hi li{margin-bottom:3px}
+    .rel-hi{margin:12px 0;padding-left:20px;font-size:.88em;color:var(--fg)}
+    .rel-hi li{margin-bottom:6px}
+    .rel-details{margin-top:10px;font-size:.9em}
+    .rel-details>summary{cursor:pointer;color:var(--link)}
     .pickbtn{font-size:.74em;border:1px solid var(--border);border-radius:6px;background:var(--surface);
          color:var(--fg);padding:4px 9px;cursor:pointer;white-space:nowrap}
     .pickbtn:hover{border-color:var(--link)}
@@ -368,7 +370,7 @@
           <span class="notes-h2" id="notesTitle">What's changed</span>
           <span class="notes-meta" id="notesMeta"></span>
         </summary>
-        <p class="hint" id="notesHint">Release notes between your version and the latest, newest first.</p>
+        <p class="hint" id="notesHint">Highlights between your version and the latest, newest first.</p>
         <div id="latestNote"></div>
         <details id="allNotes" style="display:none">
           <summary id="allNotesSummary"></summary>
@@ -474,9 +476,29 @@
     }
 
     // ---- rendering -------------------------------------------------------
+    function releaseHighlights(rel) {
+      // Editorial summaries for older releases whose catalog notes are technical logs.
+      // Keep immutable release metadata intact; these only change its presentation.
+      const editorial = {
+        "5.0.2": [
+          "More reliable dependency installation on Windows and Linux, including VIPC and Dragon packages.",
+          "Missing-dependency warnings now reflect the exact package versions installed in the selected container.",
+          "Validated the example dependencies with Windows VIPM, Linux VIPM, and Linux LVPM. Rebuild older containers to refresh their status."
+        ]
+      };
+      const supplied = Array.isArray(rel.highlights) ? rel.highlights.filter(h => typeof h === "string" && h.trim()) : [];
+      const text = String(rel.summary || rel.notes || rel.description || "");
+      const curated = Object.prototype.hasOwnProperty.call(editorial, rel.version) ? editorial[rel.version] : null;
+      const items = curated || (supplied.length ? supplied : text.split(/(?<=[.!?])\s+(?=[A-Z0-9])/));
+      return items.filter(h => h.trim()).slice(0, 3).map(h => {
+        const line = h.replace(/\s+/g, " ").trim();
+        return line.length <= 180 ? line : line.slice(0, 177).replace(/\s+\S*$/, "") + "…";
+      });
+    }
+
     function releaseCard(rel) {
       const text = rel.summary || rel.notes || rel.description || "";
-      const hi = (rel.highlights || []).map(h => `<li>${esc(h)}</li>`).join("");
+      const hi = releaseHighlights(rel).map(h => `<li>${esc(h)}</li>`).join("");
       const isStable = !!(state.stableVersion && String(rel.version) === String(state.stableVersion));
       const isBeta = !!(state.betaVersion && String(rel.version) === String(state.betaVersion));
       const badge = (isStable ? `<span class="vpill stable">&#10003; Stable</span>` : "")
@@ -502,8 +524,8 @@
           ${promote}
           ${rel.date ? `<span class="rel-date">${esc(rel.date)}</span>` : ""}
         </div>
-        ${text ? `<p class="rel-sum">${esc(text)}</p>` : `<p class="rel-sum">This update was published without detailed release notes. Open the source release to review the exact changes.</p>`}
-        ${hi ? `<ul class="rel-hi">${hi}</ul>` : ""}
+        ${hi ? `<ul class="rel-hi">${hi}</ul>` : `<p class="rel-sum">No release highlights are available.</p>`}
+        ${text ? `<details class="rel-details"><summary>Full release notes</summary><p class="rel-sum">${esc(text)}</p></details>` : ""}
       </div>`;
     }
 
@@ -522,7 +544,7 @@
       $("notesSec").style.display = "";
       $("notesTitle").textContent = "What's changed";
       $("notesMeta").textContent = `${m.length} update${m.length > 1 ? "s" : ""} \u00b7 v${state.from || "?"} \u2192 v${state.latest}`;
-      $("notesHint").textContent = "Release notes between your version and the latest, newest first.";
+      $("notesHint").textContent = "Highlights between your version and the latest, newest first.";
       $("latestNote").innerHTML = releaseCard(m[0]);
       if (m.length > 1) {
         const det = $("allNotes");

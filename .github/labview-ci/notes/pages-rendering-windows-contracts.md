@@ -1,5 +1,3 @@
-Pages rendering escapes repository-derived values in dependency links and
-installation guidance, preserving literal text and existing navigation without
-allowing injected markup. Windows Snapshot and VIPM contract checks now read
-the UTF-8 catalog and repository sources explicitly, so Unicode release notes
-no longer abort those checks.
+Pages displays repository-derived values safely in dependency links and
+installation guidance instead of allowing injected markup. Literal text,
+existing navigation destinations, and GitHub/GitLab behavior are preserved.
