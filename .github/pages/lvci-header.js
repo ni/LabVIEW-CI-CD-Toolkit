@@ -1956,7 +1956,7 @@
     pendbar.innerHTML =
       '<span class="lvci-dep-txt"><strong>\u26A0\uFE0F Dependencies need to be installed into your containers. </strong>' +
       '<span class="lvci-dep-sub">Your project declares dependencies that are not yet baked into the worker container(s); container CI may error or show broken code until you update them. </span>' +
-      '<a href="' + navBase + '/dependencies.html">Review &amp; update dependencies \u2197</a></span>';
+      '<a href="' + esc(navBase) + '/dependencies.html">Review &amp; update dependencies \u2197</a></span>';
 
     // Global attention bar (failure banner) — hidden until the activity poll
     // finds a workflow whose newest run failed; names it + links to the run.

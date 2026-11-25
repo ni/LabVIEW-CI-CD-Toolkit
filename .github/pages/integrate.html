@@ -757,7 +757,7 @@
       } else {
         $("varsStep").innerHTML =
           `Optionally pin settings as Actions variables: ` +
-          `<code class="inl">gh variable set LABVIEW_VERSION -R ${repo} -b ${ver}</code> (has a safe fallback).`;
+          `<code class="inl">gh variable set LABVIEW_VERSION -R ${esc(repo)} -b ${ver}</code> (has a safe fallback).`;
       }
     }
 

@@ -326,8 +326,8 @@ class WindowsDragonPlanTests(unittest.TestCase):
 
     def test_windows_build_forwards_client_repository_context(self):
         root = INSTALLER.parents[3]
-        docker = (root / '.github/docker/labview-ci.Dockerfile').read_text()
-        workflow = (root / '.github/workflows/build-labview-image.yml').read_text()
+        docker = (root / '.github/docker/labview-ci.Dockerfile').read_text(encoding='utf-8')
+        workflow = (root / '.github/workflows/build-labview-image.yml').read_text(encoding='utf-8')
         self.assertIn('ARG VIPM_PUBLIC_REPO_URL=https://github.com/ni/LabVIEW-CI-CD-Toolkit.git', docker)
         self.assertIn('--build-arg VIPM_PUBLIC_REPO_URL=$repoUrl', workflow)
         self.assertIn("$repoUrl = '${{ github.server_url }}/${{ github.repository }}.git'", workflow)

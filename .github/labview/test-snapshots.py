@@ -2,6 +2,7 @@ import ast
 import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -128,7 +129,7 @@ class SnapshotTests(unittest.TestCase):
     def test_cli_retirement_runs_only_in_scratch_clients(self):
         rel = '.github/workflows/build-toimages-image.yml'
         rules = INSTALLER.retired_file_rules(self.catalog, ROOT)
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'PYTHONIOENCODING': 'cp1252'}):
             target = Path(directory)
             retired = target / rel
             retired.parent.mkdir(parents=True)
@@ -136,23 +137,28 @@ class SnapshotTests(unittest.TestCase):
             command = [sys.executable, str(ROOT / '.github/labview-ci/install.py'),
                        '--source', str(ROOT), '--target', directory, '--activities', 'dashboard',
                        '--repo', 'scratch/client', '--no-vars']
-            dry = subprocess.run(command + ['--dry-run'], capture_output=True, text=True, encoding='utf-8')
-            self.assertEqual(dry.returncode, 0, dry.stderr)
+            environment = dict(os.environ, PYTHONIOENCODING='utf-8')
+            dry = subprocess.run(command + ['--dry-run'], capture_output=True, text=True, encoding='utf-8',
+                                 env=environment)
+            self.assertEqual(dry.returncode, 0, dry.stdout + dry.stderr)
             self.assertTrue(retired.exists())
             for options in ([], ['--update'], ['--thin']):
                 retired.write_text('\n'.join(rules[rel]), encoding='utf-8')
-                result = subprocess.run(command + options, capture_output=True, text=True, encoding='utf-8')
-                self.assertEqual(result.returncode, 0, result.stderr)
+                result = subprocess.run(command + options, capture_output=True, text=True, encoding='utf-8',
+                                        env=environment)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertFalse(retired.exists())
                 self.assertNotIn('snapshots', INSTALLER.read_manifest(target)['activities'])
             (target / '.github/workflows/release.yml').write_text('name: Client release', encoding='utf-8')
-            result = subprocess.run(command + ['--update'], capture_output=True, text=True, encoding='utf-8')
-            self.assertEqual(result.returncode, 0, result.stderr)
+            result = subprocess.run(command + ['--update'], capture_output=True, text=True, encoding='utf-8',
+                                    env=environment)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             sentinel = target / '.github/labview-ci/source.json'
             sentinel.write_text('source-only fixture', encoding='utf-8')
             before = (target / '.github/labview-ci.yml').read_bytes()
-            result = subprocess.run(command + ['--update'], capture_output=True, text=True, encoding='utf-8')
-            self.assertNotEqual(result.returncode, 0)
+            result = subprocess.run(command + ['--update'], capture_output=True, text=True, encoding='utf-8',
+                                    env=environment)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn('refusing to install', result.stderr)
             self.assertEqual((target / '.github/labview-ci.yml').read_bytes(), before)
 
