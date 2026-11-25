@@ -27,15 +27,15 @@
       <section class="panel filters" aria-label="Date range">
         <div class="filter-lead"><strong>Time window</strong><small id="window-label" aria-live="polite"></small></div>
         <div class="presets" role="group" aria-label="Date presets" id="presets">
-          <button data-range="traffic" hidden>Latest traffic</button><button data-range="14">14D</button><button data-range="30">30D</button><button data-range="90">90D</button><button data-range="365">1Y</button><button data-range="all">Lifetime</button><button data-range="custom">Custom</button>
+          <button data-range="archive" hidden>Tracked traffic</button><button data-range="traffic" hidden>Latest traffic</button><button data-range="14">14D</button><button data-range="30">30D</button><button data-range="90">90D</button><button data-range="365">1Y</button><button data-range="all">Lifetime</button><button data-range="custom">Custom</button>
         </div>
         <form id="custom" hidden><label>From <input type="date" id="from" required></label><label>Through <input type="date" id="through" required></label><button type="submit" class="secondary">Apply</button></form>
         <button id="export" class="secondary download"><span aria-hidden="true">↓</span> CSV</button>
       </section>
       <section class="panel trends" aria-labelledby="trend-title">
-        <div class="clone-summary" id="clone-summary" aria-label="Latest GitHub traffic window" hidden>
-          <div><strong id="clone-total" class="clone-total"></strong> <span class="clone-label">unique cloners</span></div>
-          <p><span id="clone-window"></span><small>GitHub’s deduplicated count for its latest window</small></p>
+        <div class="clone-summary" id="clone-summary" aria-label="Distinct GitHub cloners in the selected range" hidden>
+          <div><strong id="clone-total" class="clone-total"></strong> <span class="clone-label">distinct GitHub cloners</span></div>
+          <p><span id="clone-window"></span><small id="clone-coverage"></small></p>
         </div>
         <div class="panel-top"><h2 id="trend-title">Daily unique cloners</h2>
         <div class="chart-controls"><label>Metric <select id="metric"></select></label><label>Group by <select id="bucket"><option value="auto">Auto</option><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="year">Year</option></select></label></div></div>

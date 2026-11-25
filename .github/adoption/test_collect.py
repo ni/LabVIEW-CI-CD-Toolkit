@@ -26,6 +26,26 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(updated["traffic_checked"], {"views": "2026-11-16T00:00:00Z"})
         self.assertEqual(updated["clients"], {"2026-10-01": 51, "2026-11-16": 0})
 
+    def test_successive_windows_retain_history_without_double_counting_overlap(self):
+        def payload(rows):
+            return {"count": sum(n for _, n in rows), "uniques": 3, "clones": [
+                {"timestamp": day + "T00:00:00Z", "count": n, "uniques": 2}
+                for day, n in rows]}
+
+        first = collect.combine(META, [], [], [], [], {}, {"clones": payload([
+            ("2026-11-01", 100), ("2026-11-14", 20)])}, NOW)
+        second = collect.combine(META, [], [], [], [], first, {"clones": payload([
+            ("2026-11-14", 25), ("2026-11-15", 30)])}, NOW)
+        retried = collect.combine(META, [], [], [], [], second, {"clones": payload([
+            ("2026-11-14", 25), ("2026-11-15", 30)])}, NOW)
+        self.assertEqual(sum(row[0] for row in second["traffic"]["clones"].values()), 155)
+        self.assertEqual(second["clone_window_history"], {
+            "2026-11-01/2026-11-14": 3, "2026-11-14/2026-11-15": 3})
+        self.assertEqual(retried["clone_window_history"], second["clone_window_history"])
+        self.assertEqual(retried["traffic"], second["traffic"])
+        self.assertEqual(second["traffic"]["clones"]["2026-11-01"], [100, 2])
+        self.assertEqual(second["traffic_windows"]["clones"]["count"], 55)
+
     def test_event_dates_and_downloads_are_separate_and_drafts_excluded(self):
         tag = {"published_at": "2026-11-15T21:00:00Z", "tag_name": "v1.0.0",
                "draft": False, "assets": [{"download_count": 14}]}

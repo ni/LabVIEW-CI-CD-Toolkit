@@ -56,6 +56,8 @@ def combine(meta, stars, forks, release_rows, pulls, archive, traffic, now, clie
     latest = max(releases, key=lambda r: r["published_at"], default=None)
     saved = {kind: dict(archive.get("traffic", {}).get(kind, {})) for kind in ("views", "clones")}
     windows = dict(archive.get("traffic_windows", {}))
+    clone_history = dict(archive.get("clone_window_history", {}))
+    remember_clone_window(clone_history, windows.get("clones"))
     traffic_checked = dict(archive.get("traffic_checked", {}))
     timestamp = now.isoformat(timespec="seconds").replace("+00:00", "Z")
     for kind, blob in traffic.items():
@@ -71,6 +73,7 @@ def combine(meta, stars, forks, release_rows, pulls, archive, traffic, now, clie
         # They are shown only as exact-window context, never added across days or windows.
         if dates and len(dates) == len(blob[kind]) and max(dates) >= windows.get(kind, {}).get("to", ""):
             windows[kind] = {"from": min(dates), "to": max(dates), "count": blob["count"], "uniques": blob["uniques"]}
+    remember_clone_window(clone_history, windows.get("clones"))
     client_history = dict(archive.get("clients", {}))
     if clients is not None:
         client_history[now.date().isoformat()] = clients
@@ -87,8 +90,32 @@ def combine(meta, stars, forks, release_rows, pulls, archive, traffic, now, clie
         },
         "latest_release": {"tag": latest["tag_name"], "date": latest["published_at"][:10]} if latest else None,
         "traffic": saved, "traffic_windows": windows, "traffic_checked": traffic_checked,
-        "clients": client_history,
+        "clients": client_history, "clone_window_history": clone_history,
     }
+
+
+def remember_clone_window(history, window):
+    if window:
+        history[f"{window['from']}/{window['to']}"] = window["uniques"]
+
+
+def recover_clone_windows(repo, token):
+    """Upgrade pre-history dashboards from their own published Git revisions once."""
+    history = {}
+    path = "adoption/data.json"
+    revisions = list(paged(f"/repos/{repo}/commits?sha=gh-pages&path={path}", token))
+    for revision in reversed(revisions):
+        try:
+            snapshot, _ = request(f"/repos/{repo}/contents/{path}?ref={revision['sha']}",
+                                  token, "application/vnd.github.raw+json")
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:  # A deletion commit has no file.
+                continue
+            raise
+        if snapshot["repo"].lower() != repo.lower() or snapshot["schema"] != 1:
+            raise ValueError("Unexpected historical archive")
+        remember_clone_window(history, snapshot.get("traffic_windows", {}).get("clones"))
+    return history
 
 
 def verified_public_clients(token, fork_slugs):
@@ -154,6 +181,8 @@ def main():
         meta, _ = request(root, token)
         if meta["private"]:
             raise ValueError("Adoption publication is available only for public repositories")
+        if archive and "clone_window_history" not in archive:
+            archive["clone_window_history"] = recover_clone_windows(args.repo, token)
         stars = list(paged(root + "/stargazers", token, STAR_HEADER))
         forks = list(paged(root + "/forks", token))
         releases = list(paged(root + "/releases", token))
