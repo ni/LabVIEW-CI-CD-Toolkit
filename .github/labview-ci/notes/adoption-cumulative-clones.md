@@ -1,1 +1,0 @@
-The adoption dashboard now shows distinct GitHub cloners for the selected dates, with bounds when repeat cloners cannot be deduplicated. Historical GitHub windows are recovered from Pages history and retained alongside daily traffic. The repository clones card continues to show total clone operations.
