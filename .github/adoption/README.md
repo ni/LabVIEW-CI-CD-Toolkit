@@ -34,10 +34,15 @@ this add-on's scope.
 
 ## What the numbers mean
 
-- The dashboard opens on the latest archived GitHub clone window when available.
-  The headline shows GitHub's deduplicated total for the displayed dates, and
-  the chart shows GitHub's unique cloners on each UTC day. Wider chart groups
-  use the highest observed daily count for the period.
+- Tracked traffic opens on the first through last archived clone dates. The
+  headline reports distinct GitHub cloners for the selected UTC dates. A day
+  or matching saved GitHub window has an exact reported count. For wider
+  ranges the lower bound is the largest contained window or daily count. An
+  upper bound adds the daily uniques outside a contained window to its count,
+  taking the smallest such bound or the daily sum. With missing days only the
+  lower bound is displayed. GitHub exposes aggregate counts, so repeat cloners
+  across windows and automation prevent a count of distinct people using the tool.
+  The repository clones card sums full clone operations on observed days.
 - Repository traffic comes from the
   [GitHub traffic API](https://docs.github.com/en/rest/metrics/traffic).
   The seed preserves what was still available on November 16, 2026:
@@ -63,7 +68,12 @@ this add-on's scope.
 The public snapshot is `gh-pages:adoption/data.json`. When launching the
 canonical dashboard the workflow uses `seed.json` if no published snapshot
 exists. If history is lost, recover the latest valid `adoption/data.json` from
-the Pages branch's Git history and restore it before the next refresh. A failed
+the Pages branch's Git history and restore it before the next refresh. On upgrade the collector reads previous revisions of the published snapshot to
+recover exact clone windows and persists them in `clone_window_history`, keyed
+by inclusive UTC start/end dates. New snapshots refresh repeated windows and
+retain older windows and daily records. The canonical schedule runs at 08:23 and
+20:23 UTC so there are two collection opportunities each day. GitHub scheduling,
+API access and source reporting lag can still delay an observation. A failed
 traffic or client scan leaves previous observations intact. The canonical workflow
 fails after publication when either traffic endpoint cannot be refreshed, so the
 outage is visible in Actions. The base GitHub API
@@ -74,4 +84,5 @@ Run local contract checks with:
 ```sh
 python3 -m unittest discover -s .github/adoption -p 'test_*.py'
 node --check .github/adoption/site/dashboard.js
+node .github/adoption/test_dashboard.cjs
 ```

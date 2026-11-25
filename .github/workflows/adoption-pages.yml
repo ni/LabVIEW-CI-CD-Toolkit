@@ -12,7 +12,7 @@ on:
       - '.github/adoption/**'
       - '.github/workflows/adoption-pages.yml'
   schedule:
-    - cron: '23 8 * * *'
+    - cron: '23 8,20 * * *'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -41,6 +41,7 @@ jobs:
           persist-credentials: false
       - run: python3 -m unittest discover -s .github/adoption -p 'test_*.py'
       - run: node --check .github/adoption/site/dashboard.js
+      - run: node .github/adoption/test_dashboard.cjs
 
   publish:
     if: >-
@@ -84,6 +85,14 @@ jobs:
             --header 'Accept: application/vnd.github.raw+json' >"$archive" 2>"$RUNNER_TEMP/adoption-api.err"; then
             echo "path=$archive" >> "$GITHUB_OUTPUT"
           elif grep -Eq 'HTTP 404\b' "$RUNNER_TEMP/adoption-api.err"; then
+            # A missing live file after collection began requires recovery.
+            # Silently reseeding here would drop observations older than 14 days.
+            prior=$(gh api --method GET "repos/$GITHUB_REPOSITORY/commits" \
+              -f sha=gh-pages -f path=adoption/data.json -f per_page=1 --jq 'length')
+            if [[ "$prior" != 0 ]]; then
+              echo "::error::Published adoption archive is missing. Restore adoption/data.json from Pages history."
+              exit 1
+            fi
             if [[ "${GITHUB_REPOSITORY,,}" == 'ni/labview-ci-cd-toolkit' ]]; then
               echo "path=$PWD/.github/adoption/seed.json" >> "$GITHUB_OUTPUT"
             fi

@@ -198,6 +198,7 @@ function renderSources() {
     return days.length ? fmt(days.length) + ' observed days · ' + dates(days[0], days.at(-1)) : 'No days archived';
   };
   const clients = Object.keys(data.clients).sort();
+  const checked = data.traffic_checked?.clones;
   const sources = [
     ['Views & clones', 'Archived from GitHub', trafficCoverage('views') + ' for views. ' + trafficCoverage('clones') + ' for clones. GitHub provides rolling traffic only. Blank days are unknown; a zero appears only if GitHub supplied it. Daily unique counts cannot be summed to get unique people.'],
     ['Public client discovery', clients.length ? 'Observed' : 'Unavailable', clients.length ? `${fmt(clients.length)} observations from ${dates(clients[0], clients.at(-1))}. The legacy public registry was recovered from Pages history. Later topic searches validate each client against its public toolkit catalog. Private installs and clients without a public discovery signal are uncounted.` : 'This client discovery series applies to the canonical toolkit repository.'],
@@ -222,6 +223,7 @@ function renderSources() {
   ].map(([key,value]) => {const row=node('div');row.append(node('dt',key),node('dd',value));return row;}));
   const ctx = $('traffic-note');
   ctx.replaceChildren(node('strong','Latest GitHub traffic windows'));
+  if (checked) ctx.append(node('p', 'Last successful clone traffic check: ' + checked.replace('T', ' ').replace('Z', ' UTC')));
   for (const k of ['views','clones']) {
     const w = data.traffic_windows[k];
     ctx.append(node('p',w ? `${METRICS[k].name}: ${fmt(w.count)} total / ${fmt(w.uniques)} unique, ${dates(w.from,w.to)}.`
@@ -243,22 +245,57 @@ function cloneWindow() {
     Number.isSafeInteger(w.uniques) && w.uniques >= 0 ? w : null;
 }
 function defaultRange() {
-  return cloneWindow() ? 'traffic' : 'all';
+  return Object.keys(rows('clones')).length ? 'archive' : 'all';
 }
 function defaultMetric() {
-  if (Object.keys(rows('unique_cloners')).length) return 'unique_cloners';
+  if (Object.keys(rows('clones')).length) return 'unique_cloners';
   return Object.keys(data.clients).length ? 'clients' : 'stars';
 }
 function renderCloneWindow() {
   const w = cloneWindow();
+  $('presets').querySelector('[data-range="archive"]').hidden = !Object.keys(rows('clones')).length;
   $('presets').querySelector('[data-range="traffic"]').hidden = !w;
-  $('clone-summary').hidden = !w;
-  if (w) {
-    $('clone-total').textContent = fmt(w.uniques);
-    $('clone-window').textContent = dates(w.from, w.to) + ' · UTC';
-  }
+  const days = Object.keys(rows('clones')).filter(day => day >= from && day <= through).sort();
+  const spans = {...data.clone_window_history};
+  if (w) spans[w.from + '/' + w.to] = w.uniques;
+  const result = selectedCloners(days, spans);
+  $('clone-summary').hidden = false;
+  $('clone-total').textContent = result;
+  $('clone-window').textContent = dates(from, through) + ' · UTC';
+  $('clone-coverage').textContent = fmt(days.length) + ' of ' + fmt(length(from, through)) +
+    ' days archived · A range gives lower and upper bounds. Missing days allow only a lower bound. Counts include automation.';
 }
+
+function selectedCloners(days, spans) {
+  const exact = spans[from + '/' + through];
+  if (exact !== undefined) return fmt(exact);
+  if (!days.length) return 'Unknown';
+  const daily = rows('clones');
+  let lower = 0;
+  const prefix = {};
+  let sum = 0;
+  for (const day of days) {
+    const uniques = daily[day][1];
+    lower = Math.max(lower, uniques);
+    prefix[day] = sum;
+    sum += uniques;
+  }
+  let upper = sum;
+  for (const [span, uniques] of Object.entries(spans)) {
+    const [a, b] = span.split('/');
+    if (a < from || b > through) continue;
+    lower = Math.max(lower, uniques);
+    // A cloner outside this window can add at most one to the total per daily unique.
+    if (a in prefix && b in prefix) {
+      upper = Math.min(upper, uniques + prefix[a] + sum - prefix[b] - daily[b][1]);
+    }
+  }
+  if (days.length < length(from, through)) return 'At least ' + fmt(lower);
+  return lower === upper ? fmt(lower) : fmt(lower) + '–' + fmt(upper);
+}
+
 function render() {
+  renderCloneWindow();
   $('window-label').textContent = dates(from,through) + ' · UTC';
   $('metric').value = metric;
   $('bucket').value = bucketSetting;
@@ -268,6 +305,16 @@ function render() {
   updateUrl();
 }
 function preset(k) {
+  if (k === 'archive') {
+    const days = Object.keys(rows('clones')).sort();
+    if (days.length) {
+      selected = k;
+      from = days[0];
+      through = days.at(-1);
+      return;
+    }
+    k = 'all';
+  }
   if (k === 'traffic') {
     const w = cloneWindow();
     if (w) {
@@ -306,7 +353,7 @@ async function init() {
   $('updated').textContent = date(max) + ' · ' + data.updated.slice(11,16) + ' UTC';
   const p = new URLSearchParams(location.search);
   const desired = p.get('range');
-  preset(['traffic','14','30','90','365','all'].includes(desired) ? desired : defaultRange());
+  preset(['archive','traffic','14','30','90','365','all'].includes(desired) ? desired : defaultRange());
   if (desired === 'custom' && valid(p.get('from')) && valid(p.get('through')) &&
       p.get('from') >= min && p.get('through') <= max && p.get('from') <= p.get('through')) {
     selected = 'custom'; from = p.get('from'); through = p.get('through');
@@ -332,7 +379,6 @@ async function init() {
   });
   $('export').addEventListener('click',csv);
   renderSources();
-  renderCloneWindow();
   render();
   $('dashboard').hidden = false;
 }
