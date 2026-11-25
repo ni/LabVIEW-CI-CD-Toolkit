@@ -1,8 +1,44 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "518365e49ea7ebecfc6b53ff7524730655e5ccd4",
+  "sha": "b3ed76583315f27334f52c2a5620f16f1f8c301f",
   "revisions": [
+    {
+      "sha": "b3ed76583315f27334f52c2a5620f16f1f8c301f",
+      "short": "b3ed765",
+      "message": "Merge pull request #149 from ni/fix/sast-vulnerability-fixes",
+      "author": "Milena",
+      "date": "2026-11-25T03:22:57Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "fa93ef691f399193ecf47c6d5b8eec93d7f44c83",
+      "short": "fa93ef6",
+      "message": "Remove one-time manual Pages XSS test harness",
+      "author": "MIpetrov-NI",
+      "date": "2026-11-24T00:51:16Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "0bb3cbc24594a8e69347e4d66a3efa6b2b681245",
+      "short": "0bb3cbc",
+      "message": "Merge current main to unblock security PR contract checks",
+      "author": "MIpetrov-NI",
+      "date": "2026-11-23T22:09:18Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "7b48cf4a761ac5ea9234d79b359c39500d2b87c8",
+      "short": "7b48cf4",
+      "message": "Fix Windows contract checks with explicit UTF-8 reads",
+      "author": "MIpetrov-NI",
+      "date": "2026-11-23T21:32:55Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "518365e49ea7ebecfc6b53ff7524730655e5ccd4",
       "short": "518365e",
@@ -562,6 +598,24 @@
       "dep_only": false
     },
     {
+      "sha": "7d0ffd29483942a6cdeaff9e5aba2e499ad8683c",
+      "short": "7d0ffd2",
+      "message": "Merge origin/main into fix/sast-vulnerability-fixes",
+      "author": "MIpetrov-NI",
+      "date": "2026-11-06T19:23:07Z",
+      "project": true,
+      "dep_only": true
+    },
+    {
+      "sha": "0edf69c185c1366e82591a4b0a25c0faa8985a47",
+      "short": "0edf69c",
+      "message": "Fix reflected XSS in Pages header and installation guidance",
+      "author": "MIpetrov-NI",
+      "date": "2026-11-06T19:16:04Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
       "sha": "25a3917e08cd9ef425a4750ee828fb8afdb46673",
       "short": "25a3917",
       "message": "snapshots: use UTF-8 for Windows contract test text",
@@ -846,60 +900,6 @@
       "message": "Merge pull request #123 from ni/lvci-release/release-4.20.1-05ad3964e0dedcc9689fdeb9101a7620d2bca0f1",
       "author": "Elijah Kerry",
       "date": "2026-11-03T19:12:03Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "05ad3964e0dedcc9689fdeb9101a7620d2bca0f1",
-      "short": "05ad396",
-      "message": "Prepare release 4.20.1",
-      "author": "github-actions[bot]",
-      "date": "2026-11-03T19:08:49Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "74792fbf4752ecfc76cfb09ae981a0003269bc1a",
-      "short": "74792fb",
-      "message": "Merge pull request #122 from ni/fix/dependencies-linux-progress-20261103",
-      "author": "Elijah Kerry",
-      "date": "2026-11-03T19:08:22Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "8022db20463a3c3277d81e30d6be060511146bdc",
-      "short": "8022db2",
-      "message": "Merge remote-tracking branch 'origin/main' into fix/dependencies-linux-progress-20261103",
-      "author": "elijah286",
-      "date": "2026-11-03T18:13:19Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "1c9a25ca6dfc96d18a485a09ce887eeac320fe72",
-      "short": "1c9a25c",
-      "message": "dashboard: clarify Linux actions and track dispatched runs",
-      "author": "elijah286",
-      "date": "2026-11-03T18:13:19Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "d321bd24bf123880590f6ebdd4e66ab0c5baf53f",
-      "short": "d321bd2",
-      "message": "Merge pull request #120 from ni/fix/windows-vipm-bake-20261103",
-      "author": "Elijah Kerry",
-      "date": "2026-11-03T17:52:41Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "59aa26b4918f5ea7d2eed1fcdb3372744f44f0bf",
-      "short": "59aa26b",
-      "message": "vipm: verify recovered Windows dependency installs",
-      "author": "elijah286",
-      "date": "2026-11-03T17:48:12Z",
       "project": false,
       "dep_only": false
     },
@@ -2327,7 +2327,7 @@
       },
       "freshness": {
         "reason": "Local requirements and build inputs match. Registry, provenance, and runtime activities have not been verified by this freshness check.",
-        "revision": "518365e49ea7ebecfc6b53ff7524730655e5ccd4",
+        "revision": "b3ed76583315f27334f52c2a5620f16f1f8c301f",
         "selection": "linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5@sha256:af3e79eb2db59ef535a7a136b070b50ba0efe4bb5a9ecd86f9e4626425c06999",
         "status": "current"
       },
