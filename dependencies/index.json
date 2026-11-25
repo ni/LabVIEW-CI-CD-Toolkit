@@ -1,8 +1,26 @@
 {
   "schema": 1,
   "repo": "ni/LabVIEW-CI-CD-Toolkit",
-  "sha": "b3ed76583315f27334f52c2a5620f16f1f8c301f",
+  "sha": "5a18522565550804b2ba77132a5082d18612be4c",
   "revisions": [
+    {
+      "sha": "5a18522565550804b2ba77132a5082d18612be4c",
+      "short": "5a18522",
+      "message": "Merge pull request #184 from ni/codex/fix-adoption-cumulative-traffic",
+      "author": "Elijah Kerry",
+      "date": "2026-11-25T17:31:07Z",
+      "project": false,
+      "dep_only": false
+    },
+    {
+      "sha": "15d8992efc60bc9cb6cee19fd7aa6c482adc90fb",
+      "short": "15d8992",
+      "message": "Show distinct GitHub cloners across archived traffic windows",
+      "author": "elijah286",
+      "date": "2026-11-25T17:27:13Z",
+      "project": false,
+      "dep_only": false
+    },
     {
       "sha": "b3ed76583315f27334f52c2a5620f16f1f8c301f",
       "short": "b3ed765",
@@ -882,24 +900,6 @@
       "message": "vipm: resolve OpenG packaging releases and required roots",
       "author": "elijah286",
       "date": "2026-11-03T21:09:50Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b9cd8e1aede791fd120aaa23919533d1b1a77e58",
-      "short": "b9cd8e1",
-      "message": "dashboard: show Linux workflow visual progress",
-      "author": "elijah286",
-      "date": "2026-11-03T21:07:52Z",
-      "project": false,
-      "dep_only": false
-    },
-    {
-      "sha": "b22697703b944c9145feccc42e974af986049112",
-      "short": "b226977",
-      "message": "Merge pull request #123 from ni/lvci-release/release-4.20.1-05ad3964e0dedcc9689fdeb9101a7620d2bca0f1",
-      "author": "Elijah Kerry",
-      "date": "2026-11-03T19:12:03Z",
       "project": false,
       "dep_only": false
     },
@@ -2327,7 +2327,7 @@
       },
       "freshness": {
         "reason": "Local requirements and build inputs match. Registry, provenance, and runtime activities have not been verified by this freshness check.",
-        "revision": "b3ed76583315f27334f52c2a5620f16f1f8c301f",
+        "revision": "5a18522565550804b2ba77132a5082d18612be4c",
         "selection": "linux-lvpm-cbca23d44f9a882dcf622637bed365b7d0b88e9fe53e4d11ecbf39c360b6fdb5@sha256:af3e79eb2db59ef535a7a136b070b50ba0efe4bb5a9ecd86f9e4626425c06999",
         "status": "current"
       },

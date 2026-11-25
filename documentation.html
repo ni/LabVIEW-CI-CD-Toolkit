@@ -2855,9 +2855,11 @@ LabVIEWCLI -OperationName PrintToSingleFileHtml `
       <h3 id="adoption-metrics">Repository adoption dashboard</h3>
       <p>The source site publishes a separate <a href="https://ni.github.io/LabVIEW-CI-CD-Toolkit/adoption/">adoption dashboard</a>
         for GitHub engagement, traffic, and observed public client counts. The daily workflow saves traffic before GitHub's
-        rolling window expires; unavailable days are left blank. The headline uses GitHub's deduplicated unique cloners
-        for the latest archived window. The chart shows daily unique cloners and uses the highest observed day for
-        wider groups. Historical client counts reflect public discovery and
+        rolling window expires and retains observed UTC days indefinitely; unavailable days are left blank. The headline
+        covers the selected UTC dates, initially the full tracked period. It shows GitHub’s distinct cloner count
+        for an archived day or matching window. Other selections show bounds, with only a lower bound when days are
+        missing. Cloner identities and human usage are unavailable. The repository clones card sums daily clone
+        operations. The collector recovers previously published windows from Pages history and retains new ones. Historical client counts reflect public discovery and
         may include examples or scratch repositories. Clones include automated use and do not measure installs.</p>
       <p>A public GitHub client can optionally add its own adoption dashboard during setup using the
         <a href="https://github.com/ni/LabVIEW-CI-CD-Toolkit/tree/main/.github/adoption">opt-in workflow instructions</a>.
